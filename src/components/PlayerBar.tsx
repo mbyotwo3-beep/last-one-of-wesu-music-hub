@@ -15,6 +15,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
