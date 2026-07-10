@@ -447,13 +447,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         <div className="max-w-7xl mx-auto h-20 px-6 flex items-center justify-between gap-4">
           {/* Track info */}
           <div className="flex items-center gap-4 w-1/3 min-w-0">
-            <div className="size-12 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 flex items-center justify-center">
-              {track.coverUrl ? (
-                <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
-              ) : (
-                <Music2 className="size-4 text-muted-foreground" />
-              )}
-            </div>
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="size-12 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 object-cover"
+            />
             <div className="overflow-hidden min-w-0">
               <p className="text-sm font-medium truncate">{track.title}</p>
               <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
