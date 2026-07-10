@@ -24,6 +24,8 @@ import { respondToLabelInvite } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileArtistStudio } from "@/components/mobile/screens/MobileArtistStudio";
+import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
+
 
 export const Route = createFileRoute("/artist-studio")({
   head: () => ({ meta: [{ title: "Artist Studio — Wesu+" }] }),
@@ -352,7 +354,7 @@ function FeaturesTab() {
 
 // ---------- Unified Upload Wizard (single OR album) ----------
 
-import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
+
 
 type UploadMode = "single" | "album";
 
