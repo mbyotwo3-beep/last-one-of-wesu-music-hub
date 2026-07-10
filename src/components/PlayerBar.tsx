@@ -250,6 +250,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     getAudio().volume = volume;
   }, [volume]);
 
+  if (audioOnly) return null;
   if (!track) return null;
 
   const dur = track.durationSeconds ?? 0;
