@@ -74,6 +74,35 @@ export type Database = {
           },
         ]
       }
+      artist_followers: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_followers_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artists: {
         Row: {
           accepts_collabs: boolean
