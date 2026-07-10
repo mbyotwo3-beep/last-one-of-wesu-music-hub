@@ -132,8 +132,8 @@ function ArtistProfileEditPage() {
           name: formData.name,
           bio: formData.bio,
           genre: formData.genre,
-          avatar_url: avatarUrl,
-          cover_url: coverUrl,
+          avatar_url: avatarUrl ?? undefined,
+          cover_url: coverUrl ?? undefined,
           social_links: formData.social_links,
         };
         
