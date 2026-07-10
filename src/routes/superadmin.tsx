@@ -688,10 +688,21 @@ function SettingsTab() {
   });
   const [site, setSite] = useState<any>(null);
   const [pay, setPay] = useState<any>(null);
+  const [pricing, setPricing] = useState<any>(null);
   if (data && site === null) {
     setSite(data.site ?? {});
     setPay(data.payments ?? {});
+    setPricing(
+      data.pricing ?? {
+        song_min: 10,
+        song_max: 100,
+        album_min: 150,
+        album_max: 250,
+        free_song_fee: 100,
+      },
+    );
   }
+
 
   if (!data || site === null) return <div className="text-muted-foreground">Loading…</div>;
   return (
