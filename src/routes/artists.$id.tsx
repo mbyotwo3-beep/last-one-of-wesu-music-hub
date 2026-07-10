@@ -1,11 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
-import { CheckCircle2 } from "lucide-react";
+import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
+import { CheckCircle2, Play, UserPlus, UserCheck } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
+import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { resolveImageUrl } from "@/lib/storage-url";
+import { toast } from "sonner";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -37,6 +40,8 @@ function ArtistPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(artistQO(id));
   const setTrack = usePlayer((s) => s.setTrack);
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const a = data.artist!;
 
   const [coverBg, setCoverBg] = useState<string | null>(null);
@@ -45,12 +50,56 @@ function ArtistPage() {
     resolveImageUrl("artist-images", a.cover_url).then(setCoverBg).catch(() => {});
   }, [a.cover_url]);
 
+  const followQK = ["follow", id, user?.id ?? null];
+  const followQuery = useQuery({
+    queryKey: followQK,
+    queryFn: () => getFollowState({ data: { artist_id: id, user_id: user?.id ?? null } }),
+  });
+  const similarQuery = useQuery({
+    queryKey: ["similar-artists", id],
+    queryFn: () => getSimilarArtists({ data: { artist_id: id } }),
+    enabled: !!followQuery.data?.following,
+  });
+
+  const follow = useMutation({
+    mutationFn: () => toggleFollow({ data: { artist_id: id } }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: followQK });
+      qc.invalidateQueries({ queryKey: ["similar-artists", id] });
+      toast.success(res.following ? `Following ${a.name}` : `Unfollowed ${a.name}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleFollow = () => {
+    if (!user) {
+      toast.error("Sign in to follow artists");
+      return;
+    }
+    follow.mutate();
+  };
+
+  const playAll = () => {
+    const first = data.topSongs[0];
+    if (!first) return;
+    setTrack({
+      id: first.id,
+      title: first.title,
+      artistName: a.name,
+      coverUrl: first.cover_url,
+      durationSeconds: first.duration,
+    });
+  };
+
+  const following = !!followQuery.data?.following;
+  const followerCount = followQuery.data?.count ?? 0;
+
   return (
     <div className="min-h-screen pb-24">
       {/* Spotify-style hero */}
       <div className="relative">
         <div
-          className="h-64 md:h-80 w-full bg-gradient-to-b from-primary/40 via-primary/20 to-background relative overflow-hidden"
+          className="h-64 md:h-96 w-full bg-gradient-to-b from-primary/40 via-primary/20 to-background relative overflow-hidden"
           style={
             coverBg
               ? {
@@ -65,7 +114,7 @@ function ArtistPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           )}
         </div>
-        <div className="max-w-7xl mx-auto px-6 -mt-24 md:-mt-32 relative">
+        <div className="max-w-7xl mx-auto px-6 -mt-32 md:-mt-40 relative">
           <div className="flex flex-col md:flex-row gap-6 items-start md:items-end">
             <StorageImage
               bucket="artist-images"
@@ -79,12 +128,38 @@ function ArtistPage() {
                   <CheckCircle2 className="size-4" /> Verified Artist
                 </div>
               )}
-              <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{a.name}</h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <h1 className="text-4xl md:text-7xl font-black tracking-tight">{a.name}</h1>
+              <p className="text-sm text-muted-foreground mt-3">
                 {(a.monthly_listeners ?? 0).toLocaleString()} monthly listeners
                 {a.genre ? ` · ${a.genre}` : ""}
+                {" · "}
+                {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
               </p>
             </div>
+          </div>
+
+          {/* Action bar */}
+          <div className="flex items-center gap-4 mt-6">
+            <button
+              onClick={playAll}
+              disabled={data.topSongs.length === 0}
+              className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40 disabled:hover:scale-100"
+              aria-label="Play"
+            >
+              <Play className="size-6 fill-current ml-0.5" />
+            </button>
+            <button
+              onClick={handleFollow}
+              disabled={follow.isPending}
+              className={`px-6 py-2 rounded-full border font-semibold text-sm transition-colors flex items-center gap-2 ${
+                following
+                  ? "border-primary text-primary bg-primary/10"
+                  : "border-white/30 hover:border-white text-white"
+              }`}
+            >
+              {following ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
+              {following ? "Following" : "Follow"}
+            </button>
           </div>
         </div>
       </div>
@@ -94,9 +169,8 @@ function ArtistPage() {
           <p className="text-sm text-muted-foreground max-w-2xl mb-10 leading-relaxed">{a.bio}</p>
         )}
 
-
         <section className="mb-12">
-          <h2 className="text-2xl font-bold mb-4">Top Songs</h2>
+          <h2 className="text-2xl font-bold mb-4">Popular</h2>
           {data.topSongs.length === 0 ? (
             <p className="text-muted-foreground text-sm">No songs yet.</p>
           ) : (
@@ -113,9 +187,10 @@ function ArtistPage() {
                       durationSeconds: s.duration,
                     })
                   }
-                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left group"
                 >
-                  <span className="w-6 text-sm text-muted-foreground">{i + 1}</span>
+                  <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                  <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
                   <StorageImage
                     bucket="album-art"
                     path={s.cover_url}
@@ -124,7 +199,7 @@ function ArtistPage() {
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-sm">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">{s.play_count ?? 0} plays</p>
+                    <p className="text-xs text-muted-foreground">{(s.play_count ?? 0).toLocaleString()} plays</p>
                   </div>
                   <span className="text-primary text-sm font-bold">
                     K{Number(s.price ?? 0).toFixed(2)}
@@ -135,14 +210,19 @@ function ArtistPage() {
           )}
         </section>
 
-        <section>
-          <h2 className="text-2xl font-bold mb-4">Albums</h2>
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-4">Discography</h2>
           {data.albums.length === 0 ? (
             <p className="text-muted-foreground text-sm">No albums yet.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
               {data.albums.map((al) => (
-                <Link key={al.id} to="/albums" className="group">
+                <Link
+                  key={al.id}
+                  to="/albums/$id"
+                  params={{ id: al.id }}
+                  className="group"
+                >
                   <StorageImage
                     bucket="album-art"
                     path={al.cover_url}
@@ -158,6 +238,34 @@ function ArtistPage() {
             </div>
           )}
         </section>
+
+        {following && (similarQuery.data?.length ?? 0) > 0 && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-1">Fans also like</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Similar artists based on what you follow.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+              {similarQuery.data!.map((sa) => (
+                <Link
+                  key={sa.id}
+                  to="/artists/$id"
+                  params={{ id: sa.id }}
+                  className="group text-center p-4 rounded-xl hover:bg-white/5 transition-colors"
+                >
+                  <StorageImage
+                    bucket="artist-images"
+                    path={sa.avatar_url}
+                    alt={sa.name}
+                    className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
+                  />
+                  <p className="font-semibold text-sm truncate">{sa.name}</p>
+                  <p className="text-xs text-muted-foreground">Artist</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
