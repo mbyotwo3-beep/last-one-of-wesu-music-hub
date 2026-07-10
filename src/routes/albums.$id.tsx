@@ -3,7 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
-import { Play, Disc } from "lucide-react";
+import { Play } from "lucide-react";
 
 const albumQO = (id: string) =>
   queryOptions({
