@@ -39,6 +39,12 @@ function ArtistPage() {
   const setTrack = usePlayer((s) => s.setTrack);
   const a = data.artist!;
 
+  const [coverBg, setCoverBg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!a.cover_url) return;
+    resolveImageUrl("artist-images", a.cover_url).then(setCoverBg).catch(() => {});
+  }, [a.cover_url]);
+
   return (
     <div className="min-h-screen pb-24">
       {/* Spotify-style hero */}
@@ -46,28 +52,27 @@ function ArtistPage() {
         <div
           className="h-64 md:h-80 w-full bg-gradient-to-b from-primary/40 via-primary/20 to-background relative overflow-hidden"
           style={
-            a.cover_url
+            coverBg
               ? {
-                  backgroundImage: `url(${a.cover_url})`,
+                  backgroundImage: `url(${coverBg})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }
               : undefined
           }
         >
-          {a.cover_url && (
+          {coverBg && (
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           )}
         </div>
         <div className="max-w-7xl mx-auto px-6 -mt-24 md:-mt-32 relative">
           <div className="flex flex-col md:flex-row gap-6 items-start md:items-end">
-            <div className="size-40 md:size-56 rounded-full overflow-hidden bg-card ring-4 ring-background shadow-2xl shrink-0 flex items-center justify-center">
-              {a.avatar_url ? (
-                <img src={a.avatar_url} alt={a.name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="size-20 text-muted-foreground" />
-              )}
-            </div>
+            <StorageImage
+              bucket="artist-images"
+              path={a.avatar_url}
+              alt={a.name}
+              className="size-40 md:size-56 rounded-full overflow-hidden bg-card ring-4 ring-background shadow-2xl shrink-0 object-cover"
+            />
             <div className="pb-2">
               {a.verified && (
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-primary mb-2">
@@ -111,6 +116,12 @@ function ArtistPage() {
                   className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
                 >
                   <span className="w-6 text-sm text-muted-foreground">{i + 1}</span>
+                  <StorageImage
+                    bucket="album-art"
+                    path={s.cover_url}
+                    alt={s.title}
+                    className="size-10 rounded-md overflow-hidden bg-card object-cover"
+                  />
                   <div className="flex-1">
                     <p className="font-semibold text-sm">{s.title}</p>
                     <p className="text-xs text-muted-foreground">{s.play_count ?? 0} plays</p>
@@ -132,15 +143,12 @@ function ArtistPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
               {data.albums.map((al) => (
                 <Link key={al.id} to="/albums" className="group">
-                  <div className="aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-2">
-                    {al.cover_url && (
-                      <img
-                        src={al.cover_url}
-                        alt={al.title}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
+                  <StorageImage
+                    bucket="album-art"
+                    path={al.cover_url}
+                    alt={al.title}
+                    className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-2 object-cover"
+                  />
                   <p className="font-semibold text-sm truncate">{al.title}</p>
                   <p className="text-xs text-muted-foreground">
                     K{Number(al.price ?? 0).toFixed(2)}
