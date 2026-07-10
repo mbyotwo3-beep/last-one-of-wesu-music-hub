@@ -167,7 +167,8 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
                   {results.albums.map((a) => (
                     <Link
                       key={a.id}
-                      to="/albums"
+                      to="/albums/$id"
+                      params={{ id: a.id }}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
                     >
