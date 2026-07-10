@@ -55,7 +55,6 @@ function AlbumPage() {
             bucket="album-art"
             path={album.cover_url}
             alt={album.title}
-            fallback={<Disc className="size-16 text-muted-foreground" />}
             className="size-48 md:size-60 rounded-xl overflow-hidden bg-card ring-1 ring-white/10 shadow-2xl object-cover"
           />
           <div>
