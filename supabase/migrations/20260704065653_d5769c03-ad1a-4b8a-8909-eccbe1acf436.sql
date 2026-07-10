@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.grant_artist_role_on_approval() FROM PUBLIC, anon, authenticated;
