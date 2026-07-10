@@ -45,7 +45,7 @@ function getAudio(): HTMLAudioElement {
   return _audio;
 }
 
-export function PlayerBar() {
+export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
   const liked = usePlayer((s) => s.liked);
