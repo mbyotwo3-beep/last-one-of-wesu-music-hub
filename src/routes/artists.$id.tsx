@@ -1,8 +1,11 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
-import { CheckCircle2, User } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { StorageImage } from "@/components/StorageImage";
+import { useEffect, useState } from "react";
+import { resolveImageUrl } from "@/lib/storage-url";
 
 const artistQO = (id: string) =>
   queryOptions({
