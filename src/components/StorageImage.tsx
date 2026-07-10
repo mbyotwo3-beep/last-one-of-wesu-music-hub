@@ -45,10 +45,11 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
 
   if (!url) {
     return (
-      <div className={`flex items-center justify-center bg-card ${className ?? ""}`}>
+      <div className={`flex items-center justify-center bg-card ${className ?? ""}`} onClick={onClick}>
         <Music2 className="size-4 text-muted-foreground" />
       </div>
     );
   }
-  return <img src={url} alt={alt} className={className} loading={loading} />;
+  return <img src={url} alt={alt} className={className} loading={loading} onClick={onClick} />;
 }
+
