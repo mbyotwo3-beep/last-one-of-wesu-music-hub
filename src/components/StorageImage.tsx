@@ -8,6 +8,7 @@ interface Props {
   alt: string;
   className?: string;
   loading?: "eager" | "lazy";
+  onClick?: () => void;
 }
 
 /**
@@ -15,7 +16,8 @@ interface Props {
  * URL on mount. Falls back to a music-note placeholder while loading / on
  * error. Values that already look like absolute URLs are used as-is.
  */
-export function StorageImage({ bucket, path, alt, className, loading = "lazy" }: Props) {
+export function StorageImage({ bucket, path, alt, className, loading = "lazy", onClick }: Props) {
+
   const [url, setUrl] = useState<string | null>(() => peekImageUrl(bucket, path));
 
   useEffect(() => {
@@ -43,10 +45,11 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy" }:
 
   if (!url) {
     return (
-      <div className={`flex items-center justify-center bg-card ${className ?? ""}`}>
+      <div className={`flex items-center justify-center bg-card ${className ?? ""}`} onClick={onClick}>
         <Music2 className="size-4 text-muted-foreground" />
       </div>
     );
   }
-  return <img src={url} alt={alt} className={className} loading={loading} />;
+  return <img src={url} alt={alt} className={className} loading={loading} onClick={onClick} />;
 }
+

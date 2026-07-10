@@ -116,8 +116,13 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       .single();
     if (!song) throw new Error("Song not found");
 
-    // Free if priced 0 OR user is subscribed OR user purchased it
-    if ((song as any).price && Number((song as any).price) > 0) {
+    // Superadmin bypass — full playback everywhere for testing
+    const { data: isSuper } = await context.supabase.rpc("is_superadmin" as any, {
+      _user_id: context.userId,
+    });
+
+    // Free if priced 0 OR user is subscribed OR user purchased it OR superadmin
+    if (!isSuper && (song as any).price && Number((song as any).price) > 0) {
       const [{ data: sub }, { data: purchase }] = await Promise.all([
         context.supabase
           .from("subscriptions")
@@ -134,6 +139,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       ]);
       if (!sub && !purchase) throw new Error("Subscribe or purchase to play full track");
     }
+
 
     // Try to use service role for signed URLs (more secure)
     try {

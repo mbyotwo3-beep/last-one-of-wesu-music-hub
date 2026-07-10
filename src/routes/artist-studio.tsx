@@ -41,13 +41,12 @@ function ArtistStudioRoute() {
   return platform === "native" ? <MobileArtistStudio /> : <Page />;
 }
 
-type Tab = "upload" | "album" | "collabs" | "label" | "features" | "payouts";
+type Tab = "upload" | "collabs" | "label" | "features" | "payouts";
 
 function Page() {
   const [tab, setTab] = useState<Tab>("upload");
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: "upload", label: "Upload Song", icon: Upload },
-    { id: "album", label: "Albums", icon: FolderPlus },
+    { id: "upload", label: "Upload Music", icon: Upload },
     { id: "collabs", label: "Collaborators", icon: Users },
     { id: "label", label: "Label", icon: Building2 },
     { id: "features", label: "Features", icon: Star },
@@ -71,8 +70,7 @@ function Page() {
           </button>
         ))}
       </div>
-      {tab === "upload" && <UploadTab />}
-      {tab === "album" && <AlbumTab />}
+      {tab === "upload" && <UploadWizard />}
       {tab === "collabs" && <CollabsTab />}
       {tab === "label" && <LabelTab />}
       {tab === "features" && <FeaturesTab />}
@@ -80,6 +78,7 @@ function Page() {
     </div>
   );
 }
+
 
 function CollabsTab() {
   const songsFn = useServerFn(listMySongs);
@@ -350,227 +349,409 @@ function FeaturesTab() {
   );
 }
 
-function UploadTab() {
+
+// ---------- Unified Upload Wizard (single OR album) ----------
+
+const SINGLE_MIN = 10;
+const SINGLE_MAX = 100;
+const ALBUM_MIN = 150;
+const ALBUM_MAX = 250;
+const FREE_SONG_FEE = 100;
+
+type UploadMode = "single" | "album";
+
+function UploadWizard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const upload = useServerFn(uploadSong);
-  const albumsFn = useServerFn(listMyAlbums);
-  const { data: albums } = useQuery({
-    queryKey: ["my-albums"],
-    queryFn: () => albumsFn(),
-    retry: false,
-  });
-  const [form, setForm] = useState({ title: "", genre: "", price: 0, album_id: "" as string });
-  const [audio, setAudio] = useState<File | null>(null);
+  const uploadFn = useServerFn(uploadSong);
+  const createAlbumFn = useServerFn(createAlbum);
+
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [mode, setMode] = useState<UploadMode>("single");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [genre, setGenre] = useState("");
   const [cover, setCover] = useState<File | null>(null);
+  const [tracks, setTracks] = useState<File[]>([]);
+  const [tier, setTier] = useState<"free" | "paid">("paid");
+  const [price, setPrice] = useState<number>(mode === "album" ? ALBUM_MIN : SINGLE_MIN);
+  const [feeAgreed, setFeeAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
-  const m = useMutation({
-    mutationFn: upload,
-    onSuccess: () => {
-      setMsg("Submitted! Awaiting moderation.");
-      qc.invalidateQueries({ queryKey: ["my-songs"] });
-      toast.success("Song uploaded successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to upload song: ${error.message}`);
-    },
-  });
+  function switchMode(next: UploadMode) {
+    setMode(next);
+    setTier("paid");
+    setPrice(next === "album" ? ALBUM_MIN : SINGLE_MIN);
+    if (next === "single") setTracks((t) => t.slice(0, 1));
+  }
 
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!user || !audio) return;
-        setBusy(true);
-        setMsg(null);
-        try {
-          const audio_url = await uploadFileToBucket("song-audio", user.id, audio);
-          const cover_url = cover
-            ? await uploadFileToBucket("album-art", user.id, cover)
-            : undefined;
-          await m.mutateAsync({
-            data: { ...form, audio_url, cover_url, album_id: form.album_id || null },
-          });
-        } catch (err) {
-          setMsg((err as Error).message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-      className="bg-card border border-border rounded-2xl p-6 space-y-4"
-    >
-      <label className="block text-sm">
-        Title
-        <input
-          required
-          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
-      </label>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block text-sm">
-          Genre
-          <input
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={form.genre}
-            onChange={(e) => setForm({ ...form, genre: e.target.value })}
-          />
-        </label>
-        <label className="block text-sm">
-          Price (ZMW, 0 = free)
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-          />
-        </label>
-      </div>
-      <label className="block text-sm">
-        Album (optional)
-        <select
-          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.album_id}
-          onChange={(e) => setForm({ ...form, album_id: e.target.value })}
-        >
-          <option value="">— Single —</option>
-          {(albums ?? []).map((a: any) => (
-            <option key={a.id} value={a.id}>
-              {a.title}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-sm">
-        Audio file (mp3/m4a/wav)
-        <input
-          required
-          type="file"
-          accept="audio/*"
-          className="mt-1 block"
-          onChange={(e) => setAudio(e.target.files?.[0] ?? null)}
-        />
-      </label>
-      <label className="block text-sm">
-        Cover art (optional)
-        <input
-          type="file"
-          accept="image/*"
-          className="mt-1 block"
-          onChange={(e) => setCover(e.target.files?.[0] ?? null)}
-        />
-      </label>
-      {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-      <button
-        disabled={busy}
-        className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
-      >
-        {busy ? "Uploading…" : "Upload song"}
-      </button>
-    </form>
-  );
-}
+  function validatePricing(): string | null {
+    if (mode === "single") {
+      if (tier === "free") {
+        if (!feeAgreed) return `Please acknowledge the K${FREE_SONG_FEE} maintenance fee`;
+        return null;
+      }
+      if (!Number.isFinite(price) || price < SINGLE_MIN || price > SINGLE_MAX) {
+        return `Song price must be between K${SINGLE_MIN} and K${SINGLE_MAX}`;
+      }
+    } else {
+      if (!Number.isFinite(price) || price < ALBUM_MIN || price > ALBUM_MAX) {
+        return `Album price must be between K${ALBUM_MIN} and K${ALBUM_MAX}`;
+      }
+    }
+    return null;
+  }
 
-function AlbumTab() {
-  const qc = useQueryClient();
-  const create = useServerFn(createAlbum);
-  const list = useServerFn(listMyAlbums);
-  const { data: albums } = useQuery({
-    queryKey: ["my-albums"],
-    queryFn: () => list(),
-    retry: false,
-  });
-  const m = useMutation({
-    mutationFn: create,
-    onSuccess: () => {
+  async function submit() {
+    if (!user) return;
+    const perr = validatePricing();
+    if (perr) return setError(perr);
+    if (!title.trim()) return setError("Title is required");
+    if (tracks.length === 0) return setError("Please add at least one audio file");
+
+    setError(null);
+    setBusy(true);
+    try {
+      const cover_url = cover
+        ? await uploadFileToBucket("album-art", user.id, cover)
+        : undefined;
+
+      if (mode === "single") {
+        const audio_url = await uploadFileToBucket("song-audio", user.id, tracks[0]);
+        const res = await uploadFn({
+          data: {
+            title: title.trim(),
+            audio_url,
+            cover_url,
+            genre: genre || undefined,
+            price: tier === "free" ? 0 : price,
+            album_id: null,
+          },
+        });
+        setDone(
+          tier === "free"
+            ? `Song submitted. A K${FREE_SONG_FEE} maintenance fee will be billed on approval.`
+            : `Song "${title}" submitted for review.`,
+        );
+        qc.invalidateQueries({ queryKey: ["my-songs"] });
+        return res;
+      }
+
+      // Album flow
+      const album = await createAlbumFn({
+        data: {
+          title: title.trim(),
+          description: description || undefined,
+          genre: genre || undefined,
+          price,
+          cover_url,
+        },
+      });
+      for (const file of tracks) {
+        const audio_url = await uploadFileToBucket("song-audio", user.id, file);
+        await uploadFn({
+          data: {
+            title: file.name.replace(/\.[^.]+$/, ""),
+            audio_url,
+            cover_url,
+            price,
+            album_id: album.id,
+          },
+        });
+      }
+      setDone(`Album "${title}" with ${tracks.length} track${tracks.length === 1 ? "" : "s"} submitted for review.`);
       qc.invalidateQueries({ queryKey: ["my-albums"] });
-      toast.success("Album created successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to create album: ${error.message}`);
-    },
-  });
-  const { user } = useAuth();
-  const [form, setForm] = useState({ title: "", description: "", price: 0 });
-  const [cover, setCover] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
+      qc.invalidateQueries({ queryKey: ["my-songs"] });
+      toast.success("Album uploaded successfully");
+    } catch (err) {
+      const msg = (err as Error).message;
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
+        <p className="text-lg font-semibold">✓ {done}</p>
+        <button
+          onClick={() => {
+            setDone(null);
+            setStep(1);
+            setTitle("");
+            setDescription("");
+            setGenre("");
+            setCover(null);
+            setTracks([]);
+            setTier("paid");
+            setPrice(SINGLE_MIN);
+            setFeeAgreed(false);
+          }}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        >
+          Upload another
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!user) return;
-          setBusy(true);
-          try {
-            const cover_url = cover
-              ? await uploadFileToBucket("album-art", user.id, cover)
-              : undefined;
-            await m.mutateAsync({ data: { ...form, cover_url } });
-            setForm({ title: "", description: "", price: 0 });
-            setCover(null);
-          } finally {
-            setBusy(false);
-          }
-        }}
-        className="bg-card border border-border rounded-2xl p-6 space-y-3"
-      >
-        <h3 className="font-semibold">New album</h3>
-        <input
-          required
-          placeholder="Title"
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
-        <textarea
-          placeholder="Description"
-          rows={2}
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <input
-          type="number"
-          placeholder="Price ZMW"
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-        />
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setCover(e.target.files?.[0] ?? null)}
-        />
-        <button
-          disabled={busy}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
-        >
-          Create
-        </button>
-      </form>
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <h3 className="font-semibold mb-3">Your albums</h3>
-        {(albums ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No albums yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {(albums ?? []).map((a: any) => (
-              <li key={a.id} className="text-sm">
-                • {a.title}
-              </li>
-            ))}
-          </ul>
-        )}
+      {/* Stepper */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="flex items-center gap-2">
+            <span
+              className={`size-6 rounded-full inline-flex items-center justify-center text-xs font-semibold ${
+                step >= n ? "bg-primary text-primary-foreground" : "bg-muted"
+              }`}
+            >
+              {n}
+            </span>
+            <span className={step === n ? "text-foreground font-medium" : ""}>
+              {n === 1 ? "Type" : n === 2 ? "Files" : "Pricing"}
+            </span>
+            {n < 3 && <span className="mx-2">→</span>}
+          </div>
+        ))}
       </div>
+
+      {/* Step 1: pick type */}
+      {step === 1 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(["single", "album"] as UploadMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className={`text-left p-6 rounded-2xl border-2 transition-colors ${
+                mode === m ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50"
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                {m === "single" ? <Upload className="size-5" /> : <FolderPlus className="size-5" />}
+                <h3 className="font-semibold">{m === "single" ? "Single Song" : "Album"}</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {m === "single"
+                  ? `One track. Free (K${FREE_SONG_FEE} fee) or K${SINGLE_MIN}–K${SINGLE_MAX}.`
+                  : `Multi-track release. Priced K${ALBUM_MIN}–K${ALBUM_MAX}.`}
+              </p>
+            </button>
+          ))}
+          <div className="sm:col-span-2 flex justify-end">
+            <button
+              onClick={() => setStep(2)}
+              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: files + metadata */}
+      {step === 2 && (
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <input
+            required
+            placeholder={mode === "album" ? "Album title" : "Song title"}
+            className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              placeholder="Genre (optional)"
+              className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+              value={genre}
+              onChange={(e) => setGenre(e.target.value)}
+            />
+            {mode === "album" && (
+              <input
+                placeholder="Description (optional)"
+                className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            )}
+          </div>
+
+          <label className="block text-sm">
+            Cover art (optional)
+            <input
+              type="file"
+              accept="image/*"
+              className="mt-1 block text-xs"
+              onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+            />
+          </label>
+
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("audio/"));
+              if (mode === "single") setTracks(files.slice(0, 1));
+              else setTracks((prev) => [...prev, ...files]);
+            }}
+            className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30"
+          >
+            <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm font-medium">Drop audio files here</p>
+            <p className="text-xs text-muted-foreground mb-3">or</p>
+            <input
+              type="file"
+              accept="audio/*"
+              multiple={mode === "album"}
+              className="text-xs"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (mode === "single") setTracks(files.slice(0, 1));
+                else setTracks(files);
+              }}
+            />
+          </div>
+
+          {tracks.length > 0 && (
+            <ul className="text-xs space-y-1">
+              {tracks.map((f, i) => (
+                <li key={i} className="flex justify-between items-center bg-secondary/30 rounded px-2 py-1">
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    onClick={() => setTracks((t) => t.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive text-xs"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex justify-between">
+            <button
+              onClick={() => setStep(1)}
+              className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              disabled={!title.trim() || tracks.length === 0}
+              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: pricing */}
+      {step === 3 && (
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          {mode === "single" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setTier("free")}
+                  className={`p-4 rounded-xl border-2 text-left ${
+                    tier === "free" ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                >
+                  <p className="font-semibold text-sm">Free</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Listeners play free. You pay a K{FREE_SONG_FEE} maintenance fee on approval.
+                  </p>
+                </button>
+                <button
+                  onClick={() => setTier("paid")}
+                  className={`p-4 rounded-xl border-2 text-left ${
+                    tier === "paid" ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                >
+                  <p className="font-semibold text-sm">Paid</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    K{SINGLE_MIN}–K{SINGLE_MAX} per song. You earn on every purchase.
+                  </p>
+                </button>
+              </div>
+              {tier === "paid" && (
+                <label className="block text-sm">
+                  Price (ZMW)
+                  <input
+                    type="number"
+                    min={SINGLE_MIN}
+                    max={SINGLE_MAX}
+                    step="1"
+                    className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Must be K{SINGLE_MIN}–K{SINGLE_MAX}
+                  </span>
+                </label>
+              )}
+              {tier === "free" && (
+                <label className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={feeAgreed}
+                    onChange={(e) => setFeeAgreed(e.target.checked)}
+                  />
+                  <span>
+                    I agree to pay the <strong>K{FREE_SONG_FEE}</strong> maintenance fee when this
+                    free song is approved. You'll be billed via the Payouts tab.
+                  </span>
+                </label>
+              )}
+            </>
+          ) : (
+            <label className="block text-sm">
+              Album price (ZMW)
+              <input
+                type="number"
+                min={ALBUM_MIN}
+                max={ALBUM_MAX}
+                step="1"
+                className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+                value={price}
+                onChange={(e) => setPrice(Number(e.target.value))}
+              />
+              <span className="text-xs text-muted-foreground">
+                Must be K{ALBUM_MIN}–K{ALBUM_MAX}. Each track inherits this price.
+              </span>
+            </label>
+          )}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <div className="flex justify-between">
+            <button
+              onClick={() => setStep(2)}
+              className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={submit}
+              disabled={busy}
+              className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-40"
+            >
+              {busy ? "Uploading…" : mode === "album" ? "Submit album" : "Submit song"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 function PayoutTab() {
   const qc = useQueryClient();
