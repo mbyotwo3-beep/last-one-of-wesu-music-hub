@@ -1,6 +1,6 @@
-import { Music2 } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import type { PlayerTrack } from "@/stores/player";
+import { StorageImage } from "@/components/StorageImage";
 
 interface SongRowProps {
   song: {
