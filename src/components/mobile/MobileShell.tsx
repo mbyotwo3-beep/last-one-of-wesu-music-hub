@@ -32,6 +32,8 @@ export function MobileShell({ children }: MobileShellProps) {
       <div className="pt-[calc(env(safe-area-inset-top)+3.25rem)] pb-[calc(env(safe-area-inset-bottom)+4rem+4rem)]">
         {children}
       </div>
+      {/* Hidden audio engine — same load/play/preview logic as desktop */}
+      <PlayerBar audioOnly />
       {/* Mini player sits above bottom nav */}
       <MiniPlayer />
       {/* Full-screen Now Playing sheet — slides up on demand */}
