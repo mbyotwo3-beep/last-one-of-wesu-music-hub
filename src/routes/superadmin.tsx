@@ -761,9 +761,74 @@ function SettingsTab() {
           Save payments
         </button>
       </div>
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+        <h3 className="font-semibold">Upload pricing (ZMW)</h3>
+        <p className="text-xs text-muted-foreground">
+          Controls the price ranges enforced in the artist upload wizard.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            Song min
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={pricing.song_min ?? 0}
+              onChange={(e) => setPricing({ ...pricing, song_min: Number(e.target.value) })}
+            />
+          </label>
+          <label className="block text-sm">
+            Song max
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={pricing.song_max ?? 0}
+              onChange={(e) => setPricing({ ...pricing, song_max: Number(e.target.value) })}
+            />
+          </label>
+          <label className="block text-sm">
+            Album min
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={pricing.album_min ?? 0}
+              onChange={(e) => setPricing({ ...pricing, album_min: Number(e.target.value) })}
+            />
+          </label>
+          <label className="block text-sm">
+            Album max
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={pricing.album_max ?? 0}
+              onChange={(e) => setPricing({ ...pricing, album_max: Number(e.target.value) })}
+            />
+          </label>
+          <label className="block text-sm col-span-2">
+            Free-song maintenance fee
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={pricing.free_song_fee ?? 0}
+              onChange={(e) => setPricing({ ...pricing, free_song_fee: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+        <button
+          onClick={() => m.mutate({ data: { key: "pricing", value: pricing } })}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        >
+          Save pricing
+        </button>
+      </div>
     </div>
   );
 }
+
 
 function AuditTab() {
   const fn = useServerFn(listAudit);
