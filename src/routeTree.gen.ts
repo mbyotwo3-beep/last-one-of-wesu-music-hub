@@ -39,6 +39,7 @@ import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
 import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
+import { Route as AlbumsIdRouteImport } from './routes/albums.$id'
 import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
 import { Route as ApiPublicDpoWebhookRouteImport } from './routes/api/public/dpo-webhook'
 
@@ -192,6 +193,11 @@ const ArtistsIdRoute = ArtistsIdRouteImport.update({
   path: '/artists/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlbumsIdRoute = AlbumsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AlbumsRoute,
+} as any)
 const ApiPublicLencoWebhookRoute = ApiPublicLencoWebhookRouteImport.update({
   id: '/api/public/lenco-webhook',
   path: '/api/public/lenco-webhook',
@@ -206,7 +212,7 @@ const ApiPublicDpoWebhookRoute = ApiPublicDpoWebhookRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/albums': typeof AlbumsRoute
+  '/albums': typeof AlbumsRouteWithChildren
   '/apply-label': typeof ApplyLabelRoute
   '/artist-dashboard': typeof ArtistDashboardRoute
   '/artist-profile-edit': typeof ArtistProfileEditRoute
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
+  '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -240,7 +247,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/albums': typeof AlbumsRoute
+  '/albums': typeof AlbumsRouteWithChildren
   '/apply-label': typeof ApplyLabelRoute
   '/artist-dashboard': typeof ArtistDashboardRoute
   '/artist-profile-edit': typeof ArtistProfileEditRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
+  '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -275,7 +283,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/albums': typeof AlbumsRoute
+  '/albums': typeof AlbumsRouteWithChildren
   '/apply-label': typeof ApplyLabelRoute
   '/artist-dashboard': typeof ArtistDashboardRoute
   '/artist-profile-edit': typeof ArtistProfileEditRoute
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
+  '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/subscriptions'
     | '/superadmin'
+    | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/subscriptions'
     | '/superadmin'
+    | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/subscriptions'
     | '/superadmin'
+    | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
@@ -414,7 +426,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AlbumsRoute: typeof AlbumsRoute
+  AlbumsRoute: typeof AlbumsRouteWithChildren
   ApplyLabelRoute: typeof ApplyLabelRoute
   ArtistDashboardRoute: typeof ArtistDashboardRoute
   ArtistProfileEditRoute: typeof ArtistProfileEditRoute
@@ -657,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/albums/$id': {
+      id: '/albums/$id'
+      path: '/$id'
+      fullPath: '/albums/$id'
+      preLoaderRoute: typeof AlbumsIdRouteImport
+      parentRoute: typeof AlbumsRoute
+    }
     '/api/public/lenco-webhook': {
       id: '/api/public/lenco-webhook'
       path: '/api/public/lenco-webhook'
@@ -674,6 +693,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AlbumsRouteChildren {
+  AlbumsIdRoute: typeof AlbumsIdRoute
+}
+
+const AlbumsRouteChildren: AlbumsRouteChildren = {
+  AlbumsIdRoute: AlbumsIdRoute,
+}
+
+const AlbumsRouteWithChildren =
+  AlbumsRoute._addFileChildren(AlbumsRouteChildren)
+
 interface CheckoutRouteChildren {
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
 }
@@ -689,7 +719,7 @@ const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AlbumsRoute: AlbumsRoute,
+  AlbumsRoute: AlbumsRouteWithChildren,
   ApplyLabelRoute: ApplyLabelRoute,
   ArtistDashboardRoute: ArtistDashboardRoute,
   ArtistProfileEditRoute: ArtistProfileEditRoute,

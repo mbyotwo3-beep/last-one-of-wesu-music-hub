@@ -51,7 +51,8 @@ export function MobileHome() {
               {featured.map((album) => (
                 <Link
                   key={album.id}
-                  to="/albums"
+                  to="/albums/$id"
+                  params={{ id: album.id }}
                   className="shrink-0 w-36 rounded-xl overflow-hidden bg-card ring-1 ring-white/10"
                 >
                   <div className="aspect-square bg-secondary">

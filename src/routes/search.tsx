@@ -158,7 +158,7 @@ function SearchPage() {
             <ResultSection title="Albums" icon={<Disc3 className="size-4" />}>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {albums.map((a) => (
-                  <Link key={a.id} to="/albums" className="group">
+                  <Link key={a.id} to="/albums/$id" params={{ id: a.id }} className="group">
                     <img
                       src={a.cover_url ?? "/images/wesu-mark.png"}
                       alt=""
