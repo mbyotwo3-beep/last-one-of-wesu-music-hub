@@ -140,7 +140,7 @@ function ArtistProfileEditPage() {
         console.log("[Artist Profile] Updating profile with data:", profileData);
         const updateStart = Date.now();
         
-        const result = await updateProfile(profileData);
+        const result = await updateProfile({ data: profileData });
         
         console.log("[Artist Profile] Profile update completed:", {
           result,
