@@ -1,43 +1,48 @@
+# Fix bugs + upload/player upgrades
 
-This is a large scope. I'll ship it in three phases so you can review after each. Approving this plan starts Phase 1 only — I'll pause between phases so you can test.
+The root cause behind most of the visible bugs is one thing: `cover_url` and `audio_url` are stored as raw storage paths (e.g. `db1b76c3.../1783700288359-images.jpg`) but rendered directly as `<img src>` or fed to `<audio>`. Buckets are private, so the browser gets "Invalid URI" / broken images. Everything below flows from fixing that.
 
-## Phase 1 — Auth, roles, and artist workflow (ship first)
+## 1. Storage URL resolution (fixes cover art + broken mobile playback)
 
-Goal: any new user can sign up, apply as an artist, get approved by an admin, and immediately upload music. Password reset works. Email links go to the right domain.
+- Make image buckets publicly readable so `<img>` tags work everywhere without server round-trips:
+  - `album-art`, `artist-images`, `user-avatars` → set public (song-audio stays private and continues to use signed URLs).
+- Add `src/lib/storage-url.ts` with `resolveImageUrl(bucket, path)` and `resolveAudioUrl(path)` helpers that return the raw string when already an `http(s)` URL and a public/signed URL otherwise.
+- Normalize every `cover_url` / `avatar_url` display site (artist page, albums page, library, search, TrackRow, SongRow, MiniPlayer, NowPlaying, mobile Home/Browse/Library) through the helper.
+- Mobile playback path (`SongRow` → `setTrack`) currently drops audio at raw path. Change the mobile play flow to call `getPreviewAudioUrl`/`getSignedAudioUrl` before setting the track, matching the desktop path.
 
-- **Approval grants the `artist` role.** Add a DB trigger on `artists` so that when `status` flips to `approved`, a `user_roles` row `(user_id, 'artist')` is inserted. Today approval only sets a flag — the artist can't upload because they don't have the role. This is the single biggest blocker.
-- **Password reset flow.** Add `/forgot-password` and `/reset-password` public routes. Wire `supabase.auth.resetPasswordForEmail` with `redirectTo: https://www.wesuplusly.com/reset-password`, and the reset page calls `updateUser({ password })`.
-- **Email redirect domain.** All `emailRedirectTo` and `redirectTo` in code hardcoded to `https://www.wesuplusly.com/*`. I'll also give you the exact 2-click change to make in the backend Site URL setting (I can't change that from code).
-- **Artist dashboard status clarity.** Already partly done — verify Pending / Rejected / Approved states render correctly and the "Upload" area only appears after the role is granted.
-- **Fix "only 2 artists".** Not a bug — 3 of your 5 artists are still `pending`. I'll add an admin "Pending artist applications" list so you can approve them in one click.
-- **Remove the "claim superadmin" button** from the profile (you mentioned it errors and it's already claimed).
+## 2. Profile save
 
-## Phase 2 — Spotify-style search
+`updateProfile` looks correct, but the client sends the raw stored path back as `avatar_url`. Keep that (path is the source of truth), and just render via `resolveImageUrl("user-avatars", path)`. Verify one successful save round-trip on both desktop `/profile` and mobile profile screen and surface the DB error text via toast (already partly wired).
 
-- **Global search bar** in the top nav (desktop) and top of Browse (mobile).
-- **Instant results dropdown** — 300ms debounce, hits Songs / Artists / Albums grouped, keyboard nav, click a result → play song or navigate.
-- **Dedicated `/search` page** with tabs: All · Songs · Artists · Albums · Playlists. Search term in URL (`?q=`) so results are shareable.
-- Backend: one `globalSearch({ q })` server fn that returns `{ songs, artists, albums, playlists }` filtered by approved/published status only.
+## 3. Spotify-style desktop now-playing
 
-## Phase 3 — Admin CMS (scoped realistically)
+Redesign `PlayerBar.tsx`:
+- Left: cover + title + artist + like.
+- Center: shuffle / prev / play / next / repeat, with a full seekable progress bar (drag to scrub, shows `mm:ss / mm:ss`).
+- Right: queue button, volume slider, expand.
+- Uses the same `usePlayer` store; adds `volume` (0–1), `shuffle`, `repeat` to the store and wires them to the shared `<audio>` element.
 
-A true "drag any component onto any page" builder is a multi-week product on its own. I'll ship the 80% version that gives you real control without a fragile builder:
+## 4. Simple upload (single OR album)
 
-- **Homepage section manager** (`/admin/homepage`): drag to reorder shelves (Hero, Featured Albums, New Releases, Trending, Genre rows). Toggle visible/hidden. Rename titles. Stored in a new `homepage_sections` table.
-- **Featured content picker** (`/admin/featured`): search-and-pick which albums/artists/songs fill each Featured slot. Backed by the existing `featured_slots` table.
-- **Navigation editor** (`/admin/navigation`): edit the label, icon, URL, order, and visibility of top-nav and sidebar items. New `nav_items` table with `location` (`nav` | `sidebar` | `mobile_tabs`).
-- Frontend reads these tables via cached server fns; changes appear immediately after save.
+Replace the two separate forms in `artist-studio.tsx` with one wizard:
+- Step 1: pick "Single song" or "Album".
+- Step 2: drag-drop audio file(s) + cover.
+- Step 3: pricing.
+  - Single: choose Free (K100 upload fee via Lenco) or Paid K10–K100.
+  - Album: choose Paid K150–K250 (albums are always paid; free albums not supported).
+  - Client + server validators enforce ranges; free-song path routes through the existing Lenco `initiatePayment` and only inserts the row on webhook success.
+- Reuses existing `uploadFileToBucket` + `createSong`/`createAlbum` server fns; adds an `upload_fee` transaction type.
 
-**What I'm NOT building in Phase 3** (say the word if you want it and I'll scope separately):
-- Free-form drag-any-block-onto-any-page builder (Webflow/Framer-style). Realistically 2–3 more phases of work and adds a lot of surface area to maintain.
+## 5. Ignore noise
+
+The `__cf_bm` cookie warnings and `postMessage` origin errors are from the Lovable preview iframe / analytics — harmless, no code change.
 
 ## Technical notes
 
-- New tables: `homepage_sections`, `nav_items`. Both admin-write, public-read with narrow `TO anon` SELECT policies.
-- New DB trigger: `after_artist_approved` → inserts `user_roles(user_id, 'artist')` on status transition to `approved` (idempotent).
-- New server fns: `globalSearch`, `getHomepageSections`, `getNavItems`, `updateHomepageSection`, `updateNavItem`, `pickFeaturedSlot`.
-- Drag-and-drop: `@dnd-kit/core` + `@dnd-kit/sortable` (small, accessible, already React 19 compatible).
-- Password reset: two new public routes, no changes to `_authenticated`.
-- No changes to payments, DPO webhook, or existing RLS policies beyond what's listed.
+- Buckets flipped to public via `supabase--storage_update_bucket` (workspace must allow public buckets).
+- No schema changes needed for §1–3. §4 adds one row to `payment_transactions.item_type` values (`upload_fee`) — no migration required, it's a text column.
+- All fixes are additive; existing paid-song access checks stay intact.
 
-Reply "go" and I'll start Phase 1.
+## Out of scope this turn
+
+Drag-and-drop page builder, subscriptions revamp, admin dashboards, buy-to-own checkout wiring — will tackle in follow-up turns once the above lands cleanly.
