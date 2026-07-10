@@ -24,6 +24,8 @@ import { respondToLabelInvite } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileArtistStudio } from "@/components/mobile/screens/MobileArtistStudio";
+import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
+
 
 export const Route = createFileRoute("/artist-studio")({
   head: () => ({ meta: [{ title: "Artist Studio — Wesu+" }] }),
@@ -352,11 +354,7 @@ function FeaturesTab() {
 
 // ---------- Unified Upload Wizard (single OR album) ----------
 
-const SINGLE_MIN = 10;
-const SINGLE_MAX = 100;
-const ALBUM_MIN = 150;
-const ALBUM_MAX = 250;
-const FREE_SONG_FEE = 100;
+
 
 type UploadMode = "single" | "album";
 
@@ -365,6 +363,13 @@ function UploadWizard() {
   const qc = useQueryClient();
   const uploadFn = useServerFn(uploadSong);
   const createAlbumFn = useServerFn(createAlbum);
+  const pricingFn = useServerFn(getPricingConfig);
+
+  const { data: pricing = DEFAULT_PRICING } = useQuery({
+    queryKey: ["pricing-config"],
+    queryFn: () => pricingFn(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [mode, setMode] = useState<UploadMode>("single");
@@ -374,11 +379,17 @@ function UploadWizard() {
   const [cover, setCover] = useState<File | null>(null);
   const [tracks, setTracks] = useState<File[]>([]);
   const [tier, setTier] = useState<"free" | "paid">("paid");
-  const [price, setPrice] = useState<number>(mode === "album" ? ALBUM_MIN : SINGLE_MIN);
+  const [price, setPrice] = useState<number>(pricing.song_min);
   const [feeAgreed, setFeeAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+
+  const SINGLE_MIN = pricing.song_min;
+  const SINGLE_MAX = pricing.song_max;
+  const ALBUM_MIN = pricing.album_min;
+  const ALBUM_MAX = pricing.album_max;
+  const FREE_SONG_FEE = pricing.free_song_fee;
 
   function switchMode(next: UploadMode) {
     setMode(next);
@@ -386,6 +397,7 @@ function UploadWizard() {
     setPrice(next === "album" ? ALBUM_MIN : SINGLE_MIN);
     if (next === "single") setTracks((t) => t.slice(0, 1));
   }
+
 
   function validatePricing(): string | null {
     if (mode === "single") {
