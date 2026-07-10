@@ -66,17 +66,18 @@ export function MobileProfile() {
     <div className="pb-8 px-4">
       {/* Avatar + name + role */}
       <div className="flex flex-col items-center py-8 gap-3">
-        <div className="size-20 rounded-full bg-card border-2 border-border overflow-hidden flex items-center justify-center">
-          {form.avatar_url ? (
-            <img
-              src={form.avatar_url}
-              alt={form.full_name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
+        {form.avatar_url ? (
+          <StorageImage
+            bucket="user-avatars"
+            path={form.avatar_url}
+            alt={form.full_name}
+            className="size-20 rounded-full bg-card border-2 border-border overflow-hidden object-cover"
+          />
+        ) : (
+          <div className="size-20 rounded-full bg-card border-2 border-border overflow-hidden flex items-center justify-center">
             <UserCircle className="size-12 text-muted-foreground" />
-          )}
-        </div>
+          </div>
+        )}
         <div className="text-center">
           <p className="font-bold text-lg">{form.full_name || "Your Name"}</p>
           <p className="text-sm text-muted-foreground">{user?.email}</p>
