@@ -299,15 +299,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
           {/* Album Art */}
           <div className="flex-1 flex items-center justify-center px-8">
-            <div className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card">
-              {track.coverUrl ? (
-                <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Music2 className="size-24 text-muted-foreground" />
-                </div>
-              )}
-            </div>
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card object-cover"
+            />
           </div>
 
           {/* Track Info & Controls */}
