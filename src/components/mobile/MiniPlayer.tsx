@@ -1,5 +1,6 @@
-import { Loader2, Music2, Pause, Play, SkipForward, SkipBack, X } from "lucide-react";
+import { Loader2, Pause, Play, SkipForward, SkipBack, X } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { StorageImage } from "@/components/StorageImage";
 
 /**
  * Spotify-style persistent mini player rendered above BottomTabBar.
@@ -41,13 +42,12 @@ export function MiniPlayer() {
           aria-label="Open now playing"
         >
           {/* Album art */}
-          <div className="size-10 rounded-lg overflow-hidden bg-[#2c2c2e] shrink-0 flex items-center justify-center shadow-md">
-            {track.coverUrl ? (
-              <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
-            ) : (
-              <Music2 className="size-4 text-white/40" />
-            )}
-          </div>
+          <StorageImage
+            bucket="album-art"
+            path={track.coverUrl}
+            alt={track.title}
+            className="size-10 rounded-lg overflow-hidden bg-[#2c2c2e] shrink-0 object-cover shadow-md"
+          />
 
           {/* Track info */}
           <div className="flex-1 min-w-0">

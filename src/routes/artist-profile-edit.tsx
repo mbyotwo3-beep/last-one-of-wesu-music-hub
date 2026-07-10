@@ -132,15 +132,15 @@ function ArtistProfileEditPage() {
           name: formData.name,
           bio: formData.bio,
           genre: formData.genre,
-          avatar_url: avatarUrl,
-          cover_url: coverUrl,
+          avatar_url: avatarUrl ?? undefined,
+          cover_url: coverUrl ?? undefined,
           social_links: formData.social_links,
         };
         
         console.log("[Artist Profile] Updating profile with data:", profileData);
         const updateStart = Date.now();
         
-        const result = await updateProfile(profileData);
+        const result = await updateProfile({ data: profileData });
         
         console.log("[Artist Profile] Profile update completed:", {
           result,

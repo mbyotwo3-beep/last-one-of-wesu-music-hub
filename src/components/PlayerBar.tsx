@@ -5,7 +5,7 @@ import {
   SkipForward,
   Volume2,
   Heart,
-  Music2,
+  
   Loader2,
   Radio,
   X,
@@ -15,6 +15,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
@@ -45,7 +46,7 @@ function getAudio(): HTMLAudioElement {
   return _audio;
 }
 
-export function PlayerBar() {
+export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
   const liked = usePlayer((s) => s.liked);
@@ -250,6 +251,7 @@ export function PlayerBar() {
     getAudio().volume = volume;
   }, [volume]);
 
+  if (audioOnly) return null;
   if (!track) return null;
 
   const dur = track.durationSeconds ?? 0;
@@ -297,15 +299,12 @@ export function PlayerBar() {
 
           {/* Album Art */}
           <div className="flex-1 flex items-center justify-center px-8">
-            <div className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card">
-              {track.coverUrl ? (
-                <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Music2 className="size-24 text-muted-foreground" />
-                </div>
-              )}
-            </div>
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card object-cover"
+            />
           </div>
 
           {/* Track Info & Controls */}
@@ -448,13 +447,12 @@ export function PlayerBar() {
         <div className="max-w-7xl mx-auto h-20 px-6 flex items-center justify-between gap-4">
           {/* Track info */}
           <div className="flex items-center gap-4 w-1/3 min-w-0">
-            <div className="size-12 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 flex items-center justify-center">
-              {track.coverUrl ? (
-                <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
-              ) : (
-                <Music2 className="size-4 text-muted-foreground" />
-              )}
-            </div>
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="size-12 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 object-cover"
+            />
             <div className="overflow-hidden min-w-0">
               <p className="text-sm font-medium truncate">{track.title}</p>
               <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
