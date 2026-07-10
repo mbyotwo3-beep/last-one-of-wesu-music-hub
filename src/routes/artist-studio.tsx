@@ -41,13 +41,12 @@ function ArtistStudioRoute() {
   return platform === "native" ? <MobileArtistStudio /> : <Page />;
 }
 
-type Tab = "upload" | "album" | "collabs" | "label" | "features" | "payouts";
+type Tab = "upload" | "collabs" | "label" | "features" | "payouts";
 
 function Page() {
   const [tab, setTab] = useState<Tab>("upload");
   const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: "upload", label: "Upload Song", icon: Upload },
-    { id: "album", label: "Albums", icon: FolderPlus },
+    { id: "upload", label: "Upload Music", icon: Upload },
     { id: "collabs", label: "Collaborators", icon: Users },
     { id: "label", label: "Label", icon: Building2 },
     { id: "features", label: "Features", icon: Star },
@@ -71,8 +70,7 @@ function Page() {
           </button>
         ))}
       </div>
-      {tab === "upload" && <UploadTab />}
-      {tab === "album" && <AlbumTab />}
+      {tab === "upload" && <UploadWizard />}
       {tab === "collabs" && <CollabsTab />}
       {tab === "label" && <LabelTab />}
       {tab === "features" && <FeaturesTab />}
@@ -80,6 +78,7 @@ function Page() {
     </div>
   );
 }
+
 
 function CollabsTab() {
   const songsFn = useServerFn(listMySongs);
