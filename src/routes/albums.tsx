@@ -33,7 +33,7 @@ function AlbumsPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {albums.map((a) => (
-              <Link key={a.id} to="/albums" className="group">
+              <Link key={a.id} to="/albums/$id" params={{ id: a.id }} className="group">
                 <div className="aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-3 flex items-center justify-center">
                   {a.cover_url ? (
                     <img
