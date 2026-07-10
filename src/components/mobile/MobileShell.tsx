@@ -5,6 +5,7 @@ import { MiniPlayer } from "./MiniPlayer";
 import { NowPlayingSheet } from "./NowPlayingSheet";
 import { StatusBarInit } from "./StatusBarInit";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PlayerBar } from "@/components/PlayerBar";
 
 interface MobileShellProps {
   children: ReactNode;
