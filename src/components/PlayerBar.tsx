@@ -5,7 +5,7 @@ import {
   SkipForward,
   Volume2,
   Heart,
-  Music2,
+  
   Loader2,
   Radio,
   X,
