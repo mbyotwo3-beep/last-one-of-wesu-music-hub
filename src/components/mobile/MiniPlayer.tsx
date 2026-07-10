@@ -1,5 +1,6 @@
-import { Loader2, Music2, Pause, Play, SkipForward, SkipBack, X } from "lucide-react";
+import { Loader2, Pause, Play, SkipForward, SkipBack, X } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { StorageImage } from "@/components/StorageImage";
 
 /**
  * Spotify-style persistent mini player rendered above BottomTabBar.
