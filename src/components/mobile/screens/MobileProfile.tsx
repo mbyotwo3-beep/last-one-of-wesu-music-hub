@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { updateProfile } from "@/lib/listener.functions";
 import { uploadFileToBucket } from "@/lib/storage";
 import { cacheProfile } from "@/lib/offline-cache";
+import { StorageImage } from "@/components/StorageImage";
 
 /**
  * Mobile Profile screen — avatar, role badge, edit form, sign out.
