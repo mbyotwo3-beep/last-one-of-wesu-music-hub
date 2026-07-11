@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -84,9 +84,17 @@ function SuperadminPage() {
   return (
     <div className="min-h-screen pb-24">
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex items-center gap-3 mb-8">
-          <Shield className="size-6 text-primary" />
-          <h1 className="text-3xl font-bold">Superadmin</h1>
+        <div className="flex items-center justify-between gap-3 mb-8">
+          <div className="flex items-center gap-3">
+            <Shield className="size-6 text-primary" />
+            <h1 className="text-3xl font-bold">Superadmin</h1>
+          </div>
+          <Link
+            to="/superadmin/homepage"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            Homepage Builder
+          </Link>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-8 border-b border-border pb-3">
