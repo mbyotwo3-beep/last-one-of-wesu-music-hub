@@ -134,14 +134,25 @@ export function BottomTabBar() {
             >
               <X className="size-6" />
             </button>
-            <input
-              type="text"
-              placeholder="Search..."
-              className="flex-1 bg-secondary/50 border border-input rounded-full pl-4 pr-4 py-3 text-lg focus:outline-none focus:border-ring text-foreground placeholder:text-muted-foreground"
-              autoFocus
-            />
+            <form
+              className="flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = (e.currentTarget.elements.namedItem("q") as HTMLInputElement).value;
+                setSearchOpen(false);
+                navigate({ to: "/search", search: { q, tab: "all" } });
+              }}
+            >
+              <input
+                name="q"
+                type="text"
+                placeholder="Search songs, artists, albums..."
+                className="w-full bg-secondary/50 border border-input rounded-full pl-4 pr-4 py-3 text-lg focus:outline-none focus:border-ring text-foreground placeholder:text-muted-foreground"
+                autoFocus
+              />
+            </form>
           </div>
-          <p className="text-sm text-muted-foreground text-center">Search functionality coming soon</p>
+          <p className="text-xs text-muted-foreground text-center">Press Enter to search</p>
         </div>
       )}
 

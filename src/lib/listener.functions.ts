@@ -81,6 +81,19 @@ export const addToPlaylist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const removeFromPlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string; song_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("playlist_songs")
+      .delete()
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", data.song_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const toggleLike = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { song_id: string }) => d)

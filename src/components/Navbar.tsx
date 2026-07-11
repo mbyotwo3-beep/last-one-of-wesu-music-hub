@@ -1,17 +1,25 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, LogOut, UserCircle, Shield, Mic2, Menu, X } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "./ThemeToggle";
 import { GlobalSearch } from "./GlobalSearch";
+import { StorageImage } from "./StorageImage";
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const { user, loading } = useAuth();
   const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading } = useUserRoles();
+
+  useEffect(() => {
+    if (!user) { setAvatarPath(null); return; }
+    supabase.from("profiles").select("avatar_url").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setAvatarPath((data as any)?.avatar_url ?? null));
+  }, [user]);
 
   const isAuth = useRouterState({ select: (s) => s.location.pathname }) === "/auth";
   const isLoading = loading || rolesLoading;
@@ -76,7 +84,16 @@ export function Navbar() {
                     className="flex items-center gap-2 text-sm font-medium text-foreground"
                     aria-label="Open user menu"
                   >
-                    <UserCircle className="size-7" />
+                    {avatarPath ? (
+                      <StorageImage
+                        bucket="user-avatars"
+                        path={avatarPath}
+                        alt="Profile"
+                        className="size-8 rounded-full object-cover ring-1 ring-border"
+                      />
+                    ) : (
+                      <UserCircle className="size-7" />
+                    )}
                   </button>
                   {menuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
