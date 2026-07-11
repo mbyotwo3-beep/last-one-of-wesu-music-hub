@@ -11,14 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
+import { Route as SongsRouteImport } from './routes/songs'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
 import { Route as RadioRouteImport } from './routes/radio'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as NowPlayingRouteImport } from './routes/now-playing'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as NewMusicRouteImport } from './routes/new-music'
+import { Route as MustHaveRouteImport } from './routes/must-have'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LabelDashboardRouteImport } from './routes/label-dashboard'
+import { Route as HotTracksRouteImport } from './routes/hot-tracks'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -36,6 +42,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LabelsIndexRouteImport } from './routes/labels.index'
 import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
+import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
 import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
@@ -53,6 +60,11 @@ const SubscriptionsRoute = SubscriptionsRouteImport.update({
   path: '/subscriptions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SongsRoute = SongsRouteImport.update({
+  id: '/songs',
+  path: '/songs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -61,6 +73,11 @@ const SearchRoute = SearchRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecentlyAddedRoute = RecentlyAddedRouteImport.update({
+  id: '/recently-added',
+  path: '/recently-added',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RadioRoute = RadioRouteImport.update({
@@ -83,6 +100,21 @@ const NowPlayingRoute = NowPlayingRouteImport.update({
   path: '/now-playing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewMusicRoute = NewMusicRouteImport.update({
+  id: '/new-music',
+  path: '/new-music',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MustHaveRoute = MustHaveRouteImport.update({
+  id: '/must-have',
+  path: '/must-have',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -91,6 +123,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const LabelDashboardRoute = LabelDashboardRouteImport.update({
   id: '/label-dashboard',
   path: '/label-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HotTracksRoute = HotTracksRouteImport.update({
+  id: '/hot-tracks',
+  path: '/hot-tracks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -178,6 +215,11 @@ const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
   path: '/artists/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PlaylistsRoute,
+} as any)
 const LabelsSlugRoute = LabelsSlugRouteImport.update({
   id: '/labels/$slug',
   path: '/labels/$slug',
@@ -225,20 +267,27 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/must-have': typeof MustHaveRoute
+  '/new-music': typeof NewMusicRoute
+  '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
   '/radio': typeof RadioRoute
+  '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
+  '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
+  '/playlists/$id': typeof PlaylistsIdRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -260,20 +309,27 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/must-have': typeof MustHaveRoute
+  '/new-music': typeof NewMusicRoute
+  '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
   '/radio': typeof RadioRoute
+  '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
+  '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
+  '/playlists/$id': typeof PlaylistsIdRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -296,20 +352,27 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/must-have': typeof MustHaveRoute
+  '/new-music': typeof NewMusicRoute
+  '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
   '/radio': typeof RadioRoute
+  '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
+  '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
+  '/playlists/$id': typeof PlaylistsIdRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -333,20 +396,27 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/must-have'
+    | '/new-music'
+    | '/notifications'
     | '/now-playing'
     | '/playlists'
     | '/profile'
     | '/radio'
+    | '/recently-added'
     | '/reset-password'
     | '/search'
+    | '/songs'
     | '/subscriptions'
     | '/superadmin'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
+    | '/playlists/$id'
     | '/artists/'
     | '/labels/'
     | '/api/public/dpo-webhook'
@@ -368,20 +438,27 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/must-have'
+    | '/new-music'
+    | '/notifications'
     | '/now-playing'
     | '/playlists'
     | '/profile'
     | '/radio'
+    | '/recently-added'
     | '/reset-password'
     | '/search'
+    | '/songs'
     | '/subscriptions'
     | '/superadmin'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
+    | '/playlists/$id'
     | '/artists'
     | '/labels'
     | '/api/public/dpo-webhook'
@@ -403,20 +480,27 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/forgot-password'
+    | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/must-have'
+    | '/new-music'
+    | '/notifications'
     | '/now-playing'
     | '/playlists'
     | '/profile'
     | '/radio'
+    | '/recently-added'
     | '/reset-password'
     | '/search'
+    | '/songs'
     | '/subscriptions'
     | '/superadmin'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
     | '/labels/$slug'
+    | '/playlists/$id'
     | '/artists/'
     | '/labels/'
     | '/api/public/dpo-webhook'
@@ -439,14 +523,20 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  HotTracksRoute: typeof HotTracksRoute
   LabelDashboardRoute: typeof LabelDashboardRoute
   LibraryRoute: typeof LibraryRoute
+  MustHaveRoute: typeof MustHaveRoute
+  NewMusicRoute: typeof NewMusicRoute
+  NotificationsRoute: typeof NotificationsRoute
   NowPlayingRoute: typeof NowPlayingRoute
-  PlaylistsRoute: typeof PlaylistsRoute
+  PlaylistsRoute: typeof PlaylistsRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   RadioRoute: typeof RadioRoute
+  RecentlyAddedRoute: typeof RecentlyAddedRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SearchRoute: typeof SearchRoute
+  SongsRoute: typeof SongsRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   SuperadminRoute: typeof SuperadminRoute
   ArtistsIdRoute: typeof ArtistsIdRoute
@@ -473,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/songs': {
+      id: '/songs'
+      path: '/songs'
+      fullPath: '/songs'
+      preLoaderRoute: typeof SongsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -485,6 +582,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recently-added': {
+      id: '/recently-added'
+      path: '/recently-added'
+      fullPath: '/recently-added'
+      preLoaderRoute: typeof RecentlyAddedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/radio': {
@@ -515,6 +619,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NowPlayingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/new-music': {
+      id: '/new-music'
+      path: '/new-music'
+      fullPath: '/new-music'
+      preLoaderRoute: typeof NewMusicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/must-have': {
+      id: '/must-have'
+      path: '/must-have'
+      fullPath: '/must-have'
+      preLoaderRoute: typeof MustHaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -527,6 +652,13 @@ declare module '@tanstack/react-router' {
       path: '/label-dashboard'
       fullPath: '/label-dashboard'
       preLoaderRoute: typeof LabelDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hot-tracks': {
+      id: '/hot-tracks'
+      path: '/hot-tracks'
+      fullPath: '/hot-tracks'
+      preLoaderRoute: typeof HotTracksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -648,6 +780,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/playlists/$id': {
+      id: '/playlists/$id'
+      path: '/$id'
+      fullPath: '/playlists/$id'
+      preLoaderRoute: typeof PlaylistsIdRouteImport
+      parentRoute: typeof PlaylistsRoute
+    }
     '/labels/$slug': {
       id: '/labels/$slug'
       path: '/labels/$slug'
@@ -716,6 +855,18 @@ const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
   CheckoutRouteChildren,
 )
 
+interface PlaylistsRouteChildren {
+  PlaylistsIdRoute: typeof PlaylistsIdRoute
+}
+
+const PlaylistsRouteChildren: PlaylistsRouteChildren = {
+  PlaylistsIdRoute: PlaylistsIdRoute,
+}
+
+const PlaylistsRouteWithChildren = PlaylistsRoute._addFileChildren(
+  PlaylistsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -732,14 +883,20 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  HotTracksRoute: HotTracksRoute,
   LabelDashboardRoute: LabelDashboardRoute,
   LibraryRoute: LibraryRoute,
+  MustHaveRoute: MustHaveRoute,
+  NewMusicRoute: NewMusicRoute,
+  NotificationsRoute: NotificationsRoute,
   NowPlayingRoute: NowPlayingRoute,
-  PlaylistsRoute: PlaylistsRoute,
+  PlaylistsRoute: PlaylistsRouteWithChildren,
   ProfileRoute: ProfileRoute,
   RadioRoute: RadioRoute,
+  RecentlyAddedRoute: RecentlyAddedRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SearchRoute: SearchRoute,
+  SongsRoute: SongsRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   SuperadminRoute: SuperadminRoute,
   ArtistsIdRoute: ArtistsIdRoute,
