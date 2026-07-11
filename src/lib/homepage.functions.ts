@@ -70,7 +70,7 @@ async function readLayouts(): Promise<Record<string, HomepageLayout>> {
     .select("value")
     .eq("key", "homepage_layouts")
     .maybeSingle();
-  const stored = (data?.value as Record<string, HomepageLayout>) ?? {};
+  const stored = (data?.value ?? {}) as unknown as Record<string, HomepageLayout>;
   return { ...DEFAULT_LAYOUTS, ...stored };
 }
 
@@ -106,7 +106,7 @@ export const saveHomepageLayout = createServerFn({ method: "POST" })
       .select("value")
       .eq("key", "homepage_layouts")
       .maybeSingle();
-    const current = (existing?.value as Record<string, HomepageLayout>) ?? {};
+    const current = ((existing?.value ?? {}) as unknown) as Record<string, HomepageLayout>;
     const next = { ...current, [data.page]: data.layout };
     const { error } = await supabaseAdmin
       .from("platform_settings")
