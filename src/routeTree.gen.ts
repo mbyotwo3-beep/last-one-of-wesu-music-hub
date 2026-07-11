@@ -42,6 +42,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LabelsIndexRouteImport } from './routes/labels.index'
 import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
+import { Route as SuperadminHomepageRouteImport } from './routes/superadmin.homepage'
 import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
 import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
@@ -215,6 +216,11 @@ const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
   path: '/artists/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperadminHomepageRoute = SuperadminHomepageRouteImport.update({
+  id: '/homepage',
+  path: '/homepage',
+  getParentRoute: () => SuperadminRoute,
+} as any)
 const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -282,12 +288,13 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
-  '/superadmin': typeof SuperadminRoute
+  '/superadmin': typeof SuperadminRouteWithChildren
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -324,12 +331,13 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
-  '/superadmin': typeof SuperadminRoute
+  '/superadmin': typeof SuperadminRouteWithChildren
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -367,12 +375,13 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
-  '/superadmin': typeof SuperadminRoute
+  '/superadmin': typeof SuperadminRouteWithChildren
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
@@ -417,6 +426,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
     | '/api/public/dpo-webhook'
@@ -459,6 +469,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/superadmin/homepage'
     | '/artists'
     | '/labels'
     | '/api/public/dpo-webhook'
@@ -501,6 +512,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
     | '/api/public/dpo-webhook'
@@ -538,7 +550,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SongsRoute: typeof SongsRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
-  SuperadminRoute: typeof SuperadminRoute
+  SuperadminRoute: typeof SuperadminRouteWithChildren
   ArtistsIdRoute: typeof ArtistsIdRoute
   LabelsSlugRoute: typeof LabelsSlugRoute
   ArtistsIndexRoute: typeof ArtistsIndexRoute
@@ -780,6 +792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/superadmin/homepage': {
+      id: '/superadmin/homepage'
+      path: '/homepage'
+      fullPath: '/superadmin/homepage'
+      preLoaderRoute: typeof SuperadminHomepageRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
     '/playlists/$id': {
       id: '/playlists/$id'
       path: '/$id'
@@ -867,6 +886,18 @@ const PlaylistsRouteWithChildren = PlaylistsRoute._addFileChildren(
   PlaylistsRouteChildren,
 )
 
+interface SuperadminRouteChildren {
+  SuperadminHomepageRoute: typeof SuperadminHomepageRoute
+}
+
+const SuperadminRouteChildren: SuperadminRouteChildren = {
+  SuperadminHomepageRoute: SuperadminHomepageRoute,
+}
+
+const SuperadminRouteWithChildren = SuperadminRoute._addFileChildren(
+  SuperadminRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -898,7 +929,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SongsRoute: SongsRoute,
   SubscriptionsRoute: SubscriptionsRoute,
-  SuperadminRoute: SuperadminRoute,
+  SuperadminRoute: SuperadminRouteWithChildren,
   ArtistsIdRoute: ArtistsIdRoute,
   LabelsSlugRoute: LabelsSlugRoute,
   ArtistsIndexRoute: ArtistsIndexRoute,
