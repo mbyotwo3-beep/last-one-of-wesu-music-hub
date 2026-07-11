@@ -1,48 +1,57 @@
-# Fix bugs + upload/player upgrades
+# Wesu+ completeness pass
 
-The root cause behind most of the visible bugs is one thing: `cover_url` and `audio_url` are stored as raw storage paths (e.g. `db1b76c3.../1783700288359-images.jpg`) but rendered directly as `<img src>` or fed to `<audio>`. Buckets are private, so the browser gets "Invalid URI" / broken images. Everything below flows from fixing that.
+Scope is large. I'll ship it in 5 phases, each independently useful and testable. I'll go straight through — no per-phase check-ins unless something needs a decision.
 
-## 1. Storage URL resolution (fixes cover art + broken mobile playback)
+## Phase 1 — 404 audit + broken links
+Walk every `<Link to=...>` and `navigate({ to })` in the app, cross-check against `src/routes/`, and either:
+- create the missing route with a real page, or
+- redirect the link to the correct existing route.
 
-- Make image buckets publicly readable so `<img>` tags work everywhere without server round-trips:
-  - `album-art`, `artist-images`, `user-avatars` → set public (song-audio stays private and continues to use signed URLs).
-- Add `src/lib/storage-url.ts` with `resolveImageUrl(bucket, path)` and `resolveAudioUrl(path)` helpers that return the raw string when already an `http(s)` URL and a public/signed URL otherwise.
-- Normalize every `cover_url` / `avatar_url` display site (artist page, albums page, library, search, TrackRow, SongRow, MiniPlayer, NowPlaying, mobile Home/Browse/Library) through the helper.
-- Mobile playback path (`SongRow` → `setTrack`) currently drops audio at raw path. Change the mobile play flow to call `getPreviewAudioUrl`/`getSignedAudioUrl` before setting the track, matching the desktop path.
+Known gaps:
+- `/playlists/$id` — playlist detail page (list songs, play all, remove).
+- `/new-music`, `/must-have`, `/hot-tracks` — shelf "See all" pages on `/browse` currently 404.
+- `/notifications` — bell in navbar.
+- `/artist-studio/*` sub-tabs referenced by MobileArtistStudio.
+- Any other dead link I find during the sweep.
 
-## 2. Profile save
+## Phase 2 — Artist profile pic + Spotify-style player
+- Fix `avatar_url` render: `StorageImage` currently only handles `artist-images`/`album-art`. Add `user-avatars` bucket support and use signed URLs everywhere the profile pic renders (Navbar, ProfileEdit, MobileProfile, artist card).
+- Desktop `PlayerBar`: tighten to Spotify look — album art thumb clickable to expand, hoverable progress bar with scrubbing thumb, current/total time flanking bar, volume slider with mute icon, queue button. Keep the 3-column layout but reduce visual weight.
+- Mobile `MiniPlayer` + `NowPlayingScreen`: wire skipNext/skipPrev to the player store's new queue actions, add shuffle/repeat toggles in NowPlaying, ensure taps expand the sheet.
 
-`updateProfile` looks correct, but the client sends the raw stored path back as `avatar_url`. Keep that (path is the source of truth), and just render via `resolveImageUrl("user-avatars", path)`. Verify one successful save round-trip on both desktop `/profile` and mobile profile screen and surface the DB error text via toast (already partly wired).
+## Phase 3 — Real search
+Replace the "coming soon" placeholder on `/search`:
+- Debounced input, tabs (All / Songs / Artists / Albums / Playlists).
+- Backed by existing `searchSongs` server fn + new `searchArtists`, `searchAlbums`, `searchPlaylists`.
+- Result rows link to the right detail page; songs are playable inline.
 
-## 3. Spotify-style desktop now-playing
+## Phase 4 — Superadmin homepage CMS
+Full drag-and-drop builder at `/superadmin/homepage`:
+- Persist layouts to `platform_settings.homepage_layout` (JSON): `{ page: 'home'|'listen-now'|'browse', shelves: [{ id, type, title, query, order, visible }], hero_slides: [...] }`.
+- Shelf types: `new_music`, `hot_tracks`, `featured_artists`, `must_have_albums`, `by_genre`, `by_artist`, `by_playlist`, `custom`.
+- Drag-reorder with `@dnd-kit` (already installable), toggle visibility, edit title, pick data source.
+- Hero slider editor: add/remove/reorder slides, upload cover, pick linked item.
+- Home/Listen Now/Browse routes read the layout via a public `getHomepageLayout` server fn and render accordingly. Falls back to defaults if empty.
 
-Redesign `PlayerBar.tsx`:
-- Left: cover + title + artist + like.
-- Center: shuffle / prev / play / next / repeat, with a full seekable progress bar (drag to scrub, shows `mm:ss / mm:ss`).
-- Right: queue button, volume slider, expand.
-- Uses the same `usePlayer` store; adds `volume` (0–1), `shuffle`, `repeat` to the store and wires them to the shared `<audio>` element.
-
-## 4. Simple upload (single OR album)
-
-Replace the two separate forms in `artist-studio.tsx` with one wizard:
-- Step 1: pick "Single song" or "Album".
-- Step 2: drag-drop audio file(s) + cover.
-- Step 3: pricing.
-  - Single: choose Free (K100 upload fee via Lenco) or Paid K10–K100.
-  - Album: choose Paid K150–K250 (albums are always paid; free albums not supported).
-  - Client + server validators enforce ranges; free-song path routes through the existing Lenco `initiatePayment` and only inserts the row on webhook success.
-- Reuses existing `uploadFileToBucket` + `createSong`/`createAlbum` server fns; adds an `upload_fee` transaction type.
-
-## 5. Ignore noise
-
-The `__cf_bm` cookie warnings and `postMessage` origin errors are from the Lovable preview iframe / analytics — harmless, no code change.
+## Phase 5 — Payments end-to-end
+Lenco (mobile money, ZMW) is already integrated as the primary gateway (envs `LENCO_*` set, webhook at `/api/public/lenco-webhook`). I'll complete the flow rather than swap providers:
+- Checkout page: full order summary, method picker (MTN/Airtel money via Lenco), phone entry, initiates payment, polls status.
+- Success page: shows purchase receipt, "Play now" CTA, adds to library.
+- Free-song K100 upload fee: wire `UploadWizard` to actually initiate a Lenco payment before submitting the song; song stays `pending` until webhook marks fee `paid`.
+- Purchases visible in Library → Purchased tab; unlocks unlimited playback for that song.
+- Artist earnings: dashboard already reads `revenue_splits`; verify the trigger fires and add a Payouts request UI.
+- Subscription plans: `/subscriptions` page lists plans, "Subscribe" button starts Lenco recurring, webhook updates `subscriptions` row, `getSignedAudioUrl` respects active subscription (skip paywall).
 
 ## Technical notes
 
-- Buckets flipped to public via `supabase--storage_update_bucket` (workspace must allow public buckets).
-- No schema changes needed for §1–3. §4 adds one row to `payment_transactions.item_type` values (`upload_fee`) — no migration required, it's a text column.
-- All fixes are additive; existing paid-song access checks stay intact.
+- `attachSupabaseAuth` in `src/start.ts` stays as-is; all new protected fns use `requireSupabaseAuth`.
+- New DB objects (approvals needed as we hit them): `playlist_songs` policies for owner reads on private, `homepage_layout` key in `platform_settings` (data insert, not schema), `notifications` read endpoint (table exists).
+- No new tables expected for phases 1–3. Phase 4 uses `platform_settings`. Phase 5 uses existing `purchases`, `subscriptions`, `payment_transactions`, `payouts`.
+- Superadmin bypass already in `getSignedAudioUrl`; subscription check will be added alongside.
 
-## Out of scope this turn
+## Out of scope (call out and skip)
+- Native mobile app packaging changes (Capacitor rebuild).
+- Switching payment provider away from Lenco.
+- Redesign of navbar/sidebar chrome.
 
-Drag-and-drop page builder, subscriptions revamp, admin dashboards, buy-to-own checkout wiring — will tackle in follow-up turns once the above lands cleanly.
+I'll start on Phase 1 as soon as you approve.
