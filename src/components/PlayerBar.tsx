@@ -88,7 +88,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [showAd, setShowAd] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isPreview, setIsPreview] = useState(false);
+  const isPreview = usePlayer((s) => s.isPreview);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const currentTrackId = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);

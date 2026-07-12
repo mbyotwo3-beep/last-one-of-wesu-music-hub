@@ -23,6 +23,8 @@ interface PlayerState {
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  isPreview: boolean;
+  setIsPreview: (v: boolean) => void;
   setTrack: (t: PlayerTrack | null) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
   skipNext: () => void;
@@ -51,8 +53,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   muted: false,
   shuffle: false,
   repeat: "off",
+  isPreview: false,
 
-  setTrack: (t) => set({ track: t, playing: !!t, progressSeconds: 0, liked: false }),
+  setIsPreview: (v) => set({ isPreview: v }),
+  setTrack: (t) => set({ track: t, playing: !!t, progressSeconds: 0, liked: false, isPreview: false }),
 
   setQueue: (tracks, startIndex = 0) => {
     const track = tracks[startIndex] ?? null;

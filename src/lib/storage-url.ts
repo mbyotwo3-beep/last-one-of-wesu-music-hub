@@ -48,3 +48,12 @@ export function peekImageUrl(bucket: ImageBucket, path: string | null | undefine
   if (isAbsolute(path)) return path;
   return cache.get(`${bucket}:${path}`) ?? null;
 }
+
+/** Drop any cached signed URL so the next resolve re-signs from scratch. */
+export function invalidateImageUrl(bucket: ImageBucket, path: string | null | undefined) {
+  if (!path || isAbsolute(path)) return;
+  const key = `${bucket}:${path}`;
+  cache.delete(key);
+  inflight.delete(key);
+}
+
