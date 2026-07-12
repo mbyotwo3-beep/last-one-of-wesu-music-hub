@@ -20,6 +20,7 @@ export function MiniPlayer() {
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
   const openNowPlaying = usePlayer((s) => s.openNowPlaying);
+  const isPreview = usePlayer((s) => s.isPreview);
 
   if (!track) return null;
 
@@ -32,6 +33,16 @@ export function MiniPlayer() {
       className="fixed bottom-16 inset-x-0 z-40"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
+      {isPreview && (
+        <div className="mx-2 mb-1 flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 text-[11px]">
+          <span className="flex items-center gap-1.5 text-amber-400 font-medium">
+            <Radio className="size-3" /> 15-second preview
+          </span>
+          <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-300 hover:underline">
+            Unlock →
+          </Link>
+        </div>
+      )}
       {/* Main bar */}
       <div
         className="mx-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl"
