@@ -44,6 +44,7 @@ export function NowPlayingSheet() {
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
   const closeNowPlaying = usePlayer((s) => s.closeNowPlaying);
+  const isPreview = usePlayer((s) => s.isPreview);
 
   const { user } = useAuth();
 
