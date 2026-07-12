@@ -185,6 +185,19 @@ export function NowPlayingSheet() {
           </button>
         </div>
 
+        {isPreview && (
+          <div className="mx-6 mb-2 flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-amber-500/15 border border-amber-500/30 text-xs shrink-0">
+            <span className="flex items-center gap-1.5 text-amber-300 font-medium">
+              <Radio className="size-3.5" /> Playing 15-second preview
+            </span>
+            <Link to="/checkout" search={{ plan: "premium_monthly" }} onClick={closeNowPlaying} className="font-semibold text-amber-200 hover:underline whitespace-nowrap">
+              Unlock full →
+            </Link>
+          </div>
+        )}
+
+
+
         {/* Album Art — large, with drop shadow */}
         <div className="flex-1 flex items-center justify-center px-8 py-4 min-h-0">
           <div
