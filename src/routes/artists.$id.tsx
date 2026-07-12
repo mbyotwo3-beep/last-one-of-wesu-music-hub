@@ -176,39 +176,54 @@ function ArtistPage() {
           ) : (
             <div className="space-y-1">
               {data.topSongs.map((s, i) => (
-                <button
+                <div
                   key={s.id}
-                  onClick={() =>
-                    setTrack({
-                      id: s.id,
-                      title: s.title,
-                      artistName: a.name,
-                      coverUrl: s.cover_url,
-                      durationSeconds: s.duration,
-                    })
-                  }
-                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                 >
-                  <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                  <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
-                  <StorageImage
-                    bucket="album-art"
-                    path={s.cover_url}
-                    alt={s.title}
-                    className="size-10 rounded-md overflow-hidden bg-card object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">{(s.play_count ?? 0).toLocaleString()} plays</p>
-                  </div>
-                  <span className="text-primary text-sm font-bold">
-                    K{Number(s.price ?? 0).toFixed(2)}
-                  </span>
-                </button>
+                  <button
+                    onClick={() =>
+                      setTrack({
+                        id: s.id,
+                        title: s.title,
+                        artistName: a.name,
+                        coverUrl: s.cover_url,
+                        durationSeconds: s.duration,
+                      })
+                    }
+                    className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                  >
+                    <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                    <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
+                    <StorageImage
+                      bucket="album-art"
+                      path={s.cover_url}
+                      alt={s.title}
+                      className="size-10 rounded-md overflow-hidden bg-card object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{s.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(s.play_count ?? 0).toLocaleString()} plays
+                      </p>
+                    </div>
+                  </button>
+                  {Number(s.price ?? 0) > 0 ? (
+                    <Link
+                      to="/checkout"
+                      search={{ plan: "premium_monthly", item: "song", id: s.id }}
+                      className="shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 transition"
+                    >
+                      Buy K{Number(s.price).toFixed(2)}
+                    </Link>
+                  ) : (
+                    <span className="shrink-0 text-xs font-semibold text-muted-foreground">Free</span>
+                  )}
+                </div>
               ))}
             </div>
           )}
         </section>
+
 
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Discography</h2>
