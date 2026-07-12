@@ -23,6 +23,8 @@ interface PlayerState {
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  isPreview: boolean;
+  setIsPreview: (v: boolean) => void;
   setTrack: (t: PlayerTrack | null) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
   skipNext: () => void;
