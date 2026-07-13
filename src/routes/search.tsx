@@ -139,9 +139,10 @@ function SearchPage() {
                     to="/browse"
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 transition-colors"
                   >
-                    <img
-                      src={s.cover_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="album-art"
+                      path={s.cover_url}
+                      alt={s.title}
                       className="size-12 rounded object-cover bg-muted"
                     />
                     <div className="min-w-0 flex-1">
