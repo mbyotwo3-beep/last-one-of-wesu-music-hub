@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listArtists } from "@/lib/music.functions";
 import { CheckCircle2, User } from "lucide-react";
+import { StorageImage } from "@/components/StorageImage";
 
 const artistsQO = queryOptions({ queryKey: ["artists"], queryFn: () => listArtists() });
 

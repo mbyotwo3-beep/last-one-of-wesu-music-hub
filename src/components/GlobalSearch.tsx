@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Search, X, Music, Disc3, Mic2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { globalSearch } from "@/lib/music.functions";
+import { StorageImage } from "@/components/StorageImage";
 
 type Results = Awaited<ReturnType<typeof globalSearch>> | null;
 
