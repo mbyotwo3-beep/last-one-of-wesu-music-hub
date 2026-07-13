@@ -4,6 +4,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import { Crown, TrendingUp } from "lucide-react";
 import { getNewReleases, getTrendingSongs, getFeaturedAlbums } from "@/lib/music.functions";
 import { SongRow } from "@/components/mobile/shared/SongRow";
+import { StorageImage } from "@/components/StorageImage";
 
 const newReleasesQO = queryOptions({
   queryKey: ["new-releases"],
