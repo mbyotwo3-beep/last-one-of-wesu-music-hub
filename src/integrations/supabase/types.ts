@@ -1102,6 +1102,10 @@ export type Database = {
         Args: { artist_uuid: string }
         Returns: number
       }
+      get_artist_follower_count: {
+        Args: { _artist_id: string }
+        Returns: number
+      }
       get_label_available_balance: {
         Args: { label_uuid: string }
         Returns: number
