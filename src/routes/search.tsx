@@ -116,9 +116,10 @@ function SearchPage() {
                     params={{ id: a.id }}
                     className="group text-center"
                   >
-                    <img
-                      src={a.avatar_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="artist-images"
+                      path={a.avatar_url}
+                      alt={a.name}
                       className="w-full aspect-square rounded-full object-cover bg-muted mb-2 group-hover:opacity-90 transition-opacity"
                     />
                     <div className="text-sm font-medium truncate">{a.name}</div>
