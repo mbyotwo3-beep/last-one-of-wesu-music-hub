@@ -41,8 +41,9 @@ function ArtistsPage() {
               >
                 <div className="aspect-square rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 flex items-center justify-center">
                   {a.avatar_url ? (
-                    <img
-                      src={a.avatar_url}
+                    <StorageImage
+                      bucket="artist-images"
+                      path={a.avatar_url}
                       alt={a.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
