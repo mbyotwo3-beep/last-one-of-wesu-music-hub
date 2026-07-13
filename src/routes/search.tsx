@@ -6,6 +6,7 @@ import { z } from "zod";
 import { globalSearch } from "@/lib/music.functions";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Music, Disc3, Mic2 } from "lucide-react";
+import { StorageImage } from "@/components/StorageImage";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -115,9 +116,10 @@ function SearchPage() {
                     params={{ id: a.id }}
                     className="group text-center"
                   >
-                    <img
-                      src={a.avatar_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="artist-images"
+                      path={a.avatar_url}
+                      alt={a.name}
                       className="w-full aspect-square rounded-full object-cover bg-muted mb-2 group-hover:opacity-90 transition-opacity"
                     />
                     <div className="text-sm font-medium truncate">{a.name}</div>
@@ -137,9 +139,10 @@ function SearchPage() {
                     to="/browse"
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 transition-colors"
                   >
-                    <img
-                      src={s.cover_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="album-art"
+                      path={s.cover_url}
+                      alt={s.title}
                       className="size-12 rounded object-cover bg-muted"
                     />
                     <div className="min-w-0 flex-1">
@@ -159,9 +162,10 @@ function SearchPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {albums.map((a) => (
                   <Link key={a.id} to="/albums/$id" params={{ id: a.id }} className="group">
-                    <img
-                      src={a.cover_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="album-art"
+                      path={a.cover_url}
+                      alt={a.title}
                       className="w-full aspect-square rounded-lg object-cover bg-muted mb-2 group-hover:opacity-90 transition-opacity"
                     />
                     <div className="text-sm font-medium truncate">{a.title}</div>

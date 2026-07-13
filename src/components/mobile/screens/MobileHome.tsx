@@ -4,6 +4,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import { Crown, TrendingUp } from "lucide-react";
 import { getNewReleases, getTrendingSongs, getFeaturedAlbums } from "@/lib/music.functions";
 import { SongRow } from "@/components/mobile/shared/SongRow";
+import { StorageImage } from "@/components/StorageImage";
 
 const newReleasesQO = queryOptions({
   queryKey: ["new-releases"],
@@ -56,16 +57,12 @@ export function MobileHome() {
                   className="shrink-0 w-36 rounded-xl overflow-hidden bg-card ring-1 ring-white/10"
                 >
                   <div className="aspect-square bg-secondary">
-                    {album.cover_url ? (
-                      <img
-                        src={album.cover_url}
-                        alt={album.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-card" />
-                    )}
+                    <StorageImage
+                      bucket="album-art"
+                      path={album.cover_url}
+                      alt={album.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="p-2">
                     <p className="text-xs font-semibold truncate">{album.title}</p>

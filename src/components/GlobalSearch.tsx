@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Search, X, Music, Disc3, Mic2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { globalSearch } from "@/lib/music.functions";
+import { StorageImage } from "@/components/StorageImage";
 
 type Results = Awaited<ReturnType<typeof globalSearch>> | null;
 
@@ -123,9 +124,10 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
                     >
-                      <img
-                        src={a.avatar_url ?? "/images/wesu-mark.png"}
-                        alt=""
+                      <StorageImage
+                        bucket="artist-images"
+                        path={a.avatar_url}
+                        alt={a.name}
                         className="size-10 rounded-full object-cover bg-muted"
                       />
                       <div className="min-w-0">
@@ -147,9 +149,10 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
                     >
-                      <img
-                        src={s.cover_url ?? "/images/wesu-mark.png"}
-                        alt=""
+                      <StorageImage
+                        bucket="album-art"
+                        path={s.cover_url}
+                        alt={s.title}
                         className="size-10 rounded object-cover bg-muted"
                       />
                       <div className="min-w-0">
@@ -172,9 +175,10 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
                     >
-                      <img
-                        src={a.cover_url ?? "/images/wesu-mark.png"}
-                        alt=""
+                      <StorageImage
+                        bucket="album-art"
+                        path={a.cover_url}
+                        alt={a.title}
                         className="size-10 rounded object-cover bg-muted"
                       />
                       <div className="min-w-0">

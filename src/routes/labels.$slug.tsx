@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getLabelBySlug } from "@/lib/labels.functions";
+import { StorageImage } from "@/components/StorageImage";
 
 const labelQuery = (slug: string) =>
   queryOptions({
@@ -56,9 +57,12 @@ function LabelPage() {
               className="bg-card border border-border rounded-2xl p-4 text-center hover:border-primary transition"
             >
               <div className="size-24 mx-auto rounded-full bg-secondary mb-3 overflow-hidden">
-                {a.avatar_url && (
-                  <img src={a.avatar_url} alt={a.name} className="w-full h-full object-cover" />
-                )}
+                <StorageImage
+                  bucket="artist-images"
+                  path={a.avatar_url}
+                  alt={a.name}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <p className="font-medium">{a.name}</p>
               <p className="text-xs text-muted-foreground mt-1">

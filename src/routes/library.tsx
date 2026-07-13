@@ -4,6 +4,7 @@ import { Heart, Music } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { StorageImage } from "@/components/StorageImage";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -69,9 +70,10 @@ function Page() {
                 key={song.id}
                 className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
               >
-                <img
-                  src={song.cover_url ?? "/images/wesu-mark.png"}
-                  alt=""
+                <StorageImage
+                  bucket="album-art"
+                  path={song.cover_url}
+                  alt={song.title}
                   className="size-12 rounded object-cover bg-muted"
                 />
                 <div className="flex-1 min-w-0">
@@ -103,9 +105,10 @@ function Page() {
                 key={song.id}
                 className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
               >
-                <img
-                  src={song.cover_url ?? "/images/wesu-mark.png"}
-                  alt=""
+                <StorageImage
+                  bucket="album-art"
+                  path={song.cover_url}
+                  alt={song.title}
                   className="size-12 rounded object-cover bg-muted"
                 />
                 <div className="flex-1 min-w-0">

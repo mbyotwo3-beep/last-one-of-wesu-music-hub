@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
 import { Disc } from "lucide-react";
+import { StorageImage } from "@/components/StorageImage";
 
 const albumsQO = queryOptions({ queryKey: ["albums"], queryFn: () => listAlbums() });
 
@@ -35,15 +36,12 @@ function AlbumsPage() {
             {albums.map((a) => (
               <Link key={a.id} to="/albums/$id" params={{ id: a.id }} className="group">
                 <div className="aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-3 flex items-center justify-center">
-                  {a.cover_url ? (
-                    <img
-                      src={a.cover_url}
-                      alt={a.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <Disc className="size-10 text-muted-foreground" />
-                  )}
+                  <StorageImage
+                    bucket="album-art"
+                    path={a.cover_url}
+                    alt={a.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
                 </div>
                 <p className="font-semibold text-sm truncate">{a.title}</p>
                 <p className="text-xs text-muted-foreground truncate">
