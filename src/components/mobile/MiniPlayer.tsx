@@ -48,28 +48,30 @@ export function MiniPlayer() {
         className="mx-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl"
         style={{ backdropFilter: "blur(24px)" }}
       >
-        <button
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
-          onClick={openNowPlaying}
-          aria-label="Open now playing"
-        >
-          {/* Album art */}
-          <StorageImage
-            bucket="album-art"
-            path={track.coverUrl}
-            alt={track.title}
-            className="size-10 rounded-lg overflow-hidden bg-[#2c2c2e] shrink-0 object-cover shadow-md"
-          />
-
-          {/* Track info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate leading-tight">{track.title}</p>
-            <p className="text-xs text-white/60 truncate leading-tight mt-0.5">{track.artistName}</p>
-          </div>
+        <div className="w-full flex items-center gap-3 px-3 py-2.5">
+          {/* Tap album art + info to open now playing */}
+          <button
+            type="button"
+            onClick={openNowPlaying}
+            aria-label="Open now playing"
+            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          >
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="size-10 rounded-lg overflow-hidden bg-[#2c2c2e] shrink-0 object-cover shadow-md"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate leading-tight">{track.title}</p>
+              <p className="text-xs text-white/60 truncate leading-tight mt-0.5">{track.artistName}</p>
+            </div>
+          </button>
 
           {/* Controls */}
-          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 shrink-0">
             <button
+              type="button"
               onClick={skipPrev}
               className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all"
               aria-label="Previous"
@@ -78,6 +80,7 @@ export function MiniPlayer() {
             </button>
 
             <button
+              type="button"
               onClick={togglePlay}
               disabled={isLoading}
               className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all disabled:opacity-40"
@@ -93,6 +96,7 @@ export function MiniPlayer() {
             </button>
 
             <button
+              type="button"
               onClick={skipNext}
               className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all"
               aria-label="Next"
@@ -100,18 +104,17 @@ export function MiniPlayer() {
               <SkipForward className="size-4 fill-white/80" />
             </button>
 
-            {track && (
-              <button
-                onClick={() => usePlayer.getState().exitSong()}
-                className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white active:scale-90 transition-all ml-1 border-l border-white/10 pl-1"
-                aria-label="Exit song"
-                title="Exit song"
-              >
-                <X className="size-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => usePlayer.getState().exitSong()}
+              className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white active:scale-90 transition-all ml-1 border-l border-white/10 pl-1"
+              aria-label="Exit song"
+              title="Exit song"
+            >
+              <X className="size-4" />
+            </button>
           </div>
-        </button>
+        </div>
 
         {/* Spotify-style thin progress bar at the very bottom of the bar */}
         <div className="h-[2px] bg-white/10 w-full">
