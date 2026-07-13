@@ -214,12 +214,16 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
   });
 
 /**
- * Get a signed audio URL for a short preview.
- * SECURITY: paid tracks are NEVER returned in full without verifying entitlement.
- * - Free tracks (price = 0): returns a short (60s) signed URL; client caps to 15s.
- * - Paid tracks: requires an authenticated user with an active subscription or a purchase.
- *   Otherwise a "purchase required" error is thrown so anonymous callers cannot
- *   obtain a working URL to the full audio file.
+ * Get a signed audio URL for a short 15-second preview (client-capped).
+ *
+ * Previews are intentionally public for ALL approved tracks (free and paid)
+ * so anonymous listeners can sample songs before buying/subscribing. The
+ * server returns a short-lived (45s) signed URL and the client stops
+ * playback at 15s. A determined user could theoretically grab more of the
+ * file within the 45s window — this is an accepted trade-off to keep the
+ * "sample before buy" funnel frictionless.
+ *
+ * Full-length playback still requires entitlement — see getSignedAudioUrl.
  */
 export const getPreviewAudioUrl = createServerFn({ method: "POST" })
   .validator((d: { song_id: string; access_token?: string | null }) => d)
@@ -227,56 +231,21 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     const supabase = getPublicSupabase();
     const { data: song } = await supabase
       .from("songs")
-      .select("audio_url, price, id")
+      .select("audio_url, id")
       .eq("id", data.song_id)
       .eq("status", "approved")
       .single();
     if (!song) throw new Error("Song not found");
 
-    const isPaid = (song as any).price && Number((song as any).price) > 0;
-
-    if (isPaid) {
-      // Require entitlement (active subscription OR purchase). No anonymous access.
-      const token = data.access_token;
-      if (!token) throw new Error("Purchase or subscription required to preview this track");
-      const { createClient } = await import("@supabase/supabase-js");
-      const authed = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_PUBLISHABLE_KEY!,
-        { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } },
-      );
-      const { data: userRes } = await authed.auth.getUser();
-      const uid = userRes?.user?.id;
-      if (!uid) throw new Error("Sign in required to preview paid tracks");
-      const [{ data: sub }, { data: purchase }] = await Promise.all([
-        authed
-          .from("subscriptions")
-          .select("id")
-          .eq("user_id", uid)
-          .eq("status", "active")
-          .maybeSingle(),
-        authed
-          .from("purchases")
-          .select("id")
-          .eq("user_id", uid)
-          .eq("song_id", data.song_id)
-          .maybeSingle(),
-      ]);
-      if (!sub && !purchase) throw new Error("Purchase or subscription required to preview this track");
-    }
-
-    // Short-lived signed URL (60s) — enough to start playback, minimizes reuse.
+    // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: signed, error } = await supabaseAdmin.storage
         .from("song-audio")
-        .createSignedUrl((song as any).audio_url, 60);
+        .createSignedUrl((song as any).audio_url, 45);
       if (error) throw error;
       return { url: signed.signedUrl };
-
     } catch (adminError) {
-      // FALLBACK: If service role unavailable, use public URL
-      // This works if storage bucket has public read access
       console.warn("[Audio] Service role unavailable for preview, using public URL:", adminError);
       const { supabase: publicClient } = await import("@/integrations/supabase/client");
       const { data: publicUrl } = publicClient.storage
