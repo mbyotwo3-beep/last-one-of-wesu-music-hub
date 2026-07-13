@@ -162,9 +162,10 @@ function SearchPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {albums.map((a) => (
                   <Link key={a.id} to="/albums/$id" params={{ id: a.id }} className="group">
-                    <img
-                      src={a.cover_url ?? "/images/wesu-mark.png"}
-                      alt=""
+                    <StorageImage
+                      bucket="album-art"
+                      path={a.cover_url}
+                      alt={a.title}
                       className="w-full aspect-square rounded-lg object-cover bg-muted mb-2 group-hover:opacity-90 transition-opacity"
                     />
                     <div className="text-sm font-medium truncate">{a.title}</div>
