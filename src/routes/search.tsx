@@ -6,6 +6,7 @@ import { z } from "zod";
 import { globalSearch } from "@/lib/music.functions";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Music, Disc3, Mic2 } from "lucide-react";
+import { StorageImage } from "@/components/StorageImage";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
