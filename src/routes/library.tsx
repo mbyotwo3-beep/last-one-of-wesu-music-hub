@@ -4,6 +4,7 @@ import { Heart, Music } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { StorageImage } from "@/components/StorageImage";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
