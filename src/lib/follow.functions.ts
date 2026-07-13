@@ -7,10 +7,8 @@ export const getFollowState = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const supabase = getPublicSupabase();
     const [countRes, mineRes] = await Promise.all([
-      supabase
-        .from("artist_followers")
-        .select("id", { count: "exact", head: true })
-        .eq("artist_id", data.artist_id),
+      // Aggregate-only via SECURITY DEFINER RPC — raw follower rows are no longer public.
+      supabase.rpc("get_artist_follower_count" as any, { _artist_id: data.artist_id }),
       data.user_id
         ? supabase
             .from("artist_followers")
@@ -21,10 +19,11 @@ export const getFollowState = createServerFn({ method: "GET" })
         : Promise.resolve({ data: null }),
     ]);
     return {
-      count: countRes.count ?? 0,
+      count: Number((countRes as { data: unknown }).data ?? 0),
       following: !!(mineRes as { data: unknown }).data,
     };
   });
+
 
 export const toggleFollow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

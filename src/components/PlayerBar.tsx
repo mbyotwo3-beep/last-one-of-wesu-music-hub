@@ -138,21 +138,27 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         let url: string;
         let previewMode = false;
 
+        // Get current access token for entitlement-checked preview of paid tracks.
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: sess } = await supabase.auth.getSession();
+        const accessToken = sess.session?.access_token ?? null;
+
         if (user) {
           try {
             const res = await getSignedFn({ data: { song_id: track!.id } });
             url = res.url;
           } catch {
-            const res = await getPreviewFn({ data: { song_id: track!.id } });
+            const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
             url = res.url;
             previewMode = true;
           }
         } else {
-          const res = await getPreviewFn({ data: { song_id: track!.id } });
+          const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
           url = res.url;
           previewMode = true;
           setShowAd(true);
         }
+
 
         setIsPreview(previewMode);
 
