@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getLabelBySlug } from "@/lib/labels.functions";
+import { StorageImage } from "@/components/StorageImage";
 
 const labelQuery = (slug: string) =>
   queryOptions({
