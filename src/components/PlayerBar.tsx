@@ -30,6 +30,7 @@ import {
 } from "@/lib/listener.functions";
 import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
+import { useTrackMeta } from "@/hooks/use-track-meta";
 import {
   preloadNative,
   playNative,
@@ -94,6 +95,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const currentTrackId = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: meta } = useTrackMeta(track?.id);
+  const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
+  const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
+  const trackPrice: number = Number(meta?.price ?? 0);
 
   // Load audio when track changes
   useEffect(() => {
