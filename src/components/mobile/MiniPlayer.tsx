@@ -2,6 +2,7 @@ import { Loader2, Pause, Play, SkipForward, SkipBack, X, Radio } from "lucide-re
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
+import { useTrackMeta } from "@/hooks/use-track-meta";
 
 /**
  * Spotify-style persistent mini player rendered above BottomTabBar.
@@ -21,6 +22,8 @@ export function MiniPlayer() {
   const skipPrev = usePlayer((s) => s.skipPrev);
   const openNowPlaying = usePlayer((s) => s.openNowPlaying);
   const isPreview = usePlayer((s) => s.isPreview);
+  const { data: meta } = useTrackMeta(track?.id);
+  const trackPrice: number = Number(meta?.price ?? 0);
 
   if (!track) return null;
 
@@ -38,9 +41,20 @@ export function MiniPlayer() {
           <span className="flex items-center gap-1.5 text-amber-400 font-medium">
             <Radio className="size-3" /> 15-second preview
           </span>
-          <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-300 hover:underline">
-            Unlock →
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            {trackPrice > 0 && (
+              <Link
+                to="/checkout"
+                search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                className="font-semibold text-amber-300 hover:underline"
+              >
+                Buy K{trackPrice.toFixed(0)}
+              </Link>
+            )}
+            <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-300 hover:underline">
+              Subscribe →
+            </Link>
+          </div>
         </div>
       )}
       {/* Main bar */}
