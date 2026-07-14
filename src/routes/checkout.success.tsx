@@ -39,7 +39,22 @@ function CheckoutSuccessPage() {
       return data;
     },
     enabled: !!ref && !!user,
+    // Poll every 2s while pending — the Lenco webhook may arrive after redirect.
+    // Stops polling once completed/failed is reached, or after ~2 min.
+    refetchInterval: (q) => {
+      const status = (q.state.data as any)?.status;
+      if (status === "completed" || status === "failed") return false;
+      return 2000;
+    },
+    refetchIntervalInBackground: true,
   });
+
+  const [pollElapsed, setPollElapsed] = useState(0);
+  useEffect(() => {
+    if (transaction?.status !== "pending") return;
+    const t = setInterval(() => setPollElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [transaction?.status]);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
