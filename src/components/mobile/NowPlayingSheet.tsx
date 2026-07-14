@@ -18,6 +18,8 @@ import { useRef, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
+import { StorageImage } from "@/components/StorageImage";
+import { useTrackMeta } from "@/hooks/use-track-meta";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -47,6 +49,10 @@ export function NowPlayingSheet() {
   const isPreview = usePlayer((s) => s.isPreview);
 
   const { user } = useAuth();
+  const { data: meta } = useTrackMeta(track?.id);
+  const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
+  const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
+  const price: number = Number(meta?.price ?? 0);
 
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
@@ -190,9 +196,26 @@ export function NowPlayingSheet() {
             <span className="flex items-center gap-1.5 text-amber-300 font-medium">
               <Radio className="size-3.5" /> Playing 15-second preview
             </span>
-            <Link to="/checkout" search={{ plan: "premium_monthly" }} onClick={closeNowPlaying} className="font-semibold text-amber-200 hover:underline whitespace-nowrap">
-              Unlock full →
-            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              {price > 0 && track && (
+                <Link
+                  to="/checkout"
+                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                  onClick={closeNowPlaying}
+                  className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
+                >
+                  Buy K{price.toFixed(0)}
+                </Link>
+              )}
+              <Link
+                to="/checkout"
+                search={{ plan: "premium_monthly" }}
+                onClick={closeNowPlaying}
+                className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
+              >
+                Subscribe →
+              </Link>
+            </div>
           </div>
         )}
 
@@ -209,7 +232,12 @@ export function NowPlayingSheet() {
             }}
           >
             {track.coverUrl ? (
-              <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+              <StorageImage
+                bucket="album-art"
+                path={track.coverUrl}
+                alt={track.title}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Music2 className="size-24 text-white/20" />
@@ -221,8 +249,30 @@ export function NowPlayingSheet() {
         {/* Track info + Like */}
         <div className="flex items-center justify-between px-6 mb-3 shrink-0">
           <div className="flex-1 min-w-0 mr-4">
-            <p className="text-xl font-bold text-white truncate">{track.title}</p>
-            <p className="text-sm text-white/60 truncate mt-0.5">{track.artistName}</p>
+            {albumId ? (
+              <Link
+                to="/albums/$id"
+                params={{ id: albumId }}
+                onClick={closeNowPlaying}
+                className="text-xl font-bold text-white truncate block hover:underline"
+              >
+                {track.title}
+              </Link>
+            ) : (
+              <p className="text-xl font-bold text-white truncate">{track.title}</p>
+            )}
+            {artistId ? (
+              <Link
+                to="/artists/$id"
+                params={{ id: artistId }}
+                onClick={closeNowPlaying}
+                className="text-sm text-white/60 truncate mt-0.5 block hover:text-white hover:underline"
+              >
+                {track.artistName}
+              </Link>
+            ) : (
+              <p className="text-sm text-white/60 truncate mt-0.5">{track.artistName}</p>
+            )}
           </div>
           {user && (
             <button

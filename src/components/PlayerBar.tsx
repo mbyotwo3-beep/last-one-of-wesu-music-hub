@@ -30,6 +30,7 @@ import {
 } from "@/lib/listener.functions";
 import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
+import { useTrackMeta } from "@/hooks/use-track-meta";
 import {
   preloadNative,
   playNative,
@@ -94,6 +95,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const currentTrackId = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: meta } = useTrackMeta(track?.id);
+  const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
+  const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
+  const trackPrice: number = Number(meta?.price ?? 0);
 
   // Load audio when track changes
   useEffect(() => {
@@ -331,8 +336,20 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           <div className="p-6 space-y-6 max-w-md mx-auto w-full">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <h2 className="text-2xl font-bold truncate">{track.title}</h2>
-                <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
+                {albumId ? (
+                  <Link to="/albums/$id" params={{ id: albumId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                    <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                  </Link>
+                ) : (
+                  <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                )}
+                {artistId ? (
+                  <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block text-lg text-muted-foreground truncate hover:text-foreground hover:underline">
+                    {track.artistName}
+                  </Link>
+                ) : (
+                  <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
+                )}
               </div>
               {user && (
                 <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
@@ -340,6 +357,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 </button>
               )}
             </div>
+            {isPreview && trackPrice > 0 && (
+              <Link
+                to="/checkout"
+                search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                onClick={() => setIsExpanded(false)}
+                className="block w-full text-center py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/30 transition-colors"
+              >
+                Buy this track — ZMW {trackPrice.toFixed(2)}
+              </Link>
+            )}
             <div className="space-y-2">
               <div
                 className="h-1.5 bg-muted rounded-full relative overflow-hidden cursor-pointer group"
@@ -433,9 +460,20 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
               <Radio className="size-3" /> 15-second preview
             </span>
-            <Link to="/checkout" className="font-semibold text-amber-600 dark:text-amber-400 hover:underline">
-              Subscribe for full access →
-            </Link>
+            <div className="flex items-center gap-3">
+              {trackPrice > 0 && (
+                <Link
+                  to="/checkout"
+                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                  className="font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                >
+                  Buy ZMW {trackPrice.toFixed(2)}
+                </Link>
+              )}
+              <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-600 dark:text-amber-400 hover:underline">
+                Subscribe for full access →
+              </Link>
+            </div>
           </div>
         )}
 
@@ -450,10 +488,22 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               onClick={() => setIsExpanded(true)}
             />
             <div className="min-w-0 overflow-hidden">
-              <p className="text-sm font-medium truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
-                {track.title}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
+              {albumId ? (
+                <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium truncate hover:underline block">
+                  {track.title}
+                </Link>
+              ) : (
+                <p className="text-sm font-medium truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
+                  {track.title}
+                </p>
+              )}
+              {artistId ? (
+                <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block">
+                  {track.artistName}
+                </Link>
+              ) : (
+                <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
+              )}
             </div>
             {user && (
               <button

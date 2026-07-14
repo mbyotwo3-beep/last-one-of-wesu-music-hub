@@ -39,7 +39,22 @@ function CheckoutSuccessPage() {
       return data;
     },
     enabled: !!ref && !!user,
+    // Poll every 2s while pending — the Lenco webhook may arrive after redirect.
+    // Stops polling once completed/failed is reached, or after ~2 min.
+    refetchInterval: (q) => {
+      const status = (q.state.data as any)?.status;
+      if (status === "completed" || status === "failed") return false;
+      return 2000;
+    },
+    refetchIntervalInBackground: true,
   });
+
+  const [pollElapsed, setPollElapsed] = useState(0);
+  useEffect(() => {
+    if (transaction?.status !== "pending") return;
+    const t = setInterval(() => setPollElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [transaction?.status]);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -107,7 +122,8 @@ function CheckoutSuccessPage() {
               <Loader2 className="size-16 text-primary mx-auto mb-4 animate-spin" />
               <h1 className="text-3xl font-bold mb-2">Payment Processing</h1>
               <p className="text-muted-foreground mb-6">
-                Your payment is being processed. This may take a few moments.
+                Waiting for confirmation from Lenco… If you paid via mobile money, approve the prompt on your phone.
+                {pollElapsed > 0 && ` (${pollElapsed}s)`}
               </p>
               <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
                 <p className="text-sm text-muted-foreground mb-2">Transaction ID</p>

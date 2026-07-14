@@ -55,35 +55,48 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
           return new Response("OK", { status: 200 });
         }
 
-        // Ignore replays for already-completed transactions
-        if ((row as any).status === "completed") {
-          return new Response("OK", { status: 200 });
-        }
-
         const isSuccess =
           event.endsWith(".successful") || tx.status === "successful" || tx.status === "success";
         const isFailure =
           event.endsWith(".failed") || tx.status === "failed" || tx.status === "declined";
 
         if (isSuccess) {
-          const { error } = await supabaseAdmin
+          // IDEMPOTENT transition: only proceed when we actually flip pending → completed.
+          // If two webhooks race, only one wins the update and calls fulfillTransaction.
+          const { data: claimed, error: claimErr } = await supabaseAdmin
             .from("payment_transactions")
             .update({ status: "completed", provider_ref: providerRef ?? null } as any)
-            .eq("id", row.id);
-          if (error) {
-            console.error("[Lenco webhook] Update failed:", error.message);
+            .eq("id", row.id)
+            .eq("status", "pending")
+            .select()
+            .maybeSingle();
+
+          if (claimErr) {
+            console.error("[Lenco webhook] Claim failed:", claimErr.message);
             return new Response("OK", { status: 200 });
           }
+
+          if (!claimed) {
+            // Already processed by a previous delivery — nothing more to do.
+            return new Response("OK", { status: 200 });
+          }
+
           try {
-            await fulfillTransaction(row as any);
+            await fulfillTransaction(claimed as any);
           } catch (e) {
             console.error("[Lenco webhook] Fulfillment failed:", e);
+            // Mark as failed so the user can retry from the checkout success page.
+            await supabaseAdmin
+              .from("payment_transactions")
+              .update({ status: "failed" } as any)
+              .eq("id", row.id);
           }
         } else if (isFailure) {
           await supabaseAdmin
             .from("payment_transactions")
             .update({ status: "failed", provider_ref: providerRef ?? null } as any)
-            .eq("id", row.id);
+            .eq("id", row.id)
+            .eq("status", "pending");
         }
 
         return new Response("OK", { status: 200 });
