@@ -18,6 +18,8 @@ import { useRef, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
+import { StorageImage } from "@/components/StorageImage";
+import { useTrackMeta } from "@/hooks/use-track-meta";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -47,6 +49,10 @@ export function NowPlayingSheet() {
   const isPreview = usePlayer((s) => s.isPreview);
 
   const { user } = useAuth();
+  const { data: meta } = useTrackMeta(track?.id);
+  const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
+  const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
+  const price: number = Number(meta?.price ?? 0);
 
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
