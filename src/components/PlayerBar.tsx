@@ -505,23 +505,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
               )}
             </div>
-
-        <div className="h-20 px-4 grid grid-cols-3 items-center gap-4">
-          {/* Left: Track info */}
-          <div className="flex items-center gap-3 min-w-0">
-            <StorageImage
-              bucket="album-art"
-              path={track.coverUrl}
-              alt={track.title}
-              className="size-14 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 object-cover cursor-pointer"
-              onClick={() => setIsExpanded(true)}
-            />
-            <div className="min-w-0 overflow-hidden">
-              <p className="text-sm font-medium truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
-                {track.title}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
-            </div>
             {user && (
               <button
                 onClick={toggleLike}
