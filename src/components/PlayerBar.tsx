@@ -144,10 +144,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const accessToken = sess.session?.access_token ?? null;
 
         if (user) {
+          let signed: { url: string; requiresPurchase?: boolean } | null = null;
           try {
-            const res = await getSignedFn({ data: { song_id: track!.id } });
-            url = res.url;
+            signed = await getSignedFn({ data: { song_id: track!.id } });
           } catch {
+            signed = null;
+          }
+          if (signed && signed.url && !signed.requiresPurchase) {
+            url = signed.url;
+          } else {
             const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
             url = res.url;
             previewMode = true;

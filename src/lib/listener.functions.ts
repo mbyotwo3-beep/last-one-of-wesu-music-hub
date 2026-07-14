@@ -150,7 +150,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
           .eq("song_id", data.song_id)
           .maybeSingle(),
       ]);
-      if (!sub && !purchase) throw new Error("Subscribe or purchase to play full track");
+      if (!sub && !purchase) return { url: "", requiresPurchase: true as const };
     }
 
 
