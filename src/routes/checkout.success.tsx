@@ -122,7 +122,8 @@ function CheckoutSuccessPage() {
               <Loader2 className="size-16 text-primary mx-auto mb-4 animate-spin" />
               <h1 className="text-3xl font-bold mb-2">Payment Processing</h1>
               <p className="text-muted-foreground mb-6">
-                Your payment is being processed. This may take a few moments.
+                Waiting for confirmation from Lenco… If you paid via mobile money, approve the prompt on your phone.
+                {pollElapsed > 0 && ` (${pollElapsed}s)`}
               </p>
               <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
                 <p className="text-sm text-muted-foreground mb-2">Transaction ID</p>
