@@ -131,22 +131,8 @@ export function MobileHome() {
         </div>
       </div>
 
-      {/* Go Premium card */}
-      <div className="mx-4 bg-primary/10 border border-primary/20 rounded-2xl p-5 flex items-center gap-4">
-        <Crown className="size-8 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm">Go Premium</p>
-          <p className="text-xs text-muted-foreground">
-            Ad-free listening · Support Zambian artists
-          </p>
-        </div>
-        <Link
-          to="/subscriptions"
-          className="shrink-0 px-4 py-2 bg-primary text-primary-foreground rounded-full text-xs font-bold min-h-[44px] flex items-center"
-        >
-          Upgrade
-        </Link>
-      </div>
+      {/* Go Premium card — temporarily hidden while subscriptions are disabled */}
+
     </div>
   );
 }
