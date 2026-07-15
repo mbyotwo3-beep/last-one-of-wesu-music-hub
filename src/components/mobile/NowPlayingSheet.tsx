@@ -364,7 +364,7 @@ export function NowPlayingSheet() {
           </button>
 
           <button
-            onClick={() => setRepeat(r => r === "off" ? "all" : r === "all" ? "one" : "off")}
+            onClick={cycleRepeat}
             className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 relative ${repeat !== "off" ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={repeatLabel}
           >
