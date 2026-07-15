@@ -48,32 +48,8 @@ export function MobileLibrary() {
 
   return (
     <div className="pb-6">
-      {/* Subscription banner */}
-      <div
-        className={`mx-4 mt-4 mb-6 rounded-2xl p-4 flex items-center gap-3 ${
-          subscription ? "bg-primary/10 border border-primary/20" : "bg-card border border-border"
-        }`}
-      >
-        <Crown
-          className={`size-6 shrink-0 ${subscription ? "text-primary" : "text-muted-foreground"}`}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold truncate">
-            {subscription ? subscription.plan : "Free Plan"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {subscription ? "Premium active" : "Upgrade for ad-free listening"}
-          </p>
-        </div>
-        {!subscription && (
-          <a
-            href="/subscriptions"
-            className="shrink-0 px-3 py-1.5 bg-primary text-primary-foreground rounded-full text-xs font-bold min-h-[44px] flex items-center"
-          >
-            Upgrade
-          </a>
-        )}
-      </div>
+      {/* Subscription banner temporarily hidden while subscriptions are disabled */}
+
 
       {/* Playlists */}
       <div className="mb-6">
