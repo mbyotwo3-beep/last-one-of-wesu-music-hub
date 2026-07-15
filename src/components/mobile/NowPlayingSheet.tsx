@@ -56,11 +56,14 @@ export function NowPlayingSheet() {
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
 
-  const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
+  const shuffle = usePlayer((s) => s.shuffle);
+  const repeat = usePlayer((s) => s.repeat);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
+  const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const [volume, setVolume] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
+
 
   const touchStartY = useRef(0);
   const touchCurrentY = useRef(0);
@@ -251,9 +254,19 @@ export function NowPlayingSheet() {
               >
                 {track.title}
               </Link>
+            ) : artistId ? (
+              <Link
+                to="/artists/$id"
+                params={{ id: artistId }}
+                onClick={closeNowPlaying}
+                className="text-xl font-bold text-white truncate block hover:underline"
+              >
+                {track.title}
+              </Link>
             ) : (
               <p className="text-xl font-bold text-white truncate">{track.title}</p>
             )}
+
             {artistId ? (
               <Link
                 to="/artists/$id"
