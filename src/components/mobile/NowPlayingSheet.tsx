@@ -20,6 +20,8 @@ import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
+import { useSavedTrack } from "@/hooks/use-saved-track";
+
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -38,10 +40,8 @@ export function NowPlayingSheet() {
   const open = usePlayer((s) => s.nowPlayingOpen);
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
-  const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const toggleLike = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
@@ -53,6 +53,8 @@ export function NowPlayingSheet() {
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const price: number = Number(meta?.price ?? 0);
+  const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
+
 
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
@@ -196,28 +198,19 @@ export function NowPlayingSheet() {
             <span className="flex items-center gap-1.5 text-amber-300 font-medium">
               <Radio className="size-3.5" /> Playing 15-second preview
             </span>
-            <div className="flex items-center gap-2 shrink-0">
-              {price > 0 && track && (
-                <Link
-                  to="/checkout"
-                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
-                  onClick={closeNowPlaying}
-                  className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
-                >
-                  Buy K{price.toFixed(0)}
-                </Link>
-              )}
+            {price > 0 && track && (
               <Link
                 to="/checkout"
-                search={{ plan: "premium_monthly" }}
+                search={{ plan: "premium_monthly", item: "song", id: track.id }}
                 onClick={closeNowPlaying}
-                className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
+                className="font-semibold text-amber-200 hover:underline whitespace-nowrap shrink-0"
               >
-                Subscribe →
+                Buy K{price.toFixed(0)}
               </Link>
-            </div>
+            )}
           </div>
         )}
+
 
 
 

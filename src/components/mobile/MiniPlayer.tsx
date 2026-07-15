@@ -41,22 +41,18 @@ export function MiniPlayer() {
           <span className="flex items-center gap-1.5 text-amber-400 font-medium">
             <Radio className="size-3" /> 15-second preview
           </span>
-          <div className="flex items-center gap-2 shrink-0">
-            {trackPrice > 0 && (
-              <Link
-                to="/checkout"
-                search={{ plan: "premium_monthly", item: "song", id: track.id }}
-                className="font-semibold text-amber-300 hover:underline"
-              >
-                Buy K{trackPrice.toFixed(0)}
-              </Link>
-            )}
-            <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-300 hover:underline">
-              Subscribe →
+          {trackPrice > 0 && (
+            <Link
+              to="/checkout"
+              search={{ plan: "premium_monthly", item: "song", id: track.id }}
+              className="font-semibold text-amber-300 hover:underline shrink-0"
+            >
+              Buy K{trackPrice.toFixed(0)}
             </Link>
-          </div>
+          )}
         </div>
       )}
+
       {/* Main bar */}
       <div
         className="mx-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl"
