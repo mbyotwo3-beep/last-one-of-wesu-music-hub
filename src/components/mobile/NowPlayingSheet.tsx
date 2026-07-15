@@ -325,7 +325,7 @@ export function NowPlayingSheet() {
         {/* Playback controls */}
         <div className="flex items-center justify-between px-8 mb-4 shrink-0">
           <button
-            onClick={() => setShuffle(!shuffle)}
+            onClick={toggleShuffle}
             className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 ${shuffle ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={`Shuffle ${shuffle ? "on" : "off"}`}
           >
