@@ -49,9 +49,16 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutRoute() {
   const platform = usePlatform();
-  const { plan: planCode } = Route.useSearch();
-  return platform === "native" ? <MobileCheckout planCode={planCode} /> : <CheckoutPage />;
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  // Subscriptions are temporarily disabled — only track/album purchases are supported.
+  useEffect(() => {
+    if (!search.item || !search.id) navigate({ to: "/browse", replace: true });
+  }, [search.item, search.id, navigate]);
+  if (!search.item || !search.id) return null;
+  return platform === "native" ? <MobileCheckout planCode={search.plan} /> : <CheckoutPage />;
 }
+
 
 function CheckoutPage() {
   const search = Route.useSearch();
