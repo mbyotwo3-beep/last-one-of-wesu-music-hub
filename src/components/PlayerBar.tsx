@@ -498,11 +498,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium truncate hover:underline block">
                   {track.title}
                 </Link>
+              ) : artistId ? (
+                <Link to="/artists/$id" params={{ id: artistId }} className="text-sm font-medium truncate hover:underline block">
+                  {track.title}
+                </Link>
               ) : (
                 <p className="text-sm font-medium truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
                   {track.title}
                 </p>
               )}
+
               {artistId ? (
                 <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block">
                   {track.artistName}
