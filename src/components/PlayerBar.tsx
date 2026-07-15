@@ -188,7 +188,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 previewTimerRef.current = setTimeout(() => {
                   stopNative(track!.id).catch(() => {});
                   usePlayer.getState().togglePlay();
-                  setError("Preview ended. Subscribe or purchase for full track.");
+                  setError("Preview ended. Buy this track for full access.");
+
                 }, 15000);
               }
               const cleanup = await onNativeComplete(() => {
@@ -217,7 +218,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           previewTimerRef.current = setTimeout(() => {
             audio.pause();
             usePlayer.getState().togglePlay();
-            setError("Preview ended. Subscribe or purchase for full track.");
+            setError("Preview ended. Buy this track for full access.");
           }, 15000);
         }
       } catch (err) {
@@ -342,6 +343,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   <Link to="/albums/$id" params={{ id: albumId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
                     <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                   </Link>
+                ) : artistId ? (
+                  <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                    <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                  </Link>
                 ) : (
                   <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                 )}
@@ -352,6 +357,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 ) : (
                   <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
                 )}
+
               </div>
               {user && (
                 <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
@@ -469,15 +475,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   search={{ plan: "premium_monthly", item: "song", id: track.id }}
                   className="font-semibold text-amber-600 dark:text-amber-400 hover:underline"
                 >
-                  Buy ZMW {trackPrice.toFixed(2)}
+                  Buy this track — ZMW {trackPrice.toFixed(2)}
                 </Link>
               )}
-              <Link to="/checkout" search={{ plan: "premium_monthly" }} className="font-semibold text-amber-600 dark:text-amber-400 hover:underline">
-                Subscribe for full access →
-              </Link>
             </div>
           </div>
         )}
+
 
         <div className="h-20 px-4 grid grid-cols-3 items-center gap-4">
           {/* Left: Track info */}
