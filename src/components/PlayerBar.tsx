@@ -31,6 +31,8 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
+import { useSavedTrack } from "@/hooks/use-saved-track";
+
 import {
   preloadNative,
   playNative,
@@ -62,14 +64,12 @@ function fmt(seconds: number): string {
 export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
-  const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
   const shuffle = usePlayer((s) => s.shuffle);
   const repeat = usePlayer((s) => s.repeat);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const toggleLike = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
   const setVolume = usePlayer((s) => s.setVolume);
   const toggleMute = usePlayer((s) => s.toggleMute);
@@ -99,6 +99,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const trackPrice: number = Number(meta?.price ?? 0);
+  const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
+
 
   // Load audio when track changes
   useEffect(() => {
