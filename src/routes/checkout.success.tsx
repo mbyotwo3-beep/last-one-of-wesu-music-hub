@@ -39,14 +39,35 @@ function CheckoutSuccessPage() {
       return data;
     },
     enabled: !!ref && !!user,
-    // Poll every 2s while pending — the Lenco webhook may arrive after redirect.
-    // Stops polling once completed/failed is reached, or after ~2 min.
     refetchInterval: (q) => {
       const status = (q.state.data as any)?.status;
       if (status === "completed" || status === "failed") return false;
       return 2000;
     },
     refetchIntervalInBackground: true,
+  });
+
+  const { data: receiptItem } = useQuery({
+    queryKey: ["receipt-item", transaction?.item_type, transaction?.item_id],
+    enabled: !!transaction?.item_id && !!transaction?.item_type,
+    queryFn: async () => {
+      const t = transaction as any;
+      if (t.item_type === "song") {
+        const { data } = await supabase
+          .from("songs")
+          .select("id,title,price,artists:artist_id(id,name)")
+          .eq("id", t.item_id).maybeSingle();
+        return data;
+      }
+      if (t.item_type === "album") {
+        const { data } = await supabase
+          .from("albums")
+          .select("id,title,price,artists:artist_id(id,name)")
+          .eq("id", t.item_id).maybeSingle();
+        return data;
+      }
+      return null;
+    },
   });
 
   const [pollElapsed, setPollElapsed] = useState(0);
@@ -76,6 +97,39 @@ function CheckoutSuccessPage() {
   const isSuccess = transaction?.status === "completed";
   const isFailed = transaction?.status === "failed";
   const isPending = transaction?.status === "pending";
+  const tx: any = transaction;
+
+  const StatusBadge = () => {
+    if (isSuccess) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-500 border border-green-500/20">Completed</span>;
+    if (isFailed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-500 border border-red-500/20">Failed</span>;
+    if (isPending) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">Pending</span>;
+    return null;
+  };
+
+  const Receipt = () =>
+    !tx ? null : (
+      <div className="bg-secondary/40 rounded-xl p-5 text-left space-y-3 mb-6 border border-border">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Receipt</h3>
+          <StatusBadge />
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">
+            {(receiptItem as any)?.title ?? tx.item_type ?? "Item"}
+            {(receiptItem as any)?.artists?.name ? ` — ${(receiptItem as any).artists.name}` : ""}
+          </span>
+          <span className="font-semibold">{tx.currency} {Number(tx.amount).toFixed(2)}</span>
+        </div>
+        <div className="border-t border-border pt-3 grid grid-cols-2 gap-y-2 text-xs">
+          <span className="text-muted-foreground">Payment method</span>
+          <span className="text-right font-medium">{tx.method_code}</span>
+          <span className="text-muted-foreground">Date</span>
+          <span className="text-right">{new Date(tx.created_at).toLocaleString()}</span>
+          <span className="text-muted-foreground">Transaction ID</span>
+          <span className="text-right font-mono truncate">{tx.id}</span>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen pb-24">
@@ -86,17 +140,14 @@ function CheckoutSuccessPage() {
               <CheckCircle className="size-16 text-green-500 mx-auto mb-4" />
               <h1 className="text-3xl font-bold mb-2">Payment Successful!</h1>
               <p className="text-muted-foreground mb-6">
-                Your payment has been processed successfully. Thank you for your purchase.
+                Thank you for your purchase — your track is now unlocked.
               </p>
-              <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
-                <p className="text-sm text-muted-foreground mb-2">Transaction ID</p>
-                <p className="font-mono text-sm">{ref}</p>
-              </div>
+              <Receipt />
               <button
                 onClick={() => navigate({ to: "/dashboard" })}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
-                Return to Dashboard
+                Go to My Library
               </button>
             </>
           ) : isFailed ? (
@@ -106,12 +157,9 @@ function CheckoutSuccessPage() {
               <p className="text-muted-foreground mb-6">
                 Your payment could not be processed. Please try again or contact support.
               </p>
-              <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
-                <p className="text-sm text-muted-foreground mb-2">Transaction ID</p>
-                <p className="font-mono text-sm">{ref}</p>
-              </div>
+              <Receipt />
               <button
-                onClick={() => navigate({ to: "/checkout" })}
+                onClick={() => navigate({ to: "/browse" })}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
                 Try Again
@@ -125,10 +173,7 @@ function CheckoutSuccessPage() {
                 Waiting for confirmation from Lenco… If you paid via mobile money, approve the prompt on your phone.
                 {pollElapsed > 0 && ` (${pollElapsed}s)`}
               </p>
-              <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
-                <p className="text-sm text-muted-foreground mb-2">Transaction ID</p>
-                <p className="font-mono text-sm">{ref}</p>
-              </div>
+              <Receipt />
               <button
                 onClick={() => navigate({ to: "/dashboard" })}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
@@ -156,3 +201,4 @@ function CheckoutSuccessPage() {
     </div>
   );
 }
+

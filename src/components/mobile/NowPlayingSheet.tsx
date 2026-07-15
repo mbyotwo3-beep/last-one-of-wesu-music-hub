@@ -20,6 +20,8 @@ import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
+import { useSavedTrack } from "@/hooks/use-saved-track";
+
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -38,10 +40,8 @@ export function NowPlayingSheet() {
   const open = usePlayer((s) => s.nowPlayingOpen);
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
-  const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const toggleLike = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
@@ -53,12 +53,17 @@ export function NowPlayingSheet() {
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const price: number = Number(meta?.price ?? 0);
+  const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
-  const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState<"off" | "one" | "all">("off");
+
+  const shuffle = usePlayer((s) => s.shuffle);
+  const repeat = usePlayer((s) => s.repeat);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
+  const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const [volume, setVolume] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
+
 
   const touchStartY = useRef(0);
   const touchCurrentY = useRef(0);
@@ -196,28 +201,19 @@ export function NowPlayingSheet() {
             <span className="flex items-center gap-1.5 text-amber-300 font-medium">
               <Radio className="size-3.5" /> Playing 15-second preview
             </span>
-            <div className="flex items-center gap-2 shrink-0">
-              {price > 0 && track && (
-                <Link
-                  to="/checkout"
-                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
-                  onClick={closeNowPlaying}
-                  className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
-                >
-                  Buy K{price.toFixed(0)}
-                </Link>
-              )}
+            {price > 0 && track && (
               <Link
                 to="/checkout"
-                search={{ plan: "premium_monthly" }}
+                search={{ plan: "premium_monthly", item: "song", id: track.id }}
                 onClick={closeNowPlaying}
-                className="font-semibold text-amber-200 hover:underline whitespace-nowrap"
+                className="font-semibold text-amber-200 hover:underline whitespace-nowrap shrink-0"
               >
-                Subscribe →
+                Buy K{price.toFixed(0)}
               </Link>
-            </div>
+            )}
           </div>
         )}
+
 
 
 
@@ -258,9 +254,19 @@ export function NowPlayingSheet() {
               >
                 {track.title}
               </Link>
+            ) : artistId ? (
+              <Link
+                to="/artists/$id"
+                params={{ id: artistId }}
+                onClick={closeNowPlaying}
+                className="text-xl font-bold text-white truncate block hover:underline"
+              >
+                {track.title}
+              </Link>
             ) : (
               <p className="text-xl font-bold text-white truncate">{track.title}</p>
             )}
+
             {artistId ? (
               <Link
                 to="/artists/$id"
@@ -319,7 +325,7 @@ export function NowPlayingSheet() {
         {/* Playback controls */}
         <div className="flex items-center justify-between px-8 mb-4 shrink-0">
           <button
-            onClick={() => setShuffle(!shuffle)}
+            onClick={toggleShuffle}
             className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 ${shuffle ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={`Shuffle ${shuffle ? "on" : "off"}`}
           >
@@ -358,7 +364,7 @@ export function NowPlayingSheet() {
           </button>
 
           <button
-            onClick={() => setRepeat(r => r === "off" ? "all" : r === "all" ? "one" : "off")}
+            onClick={cycleRepeat}
             className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 relative ${repeat !== "off" ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={repeatLabel}
           >

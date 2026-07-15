@@ -174,13 +174,8 @@ export function MobileProfile() {
             Become an Artist
           </Link>
         )}
-        <Link
-          to="/subscriptions"
-          className="flex items-center gap-3 min-h-[44px] px-4 bg-card border border-border rounded-xl text-sm font-medium"
-        >
-          <CreditCard className="size-4 text-muted-foreground" />
-          Manage Subscription
-        </Link>
+        {/* Subscriptions temporarily disabled */}
+
       </div>
 
       {/* Sign out */}

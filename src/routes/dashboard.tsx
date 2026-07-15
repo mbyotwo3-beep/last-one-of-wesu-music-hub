@@ -73,11 +73,12 @@ function DashboardPage() {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
 
   const stats = [
-    { label: "Playlists", value: data.stats.playlists, icon: ListMusic, link: "/playlists" },
-    { label: "Purchases", value: data.stats.purchases, icon: ShoppingBag, link: "/library" },
-    { label: "Plan", value: data.subscription?.plan ?? "Free", icon: Headphones, link: "/subscriptions" },
-    { label: "Liked", value: 0, icon: Heart, link: "/library" },
+    { label: "Playlists", value: data.stats.playlists, icon: ListMusic, link: "/playlists" as const },
+    { label: "Purchases", value: data.stats.purchases, icon: ShoppingBag, link: "/library" as const },
+    { label: "Liked Songs", value: (data as any).stats?.saved ?? 0, icon: Heart, link: "/dashboard" as const },
   ];
+
+  const savedTracks: any[] = (data as any).savedTracks ?? [];
 
   return (
     <div className="min-h-screen pb-24">
@@ -87,11 +88,11 @@ function DashboardPage() {
           Welcome back{data.profile?.full_name ? `, ${data.profile.full_name}` : ""}.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-12">
           {stats.map((stat) => (
             <Link
               key={stat.label}
-              to={stat.link as any}
+              to={stat.link}
               className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-colors cursor-pointer"
             >
               <stat.icon className="size-5 text-primary mb-3" />
@@ -101,7 +102,46 @@ function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+          <div className="bg-card border border-border rounded-2xl p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Heart className="size-4 text-primary" /> Liked Songs
+            </h2>
+            {savedTracks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Tap the heart on any track and it will show up here.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {savedTracks.slice(0, 8).map((s) => {
+                  const song = s.song ?? {};
+                  const artistId = song?.artists?.id ?? song?.artist_id;
+                  const albumId = song?.album_id;
+                  return (
+                    <div key={s.id} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-accent transition-colors">
+                      <div className="min-w-0">
+                        {albumId ? (
+                          <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium truncate hover:underline block">
+                            {song.title ?? "Untitled"}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-medium truncate">{song.title ?? "Untitled"}</p>
+                        )}
+                        {artistId ? (
+                          <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block">
+                            {song?.artists?.name ?? "—"}
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-muted-foreground truncate">{song?.artists?.name ?? "—"}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="bg-card border border-border rounded-2xl p-6">
             <h2 className="text-lg font-semibold mb-4">My Playlists</h2>
             {data.playlists.length === 0 ? (
@@ -129,38 +169,44 @@ function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
 
-          <div className="bg-card border border-border rounded-2xl p-6">
-            <h2 className="text-lg font-semibold mb-4">Recent Purchases</h2>
-            {data.recentPurchases.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                No purchases yet.{" "}
-                <Link to="/browse" className="text-primary hover:underline">
-                  Browse music →
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {data.recentPurchases.map((p) => {
-                  const title =
-                    (p.song as { title?: string } | null)?.title ??
-                    (p.album as { title?: string } | null)?.title ??
-                    "Item";
-                  return (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-accent"
-                    >
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <ShoppingBag className="size-4 text-primary" /> Orders & Receipts
+          </h2>
+          {data.recentPurchases.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              No purchases yet.{" "}
+              <Link to="/browse" className="text-primary hover:underline">
+                Browse music →
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {data.recentPurchases.map((p) => {
+                const title =
+                  (p.song as { title?: string } | null)?.title ??
+                  (p.album as { title?: string } | null)?.title ??
+                  "Item";
+                const when = new Date(p.created_at).toLocaleDateString();
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between py-3"
+                  >
+                    <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{title}</p>
-                      <span className="text-primary text-sm font-bold">
-                        K{Number(p.amount).toFixed(2)}
-                      </span>
+                      <p className="text-xs text-muted-foreground">{when}</p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    <span className="text-primary text-sm font-bold">
+                      K{Number(p.amount).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
