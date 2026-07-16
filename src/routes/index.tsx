@@ -8,6 +8,7 @@ import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { getHomeDiscover, getForYou } from "@/lib/music.functions";
+import { getRecentlyPlayed } from "@/lib/play-history.functions";
 import { useAuth } from "@/hooks/use-auth";
 import {
   TrackCard,
@@ -56,11 +57,18 @@ function HomePage() {
   const setTrack = usePlayer((s) => s.setTrack);
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
+  const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
   const { data: forYouData } = useQuery({
     queryKey: ["for-you", user?.id],
     queryFn: () => forYouFn(),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
+  });
+  const { data: recentlyPlayed } = useQuery({
+    queryKey: ["recently-played", user?.id],
+    queryFn: () => recentlyPlayedFn(),
+    enabled: !!user,
+    staleTime: 60 * 1000,
   });
   const {
     featured,
@@ -120,6 +128,16 @@ function HomePage() {
               </div>
             </div>
           </section>
+        )}
+
+        {user && recentlyPlayed && recentlyPlayed.length > 0 && (
+          <HorizontalShelf title="Recently Played" showAllLink="/library">
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {recentlyPlayed.map((s: any) => (
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
         )}
 
         {user && forYouData && forYouData.forYou.length > 0 && (
