@@ -122,6 +122,36 @@ function HomePage() {
           </section>
         )}
 
+        {user && forYouData && forYouData.forYou.length > 0 && (
+          <HorizontalShelf title="Made For You" >
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {forYouData.forYou.map((s: any) => (
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {user && forYouData && forYouData.byFavoriteArtists.length > 0 && (
+          <HorizontalShelf title="More from artists you like">
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {forYouData.byFavoriteArtists.map((s: any) => (
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {user && forYouData && forYouData.favoriteArtists.length > 0 && (
+          <HorizontalShelf title="Your favorite artists" showAllLink="/artists">
+            <div className="grid grid-flow-col auto-cols-[8rem] md:auto-cols-[10rem] gap-4 min-w-max">
+              {forYouData.favoriteArtists.map((a: any) => (
+                <ArtistTile key={a.id} artist={a} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
         {newReleases.length > 0 && (
           <HorizontalShelf title="New Music" showAllLink="/new-music">
             <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
