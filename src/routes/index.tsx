@@ -6,25 +6,17 @@ import { MobileHome } from "@/components/mobile/screens/MobileHome";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
+import { getHomeDiscover } from "@/lib/music.functions";
 import {
-  getFeaturedAlbums,
-  getNewReleases,
-  getTrendingSongs,
-} from "@/lib/music.functions";
+  TrackCard,
+  AlbumTile,
+  ArtistTile,
+  PlaylistTile,
+} from "@/components/discover/TrackCard";
 
-const featuredQO = queryOptions({
-  queryKey: ["home-featured"],
-  queryFn: () => getFeaturedAlbums(),
-  staleTime: 5 * 60 * 1000,
-});
-const newQO = queryOptions({
-  queryKey: ["home-new"],
-  queryFn: () => getNewReleases(),
-  staleTime: 5 * 60 * 1000,
-});
-const trendingQO = queryOptions({
-  queryKey: ["home-trending"],
-  queryFn: () => getTrendingSongs(),
+const discoverQO = queryOptions({
+  queryKey: ["home-discover"],
+  queryFn: () => getHomeDiscover(),
   staleTime: 5 * 60 * 1000,
 });
 
@@ -47,9 +39,7 @@ export const Route = createFileRoute("/")({
     links: [{ rel: "canonical", href: "https://www.wesuplusly.com/" }],
   }),
   loader: ({ context }) => {
-    context.queryClient.ensureQueryData(featuredQO);
-    context.queryClient.ensureQueryData(newQO);
-    context.queryClient.ensureQueryData(trendingQO);
+    context.queryClient.ensureQueryData(discoverQO);
   },
   component: IndexRoute,
 });
@@ -60,81 +50,100 @@ function IndexRoute() {
 }
 
 function HomePage() {
-  const { data: featured } = useSuspenseQuery(featuredQO);
-  const { data: newReleases } = useSuspenseQuery(newQO);
-  const { data: trending } = useSuspenseQuery(trendingQO);
+  const { data } = useSuspenseQuery(discoverQO);
   const setTrack = usePlayer((s) => s.setTrack);
+  const {
+    featured,
+    newReleases,
+    trending,
+    topArtists,
+    recentAlbums,
+    editorialPlaylists,
+    moods,
+  } = data;
 
+  const heroPick = featured[0] ?? recentAlbums[0];
   const empty =
-    featured.length === 0 && newReleases.length === 0 && trending.length === 0;
+    featured.length === 0 &&
+    newReleases.length === 0 &&
+    trending.length === 0 &&
+    topArtists.length === 0 &&
+    recentAlbums.length === 0;
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="lg:max-w-[calc(100vw-16rem)] lg:ml-auto px-4 md:px-6 py-6 md:py-8">
-        {featured.length > 0 && (
-          <HorizontalShelf title="Featured Albums" showAllLink="/albums">
-            <div className="grid grid-flow-col auto-cols-[10rem] md:auto-cols-[12rem] gap-4 min-w-max">
-              {featured.map((al) => (
-                <Link key={al.id} to="/albums/$id" params={{ id: al.id }} className="group block">
-                  <StorageImage
-                    bucket="album-art"
-                    path={al.cover_url}
-                    alt={al.title}
-                    className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover"
-                  />
-                  <p className="mt-2 text-sm font-semibold truncate">{al.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {(al.artist as any)?.name ?? "Various"}
-                  </p>
+      <div className="lg:max-w-[calc(100vw-16rem)] lg:ml-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
+        {heroPick && (
+          <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
+            <StorageImage
+              bucket="album-art"
+              path={heroPick.cover_url}
+              alt={heroPick.title}
+              className="absolute inset-0 w-full h-full object-cover opacity-70"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+            <div className="relative h-full flex flex-col justify-end p-6 md:p-10 max-w-2xl">
+              <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
+                Featured
+              </p>
+              <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tight mb-2">
+                {heroPick.title}
+              </h1>
+              <p className="text-sm md:text-lg text-zinc-300 mb-5">
+                {(heroPick.artist as { name?: string } | null)?.name ?? "Various Artists"}
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  to="/albums/$id"
+                  params={{ id: heroPick.id }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
+                >
+                  <Play className="size-4 fill-current" />
+                  Open Album
                 </Link>
-              ))}
+                <Link
+                  to="/browse"
+                  className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur"
+                >
+                  Browse All
+                </Link>
+              </div>
             </div>
-          </HorizontalShelf>
+          </section>
         )}
 
         {newReleases.length > 0 && (
           <HorizontalShelf title="New Music" showAllLink="/new-music">
             <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
               {newReleases.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() =>
-                    setTrack({
-                      id: s.id,
-                      title: s.title,
-                      artistName: (s.artist as any)?.name ?? "Unknown",
-                      coverUrl: s.cover_url,
-                      durationSeconds: s.duration,
-                    })
-                  }
-                  className="group text-left"
-                >
-                  <div className="relative">
-                    <StorageImage
-                      bucket="album-art"
-                      path={s.cover_url}
-                      alt={s.title}
-                      className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover"
-                    />
-                    <div className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg">
-                        <Play className="size-5 fill-current ml-0.5" />
-                      </div>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold truncate">{s.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {(s.artist as any)?.name ?? "Unknown"}
-                  </p>
-                </button>
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {topArtists.length > 0 && (
+          <HorizontalShelf title="Popular Artists" showAllLink="/artists">
+            <div className="grid grid-flow-col auto-cols-[8rem] md:auto-cols-[10rem] gap-4 min-w-max">
+              {topArtists.map((a) => (
+                <ArtistTile key={a.id} artist={a} />
               ))}
             </div>
           </HorizontalShelf>
         )}
 
         {trending.length > 0 && (
-          <HorizontalShelf title="Top Tracks" showAllLink="/hot-tracks">
-            <div className="w-full space-y-1">
+          <section>
+            <div className="flex items-center justify-between mb-4 px-2">
+              <h2 className="text-2xl font-bold tracking-tight">Top Tracks Today</h2>
+              <Link
+                to="/hot-tracks"
+                className="text-sm text-primary hover:text-primary/80 font-medium"
+              >
+                See All
+              </Link>
+            </div>
+            <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
               {trending.map((s, i) => (
                 <button
                   key={s.id}
@@ -142,35 +151,67 @@ function HomePage() {
                     setTrack({
                       id: s.id,
                       title: s.title,
-                      artistName: (s.artist as any)?.name ?? "Unknown",
+                      artistName: (s.artist as { name?: string } | null)?.name ?? "Unknown",
                       coverUrl: s.cover_url,
+                      durationSeconds: (s as { duration?: number }).duration,
                     })
                   }
-                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
                 >
-                  <span className="w-6 text-sm text-muted-foreground group-hover:hidden">
+                  <span className="w-6 text-sm text-muted-foreground tabular-nums">
                     {i + 1}
                   </span>
-                  <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
                   <StorageImage
                     bucket="album-art"
                     path={s.cover_url}
                     alt={s.title}
-                    className="size-10 rounded-md overflow-hidden bg-card object-cover"
+                    className="size-11 rounded-md overflow-hidden bg-card object-cover"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{s.title}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {(s.artist as any)?.name ?? "Unknown"}
+                      {(s.artist as { name?: string } | null)?.name ?? "Unknown"}
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
                     {(s.play_count ?? 0).toLocaleString()} plays
                   </span>
                 </button>
               ))}
             </div>
+          </section>
+        )}
+
+        {recentAlbums.length > 0 && (
+          <HorizontalShelf title="Fresh Albums" showAllLink="/albums">
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {recentAlbums.map((al) => (
+                <AlbumTile key={al.id} album={al} />
+              ))}
+            </div>
           </HorizontalShelf>
+        )}
+
+        {editorialPlaylists.length > 0 && (
+          <HorizontalShelf title="Made For You" showAllLink="/playlists">
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {editorialPlaylists.map((p) => (
+                <PlaylistTile key={p.id} playlist={p} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {moods.map((mood) =>
+          mood.songs.length === 0 ? null : (
+            <HorizontalShelf key={mood.genre} title={`${mood.genre} Essentials`}>
+              <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+                {mood.songs.map((s) => (
+                  <TrackCard key={s.id} song={s} />
+                ))}
+              </div>
+            </HorizontalShelf>
+          ),
         )}
 
         {empty && (
