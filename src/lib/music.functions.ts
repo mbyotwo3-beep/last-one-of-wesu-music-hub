@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 
 // ---------- Featured / Trending / New releases ----------
@@ -392,3 +393,88 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .map(([g]) => g),
   };
 });
+
+/**
+ * Personalized "For You" data for the signed-in listener.
+ * Signals: saved_tracks + song_likes → favorite artists + genres.
+ * Returns forYou (mixed picks from favorite genres), byFavoriteArtists
+ * (more from artists they've liked), and topArtists (their most-liked artists).
+ */
+export const getForYou = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+
+    const [savedRes, likedRes] = await Promise.all([
+      supabase.from("saved_tracks").select("song_id").eq("user_id", userId).limit(200),
+      supabase.from("song_likes").select("song_id").eq("user_id", userId).limit(200),
+    ]);
+
+    const songIds = Array.from(
+      new Set([
+        ...(savedRes.data ?? []).map((r: any) => r.song_id as string),
+        ...(likedRes.data ?? []).map((r: any) => r.song_id as string),
+      ]),
+    );
+
+    if (songIds.length === 0) {
+      return { forYou: [], byFavoriteArtists: [], favoriteArtists: [] };
+    }
+
+    const { data: seedSongs } = await supabase
+      .from("songs")
+      .select("id,genre,artist_id,artist:artists(id,name,avatar_url)")
+      .in("id", songIds);
+
+    const genreCounts = new Map<string, number>();
+    const artistCounts = new Map<string, { count: number; artist: any }>();
+    for (const row of seedSongs ?? []) {
+      const g = (row as any).genre as string | null;
+      if (g) genreCounts.set(g, (genreCounts.get(g) ?? 0) + 1);
+      const aid = (row as any).artist_id as string | null;
+      const a = (row as any).artist;
+      if (aid && a) {
+        const cur = artistCounts.get(aid);
+        artistCounts.set(aid, { count: (cur?.count ?? 0) + 1, artist: a });
+      }
+    }
+
+    const topGenres = [...genreCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([g]) => g);
+    const topArtistIds = [...artistCounts.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 6)
+      .map(([id]) => id);
+
+    const [forYouRes, byArtistRes] = await Promise.all([
+      topGenres.length > 0
+        ? supabase
+            .from("songs")
+            .select("id,title,cover_url,duration,price,artist:artists(id,name)")
+            .in("genre", topGenres)
+            .not("id", "in", `(${songIds.join(",")})`)
+            .order("play_count", { ascending: false })
+            .limit(12)
+        : Promise.resolve({ data: [] as any[] }),
+      topArtistIds.length > 0
+        ? supabase
+            .from("songs")
+            .select("id,title,cover_url,duration,price,artist:artists(id,name)")
+            .in("artist_id", topArtistIds)
+            .not("id", "in", `(${songIds.join(",")})`)
+            .order("created_at", { ascending: false })
+            .limit(12)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    return {
+      forYou: forYouRes.data ?? [],
+      byFavoriteArtists: byArtistRes.data ?? [],
+      favoriteArtists: [...artistCounts.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([id, v]) => ({ id, ...v.artist })),
+    };
+  });

@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileHome } from "@/components/mobile/screens/MobileHome";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
-import { getHomeDiscover } from "@/lib/music.functions";
+import { getHomeDiscover, getForYou } from "@/lib/music.functions";
+import { useAuth } from "@/hooks/use-auth";
 import {
   TrackCard,
   AlbumTile,
@@ -52,6 +54,14 @@ function IndexRoute() {
 function HomePage() {
   const { data } = useSuspenseQuery(discoverQO);
   const setTrack = usePlayer((s) => s.setTrack);
+  const { user } = useAuth();
+  const forYouFn = useServerFn(getForYou);
+  const { data: forYouData } = useQuery({
+    queryKey: ["for-you", user?.id],
+    queryFn: () => forYouFn(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
   const {
     featured,
     newReleases,
@@ -110,6 +120,36 @@ function HomePage() {
               </div>
             </div>
           </section>
+        )}
+
+        {user && forYouData && forYouData.forYou.length > 0 && (
+          <HorizontalShelf title="Made For You" >
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {forYouData.forYou.map((s: any) => (
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {user && forYouData && forYouData.byFavoriteArtists.length > 0 && (
+          <HorizontalShelf title="More from artists you like">
+            <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+              {forYouData.byFavoriteArtists.map((s: any) => (
+                <TrackCard key={s.id} song={s} />
+              ))}
+            </div>
+          </HorizontalShelf>
+        )}
+
+        {user && forYouData && forYouData.favoriteArtists.length > 0 && (
+          <HorizontalShelf title="Your favorite artists" showAllLink="/artists">
+            <div className="grid grid-flow-col auto-cols-[8rem] md:auto-cols-[10rem] gap-4 min-w-max">
+              {forYouData.favoriteArtists.map((a: any) => (
+                <ArtistTile key={a.id} artist={a} />
+              ))}
+            </div>
+          </HorizontalShelf>
         )}
 
         {newReleases.length > 0 && (
