@@ -171,6 +171,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           setShowAd(true);
         }
 
+        // Validate URL is absolute HTTPS/HTTP so the browser can't accidentally
+        // resolve a bare filename against the current origin (which caused the
+        // OpaqueResponseBlocking errors on wesuplusly.com).
+        if (!url || !/^https?:\/\//i.test(url)) {
+          throw new Error("Audio unavailable (invalid URL)");
+        }
 
         setIsPreview(previewMode);
 
@@ -208,10 +214,35 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           }
         }
 
+        // Attach event-driven loading state so the spinner clears the moment
+        // the browser reports the media is ready — not just when play() resolves.
+        const cleanupEvents = () => {
+          audio.removeEventListener("canplay", onCanPlay);
+          audio.removeEventListener("playing", onPlaying);
+          audio.removeEventListener("error", onError);
+        };
+        const onCanPlay = () => setLoading(false);
+        const onPlaying = () => setLoading(false);
+        const onError = () => {
+          cleanupEvents();
+          setLoading(false);
+          setError("Failed to load audio. Please try again.");
+          if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+        };
+        audio.addEventListener("canplay", onCanPlay);
+        audio.addEventListener("playing", onPlaying);
+        audio.addEventListener("error", onError);
+
         audio.src = url;
         audio.volume = muted ? 0 : volume;
-        await audio.play();
-        setLoading(false);
+        try {
+          await audio.play();
+        } catch (playErr) {
+          // Autoplay blocked or transient — keep listeners so a subsequent
+          // togglePlay from the user still resolves loading via events.
+          setLoading(false);
+          throw playErr;
+        }
         if (!playing) usePlayer.getState().togglePlay();
 
         if (previewMode) {
