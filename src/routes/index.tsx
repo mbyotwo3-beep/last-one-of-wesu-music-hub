@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileHome } from "@/components/mobile/screens/MobileHome";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
-import { getHomeDiscover } from "@/lib/music.functions";
+import { getHomeDiscover, getForYou } from "@/lib/music.functions";
+import { useAuth } from "@/hooks/use-auth";
 import {
   TrackCard,
   AlbumTile,
@@ -52,6 +54,14 @@ function IndexRoute() {
 function HomePage() {
   const { data } = useSuspenseQuery(discoverQO);
   const setTrack = usePlayer((s) => s.setTrack);
+  const { user } = useAuth();
+  const forYouFn = useServerFn(getForYou);
+  const { data: forYouData } = useQuery({
+    queryKey: ["for-you", user?.id],
+    queryFn: () => forYouFn(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
   const {
     featured,
     newReleases,
