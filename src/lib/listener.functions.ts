@@ -153,13 +153,18 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       if (!sub && !purchase) return { url: "", requiresPurchase: true as const };
     }
 
+    const rawPath = String((song as any).audio_url ?? "");
+    // Legacy rows may already contain a full https URL.
+    if (/^https?:\/\//i.test(rawPath)) {
+      return { url: rawPath };
+    }
 
     // Try to use service role for signed URLs (more secure)
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: signed, error } = await supabaseAdmin.storage
         .from("song-audio")
-        .createSignedUrl((song as any).audio_url, 3600);
+        .createSignedUrl(rawPath, 3600);
       if (error) throw error;
       return { url: signed.signedUrl };
     } catch (adminError) {
@@ -169,7 +174,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       const { supabase: publicClient } = await import("@/integrations/supabase/client");
       const { data: publicUrl } = publicClient.storage
         .from("song-audio")
-        .getPublicUrl((song as any).audio_url);
+        .getPublicUrl(rawPath);
       return { url: publicUrl.publicUrl };
     }
   });
@@ -193,13 +198,16 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
     if ((song as any).price && Number((song as any).price) > 0) {
       throw new Error("This song requires a subscription or purchase");
     }
-    
+    const rawPath = String((song as any).audio_url ?? "");
+    if (/^https?:\/\//i.test(rawPath)) {
+      return { url: rawPath };
+    }
     // Try to use service role for signed URLs (more secure)
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: signed, error } = await supabaseAdmin.storage
         .from("song-audio")
-        .createSignedUrl((song as any).audio_url, 3600);
+        .createSignedUrl(rawPath, 3600);
       if (error) throw error;
       return { url: signed.signedUrl };
     } catch (adminError) {
@@ -208,7 +216,7 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
       const { supabase: publicClient } = await import("@/integrations/supabase/client");
       const { data: publicUrl } = publicClient.storage
         .from("song-audio")
-        .getPublicUrl((song as any).audio_url);
+        .getPublicUrl(rawPath);
       return { url: publicUrl.publicUrl };
     }
   });
@@ -237,12 +245,17 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       .single();
     if (!song) throw new Error("Song not found");
 
+    const rawPath = String((song as any).audio_url ?? "");
+    if (/^https?:\/\//i.test(rawPath)) {
+      return { url: rawPath };
+    }
+
     // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: signed, error } = await supabaseAdmin.storage
         .from("song-audio")
-        .createSignedUrl((song as any).audio_url, 45);
+        .createSignedUrl(rawPath, 45);
       if (error) throw error;
       return { url: signed.signedUrl };
     } catch (adminError) {
@@ -250,7 +263,7 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       const { supabase: publicClient } = await import("@/integrations/supabase/client");
       const { data: publicUrl } = publicClient.storage
         .from("song-audio")
-        .getPublicUrl((song as any).audio_url);
+        .getPublicUrl(rawPath);
       return { url: publicUrl.publicUrl };
     }
   });
