@@ -22,6 +22,10 @@ import {
   GenreTile,
   PlaylistTile,
 } from "@/components/discover/TrackCard";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { getRecentlyPlayed } from "@/lib/play-history.functions";
+import { useAuth } from "@/hooks/use-auth";
 
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
@@ -108,6 +112,14 @@ function BrowsePage() {
   const { data: genres } = useSuspenseQuery(genresQO);
   const { genre: activeGenre } = Route.useSearch();
   const setTrack = usePlayer((s) => s.setTrack);
+  const { user } = useAuth();
+  const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
+  const { data: recentlyPlayed } = useQuery({
+    queryKey: ["recently-played", user?.id],
+    queryFn: () => recentlyPlayedFn(),
+    enabled: !!user && !activeGenre,
+    staleTime: 60_000,
+  });
 
   const empty =
     featured.length === 0 &&
@@ -161,6 +173,16 @@ function BrowsePage() {
           <GenreView genre={activeGenre} />
         ) : (
           <>
+            {user && recentlyPlayed && recentlyPlayed.length > 0 && (
+              <HorizontalShelf title="Jump back in" showAllLink="/library">
+                <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+                  {recentlyPlayed.map((s: any) => (
+                    <TrackCard key={s.id} song={s} />
+                  ))}
+                </div>
+              </HorizontalShelf>
+            )}
+
             {featured.length > 0 && (
               <HorizontalShelf title="Must-Have Albums" showAllLink="/must-have">
                 <div className="grid grid-flow-col auto-cols-[10rem] md:auto-cols-[12rem] gap-4 min-w-max">
