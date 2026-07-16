@@ -28,6 +28,7 @@ import {
   getPreviewAudioUrl,
   incrementPlayCount,
 } from "@/lib/listener.functions";
+import { recordPlay } from "@/lib/play-history.functions";
 import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
@@ -84,6 +85,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const getPublicFn = useServerFn(getPublicAudioUrl);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const incrementFn = useServerFn(incrementPlayCount);
+  const recordPlayFn = useServerFn(recordPlay);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -222,7 +224,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           audio.removeEventListener("error", onError);
         };
         const onCanPlay = () => setLoading(false);
-        const onPlaying = () => setLoading(false);
+        const onPlaying = () => {
+          setLoading(false);
+          // Log the play to build a personalized "Recently Played" shelf.
+          if (user && !previewMode) {
+            recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
+          }
+        };
         const onError = () => {
           cleanupEvents();
           setLoading(false);
