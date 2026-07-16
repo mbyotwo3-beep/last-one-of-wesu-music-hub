@@ -588,6 +588,38 @@ export type Database = {
         }
         Relationships: []
       }
+      play_history: {
+        Row: {
+          id: string
+          played_at: string
+          progress_seconds: number
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          played_at?: string
+          progress_seconds?: number
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          played_at?: string
+          progress_seconds?: number
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_history_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_songs: {
         Row: {
           added_at: string
@@ -798,6 +830,35 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_albums: {
+        Row: {
+          album_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          album_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_albums_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
             referencedColumns: ["id"]
           },
         ]
