@@ -23,7 +23,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   return (
-    <div className="group text-left w-full">
+    <div className="group text-left w-full relative">
       <button
         type="button"
         onClick={() =>
