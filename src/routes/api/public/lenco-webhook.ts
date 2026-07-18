@@ -59,6 +59,15 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
           event.endsWith(".successful") || tx.status === "successful" || tx.status === "success";
         const isFailure =
           event.endsWith(".failed") || tx.status === "failed" || tx.status === "declined";
+        // Lenco returns "pay-offline" while waiting for the customer to approve
+        // the USSD prompt on their phone — leave the row pending, do nothing else.
+        const isPending =
+          tx.status === "pay-offline" ||
+          tx.status === "pending" ||
+          event.endsWith(".pending");
+        if (isPending && !isSuccess && !isFailure) {
+          return new Response("OK", { status: 200 });
+        }
 
         if (isSuccess) {
           // IDEMPOTENT transition: only proceed when we actually flip pending → completed.
