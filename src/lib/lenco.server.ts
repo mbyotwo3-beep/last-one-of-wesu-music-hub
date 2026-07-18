@@ -50,7 +50,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     throw new Error(`Lenco returned non-JSON (${res.status}): ${text.slice(0, 200)}`);
   }
   if (!res.ok || json.status === false) {
-    throw new Error(`Lenco ${path} failed: ${json.message ?? res.statusText}`);
+    const detail = (json as any).errors ? ` (${JSON.stringify((json as any).errors)})` : "";
+    console.error(`[Lenco] ${path} ${res.status}: ${text.slice(0, 500)}`);
+    throw new Error(`Lenco ${path} failed: ${json.message ?? res.statusText}${detail}`);
   }
   if (!json.data) throw new Error(`Lenco ${path} returned no data`);
   return json.data;
@@ -61,7 +63,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export interface LencoMobileMoneyInput {
   amount: number; // major unit (ZMW)
   reference: string; // your transaction id
-  operator: "mtn-zambia" | "airtel-zambia" | "zamtel-zambia";
+  operator: "mtn" | "airtel" | "zamtel";
   phone: string; // in international format, e.g. 260971234567
   narration?: string;
 }
@@ -77,15 +79,15 @@ export interface LencoMobileMoneyResult {
 export async function initiateMobileMoney(
   input: LencoMobileMoneyInput,
 ): Promise<LencoMobileMoneyResult> {
+  // Lenco v2 collection fields: `phone`, `operator` short code, `country` optional.
+  // Ref: https://lenco-api.readme.io/v2.0/reference/initiate-collection-from-mobile-money
   return post<LencoMobileMoneyResult>("/collections/mobile-money", {
     amount: input.amount,
     reference: input.reference,
     country: "zm",
-    currency: "ZMW",
     operator: input.operator,
     bearer: "merchant",
-    mobileNumber: normalizeZmPhone(input.phone),
-    narration: input.narration ?? "Wesu+ purchase",
+    phone: normalizeZmPhone(input.phone),
   });
 }
 
