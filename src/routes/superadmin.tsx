@@ -752,11 +752,11 @@ function SettingsTab() {
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
         <h3 className="font-semibold">Payments</h3>
         <label className="block text-sm">
-          DPO mode
+          Lenco mode
           <select
             className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={pay.dpo_mode ?? "sandbox"}
-            onChange={(e) => setPay({ ...pay, dpo_mode: e.target.value })}
+            value={pay.lenco_mode ?? "sandbox"}
+            onChange={(e) => setPay({ ...pay, lenco_mode: e.target.value })}
           >
             <option value="sandbox">Sandbox</option>
             <option value="live">Live</option>

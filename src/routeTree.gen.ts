@@ -49,7 +49,6 @@ import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AlbumsIdRouteImport } from './routes/albums.$id'
 import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
-import { Route as ApiPublicDpoWebhookRouteImport } from './routes/api/public/dpo-webhook'
 
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
@@ -251,11 +250,6 @@ const ApiPublicLencoWebhookRoute = ApiPublicLencoWebhookRouteImport.update({
   path: '/api/public/lenco-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicDpoWebhookRoute = ApiPublicDpoWebhookRouteImport.update({
-  id: '/api/public/dpo-webhook',
-  path: '/api/public/dpo-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -297,7 +291,6 @@ export interface FileRoutesByFullPath {
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
-  '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -340,7 +333,6 @@ export interface FileRoutesByTo {
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
-  '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
 }
 export interface FileRoutesById {
@@ -384,7 +376,6 @@ export interface FileRoutesById {
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
-  '/api/public/dpo-webhook': typeof ApiPublicDpoWebhookRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
 }
 export interface FileRouteTypes {
@@ -429,7 +420,6 @@ export interface FileRouteTypes {
     | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
-    | '/api/public/dpo-webhook'
     | '/api/public/lenco-webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -472,7 +462,6 @@ export interface FileRouteTypes {
     | '/superadmin/homepage'
     | '/artists'
     | '/labels'
-    | '/api/public/dpo-webhook'
     | '/api/public/lenco-webhook'
   id:
     | '__root__'
@@ -515,7 +504,6 @@ export interface FileRouteTypes {
     | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
-    | '/api/public/dpo-webhook'
     | '/api/public/lenco-webhook'
   fileRoutesById: FileRoutesById
 }
@@ -555,7 +543,6 @@ export interface RootRouteChildren {
   LabelsSlugRoute: typeof LabelsSlugRoute
   ArtistsIndexRoute: typeof ArtistsIndexRoute
   LabelsIndexRoute: typeof LabelsIndexRoute
-  ApiPublicDpoWebhookRoute: typeof ApiPublicDpoWebhookRoute
   ApiPublicLencoWebhookRoute: typeof ApiPublicLencoWebhookRoute
 }
 
@@ -841,13 +828,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicLencoWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/dpo-webhook': {
-      id: '/api/public/dpo-webhook'
-      path: '/api/public/dpo-webhook'
-      fullPath: '/api/public/dpo-webhook'
-      preLoaderRoute: typeof ApiPublicDpoWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -934,7 +914,6 @@ const rootRouteChildren: RootRouteChildren = {
   LabelsSlugRoute: LabelsSlugRoute,
   ArtistsIndexRoute: ArtistsIndexRoute,
   LabelsIndexRoute: LabelsIndexRoute,
-  ApiPublicDpoWebhookRoute: ApiPublicDpoWebhookRoute,
   ApiPublicLencoWebhookRoute: ApiPublicLencoWebhookRoute,
 }
 export const routeTree = rootRouteImport
