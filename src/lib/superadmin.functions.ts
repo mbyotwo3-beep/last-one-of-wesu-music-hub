@@ -242,7 +242,7 @@ export const getSettings = createServerFn({ method: "GET" })
 
 /**
  * Manually mark a payment_transaction as paid. Useful for testing the split
- * pipeline before DPO Pay is wired. Triggers compute_revenue_splits().
+ * pipeline before Lenco is wired. Triggers compute_revenue_splits().
  */
 export const markTransactionPaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

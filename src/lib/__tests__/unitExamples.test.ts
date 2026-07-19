@@ -125,24 +125,6 @@ describe("Cover art upload: uses album-art bucket", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DPO unknown provider_token returns HTTP 200 without DB write
-// ---------------------------------------------------------------------------
-describe("Webhook: unknown provider_token returns HTTP 200 without DB write", () => {
-  it("shouldFulfill returns false for empty ccdApproval (no fulfillment on unknown token)", async () => {
-    const { shouldFulfill } = await import("../webhook.utils");
-    // The handler only calls shouldFulfill after finding a tx; for unknown tokens it never reaches this
-    expect(shouldFulfill("")).toBe(false);
-  });
-
-  it("empty provider_token triggers early-return path (HTTP 200, no DB write)", () => {
-    // Documents the contract: when providerToken === '', handler returns 200 before any DB call
-    const providerToken = "";
-    // The handler checks: if (!providerToken) { return new Response("OK", { status: 200 }) }
-    expect(providerToken).toBe(""); // documents the condition
-  });
-});
-
-// ---------------------------------------------------------------------------
 // StatusBar called on native launch
 // ---------------------------------------------------------------------------
 describe("StatusBarInit: StatusBar API called on mount", () => {

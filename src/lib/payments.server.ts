@@ -1,6 +1,6 @@
 /**
  * Server-only payment fulfillment logic.
- * Called by the DPO Pay webhook handler after a transaction is confirmed.
+ * Called by the Lenco webhook handler after a transaction is confirmed.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
