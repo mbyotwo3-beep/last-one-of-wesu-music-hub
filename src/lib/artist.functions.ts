@@ -116,7 +116,7 @@ export const uploadSong = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: artist } = await supabase
       .from("artists")
-      .select("id, status")
+      .select("id, status, verified")
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("You must be an approved artist to upload");
@@ -134,6 +134,12 @@ export const uploadSong = createServerFn({ method: "POST" })
       throw new Error("Invalid cover_url: must be under your own storage folder");
     }
 
+    // Auto-approve songs from already-approved & verified artists so uploads
+    // are immediately visible on the site. Unverified artists still go through
+    // the moderation queue.
+    const autoApprove =
+      (artist as any).status === "approved" && (artist as any).verified === true;
+
     const { data: song, error } = await supabase
       .from("songs")
       .insert({
@@ -145,13 +151,16 @@ export const uploadSong = createServerFn({ method: "POST" })
         price: data.price ?? 0,
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
-        status: "pending",
+        status: autoApprove ? "approved" : "pending",
       } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "song.upload", "song", song!.id, { title: data.title });
-    return { ok: true, id: song!.id };
+    await audit(supabase, userId, "song.upload", "song", song!.id, {
+      title: data.title,
+      auto_approved: autoApprove,
+    });
+    return { ok: true, id: song!.id, status: autoApprove ? "approved" : "pending" };
   });
 
 // ---------- Albums ----------
