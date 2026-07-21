@@ -201,17 +201,23 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
     if (/^https?:\/\//i.test(rawPath)) {
       return { url: rawPath };
     }
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: signed, error } = await supabaseAdmin.storage
-        .from("song-audio")
-        .createSignedUrl(rawPath, 3600);
-      if (error) throw error;
-      return { url: signed.signedUrl };
-    } catch (adminError) {
-      console.error("[Audio] Service role unavailable for anonymous playback:", adminError);
-      throw new Error("Audio temporarily unavailable");
+    // Sign via the anon client — the "song-audio public read for approved songs"
+    // storage policy authorizes this without a service-role key, which isn't
+    // available on Lovable Cloud deployments.
+    const { data: signed, error } = await supabase.storage
+      .from("song-audio")
+      .createSignedUrl(rawPath, 3600);
+    if (error || !signed?.signedUrl) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: adminSigned } = await supabaseAdmin.storage
+          .from("song-audio")
+          .createSignedUrl(rawPath, 3600);
+        if (adminSigned?.signedUrl) return { url: adminSigned.signedUrl };
+      } catch {}
+      throw new Error(error?.message ?? "Audio temporarily unavailable");
     }
+    return { url: signed.signedUrl };
   });
 
 /**
@@ -244,17 +250,21 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     }
 
     // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: signed, error } = await supabaseAdmin.storage
-        .from("song-audio")
-        .createSignedUrl(rawPath, 45);
-      if (error) throw error;
-      return { url: signed.signedUrl };
-    } catch (adminError) {
-      console.error("[Audio] Service role unavailable for preview:", adminError);
-      throw new Error("Preview temporarily unavailable");
+    // Sign via anon client so previews work on deployments without a service-role key.
+    const { data: signed, error } = await supabase.storage
+      .from("song-audio")
+      .createSignedUrl(rawPath, 45);
+    if (error || !signed?.signedUrl) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: adminSigned } = await supabaseAdmin.storage
+          .from("song-audio")
+          .createSignedUrl(rawPath, 45);
+        if (adminSigned?.signedUrl) return { url: adminSigned.signedUrl };
+      } catch {}
+      throw new Error(error?.message ?? "Preview temporarily unavailable");
     }
+    return { url: signed.signedUrl };
   });
 
 /**
