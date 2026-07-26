@@ -224,9 +224,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const cleanupEvents = () => {
           audio.removeEventListener("canplay", onCanPlay);
           audio.removeEventListener("playing", onPlaying);
+          audio.removeEventListener("play", onPlay);
           audio.removeEventListener("error", onError);
         };
         const onCanPlay = () => setLoading(false);
+        const onPlay = () => setLoading(false);
         const onPlaying = () => {
           setLoading(false);
           // Log the play to build a personalized "Recently Played" shelf.
@@ -241,6 +243,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
         };
         audio.addEventListener("canplay", onCanPlay);
+        audio.addEventListener("play", onPlay);
         audio.addEventListener("playing", onPlaying);
         audio.addEventListener("error", onError);
 
@@ -546,7 +549,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       <div className="fixed bottom-0 inset-x-0 bg-obsidian/95 backdrop-blur-xl border-t border-white/10 z-50">
         {showAd && !user && (
           <div className="flex items-center justify-between px-6 py-1.5 bg-primary/10 border-b border-primary/20 text-xs">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-gray-300">
               <Radio className="size-3 text-primary" /> You're listening with ads.
             </span>
             <Link to="/auth" className="font-semibold text-primary hover:underline">
@@ -556,7 +559,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         )}
         {isPreview && (
           <div className="flex items-center justify-between px-6 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs">
-            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1.5 text-amber-400">
               <Radio className="size-3" /> 15-second preview
             </span>
             <div className="flex items-center gap-3">
@@ -564,7 +567,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <Link
                   to="/checkout"
                   search={{ plan: "premium_monthly", item: "song", id: track.id }}
-                  className="font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                  className="font-semibold text-amber-400 hover:underline"
                 >
                   Buy this track — ZMW {trackPrice.toFixed(2)}
                 </Link>
@@ -586,34 +589,34 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             />
             <div className="min-w-0 overflow-hidden">
               {albumId ? (
-                <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium truncate hover:underline block">
+                <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium text-white truncate hover:underline block">
                   {track.title}
                 </Link>
               ) : artistId ? (
-                <Link to="/artists/$id" params={{ id: artistId }} className="text-sm font-medium truncate hover:underline block">
+                <Link to="/artists/$id" params={{ id: artistId }} className="text-sm font-medium text-white truncate hover:underline block">
                   {track.title}
                 </Link>
               ) : (
-                <p className="text-sm font-medium truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
+                <p className="text-sm font-medium text-white truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
                   {track.title}
                 </p>
               )}
 
               {artistId ? (
-                <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block">
+                <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-gray-300 truncate hover:text-white hover:underline block">
                   {track.artistName}
                 </Link>
               ) : (
-                <p className="text-xs text-muted-foreground truncate">{track.artistName}</p>
+                <p className="text-xs text-gray-300 truncate">{track.artistName}</p>
               )}
             </div>
             {user && (
               <button
                 onClick={toggleLike}
-                className="ml-2 shrink-0 p-1.5 rounded-full hover:bg-white/5"
+                className="ml-2 shrink-0 p-1.5 rounded-full hover:bg-white/10"
                 aria-label={liked ? "Unlike" : "Like"}
               >
-                <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`} />
               </button>
             )}
           </div>
@@ -623,7 +626,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleShuffle}
-                className={`transition-colors ${shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`transition-colors ${shuffle ? "text-primary" : "text-gray-300 hover:text-white"}`}
                 aria-label="Shuffle"
                 title="Shuffle"
               >
@@ -631,7 +634,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               </button>
               <button
                 onClick={skipPrev}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-gray-300 hover:text-white"
                 aria-label="Previous"
                 title="Previous"
               >
@@ -640,7 +643,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               <button
                 onClick={() => !loading && !error && togglePlay()}
                 disabled={loading || !!error}
-                className="bg-foreground text-obsidian p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                 aria-label={playing ? "Pause" : "Play"}
               >
                 {loading ? (
@@ -653,7 +656,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               </button>
               <button
                 onClick={skipNext}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-gray-300 hover:text-white"
                 aria-label="Next"
                 title="Next"
               >
@@ -661,7 +664,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               </button>
               <button
                 onClick={cycleRepeat}
-                className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-gray-300 hover:text-white"}`}
                 aria-label="Repeat"
                 title={`Repeat: ${repeat}`}
               >
@@ -669,11 +672,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               </button>
             </div>
             <div className="w-full flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">
+              <span className="text-[10px] text-gray-300 tabular-nums w-8 text-right">
                 {fmt(progressSeconds)}
               </span>
               <div
-                className="flex-1 h-1 bg-muted rounded-full relative overflow-hidden cursor-pointer group"
+                className="flex-1 h-1 bg-gray-600 rounded-full relative overflow-hidden cursor-pointer group"
                 onClick={seek}
                 role="slider"
                 aria-valuemin={0}
@@ -682,15 +685,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 aria-label="Seek"
               >
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-foreground group-hover:bg-primary transition-colors"
+                  className="absolute left-0 top-0 h-full rounded-full bg-white group-hover:bg-primary transition-colors"
                   style={{ width: `${progressPct}%` }}
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ left: `calc(${progressPct}% - 6px)` }}
                 />
               </div>
-              <span className="text-[10px] text-muted-foreground tabular-nums w-8">{fmt(dur)}</span>
+              <span className="text-[10px] text-gray-300 tabular-nums w-8">{fmt(dur)}</span>
             </div>
             {error && <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>}
           </div>
@@ -699,14 +702,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           <div className="flex items-center justify-end gap-3">
             <Link
               to="/library"
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-white/5"
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
               aria-label="Queue"
               title="Your library"
             >
               <ListMusic className="size-4" />
             </Link>
             <div className="flex items-center gap-2">
-              <button onClick={toggleMute} className="text-muted-foreground hover:text-foreground" aria-label="Mute">
+              <button onClick={toggleMute} className="text-gray-300 hover:text-white" aria-label="Mute">
                 <VolIcon className="size-4" />
               </button>
               <input
@@ -716,13 +719,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 step={0.02}
                 value={muted ? 0 : volume}
                 onChange={(e) => setVolume(Number(e.target.value))}
-                className="w-24 accent-primary"
+                className="w-24 accent-white"
                 aria-label="Volume"
               />
             </div>
             <button
               onClick={() => setIsExpanded(true)}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-white/5"
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
               aria-label="Expand"
               title="Now playing"
             >
@@ -730,7 +733,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             </button>
             <button
               onClick={() => usePlayer.getState().exitSong()}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-white/5"
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
               aria-label="Close"
               title="Close player"
             >
