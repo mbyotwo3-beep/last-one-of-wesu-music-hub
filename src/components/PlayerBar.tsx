@@ -70,6 +70,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const muted = usePlayer((s) => s.muted);
   const shuffle = usePlayer((s) => s.shuffle);
   const repeat = usePlayer((s) => s.repeat);
+  const queue = usePlayer((s) => s.queue);
+  const queueIndex = usePlayer((s) => s.queueIndex);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const setProgress = usePlayer((s) => s.setProgress);
   const setVolume = usePlayer((s) => s.setVolume);
@@ -91,6 +93,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [showAd, setShowAd] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
   const isPreview = usePlayer((s) => s.isPreview);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const [audioDuration, setAudioDuration] = useState<number>(0);
@@ -344,18 +347,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
   return (
     <>
-      {/* Expanded Now Playing (mobile-style overlay, reused on desktop when expanded) */}
+      {/* Expanded Now Playing (Spotify-style desktop layout) */}
       {isExpanded && (
         <div className="fixed inset-0 bg-gradient-to-b from-background to-background/95 z-[100] flex flex-col">
-          <div className="flex items-center justify-between p-6">
+          <div className="flex items-center justify-between p-4 border-b border-border">
             <button
               onClick={() => setIsExpanded(false)}
               className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Minimize player"
             >
-              <Minimize2 className="size-6" />
+              <Minimize2 className="size-5" />
             </button>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Now Playing</p>
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Now Playing</p>
             <button
               onClick={() => {
                 usePlayer.getState().exitSong();
@@ -364,129 +367,178 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Exit song"
             >
-              <X className="size-6" />
+              <X className="size-5" />
             </button>
           </div>
-          <div className="flex-1 flex items-center justify-center px-8">
-            <StorageImage
-              bucket="album-art"
-              path={track.coverUrl}
-              alt={track.title}
-              className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card object-cover"
-            />
-          </div>
-          <div className="p-6 space-y-6 max-w-md mx-auto w-full">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                {albumId ? (
-                  <Link to="/albums/$id" params={{ id: albumId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
-                    <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left side: Album art and controls */}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto">
+              <StorageImage
+                bucket="album-art"
+                path={track.coverUrl}
+                alt={track.title}
+                className="aspect-square max-w-md w-full rounded-lg overflow-hidden shadow-2xl bg-card object-cover mb-8"
+              />
+              <div className="w-full max-w-md space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    {albumId ? (
+                      <Link to="/albums/$id" params={{ id: albumId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                        <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                      </Link>
+                    ) : artistId ? (
+                      <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                        <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                      </Link>
+                    ) : (
+                      <h2 className="text-2xl font-bold truncate">{track.title}</h2>
+                    )}
+                    {artistId ? (
+                      <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block text-lg text-muted-foreground truncate hover:text-foreground hover:underline">
+                        {track.artistName}
+                      </Link>
+                    ) : (
+                      <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
+                    )}
+                  </div>
+                  {user && (
+                    <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
+                      <Heart className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                    </button>
+                  )}
+                </div>
+                {isPreview && trackPrice > 0 && (
+                  <Link
+                    to="/checkout"
+                    search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                    onClick={() => setIsExpanded(false)}
+                    className="block w-full text-center py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/30 transition-colors"
+                  >
+                    Buy this track — ZMW {trackPrice.toFixed(2)}
                   </Link>
-                ) : artistId ? (
-                  <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
-                    <h2 className="text-2xl font-bold truncate">{track.title}</h2>
-                  </Link>
-                ) : (
-                  <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                 )}
-                {artistId ? (
-                  <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block text-lg text-muted-foreground truncate hover:text-foreground hover:underline">
-                    {track.artistName}
-                  </Link>
-                ) : (
-                  <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
-                )}
-
+                <div className="space-y-2">
+                  <div
+                    className="h-1.5 bg-muted rounded-full relative overflow-hidden cursor-pointer group"
+                    onClick={seek}
+                    role="slider"
+                    aria-valuemin={0}
+                    aria-valuemax={dur}
+                    aria-valuenow={progressSeconds}
+                    aria-label="Seek"
+                  >
+                    <div
+                      className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
+                    <span>{fmt(progressSeconds)}</span>
+                    <span>{fmt(dur)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-6">
+                  <button
+                    onClick={toggleShuffle}
+                    className={`transition-colors ${shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    aria-label="Shuffle"
+                  >
+                    <Shuffle className="size-5" />
+                  </button>
+                  <button onClick={skipPrev} className="text-muted-foreground hover:text-foreground" aria-label="Previous">
+                    <SkipBack className="size-6" />
+                  </button>
+                  <button
+                    onClick={() => !loading && !error && togglePlay()}
+                    disabled={loading || !!error}
+                    className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                    aria-label={playing ? "Pause" : "Play"}
+                  >
+                    {loading ? (
+                      <Loader2 className="size-6 animate-spin" />
+                    ) : playing ? (
+                      <Pause className="size-6" />
+                    ) : (
+                      <Play className="size-6 ml-0.5" />
+                    )}
+                  </button>
+                  <button onClick={skipNext} className="text-muted-foreground hover:text-foreground" aria-label="Next">
+                    <SkipForward className="size-6" />
+                  </button>
+                  <button
+                    onClick={cycleRepeat}
+                    className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    aria-label="Repeat"
+                  >
+                    {repeat === "one" ? <Repeat1 className="size-5" /> : <Repeat className="size-5" />}
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={toggleMute} aria-label="Mute">
+                    <VolIcon className="size-5 text-muted-foreground" />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.02}
+                    value={muted ? 0 : volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                    className="flex-1 accent-primary"
+                    aria-label="Volume"
+                  />
+                </div>
               </div>
-              {user && (
-                <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
-                  <Heart className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                </button>
+            </div>
+
+            {/* Right side: Queue */}
+            <div className="w-96 border-l border-border bg-muted/20 p-6 overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Queue</h3>
+                <span className="text-sm text-muted-foreground">{queue.length} songs</span>
+              </div>
+              {queue.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Queue is empty</p>
+              ) : (
+                <div className="space-y-2">
+                  {queue.map((queueTrack, index) => (
+                    <button
+                      key={`${queueTrack.id}-${index}`}
+                      onClick={() => {
+                        if (index !== queueIndex) {
+                          usePlayer.getState().setQueue(queue, index);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                        index === queueIndex ? "bg-primary/10" : "hover:bg-accent"
+                      }`}
+                    >
+                      <StorageImage
+                        bucket="album-art"
+                        path={queueTrack.coverUrl}
+                        alt={queueTrack.title}
+                        className="size-10 rounded overflow-hidden bg-card object-cover"
+                      />
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : ""}`}>
+                          {queueTrack.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{queueTrack.artistName}</p>
+                      </div>
+                      {index === queueIndex && playing && (
+                        <div className="flex items-center gap-0.5">
+                          <div className="w-0.5 h-3 bg-primary animate-pulse" />
+                          <div className="w-0.5 h-3 bg-primary animate-pulse delay-75" />
+                          <div className="w-0.5 h-3 bg-primary animate-pulse delay-150" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            {isPreview && trackPrice > 0 && (
-              <Link
-                to="/checkout"
-                search={{ plan: "premium_monthly", item: "song", id: track.id }}
-                onClick={() => setIsExpanded(false)}
-                className="block w-full text-center py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/30 transition-colors"
-              >
-                Buy this track — ZMW {trackPrice.toFixed(2)}
-              </Link>
-            )}
-            <div className="space-y-2">
-              <div
-                className="h-1.5 bg-muted rounded-full relative overflow-hidden cursor-pointer group"
-                onClick={seek}
-                role="slider"
-                aria-valuemin={0}
-                aria-valuemax={dur}
-                aria-valuenow={progressSeconds}
-                aria-label="Seek"
-              >
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-                <span>{fmt(progressSeconds)}</span>
-                <span>{fmt(dur)}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-8">
-              <button
-                onClick={toggleShuffle}
-                className={`transition-colors ${shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                aria-label="Shuffle"
-              >
-                <Shuffle className="size-5" />
-              </button>
-              <button onClick={skipPrev} className="text-muted-foreground hover:text-foreground" aria-label="Previous">
-                <SkipBack className="size-6" />
-              </button>
-              <button
-                onClick={() => !loading && !error && togglePlay()}
-                disabled={loading || !!error}
-                className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
-                aria-label={playing ? "Pause" : "Play"}
-              >
-                {loading ? (
-                  <Loader2 className="size-6 animate-spin" />
-                ) : playing ? (
-                  <Pause className="size-6" />
-                ) : (
-                  <Play className="size-6 ml-0.5" />
-                )}
-              </button>
-              <button onClick={skipNext} className="text-muted-foreground hover:text-foreground" aria-label="Next">
-                <SkipForward className="size-6" />
-              </button>
-              <button
-                onClick={cycleRepeat}
-                className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                aria-label="Repeat"
-              >
-                {repeat === "one" ? <Repeat1 className="size-5" /> : <Repeat className="size-5" />}
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={toggleMute} aria-label="Mute">
-                <VolIcon className="size-5 text-muted-foreground" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.02}
-                value={muted ? 0 : volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="flex-1 accent-primary"
-                aria-label="Volume"
-              />
-            </div>
-            {error && <p className="text-sm text-destructive text-center">{error}</p>}
           </div>
+          {error && <div className="p-4 text-sm text-destructive text-center border-t border-border">{error}</div>}
         </div>
       )}
 

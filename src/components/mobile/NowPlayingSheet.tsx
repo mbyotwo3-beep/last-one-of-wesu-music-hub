@@ -58,11 +58,14 @@ export function NowPlayingSheet() {
 
   const shuffle = usePlayer((s) => s.shuffle);
   const repeat = usePlayer((s) => s.repeat);
+  const queue = usePlayer((s) => s.queue);
+  const queueIndex = usePlayer((s) => s.queueIndex);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const [volume, setVolume] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
+  const [showQueue, setShowQueue] = useState(false);
 
 
   const touchStartY = useRef(0);
@@ -182,7 +185,12 @@ export function NowPlayingSheet() {
             <ChevronDown className="size-6" />
           </button>
           <div className="text-center">
-            <p className="text-xs font-semibold text-white/50 uppercase tracking-widest">Now Playing</p>
+            <button
+              onClick={() => setShowQueue(!showQueue)}
+              className="text-xs font-semibold text-white/50 uppercase tracking-widest hover:text-white transition-colors"
+            >
+              {showQueue ? "Now Playing" : "Queue"}
+            </button>
           </div>
           <button
             onClick={() => {
@@ -391,6 +399,52 @@ export function NowPlayingSheet() {
           />
           <Volume2 className="size-5 text-white/70 shrink-0" />
         </div>
+
+        {/* Queue Display */}
+        {showQueue && (
+          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
+            <h3 className="text-lg font-semibold text-white mb-4">Queue</h3>
+            {queue.length === 0 ? (
+              <p className="text-sm text-white/60">Queue is empty</p>
+            ) : (
+              <div className="space-y-2">
+                {queue.map((queueTrack, index) => (
+                  <button
+                    key={`${queueTrack.id}-${index}`}
+                    onClick={() => {
+                      if (index !== queueIndex) {
+                        usePlayer.getState().setQueue(queue, index);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                      index === queueIndex ? "bg-white/10" : "hover:bg-white/5"
+                    }`}
+                  >
+                    <StorageImage
+                      bucket="album-art"
+                      path={queueTrack.coverUrl}
+                      alt={queueTrack.title}
+                      className="size-10 rounded overflow-hidden bg-[#2c2c2e] object-cover"
+                    />
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-[#1db954]" : "text-white"}`}>
+                        {queueTrack.title}
+                      </p>
+                      <p className="text-xs text-white/60 truncate">{queueTrack.artistName}</p>
+                    </div>
+                    {index === queueIndex && playing && (
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse" />
+                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse delay-75" />
+                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse delay-150" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

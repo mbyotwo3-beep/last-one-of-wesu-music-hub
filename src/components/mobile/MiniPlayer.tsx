@@ -1,4 +1,4 @@
-import { Loader2, Pause, Play, SkipForward, SkipBack, X, Radio } from "lucide-react";
+import { Loader2, Pause, Play, SkipForward, SkipBack, Radio } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
@@ -112,16 +112,6 @@ export function MiniPlayer() {
               aria-label="Next"
             >
               <SkipForward className="size-4 fill-white/80" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => usePlayer.getState().exitSong()}
-              className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white active:scale-90 transition-all ml-1 border-l border-white/10 pl-1"
-              aria-label="Exit song"
-              title="Exit song"
-            >
-              <X className="size-4" />
             </button>
           </div>
         </div>
