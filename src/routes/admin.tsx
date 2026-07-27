@@ -135,22 +135,36 @@ function LabelMod() {
 function Overview() {
   const statsFn = useServerFn(getPlatformStats);
   const activityFn = useServerFn(getRecentActivity);
+  const listSongsFn = useServerFn(listPendingSongs);
+  const listArtistsFn = useServerFn(listPendingArtists);
+  const listLabelsFn = useServerFn(listPendingLabels);
   const statsQ = useQuery({ queryKey: ["admin-stats"], queryFn: () => statsFn(), retry: 1 });
   const activityQ = useQuery({
     queryKey: ["admin-activity"],
     queryFn: () => activityFn(),
     retry: 1,
   });
+  const pendingSongsQ = useQuery({
+    queryKey: ["pending-songs-count"],
+    queryFn: () => listSongsFn(),
+    retry: 1,
+  });
+  const pendingArtistsQ = useQuery({
+    queryKey: ["pending-artists-count"],
+    queryFn: () => listArtistsFn(),
+    retry: 1,
+  });
+  const pendingLabelsQ = useQuery({
+    queryKey: ["pending-labels-count"],
+    queryFn: () => listLabelsFn(),
+    retry: 1,
+  });
 
   const stats = statsQ.data
     ? [
-        { label: "Total Users", value: statsQ.data.totalUsers.toLocaleString(), icon: Users },
-        { label: "Total Songs", value: statsQ.data.totalSongs.toLocaleString(), icon: Music },
-        {
-          label: "Premium Subs",
-          value: statsQ.data.premiumSubscribers.toLocaleString(),
-          icon: CreditCard,
-        },
+        { label: "Pending Songs", value: pendingSongsQ.data?.length ?? 0, icon: Music },
+        { label: "Pending Artists", value: pendingArtistsQ.data?.length ?? 0, icon: Users },
+        { label: "Pending Labels", value: pendingLabelsQ.data?.length ?? 0, icon: Building2 },
         {
           label: "Revenue 30d",
           value: `ZMW ${statsQ.data.monthlyRevenueZmw.toFixed(2)}`,

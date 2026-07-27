@@ -341,16 +341,25 @@ function FeaturedTab() {
 
 function OverviewTab() {
   const fn = useServerFn(getPlatformStats);
+  const listPayoutsFn = useServerFn(listPayouts);
   const { data } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
+  const { data: payouts } = useQuery({
+    queryKey: ["super-payouts-overview"],
+    queryFn: () => listPayoutsFn(),
+    retry: 1,
+  });
   if (!data) return <div className="text-muted-foreground">Loading…</div>;
+  const pendingPayouts = payouts?.filter((p: any) => p.status === "pending").length ?? 0;
   const cards = [
-    { label: "Total Users", value: data.totalUsers },
-    { label: "Total Songs", value: data.totalSongs },
-    { label: "Premium Subscribers", value: data.premiumSubscribers },
+    { label: "Total Users", value: data.totalUsers.toLocaleString() },
+    { label: "Total Songs", value: data.totalSongs.toLocaleString() },
+    { label: "Premium Subscribers", value: data.premiumSubscribers.toLocaleString() },
+    { label: "Pending Payouts", value: pendingPayouts },
     { label: "Revenue 30d (ZMW)", value: data.monthlyRevenueZmw.toFixed(2) },
+    { label: "Total Artists", value: data.totalArtists?.toLocaleString() ?? "0" },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       {cards.map((c) => (
         <div key={c.label} className="bg-card border border-border rounded-2xl p-6">
           <p className="text-2xl font-bold">{c.value}</p>

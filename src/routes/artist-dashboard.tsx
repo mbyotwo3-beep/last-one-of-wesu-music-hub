@@ -114,6 +114,7 @@ function ArtistDashboardPage() {
     { label: "Total Revenue", value: `ZMW ${data.totalRevenueZmw.toFixed(2)}`, icon: DollarSign },
     { label: "Total Plays", value: data.totalPlays.toLocaleString(), icon: TrendingUp },
     { label: "Songs", value: String(data.totalSongs), icon: Music },
+    { label: "Albums", value: String(data.totalAlbums ?? 0), icon: BarChart3 },
   ];
 
   return (
