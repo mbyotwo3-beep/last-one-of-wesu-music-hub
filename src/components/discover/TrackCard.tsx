@@ -14,6 +14,7 @@ export interface TrackCardSong {
   cover_url: string | null;
   duration?: number | null;
   artist?: Artist;
+  price?: number | null;
 }
 
 /** Cover-first tile for New Music / Made For You style shelves. */
@@ -62,6 +63,11 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         </button>
       )}
       <p className="mt-2 text-sm font-semibold truncate">{song.title}</p>
+      {song.price != null && (
+        <p className="text-xs font-medium text-primary">
+          {song.price > 0 ? `ZMW ${song.price.toFixed(2)}` : 'Free'}
+        </p>
+      )}
       {song.artist?.id ? (
         <Link
           to="/artists/$id"

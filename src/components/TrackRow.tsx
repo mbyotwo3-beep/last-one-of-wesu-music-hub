@@ -10,9 +10,10 @@ interface TrackRowProps {
   coverUrl: string;
   audioUrl?: string;
   index: number;
+  price?: number | null;
 }
 
-export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUrl, index }: TrackRowProps) {
+export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUrl, index, price }: TrackRowProps) {
   const setTrack = usePlayer((s) => s.setTrack);
   const liked = usePlayer((s) => s.liked);
   const toggleLike = usePlayer((s) => s.toggleLike);
@@ -56,6 +57,13 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
 
       {/* Duration */}
       <div className="text-sm text-muted-foreground w-12 text-right">{duration}</div>
+
+      {/* Price */}
+      {price !== null && price !== undefined && (
+        <div className="text-sm font-medium text-primary w-16 text-right">
+          {price > 0 ? `ZMW ${price.toFixed(2)}` : 'Free'}
+        </div>
+      )}
 
       {/* Like Button */}
       <button

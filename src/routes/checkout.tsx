@@ -94,10 +94,12 @@ function CheckoutPage() {
         window.location.href = res.paymentUrl;
         return;
       }
-      const successMsg = res?.message ??
-          (res?.pendingUssd
-            ? "Check your phone and approve the payment prompt."
-            : "Payment started.");
+      if (res?.transactionId) {
+        // Mobile money — redirect to success page to poll for status
+        navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
+        return;
+      }
+      const successMsg = res?.message ?? "Payment started.";
       setResultMsg(successMsg);
       toast.success(successMsg);
     },

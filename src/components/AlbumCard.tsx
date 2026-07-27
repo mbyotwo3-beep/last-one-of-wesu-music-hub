@@ -8,9 +8,10 @@ interface AlbumCardProps {
   imageUrl: string;
   audioUrl?: string;
   duration?: number;
+  price?: number | null;
 }
 
-export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration }: AlbumCardProps) {
+export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, price }: AlbumCardProps) {
   const setTrack = usePlayer((s) => s.setTrack);
 
   const handlePlay = () => {
@@ -49,6 +50,11 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration }:
       <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <p className="text-sm font-semibold text-white truncate">{title}</p>
         <p className="text-xs text-zinc-300 truncate">{subtitle}</p>
+        {price !== null && price !== undefined && (
+          <p className="text-xs font-medium text-primary mt-1">
+            {price > 0 ? `ZMW ${price.toFixed(2)}` : 'Free'}
+          </p>
+        )}
       </div>
     </button>
   );
