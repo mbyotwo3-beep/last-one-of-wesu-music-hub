@@ -159,6 +159,11 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       return { url: rawPath };
     }
 
+    // Validate that audio_url is not empty
+    if (!rawPath || rawPath === "" || rawPath === "null") {
+      throw new Error("Song audio file not found. Please contact support.");
+    }
+
     // Sign via the authenticated user's client — storage RLS grants access
     // to entitled listeners (owner, staff, subscribed, or purchased).
     // The public read policy allows this for approved songs without service role.
@@ -166,6 +171,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       .from("song-audio")
       .createSignedUrl(rawPath, 3600);
     if (error || !signed?.signedUrl) {
+      console.error("Audio URL signing error:", error);
       throw new Error(error?.message ?? "Unable to sign audio URL. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
@@ -194,12 +200,19 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
     if (/^https?:\/\//i.test(rawPath)) {
       return { url: rawPath };
     }
+
+    // Validate that audio_url is not empty
+    if (!rawPath || rawPath === "" || rawPath === "null") {
+      throw new Error("Song audio file not found. Please contact support.");
+    }
+
     // Sign via the anon client — the "song-audio public read for approved songs"
     // storage policy authorizes this without a service-role key.
     const { data: signed, error } = await supabase.storage
       .from("song-audio")
       .createSignedUrl(rawPath, 3600);
     if (error || !signed?.signedUrl) {
+      console.error("Public audio URL signing error:", error);
       throw new Error(error?.message ?? "Audio temporarily unavailable. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
@@ -234,12 +247,18 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       return { url: rawPath };
     }
 
+    // Validate that audio_url is not empty
+    if (!rawPath || rawPath === "" || rawPath === "null") {
+      throw new Error("Song audio file not found. Please contact support.");
+    }
+
     // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
     // Sign via anon client so previews work on deployments without a service-role key.
     const { data: signed, error } = await supabase.storage
       .from("song-audio")
       .createSignedUrl(rawPath, 45);
     if (error || !signed?.signedUrl) {
+      console.error("Preview audio URL signing error:", error);
       throw new Error(error?.message ?? "Preview temporarily unavailable. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
