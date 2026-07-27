@@ -161,19 +161,12 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
 
     // Sign via the authenticated user's client — storage RLS grants access
     // to entitled listeners (owner, staff, subscribed, or purchased).
+    // The public read policy allows this for approved songs without service role.
     const { data: signed, error } = await context.supabase.storage
       .from("song-audio")
       .createSignedUrl(rawPath, 3600);
     if (error || !signed?.signedUrl) {
-      // Last-resort: try service role if available (may not be in some deploys).
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: adminSigned } = await supabaseAdmin.storage
-          .from("song-audio")
-          .createSignedUrl(rawPath, 3600);
-        if (adminSigned?.signedUrl) return { url: adminSigned.signedUrl };
-      } catch {}
-      throw new Error(error?.message ?? "Unable to sign audio URL");
+      throw new Error(error?.message ?? "Unable to sign audio URL. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
   });
@@ -202,20 +195,12 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
       return { url: rawPath };
     }
     // Sign via the anon client — the "song-audio public read for approved songs"
-    // storage policy authorizes this without a service-role key, which isn't
-    // available on Lovable Cloud deployments.
+    // storage policy authorizes this without a service-role key.
     const { data: signed, error } = await supabase.storage
       .from("song-audio")
       .createSignedUrl(rawPath, 3600);
     if (error || !signed?.signedUrl) {
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: adminSigned } = await supabaseAdmin.storage
-          .from("song-audio")
-          .createSignedUrl(rawPath, 3600);
-        if (adminSigned?.signedUrl) return { url: adminSigned.signedUrl };
-      } catch {}
-      throw new Error(error?.message ?? "Audio temporarily unavailable");
+      throw new Error(error?.message ?? "Audio temporarily unavailable. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
   });
@@ -255,14 +240,7 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       .from("song-audio")
       .createSignedUrl(rawPath, 45);
     if (error || !signed?.signedUrl) {
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: adminSigned } = await supabaseAdmin.storage
-          .from("song-audio")
-          .createSignedUrl(rawPath, 45);
-        if (adminSigned?.signedUrl) return { url: adminSigned.signedUrl };
-      } catch {}
-      throw new Error(error?.message ?? "Preview temporarily unavailable");
+      throw new Error(error?.message ?? "Preview temporarily unavailable. Please ensure the song is approved.");
     }
     return { url: signed.signedUrl };
   });
