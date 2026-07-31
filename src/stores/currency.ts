@@ -9,18 +9,8 @@ function getInitialCurrency(): Currency {
   if (typeof window === "undefined") return "ZMW";
   const saved = localStorage.getItem("wesu_currency");
   if (saved === "ZMW" || saved === "USD") return saved;
-
-  // Auto-detect based on user timezone
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tz.includes("Lusaka") || tz.includes("Harare")) {
-      return "ZMW";
-    }
-    // Non-Zambian listener defaults to USD
-    return "USD";
-  } catch {
-    return "ZMW";
-  }
+  // Default to ZMW
+  return "ZMW";
 }
 
 interface CurrencyState {
