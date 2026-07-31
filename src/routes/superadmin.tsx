@@ -102,10 +102,10 @@ function SuperadminPage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition cursor-pointer ${
                 tab === t.id
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
+                  : "bg-card text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
               <t.icon className="size-4" />
@@ -356,7 +356,7 @@ function OverviewTab() {
     { label: "Premium Subscribers", value: data.premiumSubscribers.toLocaleString() },
     { label: "Pending Payouts", value: pendingPayouts },
     { label: "Revenue 30d (ZMW)", value: data.monthlyRevenueZmw.toFixed(2) },
-    { label: "Total Artists", value: data.totalArtists?.toLocaleString() ?? "0" },
+    { label: "Total Artists", value: (data as any).totalArtists?.toLocaleString() ?? "0" },
   ];
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -454,7 +454,7 @@ function UsersTab() {
                             ? revokeM.mutate({ data: { user_id: u.user_id, role: r } })
                             : grantM.mutate({ data: { user_id: u.user_id, role: r } })
                         }
-                        className={`text-xs px-2 py-1 rounded-md border ${
+                        className={`text-xs px-2 py-1 rounded-md border cursor-pointer transition-colors ${
                           has
                             ? "border-destructive/40 text-destructive hover:bg-destructive/10"
                             : "border-border text-foreground hover:bg-accent"
@@ -527,7 +527,7 @@ function PlansTab() {
         <button
           disabled={!draft.name || upsertM.isPending}
           onClick={() => upsertM.mutate({ data: draft })}
-          className="mt-3 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          className="mt-3 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Create plan
         </button>
@@ -600,7 +600,7 @@ function PaymentsTab() {
                 <button
                   disabled={m.isPending}
                   onClick={() => m.mutate({ data: { code: p.code, is_enabled: !p.is_enabled } })}
-                  className={`text-xs px-3 py-1 rounded-full ${p.is_enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}
+                  className={`text-xs px-3 py-1 rounded-full cursor-pointer transition-colors ${p.is_enabled ? "bg-primary/15 text-primary hover:bg-primary/25" : "bg-muted text-muted-foreground hover:bg-accent"}`}
                 >
                   {p.is_enabled ? "Enabled" : "Disabled"}
                 </button>
@@ -659,14 +659,14 @@ function PayoutsTab() {
                     <button
                       disabled={m.isPending}
                       onClick={() => m.mutate({ data: { id: p.id, decision: "approved" } })}
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/15 text-primary"
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors"
                     >
                       <Check className="size-3" /> Approve
                     </button>
                     <button
                       disabled={m.isPending}
                       onClick={() => m.mutate({ data: { id: p.id, decision: "rejected" } })}
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-destructive/15 text-destructive"
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors"
                     >
                       <X className="size-3" /> Reject
                     </button>
@@ -753,7 +753,7 @@ function SettingsTab() {
         </label>
         <button
           onClick={() => m.mutate({ data: { key: "site", value: site } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Save site
         </button>
@@ -773,7 +773,7 @@ function SettingsTab() {
         </label>
         <button
           onClick={() => m.mutate({ data: { key: "payments", value: pay } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Save payments
         </button>
@@ -837,7 +837,7 @@ function SettingsTab() {
         </div>
         <button
           onClick={() => m.mutate({ data: { key: "pricing", value: pricing } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Save pricing
         </button>

@@ -179,7 +179,7 @@ export function NowPlayingSheet() {
         <div className="flex items-center justify-between px-6 py-2 shrink-0">
           <button
             onClick={closeNowPlaying}
-            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -ml-2"
+            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -ml-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
             aria-label="Close"
           >
             <ChevronDown className="size-6" />
@@ -187,7 +187,7 @@ export function NowPlayingSheet() {
           <div className="text-center">
             <button
               onClick={() => setShowQueue(!showQueue)}
-              className="text-xs font-semibold text-white/50 uppercase tracking-widest hover:text-white transition-colors"
+              className="text-xs font-semibold text-white/50 uppercase tracking-widest hover:text-white transition-colors cursor-pointer"
             >
               {showQueue ? "Now Playing" : "Queue"}
             </button>
@@ -196,7 +196,7 @@ export function NowPlayingSheet() {
             onClick={() => {
               usePlayer.getState().exitSong();
             }}
-            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -mr-2"
+            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -mr-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
             aria-label="Exit song"
             title="Exit song"
           >
@@ -214,7 +214,7 @@ export function NowPlayingSheet() {
                 to="/checkout"
                 search={{ plan: "premium_monthly", item: "song", id: track.id }}
                 onClick={closeNowPlaying}
-                className="font-semibold text-amber-200 hover:underline whitespace-nowrap shrink-0"
+                className="font-semibold text-amber-200 hover:underline whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Buy K{price.toFixed(0)}
               </Link>
@@ -258,7 +258,7 @@ export function NowPlayingSheet() {
                 to="/albums/$id"
                 params={{ id: albumId }}
                 onClick={closeNowPlaying}
-                className="text-xl font-bold text-white truncate block hover:underline"
+                className="text-xl font-bold text-white truncate block hover:underline cursor-pointer"
               >
                 {track.title}
               </Link>
@@ -267,7 +267,7 @@ export function NowPlayingSheet() {
                 to="/artists/$id"
                 params={{ id: artistId }}
                 onClick={closeNowPlaying}
-                className="text-xl font-bold text-white truncate block hover:underline"
+                className="text-xl font-bold text-white truncate block hover:underline cursor-pointer"
               >
                 {track.title}
               </Link>
@@ -280,7 +280,7 @@ export function NowPlayingSheet() {
                 to="/artists/$id"
                 params={{ id: artistId }}
                 onClick={closeNowPlaying}
-                className="text-sm text-white/60 truncate mt-0.5 block hover:text-white hover:underline"
+                className="text-sm text-white/60 truncate mt-0.5 block hover:text-white hover:underline cursor-pointer"
               >
                 {track.artistName}
               </Link>
@@ -291,7 +291,7 @@ export function NowPlayingSheet() {
           {user && (
             <button
               onClick={toggleLike}
-              className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform"
+              className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform cursor-pointer rounded-full hover:bg-white/10"
               aria-label={liked ? "Unlike" : "Like"}
             >
               <Heart
@@ -334,7 +334,7 @@ export function NowPlayingSheet() {
         <div className="flex items-center justify-between px-8 mb-4 shrink-0">
           <button
             onClick={toggleShuffle}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 ${shuffle ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
+            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 ${shuffle ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={`Shuffle ${shuffle ? "on" : "off"}`}
           >
             <Shuffle className="size-5" />
@@ -342,7 +342,7 @@ export function NowPlayingSheet() {
 
           <button
             onClick={skipPrev}
-            className="w-12 h-12 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-12 h-12 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
             aria-label="Previous"
           >
             <SkipBack className="size-7 fill-white" />
@@ -351,7 +351,7 @@ export function NowPlayingSheet() {
           <button
             onClick={() => { if (!isLoading) togglePlay(); }}
             disabled={isLoading}
-            className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50"
+            className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50 cursor-pointer hover:scale-105"
             aria-label={playing ? "Pause" : "Play"}
           >
             {isLoading ? (
@@ -365,7 +365,7 @@ export function NowPlayingSheet() {
 
           <button
             onClick={skipNext}
-            className="w-12 h-12 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-12 h-12 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
             aria-label="Next"
           >
             <SkipForward className="size-7 fill-white" />
@@ -373,7 +373,7 @@ export function NowPlayingSheet() {
 
           <button
             onClick={cycleRepeat}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 relative ${repeat !== "off" ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
+            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 relative ${repeat !== "off" ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
             aria-label={repeatLabel}
           >
             <Repeat className="size-5" />
@@ -416,7 +416,7 @@ export function NowPlayingSheet() {
                         usePlayer.getState().setQueue(queue, index);
                       }
                     }}
-                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer ${
                       index === queueIndex ? "bg-white/10" : "hover:bg-white/5"
                     }`}
                   >

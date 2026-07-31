@@ -1,5 +1,6 @@
 import { Play, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { useCurrency } from "@/stores/currency";
 
 interface TrackRowProps {
   id: string;
@@ -60,8 +61,8 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
 
       {/* Price */}
       {price !== null && price !== undefined && (
-        <div className="text-sm font-medium text-primary w-16 text-right">
-          {price > 0 ? `ZMW ${price.toFixed(2)}` : 'Free'}
+        <div className="text-sm font-medium text-primary w-20 text-right">
+          {useCurrency.getState().formatPrice(price)}
         </div>
       )}
 

@@ -45,7 +45,7 @@ export function MiniPlayer() {
             <Link
               to="/checkout"
               search={{ plan: "premium_monthly", item: "song", id: track.id }}
-              className="font-semibold text-amber-300 hover:underline shrink-0"
+              className="font-semibold text-amber-300 hover:underline shrink-0 cursor-pointer"
             >
               Buy K{trackPrice.toFixed(0)}
             </Link>
@@ -64,7 +64,7 @@ export function MiniPlayer() {
             type="button"
             onClick={openNowPlaying}
             aria-label="Open now playing"
-            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer hover:bg-white/5 rounded-lg transition-colors"
           >
             <StorageImage
               bucket="album-art"
@@ -83,7 +83,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={skipPrev}
-              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all"
+              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label="Previous"
             >
               <SkipBack className="size-4 fill-white/80" />
@@ -93,7 +93,7 @@ export function MiniPlayer() {
               type="button"
               onClick={togglePlay}
               disabled={isLoading}
-              className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all disabled:opacity-40"
+              className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all disabled:opacity-40 cursor-pointer rounded-full hover:bg-white/10"
               aria-label={playing ? "Pause" : "Play"}
             >
               {isLoading ? (
@@ -108,7 +108,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={skipNext}
-              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all"
+              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label="Next"
             >
               <SkipForward className="size-4 fill-white/80" />

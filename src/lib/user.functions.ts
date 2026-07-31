@@ -60,22 +60,37 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
       .maybeSingle();
 
     if (!artist) {
-      return { artist: null, topSongs: [], totalSongs: 0, totalPlays: 0, totalRevenueZmw: 0 };
+      return {
+        artist: null,
+        topSongs: [],
+        totalSongs: 0,
+        totalPlays: 0,
+        totalRevenueZmw: 0,
+        totalFollowers: 0,
+        eligibleForVerification: false,
+        eligibleForPayout: false,
+      };
     }
 
-    const { data: songRowsAll } = await supabase
-      .from("songs")
-      .select("id,title,play_count,price,created_at")
-      .eq("artist_id", artist.id)
-      .order("play_count", { ascending: false });
+    const [songRowsRes, albumRowsRes, followersRes] = await Promise.all([
+      supabase
+        .from("songs")
+        .select("id,title,play_count,price,status,created_at")
+        .eq("artist_id", artist.id)
+        .order("play_count", { ascending: false }),
+      supabase.from("albums").select("id").eq("artist_id", artist.id),
+      supabase
+        .from("artist_followers")
+        .select("id", { count: "exact", head: true })
+        .eq("artist_id", artist.id),
+    ]);
 
-    const { data: albumRows } = await supabase
-      .from("albums")
-      .select("id")
-      .eq("artist_id", artist.id);
+    const songRowsAll = songRowsRes.data ?? [];
+    const albumRows = albumRowsRes.data ?? [];
+    const totalFollowers = followersRes.count ?? 0;
 
-    const songIds = (songRowsAll ?? []).map((s) => s.id);
-    const albumIds = (albumRows ?? []).map((a) => a.id);
+    const songIds = songRowsAll.map((s) => s.id);
+    const albumIds = albumRows.map((a) => a.id);
 
     // Revenue requires admin client — purchases RLS scopes per-user.
     // We're authorized because the caller proved ownership of this artist row.
@@ -89,20 +104,24 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
       sales = { data: r.data ?? [] };
     }
 
-    const songs = { data: songRowsAll };
-
-    const songRows = songs.data ?? [];
-    const totalPlays = songRows.reduce((s, r) => s + (r.play_count ?? 0), 0);
+    const totalPlays = songRowsAll.reduce((s, r) => s + (r.play_count ?? 0), 0);
     const totalRevenueZmw = (sales.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+
+    const eligibleForVerification = totalFollowers >= 100 && totalRevenueZmw > 500;
+    const eligibleForPayout = totalRevenueZmw > 500;
 
     return {
       artist,
-      topSongs: songRows.slice(0, 10),
-      totalSongs: songRows.length,
+      topSongs: songRowsAll.slice(0, 10),
+      totalSongs: songRowsAll.length,
       totalPlays,
       totalRevenueZmw,
+      totalFollowers,
+      eligibleForVerification,
+      eligibleForPayout,
     };
   });
+
 
 export const getMyArtistProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

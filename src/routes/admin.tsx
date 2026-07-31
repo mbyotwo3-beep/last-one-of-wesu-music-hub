@@ -12,6 +12,8 @@ import {
   moderateSong,
   listPendingArtists,
   moderateArtist,
+  listPendingVerifications,
+  moderateArtistVerification,
   listPendingLabels,
   moderateLabel,
   getArtistDiagnostics,
@@ -53,10 +55,10 @@ function AdminPage() {
               key={t}
               data-tab={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-full text-sm font-medium capitalize ${
+              className={`px-4 py-2 rounded-full text-sm font-medium capitalize cursor-pointer transition-colors ${
                 tab === t
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
+                  : "bg-card text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
               {t}
@@ -114,14 +116,14 @@ function LabelMod() {
             <button
               disabled={m.isPending}
               onClick={() => m.mutate({ data: { id: l.id, status: "approved" } })}
-              className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/15 text-primary"
+              className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors"
             >
               <Check className="size-3" /> Approve
             </button>
             <button
               disabled={m.isPending}
               onClick={() => m.mutate({ data: { id: l.id, status: "rejected" } })}
-              className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/15 text-destructive"
+              className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors"
             >
               <X className="size-3" /> Reject
             </button>
@@ -269,14 +271,14 @@ function SongMod() {
             <button
               disabled={m.isPending}
               onClick={() => m.mutate({ data: { id: s.id, status: "approved" } })}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary"
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors"
             >
               <Check className="size-3" /> Approve
             </button>
             <button
               disabled={m.isPending}
               onClick={() => m.mutate({ data: { id: s.id, status: "rejected" } })}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive"
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors"
             >
               <X className="size-3" /> Reject
             </button>
@@ -291,50 +293,113 @@ function ArtistMod() {
   const qc = useQueryClient();
   const list = useServerFn(listPendingArtists);
   const mod = useServerFn(moderateArtist);
-  const { data } = useQuery({ queryKey: ["pending-artists"], queryFn: () => list(), retry: false });
+  const listVerifs = useServerFn(listPendingVerifications);
+  const modVerif = useServerFn(moderateArtistVerification);
+
+  const { data: pendingArtists } = useQuery({ queryKey: ["pending-artists"], queryFn: () => list(), retry: false });
+  const { data: pendingVerifications } = useQuery({ queryKey: ["pending-verifications"], queryFn: () => listVerifs(), retry: false });
+
   const m = useMutation({
     mutationFn: mod,
     onSuccess: (_, variables) => {
       const action = variables.data.status === "approved" ? "approved" : "rejected";
-      toast.success(`Artist ${action} successfully`);
+      toast.success(`Artist application ${action} successfully`);
       qc.invalidateQueries({ queryKey: ["pending-artists"] });
     },
     onError: (error) => {
       toast.error(`Failed to moderate artist: ${(error as Error).message}`);
     },
   });
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
-  if (data.length === 0)
-    return <p className="text-muted-foreground">No artist applications awaiting review.</p>;
+
+  const mVerif = useMutation({
+    mutationFn: modVerif,
+    onSuccess: (_, variables) => {
+      const action = variables.data.decision === "approve" ? "approved" : "rejected";
+      toast.success(`Artist verification ${action} successfully`);
+      qc.invalidateQueries({ queryKey: ["pending-verifications"] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to moderate verification: ${(error as Error).message}`);
+    },
+  });
+
   return (
-    <div className="space-y-3">
-      {data.map((a: any) => (
-        <div key={a.id} className="bg-card border border-border rounded-xl p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="font-medium">{a.name}</p>
-              <p className="text-xs text-muted-foreground">{a.genre ?? "—"}</p>
-              {a.bio && <p className="text-sm mt-2 text-muted-foreground">{a.bio}</p>}
-            </div>
-            <div className="flex gap-2">
-              <button
-                disabled={m.isPending}
-                onClick={() => m.mutate({ data: { id: a.id, status: "approved", verified: true } })}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary"
-              >
-                <Check className="size-3" /> Approve
-              </button>
-              <button
-                disabled={m.isPending}
-                onClick={() => m.mutate({ data: { id: a.id, status: "rejected" } })}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive"
-              >
-                <X className="size-3" /> Reject
-              </button>
-            </div>
+    <div className="space-y-8">
+      {/* 1. Initial Artist Applications */}
+      <div>
+        <h2 className="text-xl font-bold mb-4">Pending Artist Applications</h2>
+        {!pendingArtists || pendingArtists.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No artist applications awaiting review.</p>
+        ) : (
+          <div className="space-y-3">
+            {pendingArtists.map((a: any) => (
+              <div key={a.id} className="bg-card border border-border rounded-xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium">{a.name}</p>
+                    <p className="text-xs text-muted-foreground">{a.genre ?? "—"}</p>
+                    {a.bio && <p className="text-sm mt-2 text-muted-foreground">{a.bio}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={m.isPending}
+                      onClick={() => m.mutate({ data: { id: a.id, status: "approved", verified: false } })}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors"
+                    >
+                      <Check className="size-3" /> Approve Account
+                    </button>
+                    <button
+                      disabled={m.isPending}
+                      onClick={() => m.mutate({ data: { id: a.id, status: "rejected" } })}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors"
+                    >
+                      <X className="size-3" /> Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* 2. Verification Applications */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-xl font-bold">Verification Requests</h2>
+          <span className="text-xs text-muted-foreground">(Artists with &ge;100 followers &amp; &gt;K500 earnings)</span>
         </div>
-      ))}
+        {!pendingVerifications || pendingVerifications.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No verification requests awaiting review.</p>
+        ) : (
+          <div className="space-y-3">
+            {pendingVerifications.map((a: any) => (
+              <div key={a.id} className="bg-card border border-border rounded-xl p-4 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-sm">{a.name}</p>
+                  <p className="text-xs text-muted-foreground">{a.genre ?? "—"}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={mVerif.isPending}
+                    onClick={() => mVerif.mutate({ data: { id: a.id, decision: "approve" } })}
+                    className="inline-flex items-center gap-1 text-xs px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:brightness-110 transition-all"
+                  >
+                    <Check className="size-3" /> Approve Verification
+                  </button>
+                  <button
+                    disabled={mVerif.isPending}
+                    onClick={() => mVerif.mutate({ data: { id: a.id, decision: "reject" } })}
+                    className="inline-flex items-center gap-1 text-xs px-3.5 py-1.5 rounded-full bg-destructive/15 text-destructive font-semibold cursor-pointer hover:bg-destructive/25 transition-all"
+                  >
+                    <X className="size-3" /> Reject Verification
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

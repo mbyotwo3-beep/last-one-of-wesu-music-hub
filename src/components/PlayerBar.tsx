@@ -498,7 +498,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                     onChange={(e) => setVolume(Number(e.target.value))}
                     className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer"
                     style={{
-                      writingMode: "bt-lr",
                       WebkitAppearance: "slider-vertical",
                       accentColor: "hsl(var(--primary))",
                     }}

@@ -134,12 +134,7 @@ export const uploadSong = createServerFn({ method: "POST" })
       throw new Error("Invalid cover_url: must be under your own storage folder");
     }
 
-    // Auto-approve songs from already-approved & verified artists so uploads
-    // are immediately visible on the site. Unverified artists still go through
-    // the moderation queue.
-    const autoApprove =
-      (artist as any).status === "approved" && (artist as any).verified === true;
-
+    // Songs require admin approval before showing on the platform.
     const { data: song, error } = await supabase
       .from("songs")
       .insert({
@@ -151,16 +146,16 @@ export const uploadSong = createServerFn({ method: "POST" })
         price: data.price ?? 0,
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
-        status: autoApprove ? "approved" : "pending",
+        status: "pending",
       } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
     await audit(supabase, userId, "song.upload", "song", song!.id, {
       title: data.title,
-      auto_approved: autoApprove,
+      status: "pending",
     });
-    return { ok: true, id: song!.id, status: autoApprove ? "approved" : "pending" };
+    return { ok: true, id: song!.id, status: "pending" };
   });
 
 // ---------- Albums ----------
@@ -253,13 +248,9 @@ export const requestPayout = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     
-    // SECURITY: Validate amount
-    if (!Number.isFinite(data.amount) || data.amount <= 0) {
-      throw new Error("Payout amount must be a positive number");
-    }
-    
-    if (data.amount > 1000000) {
-      throw new Error("Payout amount cannot exceed $1,000,000");
+    // REQUIREMENT: Payout only allowed if money is over K500
+    if (data.amount < 500) {
+      throw new Error("Minimum withdrawal amount is K500 (ZMW 500)");
     }
     
     const { data: artist } = await supabase
@@ -271,9 +262,12 @@ export const requestPayout = createServerFn({ method: "POST" })
     
     // SECURITY: Check available balance
     const available = await getArtistAvailableBalance(supabase, (artist as any).id);
+    if (available <= 500) {
+      throw new Error(`You can only apply for withdrawal if your available balance is over K500 (Current: K${available.toFixed(2)})`);
+    }
     if (data.amount > available) {
       throw new Error(
-        `Insufficient balance. Available: $${available.toFixed(2)}, Requested: $${data.amount.toFixed(2)}`
+        `Insufficient balance. Available: K${available.toFixed(2)}, Requested: K${data.amount.toFixed(2)}`
       );
     }
     
@@ -306,6 +300,68 @@ export const listMyPayouts = createServerFn({ method: "GET" })
       .eq("artist_id", (artist as any).id)
       .order("requested_at", { ascending: false });
     return data ?? [];
+  });
+
+// ---------- Verification Application ----------
+
+export const requestArtistVerification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: artist } = await supabase
+      .from("artists")
+      .select("id, verified, verification_status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!artist) throw new Error("Artist profile required");
+    if ((artist as any).verified) throw new Error("Artist is already verified");
+    if ((artist as any).verification_status === "pending") {
+      throw new Error("Your verification application is already under review");
+    }
+
+    // Check follower count (>= 100)
+    const { count: followersCount } = await supabase
+      .from("artist_followers")
+      .select("id", { count: "exact", head: true })
+      .eq("artist_id", (artist as any).id);
+
+    if ((followersCount ?? 0) < 100) {
+      throw new Error(
+        `Verification requires at least 100 followers (Currently: ${followersCount ?? 0})`
+      );
+    }
+
+    // Check total earnings (> 500 ZMW)
+    const { data: songs } = await supabase.from("songs").select("id").eq("artist_id", (artist as any).id);
+    const { data: albums } = await supabase.from("albums").select("id").eq("artist_id", (artist as any).id);
+    const songIds = (songs ?? []).map((s) => s.id);
+    const albumIds = (albums ?? []).map((a) => a.id);
+
+    let totalRevenue = 0;
+    if (songIds.length || albumIds.length) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const filters: string[] = [];
+      if (songIds.length) filters.push(`song_id.in.(${songIds.join(",")})`);
+      if (albumIds.length) filters.push(`album_id.in.(${albumIds.join(",")})`);
+      const { data: sales } = await supabaseAdmin.from("purchases").select("amount").or(filters.join(","));
+      totalRevenue = (sales ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+    }
+
+    if (totalRevenue <= 500) {
+      throw new Error(
+        `Verification requires total earnings over K500 (Currently: K${totalRevenue.toFixed(2)})`
+      );
+    }
+
+    const { error } = await supabase
+      .from("artists")
+      .update({ verification_status: "pending" } as any)
+      .eq("id", (artist as any).id);
+
+    if (error) throw new Error(error.message);
+    await audit(supabase, userId, "artist.request_verification", "artist", (artist as any).id);
+    return { ok: true };
   });
 
 // ---------- New: collab prefs, feature toggle, label join/leave, song list ----------

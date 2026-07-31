@@ -1,5 +1,6 @@
 import { Play } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { useCurrency } from "@/stores/currency";
 
 interface AlbumCardProps {
   id: string;
@@ -13,6 +14,7 @@ interface AlbumCardProps {
 
 export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, price }: AlbumCardProps) {
   const setTrack = usePlayer((s) => s.setTrack);
+  const formatPrice = useCurrency((s) => s.formatPrice);
 
   const handlePlay = () => {
     setTrack({
@@ -28,7 +30,7 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
   return (
     <button
       onClick={handlePlay}
-      className="group relative aspect-square rounded-xl overflow-hidden bg-secondary transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/50"
+      className="group relative aspect-square rounded-xl overflow-hidden bg-secondary transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
     >
       {/* Album Art */}
       <img
@@ -52,10 +54,11 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
         <p className="text-xs text-zinc-300 truncate">{subtitle}</p>
         {price !== null && price !== undefined && (
           <p className="text-xs font-medium text-primary mt-1">
-            {price > 0 ? `ZMW ${price.toFixed(2)}` : 'Free'}
+            {formatPrice(price)}
           </p>
         )}
       </div>
     </button>
   );
 }
+

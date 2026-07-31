@@ -3,6 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
+import { useCurrency } from "@/stores/currency";
 import { Play } from "lucide-react";
 
 const albumQO = (id: string) =>
@@ -72,7 +73,7 @@ function AlbumPage() {
             <p className="text-xs text-muted-foreground mt-1">
               {data.songs.length} song{data.songs.length === 1 ? "" : "s"}
               {album.release_date ? ` · ${new Date(album.release_date).getFullYear()}` : ""}
-              {" · "}K{Number(album.price ?? 0).toFixed(2)}
+              {" · "}{useCurrency.getState().formatPrice(album.price)}
             </p>
           </div>
         </div>
@@ -104,14 +105,15 @@ function AlbumPage() {
                     durationSeconds: s.duration,
                   })
                 }
-                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left cursor-pointer group"
               >
-                <span className="w-6 text-sm text-muted-foreground">{i + 1}</span>
+                <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
                 <div className="flex-1">
-                  <p className="font-semibold text-sm">{s.title}</p>
+                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
                 </div>
                 <span className="text-primary text-sm font-bold">
-                  K{Number(s.price ?? 0).toFixed(2)}
+                  {useCurrency.getState().formatPrice(s.price)}
                 </span>
               </button>
             ))}

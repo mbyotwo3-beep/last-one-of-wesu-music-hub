@@ -150,6 +150,23 @@
       background-color 0.2s ease,
       color 0.2s ease;
   }
+
+  /* All interactive elements should show pointer cursor */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+
+  /* Disabled elements clearly show they're not interactive */
+  button:disabled,
+  [role="button"]:disabled,
+  input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 }
 
 @layer components {

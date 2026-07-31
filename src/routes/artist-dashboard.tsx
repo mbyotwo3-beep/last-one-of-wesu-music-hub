@@ -1,12 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, TrendingUp, DollarSign, Music, BarChart3, Settings } from "lucide-react";
+import { Upload, TrendingUp, DollarSign, Music, BarChart3, Settings, Users, CheckCircle2, Clock, ShieldAlert } from "lucide-react";
 import { useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { getMyArtistOverview } from "@/lib/user.functions";
+import { requestArtistVerification } from "@/lib/artist.functions";
+import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/artist-dashboard")({
   head: () => ({
@@ -24,7 +27,10 @@ export const Route = createFileRoute("/artist-dashboard")({
 function ArtistDashboardPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const fetchOverview = useServerFn(getMyArtistOverview);
+  const requestVerificationFn = useServerFn(requestArtistVerification);
+  const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -35,6 +41,17 @@ function ArtistDashboardPage() {
     queryFn: () => fetchOverview(),
     enabled: !!user,
     retry: 1,
+  });
+
+  const verificationMutation = useMutation({
+    mutationFn: requestVerificationFn,
+    onSuccess: () => {
+      toast.success("Verification application submitted! Waiting for admin review.");
+      qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 
   if (loading || !user) return null;
@@ -110,11 +127,15 @@ function ArtistDashboardPage() {
     );
   }
 
+  const isVerified = data.artist.verified;
+  const verificationStatus = (data.artist as any).verification_status ?? "none";
+  const followerCount = data.totalFollowers ?? 0;
+
   const stats = [
-    { label: "Total Revenue", value: `ZMW ${data.totalRevenueZmw.toFixed(2)}`, icon: DollarSign },
-    { label: "Total Plays", value: data.totalPlays.toLocaleString(), icon: TrendingUp },
+    { label: "Total Followers", value: followerCount.toLocaleString(), icon: Users },
+    { label: "Total Listens / Plays", value: data.totalPlays.toLocaleString(), icon: TrendingUp },
+    { label: "Total Revenue", value: formatPrice(data.totalRevenueZmw), icon: DollarSign },
     { label: "Songs", value: String(data.totalSongs), icon: Music },
-    { label: "Albums", value: String(data.totalAlbums ?? 0), icon: BarChart3 },
   ];
 
   return (
@@ -122,26 +143,34 @@ function ArtistDashboardPage() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold">{data.artist.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{data.artist.name}</h1>
+              {isVerified && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  <CheckCircle2 className="size-3.5" /> Verified
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground">Artist Dashboard</p>
           </div>
           <div className="flex gap-2">
             <a
               href="/artist-profile-edit"
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent hover:bg-accent/80 transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent hover:bg-accent/80 transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
               <Settings className="size-4" /> Edit Profile
             </a>
             <a
               href="/artist-studio"
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground inline-flex items-center gap-2"
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground inline-flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
             >
               <Upload className="size-4" /> Open Studio
             </a>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-12">
+        {/* Metric Cards Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat) => (
             <div key={stat.label} className="bg-card border border-border rounded-2xl p-6">
               <stat.icon className="size-5 text-primary mb-4" />
@@ -151,10 +180,63 @@ function ArtistDashboardPage() {
           ))}
         </div>
 
+        {/* Verification Status Banner / Application Card */}
+        <div className="bg-card border border-border rounded-2xl p-6 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className={`size-5 ${isVerified ? "text-primary" : "text-muted-foreground"}`} />
+                <h2 className="text-lg font-semibold">Artist Verification</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {isVerified
+                  ? "Your artist profile is officially verified by Wesu+ staff."
+                  : verificationStatus === "pending"
+                  ? "Your verification application is currently under review by Admin / Superadmin."
+                  : "Get the verified badge on your profile. Verification requires at least 100 followers and over K500 in total earnings."}
+              </p>
+            </div>
+
+            {!isVerified && (
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Followers:</span>
+                    <span className={`font-semibold ${followerCount >= 100 ? "text-primary" : "text-foreground"}`}>
+                      {followerCount} / 100
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Earnings:</span>
+                    <span className={`font-semibold ${data.totalRevenueZmw > 500 ? "text-primary" : "text-foreground"}`}>
+                      K{data.totalRevenueZmw.toFixed(2)} / K500
+                    </span>
+                  </div>
+                </div>
+
+                {verificationStatus === "pending" ? (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-yellow-500/15 text-yellow-500 text-xs font-semibold">
+                    <Clock className="size-4" /> Under Review
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => verificationMutation.mutate()}
+                    disabled={!data.eligibleForVerification || verificationMutation.isPending}
+                    className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40 hover:scale-105 transition-all cursor-pointer"
+                  >
+                    {verificationMutation.isPending ? "Submitting..." : "Apply for Verification"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Top / Uploaded Songs */}
         <div className="bg-card border border-border rounded-2xl p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 className="size-5" />
-            Top Tracks
+            <BarChart3 className="size-5 text-primary" />
+            Uploaded Tracks
           </h2>
           {data.topSongs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -162,25 +244,39 @@ function ArtistDashboardPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {data.topSongs.map((track, i) => (
-                <div
-                  key={track.id}
-                  className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent transition-colors"
-                >
-                  <span className="w-6 text-sm text-muted-foreground">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{track.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(track.play_count ?? 0).toLocaleString()} streams
-                    </p>
+              {data.topSongs.map((track: any, i: number) => {
+                const isPending = track.status === "pending";
+                return (
+                  <div
+                    key={track.id}
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <span className="w-6 text-sm text-muted-foreground">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{track.title}</p>
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 text-[11px] font-medium shrink-0">
+                            <Clock className="size-3" /> Waiting for approval
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium shrink-0">
+                            <CheckCircle2 className="size-3" /> Approved
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {(track.play_count ?? 0).toLocaleString()} listens
+                      </p>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {formatPrice(track.price)}
+                    </span>
                   </div>
-                  <span className="text-sm font-medium">
-                    ZMW {Number(track.price ?? 0).toFixed(2)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -188,3 +284,4 @@ function ArtistDashboardPage() {
     </div>
   );
 }
+

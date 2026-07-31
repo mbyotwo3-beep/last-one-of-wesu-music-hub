@@ -167,10 +167,10 @@ function CheckoutPage() {
               <button
                 key={m.id}
                 onClick={() => setSelectedMethodCode(m.code)}
-                className={`p-4 rounded-xl border text-left transition-all ${
+                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                   selectedMethodCode === m.code
                     ? "border-primary bg-primary/10"
-                    : "border-white/10 hover:border-white/20 bg-white/5"
+                    : "border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10"
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -224,7 +224,7 @@ function CheckoutPage() {
               },
             })
           }
-          className="w-full py-4 bg-primary text-obsidian rounded-2xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-4 bg-primary text-obsidian rounded-2xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
         >
           {mutation.isPending ? (
             <Loader2 className="size-4 animate-spin" />

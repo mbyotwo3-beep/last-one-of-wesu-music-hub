@@ -5,6 +5,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSavedAlbum } from "@/hooks/use-saved-album";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrency } from "@/stores/currency";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -24,7 +25,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   return (
-    <div className="group text-left w-full relative">
+    <div className="group text-left w-full relative cursor-pointer">
       <button
         type="button"
         onClick={() =>
@@ -36,17 +37,17 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             durationSeconds: song.duration ?? undefined,
           })
         }
-        className="relative block w-full"
+        className="relative block w-full cursor-pointer"
         aria-label={`Play ${song.title}`}
       >
         <StorageImage
           bucket="album-art"
           path={song.cover_url}
           alt={song.title}
-          className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover"
+          className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2">
-          <div className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg">
+          <div className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors">
             <Play className="size-4 fill-current ml-0.5" />
           </div>
         </div>
@@ -56,23 +57,23 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           type="button"
           onClick={(e) => { e.stopPropagation(); toggle(); }}
           aria-label={isSaved ? "Unsave track" : "Save track"}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
           style={{ position: "absolute" }}
         >
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
       )}
-      <p className="mt-2 text-sm font-semibold truncate">{song.title}</p>
+      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
       {song.price != null && (
         <p className="text-xs font-medium text-primary">
-          {song.price > 0 ? `ZMW ${song.price.toFixed(2)}` : 'Free'}
+          {useCurrency.getState().formatPrice(song.price)}
         </p>
       )}
       {song.artist?.id ? (
         <Link
           to="/artists/$id"
           params={{ id: song.artist.id }}
-          className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block"
+          className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
         >
           {artistName}
         </Link>
@@ -94,22 +95,22 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedAlbum(album.id);
   return (
-    <div className="group text-left w-full relative">
-      <Link to="/albums/$id" params={{ id: album.id }} className="block">
+    <div className="group text-left w-full relative cursor-pointer">
+      <Link to="/albums/$id" params={{ id: album.id }} className="block cursor-pointer">
         <StorageImage
           bucket="album-art"
           path={album.cover_url}
           alt={album.title}
           className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <p className="mt-2 text-sm font-semibold truncate">{album.title}</p>
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{album.title}</p>
       </Link>
       {user && (
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
           aria-label={isSaved ? "Unsave album" : "Save album"}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110"
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
         >
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
@@ -118,7 +119,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
         <Link
           to="/artists/$id"
           params={{ id: album.artist.id }}
-          className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block"
+          className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
         >
           {album.artist.name}
         </Link>
@@ -142,7 +143,7 @@ export function ArtistTile({ artist }: { artist: ArtistTileData }) {
     <Link
       to="/artists/$id"
       params={{ id: artist.id }}
-      className="group text-center w-full block"
+      className="group text-center w-full block cursor-pointer"
     >
       <StorageImage
         bucket="artist-images"
@@ -150,7 +151,7 @@ export function ArtistTile({ artist }: { artist: ArtistTileData }) {
         alt={artist.name}
         className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
       />
-      <p className="mt-2 text-sm font-semibold truncate">{artist.name}</p>
+      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{artist.name}</p>
       <p className="text-xs text-muted-foreground truncate">
         {artist.genre ?? "Artist"}
       </p>
@@ -179,7 +180,7 @@ export function GenreTile({ genre, index }: { genre: string; index: number }) {
     <Link
       to="/browse"
       search={{ genre } as never}
-      className={`relative aspect-[16/10] rounded-xl overflow-hidden bg-gradient-to-br ${gradient} p-4 flex items-start`}
+      className={`relative aspect-[16/10] rounded-xl overflow-hidden bg-gradient-to-br ${gradient} p-4 flex items-start cursor-pointer hover:scale-[1.02] transition-transform`}
     >
       <span className="text-white text-lg font-bold tracking-tight drop-shadow">
         {genre}
@@ -200,7 +201,7 @@ export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
     <Link
       to="/playlists/$id"
       params={{ id: playlist.id }}
-      className="group text-left w-full block"
+      className="group text-left w-full block cursor-pointer"
     >
       <StorageImage
         bucket="album-art"
@@ -208,7 +209,7 @@ export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
         alt={playlist.name}
         className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
       />
-      <p className="mt-2 text-sm font-semibold truncate">{playlist.name}</p>
+      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{playlist.name}</p>
       {playlist.description ? (
         <p className="text-xs text-muted-foreground line-clamp-2">
           {playlist.description}

@@ -38,9 +38,9 @@ function ArtistsPage() {
                 key={a.id}
                 to="/artists/$id"
                 params={{ id: a.id }}
-                className="text-center group"
+                className="text-center group cursor-pointer"
               >
-                <div className="aspect-square rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 flex items-center justify-center">
+                <div className="aspect-square rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 flex items-center justify-center transition-transform group-hover:scale-[1.03] group-hover:ring-primary/40">
                   {a.avatar_url ? (
                     <StorageImage
                       bucket="artist-images"

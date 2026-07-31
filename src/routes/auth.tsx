@@ -121,7 +121,7 @@ function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-obsidian rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 bg-primary text-obsidian rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
           >
             {loading ? (
               "Loading..."
@@ -161,7 +161,7 @@ function AuthPage() {
             setLoading(false);
           }}
           disabled={loading}
-          className="w-full mt-6 py-3 bg-card border border-white/10 rounded-xl font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full mt-6 py-3 bg-card border border-white/10 rounded-xl font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
         >
           <svg className="size-4" viewBox="0 0 24 24">
             <path
@@ -190,7 +190,7 @@ function AuthPage() {
               setMode(mode === "signin" ? "signup" : "signin");
               setError(null);
             }}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors block w-full"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors block w-full cursor-pointer"
           >
             {mode === "signin"
               ? "Don't have an account? Sign up"
@@ -199,7 +199,7 @@ function AuthPage() {
           {mode === "signin" && (
             <Link
               to="/forgot-password"
-              className="text-sm text-primary hover:brightness-110 transition-colors block"
+              className="text-sm text-primary hover:brightness-110 transition-colors block cursor-pointer"
             >
               Forgot password?
             </Link>
@@ -209,7 +209,7 @@ function AuthPage() {
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
           <Link
             to="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             Back to home
           </Link>

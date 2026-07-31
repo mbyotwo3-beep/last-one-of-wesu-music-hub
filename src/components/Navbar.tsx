@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "./ThemeToggle";
+import { CurrencyToggle } from "./CurrencyToggle";
 import { GlobalSearch } from "./GlobalSearch";
 import { StorageImage } from "./StorageImage";
 
@@ -73,6 +74,7 @@ export function Navbar() {
             <Search className="size-5" />
           </Link>
 
+          <CurrencyToggle />
           <ThemeToggle />
 
           {!isLoading && (
@@ -81,7 +83,7 @@ export function Navbar() {
                 <div className="relative">
                   <button
                     onClick={() => setMenuOpen(!menuOpen)}
-                    className="flex items-center gap-2 text-sm font-medium text-foreground"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground hover:opacity-80 transition-opacity"
                     aria-label="Open user menu"
                   >
                     {avatarPath ? (
@@ -89,10 +91,10 @@ export function Navbar() {
                         bucket="user-avatars"
                         path={avatarPath}
                         alt="Profile"
-                        className="size-8 rounded-full object-cover ring-1 ring-border"
+                        className="size-8 rounded-full object-cover ring-2 ring-border hover:ring-primary transition-all"
                       />
                     ) : (
-                      <UserCircle className="size-7" />
+                      <UserCircle className="size-7 hover:text-primary transition-colors" />
                     )}
                   </button>
                   {menuOpen && (

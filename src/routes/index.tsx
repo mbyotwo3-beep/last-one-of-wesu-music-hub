@@ -114,14 +114,14 @@ function HomePage() {
                 <Link
                   to="/albums/$id"
                   params={{ id: heroPick.id }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm cursor-pointer hover:scale-105 transition-transform"
                 >
                   <Play className="size-4 fill-current" />
                   Open Album
                 </Link>
                 <Link
                   to="/browse"
-                  className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur"
+                  className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur cursor-pointer hover:scale-105 transition-transform"
                 >
                   Browse All
                 </Link>
@@ -196,7 +196,7 @@ function HomePage() {
               <h2 className="text-2xl font-bold tracking-tight">Top Tracks Today</h2>
               <Link
                 to="/hot-tracks"
-                className="text-sm text-primary hover:text-primary/80 font-medium"
+                className="text-sm text-primary hover:text-primary/80 font-medium cursor-pointer"
               >
                 See All
               </Link>
@@ -214,7 +214,7 @@ function HomePage() {
                       durationSeconds: (s as { duration?: number }).duration,
                     })
                   }
-                  className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors text-left group cursor-pointer"
                 >
                   <span className="w-6 text-sm text-muted-foreground tabular-nums">
                     {i + 1}

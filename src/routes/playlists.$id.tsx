@@ -66,8 +66,8 @@ function Page() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
-      <button onClick={() => navigate({ to: "/playlists" })} className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1">
-        <ArrowLeft className="size-4" /> Back
+      <button onClick={() => navigate({ to: "/playlists" })} className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 cursor-pointer transition-colors group">
+        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back
       </button>
       <div className="flex items-end gap-6 mb-8">
         <div className="size-48 bg-gradient-to-br from-primary/40 to-primary/10 rounded-lg flex items-center justify-center">
@@ -86,7 +86,7 @@ function Page() {
       <button
         onClick={playAll}
         disabled={!songs.length}
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-obsidian font-bold hover:brightness-110 disabled:opacity-40 mb-6"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-obsidian font-bold hover:brightness-110 hover:scale-105 transition-all disabled:opacity-40 disabled:hover:scale-100 cursor-pointer mb-6"
       >
         <Play className="size-5 fill-current" /> Play
       </button>
@@ -98,19 +98,29 @@ function Page() {
           {songs.map((s: any, i: number) => (
             <div
               key={s.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
+              onClick={() =>
+                usePlayer.getState().setTrack({
+                  id: s.id,
+                  title: s.title,
+                  artistName: s.artist?.name ?? "Unknown",
+                  coverUrl: s.cover_url,
+                  durationSeconds: s.duration,
+                })
+              }
             >
-              <span className="text-sm text-muted-foreground w-6 text-right">{i + 1}</span>
+              <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
+              <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
               <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">{s.title}</div>
-                <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline">
+                <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
+                <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
                   {s.artist?.name ?? "Unknown"}
                 </Link>
               </div>
               <button
-                onClick={() => remove.mutate({ data: { playlist_id: id, song_id: s.id } })}
-                className="text-muted-foreground hover:text-destructive p-2"
+                onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
+                className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
                 aria-label="Remove"
               >
                 <Trash2 className="size-4" />

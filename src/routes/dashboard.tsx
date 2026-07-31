@@ -93,9 +93,9 @@ function DashboardPage() {
             <Link
               key={stat.label}
               to={stat.link}
-              className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-colors cursor-pointer"
+              className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 hover:scale-[1.02] transition-all cursor-pointer group"
             >
-              <stat.icon className="size-5 text-primary mb-3" />
+              <stat.icon className="size-5 text-primary mb-3 group-hover:scale-110 transition-transform" />
               <p className="text-2xl font-bold">{String(stat.value)}</p>
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
             </Link>
@@ -151,20 +151,22 @@ function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {data.playlists.map((p) => (
-                  <div
+                  <Link
                     key={p.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+                    to="/playlists/$id"
+                    params={{ id: p.id }}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer group"
                   >
-                    <div className="size-10 rounded bg-secondary flex items-center justify-center">
-                      <ListMusic className="size-4 text-muted-foreground" />
+                    <div className="size-10 rounded bg-secondary flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                      <ListMusic className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{p.name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {p.is_public ? "Public" : "Private"}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

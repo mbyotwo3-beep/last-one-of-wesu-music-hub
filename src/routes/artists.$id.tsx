@@ -6,6 +6,7 @@ import { CheckCircle2, Play, UserPlus, UserCheck } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrency } from "@/stores/currency";
 import { useEffect, useState } from "react";
 import { resolveImageUrl } from "@/lib/storage-url";
 import { toast } from "sonner";
@@ -211,9 +212,9 @@ function ArtistPage() {
                     <Link
                       to="/checkout"
                       search={{ plan: "premium_monthly", item: "song", id: s.id }}
-                      className="shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 transition"
+                      className="shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 transition cursor-pointer"
                     >
-                      Buy K{Number(s.price).toFixed(2)}
+                      Buy {useCurrency.getState().formatPrice(s.price)}
                     </Link>
                   ) : (
                     <span className="shrink-0 text-xs font-semibold text-muted-foreground">Free</span>
@@ -244,7 +245,7 @@ function ArtistPage() {
                   </Link>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-muted-foreground">
-                      K{Number(al.price ?? 0).toFixed(2)}
+                      {useCurrency.getState().formatPrice(al.price)}
                     </p>
                     {Number(al.price ?? 0) > 0 && (
                       <Link

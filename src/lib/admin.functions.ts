@@ -156,6 +156,41 @@ export const moderateArtist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---------- Verification Moderation ----------
+
+export const listPendingVerifications = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("artists")
+      .select("id, name, bio, genre, verified, verification_status, created_at, user_id")
+      .or("verification_status.eq.pending,and(verified.eq.false,verification_status.eq.pending)")
+      .order("created_at", { ascending: false });
+    return data ?? [];
+  });
+
+export const moderateArtistVerification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; decision: "approve" | "reject" }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const isApprove = data.decision === "approve";
+    const patch = {
+      verified: isApprove,
+      verification_status: isApprove ? "verified" : "rejected",
+    };
+
+    const { error } = await supabaseAdmin.from("artists").update(patch as any).eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await audit(context.userId, `artist.verification.${data.decision}`, "artist", data.id);
+    return { ok: true };
+  });
+
 // ---------- Labels moderation ----------
 
 export const listPendingLabels = createServerFn({ method: "GET" })

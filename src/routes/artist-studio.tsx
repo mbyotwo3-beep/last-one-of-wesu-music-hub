@@ -444,8 +444,8 @@ function UploadWizard() {
         });
         setDone(
           tier === "free"
-            ? `Song submitted. A K${FREE_SONG_FEE} maintenance fee will be billed on approval.`
-            : `Song "${title}" submitted for review.`,
+            ? `Song "${title}" submitted. It is waiting for admin approval. Once approved, it will automatically show on the platform (A K${FREE_SONG_FEE} fee applies).`
+            : `Song "${title}" uploaded successfully. It is waiting for approval by an admin. Once approved, it will automatically show on the platform.`,
         );
         qc.invalidateQueries({ queryKey: ["my-songs"] });
         return res;
@@ -473,7 +473,7 @@ function UploadWizard() {
           },
         });
       }
-      setDone(`Album "${title}" with ${tracks.length} track${tracks.length === 1 ? "" : "s"} submitted for review.`);
+      setDone(`Album "${title}" with ${tracks.length} track${tracks.length === 1 ? "" : "s"} uploaded. It is waiting for approval by an admin. Once approved, it will automatically show on the platform.`);
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       toast.success("Album uploaded successfully");
@@ -790,34 +790,48 @@ function PayoutTab() {
       toast.error(`Failed to request payout: ${error.message}`);
     },
   });
-  const [form, setForm] = useState({ amount: 0, method_code: "MTN_MOMO", destination: "" });
+  const availableBalance = Number(overview?.totalRevenueZmw ?? 0);
+  const eligible = availableBalance > 500;
+  const [form, setForm] = useState({ amount: 500, method_code: "MTN_MOMO", destination: "" });
 
   return (
     <div className="space-y-6">
       <div className="bg-card border border-border rounded-2xl p-6">
         <p className="text-sm text-muted-foreground">Available earnings</p>
         <p className="text-3xl font-bold mt-1">
-          ZMW {Number(overview?.totalRevenueZmw ?? 0).toFixed(2)}
+          ZMW {availableBalance.toFixed(2)}
         </p>
+        {!eligible && (
+          <p className="text-xs text-amber-500 mt-2">
+            ⚠️ You can only apply for withdrawal when your available money is over K500 (Current: K{availableBalance.toFixed(2)}).
+          </p>
+        )}
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (form.amount < 500) {
+            toast.error("Minimum withdrawal amount is K500");
+            return;
+          }
           m.mutate({ data: form });
         }}
         className="bg-card border border-border rounded-2xl p-6 space-y-3"
       >
         <h3 className="font-semibold">Request payout</h3>
-        <input
-          required
-          type="number"
-          min="1"
-          step="0.01"
-          placeholder="Amount"
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.amount}
-          onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-        />
+        <label className="block text-xs text-muted-foreground">
+          Withdrawal amount (Minimum K500)
+          <input
+            required
+            type="number"
+            min="500"
+            step="1"
+            placeholder="Amount (min 500)"
+            className="w-full px-3 py-2 mt-1 rounded-lg bg-secondary border border-border text-foreground"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+          />
+        </label>
         <select
           className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
           value={form.method_code}
@@ -837,10 +851,10 @@ function PayoutTab() {
         />
         {m.error ? <p className="text-sm text-destructive">{(m.error as Error).message}</p> : null}
         <button
-          disabled={m.isPending}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          disabled={m.isPending || !eligible || form.amount < 500}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 cursor-pointer"
         >
-          Request
+          {m.isPending ? "Submitting..." : "Request Withdrawal"}
         </button>
       </form>
       <div className="bg-card border border-border rounded-2xl p-4">

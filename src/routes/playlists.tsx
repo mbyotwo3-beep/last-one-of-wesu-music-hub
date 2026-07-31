@@ -79,7 +79,7 @@ function Page() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground font-semibold hover:brightness-110 hover:scale-105 transition-all cursor-pointer"
         >
           <Plus className="size-4" /> Create Playlist
         </button>
@@ -147,10 +147,14 @@ function Page() {
           {playlists.map((playlist: any) => (
             <div
               key={playlist.id}
-              className="bg-card border border-border rounded-xl p-4 flex justify-between items-center"
+              className="bg-card border border-border rounded-xl p-4 flex justify-between items-center hover:border-primary/40 transition-colors group"
             >
-              <div>
-                <div className="font-semibold hover:text-primary transition-colors cursor-pointer">
+              <Link
+                to="/playlists/$id"
+                params={{ id: playlist.id }}
+                className="flex-1 min-w-0 cursor-pointer"
+              >
+                <div className="font-semibold group-hover:text-primary transition-colors">
                   {playlist.name}
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -159,10 +163,11 @@ function Page() {
                 {playlist.description && (
                   <p className="text-xs text-muted-foreground mt-1">{playlist.description}</p>
                 )}
-              </div>
+              </Link>
               <button
                 onClick={() => deleteM.mutate({ data: { id: playlist.id } })}
-                className="text-destructive hover:text-destructive/80"
+                className="text-destructive hover:text-destructive/80 p-2 hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer ml-2"
+                aria-label="Delete playlist"
               >
                 <Trash2 className="size-4" />
               </button>

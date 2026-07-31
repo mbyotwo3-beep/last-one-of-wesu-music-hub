@@ -143,10 +143,10 @@ function BrowsePage() {
               <Link
                 to="/browse"
                 search={{} as never}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   !activeGenre
                     ? "bg-primary text-primary-foreground"
-                    : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                    : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 All
@@ -156,10 +156,10 @@ function BrowsePage() {
                   key={g.genre}
                   to="/browse"
                   search={{ genre: g.genre } as never}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                     activeGenre === g.genre
                       ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                      : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
                   {g.genre}
@@ -232,7 +232,7 @@ function BrowsePage() {
                   <h2 className="text-2xl font-bold tracking-tight">Hot Tracks</h2>
                   <Link
                     to="/hot-tracks"
-                    className="text-sm text-primary hover:text-primary/80 font-medium"
+                    className="text-sm text-primary hover:text-primary/80 font-medium cursor-pointer"
                   >
                     See All
                   </Link>
@@ -334,7 +334,7 @@ function TrackListRow({
   return (
     <div className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors group">
       <span className="w-6 text-sm text-muted-foreground tabular-nums">{index}</span>
-      <button onClick={onPlay} className="shrink-0" aria-label={`Play ${song.title}`}>
+      <button onClick={onPlay} className="shrink-0 cursor-pointer" aria-label={`Play ${song.title}`}>
         <StorageImage
           bucket="album-art"
           path={song.cover_url}
@@ -343,14 +343,14 @@ function TrackListRow({
         />
       </button>
       <div className="flex-1 min-w-0">
-        <button onClick={onPlay} className="text-left w-full">
+        <button onClick={onPlay} className="text-left w-full cursor-pointer">
           <p className="text-sm font-semibold truncate">{song.title}</p>
         </button>
         {song.artist?.id ? (
           <Link
             to="/artists/$id"
             params={{ id: song.artist.id }}
-            className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline"
+            className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline cursor-pointer"
           >
             {song.artist.name}
           </Link>
