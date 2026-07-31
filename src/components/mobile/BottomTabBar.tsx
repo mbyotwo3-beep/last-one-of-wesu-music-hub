@@ -334,7 +334,7 @@ export function BottomTabBar() {
                   <User className="size-5" />
                   <span className="text-sm font-medium">Profile</span>
                 </button>
-                {isArtist && !isAdmin && !isSuperAdmin && (
+                {isArtist && (
                   <button
                     onClick={() => {
                       navigate({ to: "/artist-dashboard" });
@@ -384,8 +384,8 @@ export function BottomTabBar() {
               </>
             )}
           </div>
-          {/* Pinned bottom: Become an Artist — hide for admins/superadmins */}
-          {!isArtist && !isAdmin && !isSuperAdmin && (
+          {/* Pinned bottom: Become an Artist */}
+          {!isArtist && (
             <div className="border-t border-border p-4">
               <button
                 onClick={() => {

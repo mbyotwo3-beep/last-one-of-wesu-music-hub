@@ -342,30 +342,74 @@ function FeaturedTab() {
 function OverviewTab() {
   const fn = useServerFn(getPlatformStats);
   const listPayoutsFn = useServerFn(listPayouts);
-  const { data } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
+  const { data, isLoading } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
   const { data: payouts } = useQuery({
     queryKey: ["super-payouts-overview"],
     queryFn: () => listPayoutsFn(),
     retry: 1,
   });
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
-  const pendingPayouts = payouts?.filter((p: any) => p.status === "pending").length ?? 0;
+
+  if (isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
+  if (!data) return null;
+
+  const pendingPayouts = payouts?.filter((p: any) => p.status === "pending") ?? [];
+
   const cards = [
-    { label: "Total Users", value: data.totalUsers.toLocaleString() },
-    { label: "Total Songs", value: data.totalSongs.toLocaleString() },
-    { label: "Premium Subscribers", value: data.premiumSubscribers.toLocaleString() },
-    { label: "Pending Payouts", value: pendingPayouts },
-    { label: "Revenue 30d (ZMW)", value: data.monthlyRevenueZmw.toFixed(2) },
-    { label: "Total Artists", value: (data as any).totalArtists?.toLocaleString() ?? "0" },
+    { label: "Total Users", value: data.totalUsers.toLocaleString(), color: "text-blue-400" },
+    { label: "Total Artists", value: ((data as any).totalArtists ?? 0).toLocaleString(), color: "text-purple-400" },
+    { label: "Total Songs", value: data.totalSongs.toLocaleString(), color: "text-green-400" },
+    { label: "Premium Subscribers", value: data.premiumSubscribers.toLocaleString(), color: "text-yellow-400" },
+    {
+      label: "Revenue (30 days)",
+      value: `ZMW ${data.monthlyRevenueZmw.toFixed(2)}`,
+      color: "text-primary",
+    },
+    {
+      label: "Pending Payouts",
+      value: pendingPayouts.length,
+      color: pendingPayouts.length > 0 ? "text-destructive" : "text-muted-foreground",
+    },
   ];
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-card border border-border rounded-2xl p-6">
-          <p className="text-2xl font-bold">{c.value}</p>
-          <p className="text-xs text-muted-foreground mt-1">{c.label}</p>
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {cards.map((c) => (
+          <div key={c.label} className="bg-card border border-border rounded-2xl p-6">
+            <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
+            <p className="text-xs text-muted-foreground mt-1">{c.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Pending payout alert */}
+      {pendingPayouts.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6">
+          <h3 className="font-semibold mb-1 flex items-center gap-2">
+            <Star className="size-4 text-yellow-500" />
+            {pendingPayouts.length} Payout Request{pendingPayouts.length > 1 ? "s" : ""} Pending
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Artists are waiting to receive their earnings. Go to the Payouts tab to review and approve.
+          </p>
+          <div className="space-y-2">
+            {pendingPayouts.slice(0, 3).map((p: any) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between bg-card/60 rounded-lg px-4 py-2"
+              >
+                <span className="text-sm font-medium">{p.artist?.name ?? "—"}</span>
+                <span className="text-sm font-bold text-primary">ZMW {Number(p.amount).toFixed(2)}</span>
+              </div>
+            ))}
+            {pendingPayouts.length > 3 && (
+              <p className="text-xs text-muted-foreground pl-1">
+                + {pendingPayouts.length - 3} more…
+              </p>
+            )}
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

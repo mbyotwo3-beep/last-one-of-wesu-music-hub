@@ -31,7 +31,7 @@ export const getPlatformStats = createServerFn({ method: "GET" })
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [users, songs, subs, revenue] = await Promise.all([
+    const [users, songs, subs, revenue, artists] = await Promise.all([
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("songs").select("id", { count: "exact", head: true }),
       supabaseAdmin
@@ -43,6 +43,10 @@ export const getPlatformStats = createServerFn({ method: "GET" })
         .select("amount")
         .eq("status", "completed")
         .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      supabaseAdmin
+        .from("artists")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "approved"),
     ]);
 
     const monthlyRevenue = (revenue.data ?? []).reduce(
@@ -55,6 +59,7 @@ export const getPlatformStats = createServerFn({ method: "GET" })
       totalSongs: songs.count ?? 0,
       premiumSubscribers: subs.count ?? 0,
       monthlyRevenueZmw: monthlyRevenue,
+      totalArtists: artists.count ?? 0,
     };
   });
 
