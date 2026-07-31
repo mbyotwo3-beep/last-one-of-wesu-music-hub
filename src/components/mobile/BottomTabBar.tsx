@@ -3,7 +3,7 @@ import { Home, Search, Library, User, Mic2, Shield, Menu, X, LogOut, Play, Grid,
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Tab {
@@ -44,7 +44,8 @@ export function computeTabs(opts: {
       label: "Studio",
       icon: Mic2,
       ariaLabel: "Artist studio",
-      show: isArtist || isAdmin || isSuperAdmin,
+      // Only show Studio tab for actual artists — not for pure admins/superadmins
+      show: isArtist && !isAdmin && !isSuperAdmin,
     },
     {
       to: isSuperAdmin ? "/superadmin" : "/admin",
@@ -63,6 +64,18 @@ export function BottomTabBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!user) { setUserPlaylists([]); return; }
+    supabase
+      .from("playlists")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .then(({ data }) => setUserPlaylists(data ?? []));
+  }, [user]);
 
   const tabs = computeTabs({
     isAuthenticated: !!user,
@@ -253,24 +266,37 @@ export function BottomTabBar() {
             <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Playlists
             </h3>
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              <Heart className="size-5" />
-              <span className="text-sm font-medium">Favorites</span>
-            </button>
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              <Play className="size-5" />
-              <span className="text-sm font-medium">Workout Mix</span>
-            </button>
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              <Music className="size-5" />
-              <span className="text-sm font-medium">Late Night</span>
-            </button>
+            {/* Favorites / Liked Songs — always shown when logged in */}
+            {user && (
+              <button
+                onClick={() => { navigate({ to: "/library" }); setMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+              >
+                <Heart className="size-5" />
+                <span className="text-sm font-medium">Favorites &amp; Liked</span>
+              </button>
+            )}
+            {/* Dynamic user playlists */}
+            {userPlaylists.length > 0 ? (
+              userPlaylists.map((pl) => (
+                <button
+                  key={pl.id}
+                  onClick={() => { navigate({ to: "/playlists/$id", params: { id: pl.id } }); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                >
+                  <ListMusic className="size-5" />
+                  <span className="text-sm font-medium truncate">{pl.name}</span>
+                </button>
+              ))
+            ) : user ? (
+              <button
+                onClick={() => { navigate({ to: "/playlists" }); setMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+              >
+                <ListMusic className="size-5" />
+                <span className="text-sm font-medium">Create a playlist…</span>
+              </button>
+            ) : null}
 
             {/* User Section */}
             {user && (
@@ -308,7 +334,7 @@ export function BottomTabBar() {
                   <User className="size-5" />
                   <span className="text-sm font-medium">Profile</span>
                 </button>
-                {isArtist && (
+                {isArtist && !isAdmin && !isSuperAdmin && (
                   <button
                     onClick={() => {
                       navigate({ to: "/artist-dashboard" });
@@ -358,8 +384,8 @@ export function BottomTabBar() {
               </>
             )}
           </div>
-          {/* Pinned bottom: Become an Artist (like desktop sidebar) */}
-          {!isArtist && (
+          {/* Pinned bottom: Become an Artist — hide for admins/superadmins */}
+          {!isArtist && !isAdmin && !isSuperAdmin && (
             <div className="border-t border-border p-4">
               <button
                 onClick={() => {

@@ -125,7 +125,7 @@ export function Navbar() {
                       >
                         Profile
                       </Link>
-                      {!isArtist && (
+                      {!isArtist && !isAdmin && (
                         <Link
                           to="/become-artist"
                           className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
@@ -228,7 +228,7 @@ export function Navbar() {
                 >
                   Profile
                 </Link>
-                {!isArtist && (
+                {!isArtist && !isAdmin && (
                   <Link
                     to="/become-artist"
                     onClick={() => setMobileMenuOpen(false)}

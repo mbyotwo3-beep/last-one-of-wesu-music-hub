@@ -9,6 +9,7 @@ import { getMyOverview } from "@/lib/user.functions";
 import { getMyLabel } from "@/lib/labels.functions";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileLibrary } from "@/components/mobile/screens/MobileLibrary";
+import { useCurrency } from "@/stores/currency";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -57,6 +58,7 @@ function DashboardPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const fetchOverview = useServerFn(getMyOverview);
+  const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
@@ -202,7 +204,7 @@ function DashboardPage() {
                       <p className="text-xs text-muted-foreground">{when}</p>
                     </div>
                     <span className="text-primary text-sm font-bold">
-                      K{Number(p.amount).toFixed(2)}
+                      {formatPrice(Number(p.amount))}
                     </span>
                   </div>
                 );
