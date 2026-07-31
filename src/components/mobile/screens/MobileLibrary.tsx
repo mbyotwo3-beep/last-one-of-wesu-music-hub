@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ListMusic, ShoppingBag, Crown, Plus, X } from "lucide-react";
@@ -100,12 +101,14 @@ export function MobileLibrary() {
           <p className="px-4 text-sm text-muted-foreground">No playlists yet.</p>
         ) : (
           playlists.map((p) => (
-            <div
+            <Link
               key={p.id}
-              className="flex items-center gap-3 px-4 py-2 min-h-[44px] hover:bg-white/5"
+              to="/playlists/$id"
+              params={{ id: p.id }}
+              className="flex items-center gap-3 px-4 py-2 min-h-[44px] hover:bg-white/5 transition-colors cursor-pointer"
             >
               <div className="size-10 rounded-md bg-card flex items-center justify-center shrink-0">
-                <ListMusic className="size-4 text-muted-foreground" />
+                <ListMusic className="size-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{p.name}</p>
@@ -113,7 +116,7 @@ export function MobileLibrary() {
                   {p.is_public ? "Public" : "Private"}
                 </p>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

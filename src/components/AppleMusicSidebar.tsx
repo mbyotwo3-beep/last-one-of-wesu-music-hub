@@ -1,10 +1,14 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Search, Play, Grid, Radio, Clock, Disc, Music, ListMusic, Heart, Mic2 } from "lucide-react";
+import { Search, Play, Grid, Radio, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AppleMusicSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
   const mainNav = [
@@ -14,17 +18,26 @@ export function AppleMusicSidebar() {
   ];
 
   const libraryNav = [
-    { to: "/recently-added", label: "Recently Added", icon: Clock },
+    { to: "/new-music", label: "Recently Added", icon: Clock },
     { to: "/artists", label: "Artists", icon: Disc },
     { to: "/albums", label: "Albums", icon: Music },
-    { to: "/songs", label: "Songs", icon: ListMusic },
+    { to: "/hot-tracks", label: "Songs", icon: ListMusic },
   ];
 
-  const playlists = [
-    { id: "1", name: "Favorites", icon: Heart },
-    { id: "3", name: "Workout Mix", icon: Play },
-    { id: "4", name: "Late Night", icon: Music },
-  ];
+  // Dynamically fetch user playlists
+  const { data: userPlaylists } = useQuery({
+    queryKey: ["my-playlists-sidebar", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("playlists")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+  });
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 bg-sidebar/80 backdrop-blur-xl border-r border-border">
@@ -119,28 +132,61 @@ export function AppleMusicSidebar() {
           </Link>
         </div>
         <nav className="space-y-0.5">
-          {playlists.map((playlist) => {
-            const Icon = playlist.icon;
-            return (
-              <Link
-                key={playlist.id}
-                to="/playlists"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
-              >
-                <Icon className="size-5" />
-                {playlist.name}
-              </Link>
-            );
-          })}
+          {/* Favorites / Liked Songs preset */}
+          <Link
+            to="/library"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname === "/library"
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            }`}
+          >
+            <Heart className="size-5 text-primary" />
+            Favorites & Liked
+          </Link>
+
+          {/* User's dynamic playlists */}
+          {userPlaylists && userPlaylists.length > 0 ? (
+            userPlaylists.map((pl) => {
+              const isPlActive = pathname === `/playlists/${pl.id}`;
+              return (
+                <Link
+                  key={pl.id}
+                  to="/playlists/$id"
+                  params={{ id: pl.id }}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isPlActive
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  <ListMusic className="size-5" />
+                  <span className="truncate">{pl.name}</span>
+                </Link>
+              );
+            })
+          ) : (
+            <Link
+              to="/playlists"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+            >
+              <Plus className="size-4" />
+              Create Playlist
+            </Link>
+          )}
         </nav>
-        <Link
-          to="/become-artist"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
-        >
-          <Mic2 className="size-5" />
-          Become an Artist
-        </Link>
+
+        <div className="mt-4 pt-3 border-t border-border/50">
+          <Link
+            to="/become-artist"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
+          >
+            <Mic2 className="size-5" />
+            Become an Artist
+          </Link>
+        </div>
       </div>
     </aside>
   );
 }
+
