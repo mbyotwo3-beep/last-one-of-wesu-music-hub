@@ -25,6 +25,7 @@ export type Database = {
           id: string
           price: number | null
           release_date: string | null
+          status: string
           title: string
         }
         Insert: {
@@ -37,6 +38,7 @@ export type Database = {
           id?: string
           price?: number | null
           release_date?: string | null
+          status?: string
           title: string
         }
         Update: {
@@ -49,6 +51,7 @@ export type Database = {
           id?: string
           price?: number | null
           release_date?: string | null
+          status?: string
           title?: string
         }
         Relationships: [
@@ -67,6 +70,7 @@ export type Database = {
           available_for_features: boolean
           avatar_url: string | null
           bio: string | null
+          cover_url: string | null
           created_at: string
           feature_rate: number | null
           genre: string | null
@@ -85,6 +89,7 @@ export type Database = {
           available_for_features?: boolean
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string
           feature_rate?: number | null
           genre?: string | null
@@ -103,6 +108,7 @@ export type Database = {
           available_for_features?: boolean
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string
           feature_rate?: number | null
           genre?: string | null
@@ -335,6 +341,7 @@ export type Database = {
           id: string
           is_enabled: boolean
           label: string
+          lenco_operator: string | null
           logo_url: string | null
           sort_order: number
         }
@@ -345,6 +352,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           label: string
+          lenco_operator?: string | null
           logo_url?: string | null
           sort_order?: number
         }
@@ -355,6 +363,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           label?: string
+          lenco_operator?: string | null
           logo_url?: string | null
           sort_order?: number
         }
