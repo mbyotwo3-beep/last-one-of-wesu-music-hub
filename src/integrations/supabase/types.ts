@@ -63,11 +63,15 @@ export type Database = {
       }
       artists: {
         Row: {
+          accepts_collabs: boolean
+          available_for_features: boolean
           avatar_url: string | null
           bio: string | null
           created_at: string
+          feature_rate: number | null
           genre: string | null
           id: string
+          label_id: string | null
           monthly_listeners: number
           name: string
           social_links: Json
@@ -77,11 +81,15 @@ export type Database = {
           verified: boolean
         }
         Insert: {
+          accepts_collabs?: boolean
+          available_for_features?: boolean
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          feature_rate?: number | null
           genre?: string | null
           id?: string
+          label_id?: string | null
           monthly_listeners?: number
           name: string
           social_links?: Json
@@ -91,11 +99,15 @@ export type Database = {
           verified?: boolean
         }
         Update: {
+          accepts_collabs?: boolean
+          available_for_features?: boolean
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          feature_rate?: number | null
           genre?: string | null
           id?: string
+          label_id?: string | null
           monthly_listeners?: number
           name?: string
           social_links?: Json
@@ -104,7 +116,15 @@ export type Database = {
           user_id?: string
           verified?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "artists_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_log: {
         Row: {
@@ -133,6 +153,177 @@ export type Database = {
           meta?: Json
           target_id?: string | null
           target_type?: string | null
+        }
+        Relationships: []
+      }
+      featured_slots: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          image_url: string | null
+          position: number
+          slot_type: string
+          starts_at: string
+          subtitle: string | null
+          target_id: string
+          target_type: string
+          title: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          position?: number
+          slot_type: string
+          starts_at?: string
+          subtitle?: string | null
+          target_id: string
+          target_type: string
+          title?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          position?: number
+          slot_type?: string
+          starts_at?: string
+          subtitle?: string | null
+          target_id?: string
+          target_type?: string
+          title?: string | null
+        }
+        Relationships: []
+      }
+      invitations: {
+        Row: {
+          created_at: string
+          from_user_id: string | null
+          id: string
+          kind: string
+          payload: Json
+          responded_at: string | null
+          status: string
+          to_email: string | null
+          to_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          kind: string
+          payload?: Json
+          responded_at?: string | null
+          status?: string
+          to_email?: string | null
+          to_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          kind?: string
+          payload?: Json
+          responded_at?: string | null
+          status?: string
+          to_email?: string | null
+          to_user_id?: string | null
+        }
+        Relationships: []
+      }
+      label_artists: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          joined_at: string | null
+          label_id: string
+          royalty_pct: number
+          status: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          label_id: string
+          royalty_pct?: number
+          status?: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          label_id?: string
+          royalty_pct?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_artists_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "label_artists_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labels: {
+        Row: {
+          bio: string | null
+          commission_pct: number
+          contact_email: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          owner_user_id: string
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          commission_pct?: number
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_user_id: string
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          commission_pct?: number
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_user_id?: string
+          slug?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -225,9 +416,16 @@ export type Database = {
           amount: number
           artist_id: string
           destination: string
+          gross_amount: number | null
           id: string
+          label_fee: number | null
+          label_id: string | null
           method_code: string
+          net_amount: number | null
           notes: string | null
+          period_end: string | null
+          period_start: string | null
+          platform_fee: number | null
           processed_at: string | null
           processed_by: string | null
           requested_at: string
@@ -237,9 +435,16 @@ export type Database = {
           amount: number
           artist_id: string
           destination: string
+          gross_amount?: number | null
           id?: string
+          label_fee?: number | null
+          label_id?: string | null
           method_code: string
+          net_amount?: number | null
           notes?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          platform_fee?: number | null
           processed_at?: string | null
           processed_by?: string | null
           requested_at?: string
@@ -249,9 +454,16 @@ export type Database = {
           amount?: number
           artist_id?: string
           destination?: string
+          gross_amount?: number | null
           id?: string
+          label_fee?: number | null
+          label_id?: string | null
           method_code?: string
+          net_amount?: number | null
           notes?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          platform_fee?: number | null
           processed_at?: string | null
           processed_by?: string | null
           requested_at?: string
@@ -263,6 +475,13 @@ export type Database = {
             columns: ["artist_id"]
             isOneToOne: false
             referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
             referencedColumns: ["id"]
           },
         ]
@@ -444,6 +663,112 @@ export type Database = {
           },
         ]
       }
+      revenue_splits: {
+        Row: {
+          amount: number
+          artist_id: string | null
+          created_at: string
+          id: string
+          label_id: string | null
+          payee_role: string
+          payee_user_id: string | null
+          pct: number
+          transaction_id: string
+        }
+        Insert: {
+          amount: number
+          artist_id?: string | null
+          created_at?: string
+          id?: string
+          label_id?: string | null
+          payee_role: string
+          payee_user_id?: string | null
+          pct: number
+          transaction_id: string
+        }
+        Update: {
+          amount?: number
+          artist_id?: string | null
+          created_at?: string
+          id?: string
+          label_id?: string | null
+          payee_role?: string
+          payee_user_id?: string | null
+          pct?: number
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenue_splits_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_splits_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_splits_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      song_collaborators: {
+        Row: {
+          accepted: boolean
+          artist_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          role: string
+          song_id: string
+          split_pct: number
+        }
+        Insert: {
+          accepted?: boolean
+          artist_id: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          song_id: string
+          split_pct?: number
+        }
+        Update: {
+          accepted?: boolean
+          artist_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          song_id?: string
+          split_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_collaborators_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "song_collaborators_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       song_likes: {
         Row: {
           created_at: string
@@ -473,6 +798,7 @@ export type Database = {
       songs: {
         Row: {
           album_id: string | null
+          allow_collab_requests: boolean
           artist_id: string
           audio_url: string | null
           cover_url: string | null
@@ -482,6 +808,7 @@ export type Database = {
           genre: string | null
           id: string
           is_trending: boolean
+          label_id: string | null
           play_count: number
           price: number | null
           status: string
@@ -489,6 +816,7 @@ export type Database = {
         }
         Insert: {
           album_id?: string | null
+          allow_collab_requests?: boolean
           artist_id: string
           audio_url?: string | null
           cover_url?: string | null
@@ -498,6 +826,7 @@ export type Database = {
           genre?: string | null
           id?: string
           is_trending?: boolean
+          label_id?: string | null
           play_count?: number
           price?: number | null
           status?: string
@@ -505,6 +834,7 @@ export type Database = {
         }
         Update: {
           album_id?: string | null
+          allow_collab_requests?: boolean
           artist_id?: string
           audio_url?: string | null
           cover_url?: string | null
@@ -514,6 +844,7 @@ export type Database = {
           genre?: string | null
           id?: string
           is_trending?: boolean
+          label_id?: string | null
           play_count?: number
           price?: number | null
           status?: string
@@ -532,6 +863,13 @@ export type Database = {
             columns: ["artist_id"]
             isOneToOne: false
             referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "songs_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
             referencedColumns: ["id"]
           },
         ]
@@ -637,11 +975,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      artist_user_id: { Args: { _artist_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      increment_play_count: { Args: { _song_id: string }; Returns: undefined }
+      is_label_owner: {
+        Args: { _label_id: string; _uid: string }
+        Returns: boolean
+      }
+      is_song_collaborator: {
+        Args: { _song_id: string; _uid: string }
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
