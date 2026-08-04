@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
+import { isSuperadminUser } from "./roles";
 
 export type ShelfType =
   | "new_music"
