@@ -1,10 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isStaffUser, isSuperadminUser } from "./roles";
 
 async function assertSuperadmin(supabase: any, userId: string) {
-  const { data, error } = await supabase.rpc("is_superadmin", { _user_id: userId });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden: superadmin only");
+  if (!(await isSuperadminUser(supabase, userId))) throw new Error("Forbidden: superadmin only");
 }
 
 async function audit(
@@ -184,8 +183,7 @@ export const listAudit = createServerFn({ method: "GET" })
 export const listPayouts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isStaff } = await context.supabase.rpc("is_staff", { _user_id: context.userId });
-    if (!isStaff) throw new Error("Forbidden");
+    if (!(await isStaffUser(context.supabase, context.userId))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("payouts")
@@ -198,8 +196,7 @@ export const decidePayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { id: string; decision: "approved" | "rejected"; notes?: string }) => d)
   .handler(async ({ context, data }) => {
-    const { data: isStaff } = await context.supabase.rpc("is_staff", { _user_id: context.userId });
-    if (!isStaff) throw new Error("Forbidden");
+    if (!(await isStaffUser(context.supabase, context.userId))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("payouts")

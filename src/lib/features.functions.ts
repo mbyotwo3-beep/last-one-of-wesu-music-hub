@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isStaffUser } from "./roles";
 
 async function ensureStaff(supabase: any, userId: string) {
-  const { data } = await supabase.rpc("is_staff", { _user_id: userId });
-  if (!data) throw new Error("Forbidden");
+  if (!(await isStaffUser(supabase, userId))) throw new Error("Forbidden");
 }
 async function audit(
   actorId: string,
