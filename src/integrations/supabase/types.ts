@@ -102,6 +102,7 @@ export type Database = {
           cover_url: string | null
           created_at: string
           feature_rate: number | null
+          follower_count: number
           genre: string | null
           id: string
           label_id: string | null
@@ -121,6 +122,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           feature_rate?: number | null
+          follower_count?: number
           genre?: string | null
           id?: string
           label_id?: string | null
@@ -140,6 +142,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           feature_rate?: number | null
+          follower_count?: number
           genre?: string | null
           id?: string
           label_id?: string | null
