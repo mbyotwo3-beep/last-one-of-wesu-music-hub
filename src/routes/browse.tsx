@@ -82,9 +82,8 @@ export const Route = createFileRoute("/browse")({
     ],
     links: [{ rel: "canonical", href: "https://www.wesuplusly.com/browse" }],
   }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    genre: typeof search.genre === "string" ? (search.genre as string) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { genre?: string } =>
+    typeof search.genre === "string" ? { genre: search.genre } : {},
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(featuredQO);
     context.queryClient.ensureQueryData(newReleasesQO);
