@@ -185,10 +185,13 @@ export const setArtistRoyalty = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!row) throw new Error("Roster entry not found");
 
-    const { data: ownerCheck } = await supabaseAdmin.rpc("is_label_owner", {
-      _user_id: context.userId,
-      _label_id: (row as any).label_id,
-    } as any);
+    const { data: ownedLabel } = await supabaseAdmin
+      .from("labels")
+      .select("id")
+      .eq("id", (row as any).label_id)
+      .eq("owner_user_id", context.userId)
+      .maybeSingle();
+    const ownerCheck = Boolean(ownedLabel);
     const { data: roles } = await supabaseAdmin
       .from("user_roles")
       .select("role")
