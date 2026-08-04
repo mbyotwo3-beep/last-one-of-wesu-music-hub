@@ -18,7 +18,7 @@ const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymen
 const plansQO = queryOptions({ queryKey: ["plans"], queryFn: () => getSubscriptionPlans() });
 
 type CheckoutSearch = {
-  plan: string;
+  plan?: string;
   item?: "song" | "album";
   id?: string;
 };
@@ -32,11 +32,10 @@ export const Route = createFileRoute("/checkout")({
   }),
   validateSearch: (s: Record<string, unknown>): CheckoutSearch => {
     const item = s.item === "song" || s.item === "album" ? s.item : undefined;
-    return {
-      plan: typeof s.plan === "string" ? s.plan : "premium_monthly",
-      item,
-      id: typeof s.id === "string" ? s.id : undefined,
-    };
+    const out: CheckoutSearch = { plan: typeof s.plan === "string" ? s.plan : "premium_monthly" };
+    if (item) out.item = item;
+    if (typeof s.id === "string") out.id = s.id;
+    return out;
   },
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(methodsQO);
