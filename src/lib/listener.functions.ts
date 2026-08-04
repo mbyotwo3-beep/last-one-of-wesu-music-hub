@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
+import { isSuperadminUser } from "./roles";
 
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -130,9 +131,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
     if (!song) throw new Error("Song not found");
 
     // Superadmin bypass — full playback everywhere for testing
-    const { data: isSuper } = await context.supabase.rpc("is_superadmin" as any, {
-      _user_id: context.userId,
-    });
+    const isSuper = await isSuperadminUser(context.supabase, context.userId);
 
     // Free if priced 0 OR user is subscribed OR user purchased it OR superadmin
     if (!isSuper && (song as any).price && Number((song as any).price) > 0) {

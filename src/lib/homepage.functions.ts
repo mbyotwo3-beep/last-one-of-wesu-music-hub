@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
+import { isSuperadminUser } from "./roles";
 
 export type ShelfType =
   | "new_music"
@@ -84,9 +85,7 @@ export const getHomepageLayout = createServerFn({ method: "GET" })
 export const getAllHomepageLayouts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isSuper } = await context.supabase.rpc("is_superadmin", {
-      _user_id: context.userId,
-    });
+    const isSuper = await isSuperadminUser(context.supabase, context.userId);
     if (!isSuper) throw new Error("Forbidden");
     return await readLayouts();
   });
@@ -95,9 +94,7 @@ export const saveHomepageLayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { page: string; layout: HomepageLayout }) => d)
   .handler(async ({ data, context }) => {
-    const { data: isSuper } = await context.supabase.rpc("is_superadmin", {
-      _user_id: context.userId,
-    });
+    const isSuper = await isSuperadminUser(context.supabase, context.userId);
     if (!isSuper) throw new Error("Forbidden");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
