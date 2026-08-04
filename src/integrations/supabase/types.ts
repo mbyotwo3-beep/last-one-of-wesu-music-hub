@@ -1180,37 +1180,15 @@ export type Database = {
       }
     }
     Functions: {
-      artist_user_id: { Args: { _artist_id: string }; Returns: string }
       get_artist_available_balance: {
         Args: { artist_uuid: string }
-        Returns: number
-      }
-      get_artist_follower_count: {
-        Args: { _artist_id: string }
         Returns: number
       }
       get_label_available_balance: {
         Args: { label_uuid: string }
         Returns: number
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
       increment_play_count: { Args: { _song_id: string }; Returns: undefined }
-      is_label_owner: {
-        Args: { _label_id: string; _uid: string }
-        Returns: boolean
-      }
-      is_song_collaborator: {
-        Args: { _song_id: string; _uid: string }
-        Returns: boolean
-      }
-      is_staff: { Args: { _user_id: string }; Returns: boolean }
-      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "artist" | "user" | "superadmin"
