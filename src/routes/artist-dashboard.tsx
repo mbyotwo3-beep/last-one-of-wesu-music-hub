@@ -220,7 +220,7 @@ function ArtistDashboardPage() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => verificationMutation.mutate()}
+                    onClick={() => verificationMutation.mutate(undefined as never)}
                     disabled={!data.eligibleForVerification || verificationMutation.isPending}
                     className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40 hover:scale-105 transition-all cursor-pointer"
                   >
