@@ -64,6 +64,35 @@ export type Database = {
           },
         ]
       }
+      artist_followers: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_followers_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artists: {
         Row: {
           accepts_collabs: boolean
@@ -516,6 +545,38 @@ export type Database = {
         }
         Relationships: []
       }
+      play_history: {
+        Row: {
+          id: string
+          played_at: string
+          progress_seconds: number
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          played_at?: string
+          progress_seconds?: number
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          played_at?: string
+          progress_seconds?: number
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_history_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_songs: {
         Row: {
           added_at: string
@@ -726,6 +787,64 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_albums: {
+        Row: {
+          album_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          album_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_albums_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_tracks: {
+        Row: {
+          created_at: string
+          id: string
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_tracks_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
             referencedColumns: ["id"]
           },
         ]
@@ -981,10 +1100,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_song_collaborators: {
+        Row: {
+          accepted: boolean | null
+          artist_id: string | null
+          created_at: string | null
+          id: string | null
+          role: string | null
+          song_id: string | null
+        }
+        Insert: {
+          accepted?: boolean | null
+          artist_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          role?: string | null
+          song_id?: string | null
+        }
+        Update: {
+          accepted?: boolean | null
+          artist_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          role?: string | null
+          song_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "song_collaborators_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "song_collaborators_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       artist_user_id: { Args: { _artist_id: string }; Returns: string }
+      get_artist_available_balance: {
+        Args: { artist_uuid: string }
+        Returns: number
+      }
+      get_artist_follower_count: {
+        Args: { _artist_id: string }
+        Returns: number
+      }
+      get_label_available_balance: {
+        Args: { label_uuid: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
