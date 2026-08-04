@@ -252,10 +252,20 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     }
 
     // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
-    // Sign via anon client so previews work on deployments without a service-role key.
-    const { data: signed, error } = await supabase.storage
-      .from("song-audio")
-      .createSignedUrl(rawPath, 45);
+    // Paid tracks are no longer anon-readable in storage, so sign previews with the
+    // service-role client when available and fall back to anon (free songs) otherwise.
+    let signed: { signedUrl: string } | null = null;
+    let error: { message: string } | null = null;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const res = await supabaseAdmin.storage.from("song-audio").createSignedUrl(rawPath, 45);
+      signed = res.data;
+      error = res.error;
+    } catch {
+      const res = await supabase.storage.from("song-audio").createSignedUrl(rawPath, 45);
+      signed = res.data;
+      error = res.error;
+    }
     if (error || !signed?.signedUrl) {
       console.error("Preview audio URL signing error:", error);
       throw new Error(error?.message ?? "Preview temporarily unavailable. Please ensure the song is approved.");
