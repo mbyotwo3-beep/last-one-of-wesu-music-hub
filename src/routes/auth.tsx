@@ -21,6 +21,7 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +30,7 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -38,7 +39,12 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        window.location.href = "/dashboard";
+        if (!data.session) {
+          setNotice("Account created. Check your email to confirm your address, then sign in.");
+          setMode("signin");
+        } else {
+          window.location.href = "/dashboard";
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -69,6 +75,12 @@ function AuthPage() {
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-4 p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
+            {notice}
           </div>
         )}
 

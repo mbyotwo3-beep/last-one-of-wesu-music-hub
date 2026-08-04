@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useUserRoles, type AppRole } from "@/hooks/use-roles";
+import { checkRoleAccess } from "@/components/roleGate.utils";
 import { toast } from "sonner";
 
 interface Props {
@@ -12,32 +13,25 @@ export function RoleGate({ require, children }: Props) {
   const { isUser, isArtist, isAdmin, isSuperAdmin, loading } = useUserRoles();
   const navigate = useNavigate();
 
-  const ok =
-    !loading &&
-    (require === "user"
-      ? isUser
-      : require === "artist"
-        ? isArtist || isAdmin || isSuperAdmin
-        : require === "admin"
-          ? isAdmin
-          : require === "superadmin"
-            ? isSuperAdmin
-            : false);
+  const access = loading
+    ? null
+    : checkRoleAccess({ require, isUser, isArtist, isAdmin, isSuperAdmin });
+  const ok = access === "allowed";
 
   useEffect(() => {
     if (loading) return;
-    if (!isUser) {
+    if (access === "redirect-auth") {
       navigate({ to: "/auth" });
       return;
     }
-    if (!ok) {
+    if (access === "redirect-home") {
       toast.error(`You need the "${require}" role to access this page.`);
       navigate({ to: "/" });
     }
-  }, [loading, isUser, ok, require, navigate]);
+  }, [loading, access, require, navigate]);
 
   if (loading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
-  if (!isUser || !ok) return null;
+  if (!ok) return null;
 
   return <>{children}</>;
 }
