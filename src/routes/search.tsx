@@ -47,7 +47,7 @@ function SearchPage() {
   });
 
   function setTab(t: "all" | "songs" | "artists" | "albums") {
-    navigate({ to: "/search", search: (p: { q: string; tab: string }) => ({ ...p, tab: t }) });
+    navigate({ to: "/search", search: { q, tab: t } });
   }
 
   const tabs: Array<{ id: "all" | "songs" | "artists" | "albums"; label: string }> = [
@@ -72,7 +72,7 @@ function SearchPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          navigate({ to: "/search", search: (p: { q: string; tab: string }) => ({ ...p, q: term }) });
+          navigate({ to: "/search", search: { q: term, tab } });
         }}
         className="hidden md:block mb-6"
       >
