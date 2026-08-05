@@ -58,7 +58,7 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
     const term = q.trim();
     if (!term) return;
     setOpen(false);
-    navigate({ to: "/search", search: { q: term } });
+    navigate({ to: "/search", search: { q: term, tab: "all" } });
   }
 
   function clear() {
