@@ -131,9 +131,9 @@ export const initiatePayment = createServerFn({ method: "POST" })
       }
     }
 
-    // Card / hosted checkout
+    // Card
+    const email = (claims?.email as string | undefined) ?? "buyer@wesuplusly.com";
     try {
-      const email = (claims?.email as string | undefined) ?? "buyer@wesuplusly.com";
       const result = await initiateCardCheckout({
         amount,
         reference: tx.id,
@@ -150,6 +150,24 @@ export const initiatePayment = createServerFn({ method: "POST" })
         paymentUrl: result.checkoutUrl,
       };
     } catch (e: any) {
+      // Most Lenco accounts are not enabled for server-side direct card
+      // collections ("The API key does not have permission to initiate direct
+      // card collections"). Fall back to Lenco's hosted inline widget, which
+      // only needs the publishable key. Fulfilment still happens by webhook.
+      const publicKey = process.env.LENCO_PUBLIC_KEY;
+      if (publicKey) {
+        console.warn(`[Lenco] direct card unavailable, using inline widget: ${e?.message}`);
+        return {
+          transactionId: tx.id,
+          widget: {
+            publicKey,
+            reference: tx.id,
+            amount,
+            currency: "ZMW",
+            email,
+          },
+        };
+      }
       await supabase
         .from("payment_transactions")
         .update({ status: "failed" } as any)
