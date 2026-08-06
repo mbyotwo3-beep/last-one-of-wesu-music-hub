@@ -93,6 +93,23 @@ function CheckoutPage() {
         window.location.href = res.paymentUrl;
         return;
       }
+      if (res?.widget) {
+        // Card via Lenco's hosted inline widget (account not enabled for
+        // server-side direct card collections).
+        import("@/lib/lenco-widget")
+          .then(({ openLencoCardWidget }) =>
+            openLencoCardWidget(res.widget, {
+              onSuccess: () =>
+                navigate({ to: "/checkout/success", search: { ref: res.transactionId } }),
+              onClose: () => toast.info("Card payment cancelled."),
+            }),
+          )
+          .catch((err: Error) => {
+            setResultMsg(err.message);
+            toast.error(`Payment failed: ${err.message}`);
+          });
+        return;
+      }
       if (res?.transactionId) {
         // Mobile money — redirect to success page to poll for status
         navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
