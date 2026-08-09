@@ -2,6 +2,60 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
+ * Poll Lenco for the authoritative state of one of the caller's own
+ * transactions and settle it. This is the fallback (and, in practice, the
+ * primary) completion path for mobile money: the customer approves the USSD
+ * prompt on their phone and the checkout page verifies the result directly
+ * instead of waiting on webhook delivery.
+ */
+export const verifyPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { transactionId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: tx } = await supabase
+      .from("payment_transactions")
+      .select("*")
+      .eq("id", data.transactionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!tx) return { status: "not_found" as const };
+    if (tx.status !== "pending") {
+      return { status: tx.status as string, transaction: tx };
+    }
+
+    const { getCollectionStatus } = await import("@/lib/lenco.server");
+    const remote = await getCollectionStatus(tx.id, (tx as any).provider_token);
+
+    if (!remote) return { status: "pending" as const, transaction: tx };
+
+    const s = (remote.status ?? "").toLowerCase();
+    const isSuccess = s === "successful" || s === "success" || s === "completed";
+    const isFailure = s === "failed" || s === "declined" || s === "cancelled";
+
+    if (!isSuccess && !isFailure) {
+      return { status: "pending" as const, transaction: tx, reason: remote.reasonForFailure };
+    }
+
+    const { settleTransaction } = await import("@/lib/payments.server");
+    const settled = await settleTransaction(
+      tx.id,
+      isSuccess ? "successful" : "failed",
+      remote.id ?? null,
+    );
+
+    const { data: fresh } = await supabase
+      .from("payment_transactions")
+      .select("*")
+      .eq("id", tx.id)
+      .maybeSingle();
+
+    return { status: settled, transaction: fresh ?? tx, reason: remote.reasonForFailure };
+  });
+
+/**
  * Initiate a Lenco collection.
  *
  * - Looks up the authoritative price server-side (never trusts client amount).

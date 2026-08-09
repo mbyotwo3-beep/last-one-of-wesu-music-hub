@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { fulfillTransaction } = await import("@/lib/payments.server");
+        const { settleTransaction } = await import("@/lib/payments.server");
 
         // Our `reference` == payment_transactions.id
         const { data: row } = await supabaseAdmin
@@ -70,42 +70,10 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         }
 
         if (isSuccess) {
-          // IDEMPOTENT transition: only proceed when we actually flip pending → completed.
-          // If two webhooks race, only one wins the update and calls fulfillTransaction.
-          const { data: claimed, error: claimErr } = await supabaseAdmin
-            .from("payment_transactions")
-            .update({ status: "completed", provider_ref: providerRef ?? null } as any)
-            .eq("id", row.id)
-            .eq("status", "pending")
-            .select()
-            .maybeSingle();
-
-          if (claimErr) {
-            console.error("[Lenco webhook] Claim failed:", claimErr.message);
-            return new Response("OK", { status: 200 });
-          }
-
-          if (!claimed) {
-            // Already processed by a previous delivery — nothing more to do.
-            return new Response("OK", { status: 200 });
-          }
-
-          try {
-            await fulfillTransaction(claimed as any);
-          } catch (e) {
-            console.error("[Lenco webhook] Fulfillment failed:", e);
-            // Mark as failed so the user can retry from the checkout success page.
-            await supabaseAdmin
-              .from("payment_transactions")
-              .update({ status: "failed" } as any)
-              .eq("id", row.id);
-          }
+          // Idempotent: only the caller that wins pending → completed fulfils.
+          await settleTransaction(row.id, "successful", providerRef ?? null);
         } else if (isFailure) {
-          await supabaseAdmin
-            .from("payment_transactions")
-            .update({ status: "failed", provider_ref: providerRef ?? null } as any)
-            .eq("id", row.id)
-            .eq("status", "pending");
+          await settleTransaction(row.id, "failed", providerRef ?? null);
         }
 
         return new Response("OK", { status: 200 });

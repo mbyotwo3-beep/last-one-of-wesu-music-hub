@@ -58,6 +58,48 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return json.data;
 }
 
+async function get<T>(path: string): Promise<T | null> {
+  const res = await fetch(`${apiBase()}${path}`, {
+    headers: { Authorization: `Bearer ${secretKey()}` },
+  });
+  const text = await res.text();
+  if (!res.ok) return null;
+  try {
+    const json = JSON.parse(text) as LencoResponse<T>;
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export interface LencoCollectionStatus {
+  id?: string;
+  reference?: string;
+  status: string;
+  amount?: number;
+  reasonForFailure?: string | null;
+}
+
+/**
+ * Look up the current state of a collection, by our reference first and then
+ * by Lenco's own collection id. Used to settle transactions when the webhook
+ * has not (yet) been delivered.
+ */
+export async function getCollectionStatus(
+  reference: string,
+  providerId?: string | null,
+): Promise<LencoCollectionStatus | null> {
+  const byRef = await get<LencoCollectionStatus>(
+    `/collections/status/${encodeURIComponent(reference)}`,
+  );
+  if (byRef?.status) return byRef;
+  if (providerId) {
+    const byId = await get<LencoCollectionStatus>(`/collections/${encodeURIComponent(providerId)}`);
+    if (byId?.status) return byId;
+  }
+  return null;
+}
+
 // ---------- Mobile money ----------
 
 export interface LencoMobileMoneyInput {

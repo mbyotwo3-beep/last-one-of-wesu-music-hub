@@ -51,7 +51,7 @@ async function fulfillSubscription(tx: PaymentTransaction): Promise<void> {
   const { error } = await supabaseAdmin.from("subscriptions").upsert(
     {
       user_id: tx.user_id,
-      plan_id: tx.item_id,
+      plan: tx.item_id ?? "premium",
       status: "active",
       expires_at: expiresAt,
     } as any,
@@ -98,13 +98,57 @@ async function fulfillPurchase(tx: PaymentTransaction): Promise<void> {
       const commissionPct = (setting?.value as any)?.commission_pct ?? 20;
       const artistPct = 100 - commissionPct;
 
+      const { data: artistRow } = await supabaseAdmin
+        .from("artists")
+        .select("user_id")
+        .eq("id", item.artist_id)
+        .maybeSingle();
+
       await supabaseAdmin.from("revenue_splits").insert({
         transaction_id: tx.id,
-        payee_artist_id: item.artist_id,
+        artist_id: item.artist_id,
+        payee_user_id: artistRow?.user_id ?? null,
         amount: (tx.amount * artistPct) / 100,
         pct: artistPct,
         payee_role: "artist",
       } as any);
     }
   }
+}
+
+/**
+ * Idempotently move a pending transaction to its final state and fulfil it.
+ * Safe to call from both the webhook and the client-side status poller —
+ * only the caller that wins the `pending -> completed` update fulfils.
+ */
+export async function settleTransaction(
+  transactionId: string,
+  outcome: "successful" | "failed",
+  providerRef?: string | null,
+): Promise<"completed" | "failed" | "pending"> {
+  if (outcome === "failed") {
+    await supabaseAdmin
+      .from("payment_transactions")
+      .update({ status: "failed", provider_ref: providerRef ?? null } as any)
+      .eq("id", transactionId)
+      .eq("status", "pending");
+    return "failed";
+  }
+
+  const { data: claimed } = await supabaseAdmin
+    .from("payment_transactions")
+    .update({ status: "completed", provider_ref: providerRef ?? null } as any)
+    .eq("id", transactionId)
+    .eq("status", "pending")
+    .select()
+    .maybeSingle();
+
+  if (!claimed) return "completed"; // already settled by another delivery
+
+  try {
+    await fulfillTransaction(claimed as any);
+  } catch (e) {
+    console.error("[payments] Fulfilment failed:", e);
+  }
+  return "completed";
 }
