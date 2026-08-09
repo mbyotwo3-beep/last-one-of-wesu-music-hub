@@ -23,6 +23,7 @@ import {
 } from "@/lib/admin.functions";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileAdmin } from "@/components/mobile/screens/MobileAdmin";
+import { CarouselBuilder } from "@/components/CarouselBuilder";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — Wesu+" }] }),
@@ -40,7 +41,7 @@ function AdminRoute() {
   return platform === "native" ? <MobileAdmin /> : <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "carousels" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -61,6 +62,7 @@ function AdminPage() {
     { id: "artists", label: "Artists", badge: pendingArtistsQ.data?.length },
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
+    { id: "carousels", label: "Carousels" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
 
@@ -108,6 +110,7 @@ function AdminPage() {
         {tab === "artists" && <ArtistMod />}
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
+        {tab === "carousels" && <CarouselBuilder />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
     </div>

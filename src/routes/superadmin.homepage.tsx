@@ -30,6 +30,7 @@ import {
   type HomepageShelf,
   type ShelfType,
 } from "@/lib/homepage.functions";
+import { CarouselBuilder } from "@/components/CarouselBuilder";
 
 export const Route = createFileRoute("/superadmin/homepage")({
   head: () => ({ meta: [{ title: "Homepage Builder — Wesu+" }] }),
@@ -190,11 +191,16 @@ function Page() {
         )}
       </div>
 
-      <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="bg-card border border-border rounded-2xl p-6 mb-6">
         <h2 className="text-lg font-semibold mb-2">Hero Slider</h2>
         <p className="text-xs text-muted-foreground mb-4">
           {layout.hero_slides.length} slide{layout.hero_slides.length === 1 ? "" : "s"}. Slide editor coming — for now, page defaults to no slides.
         </p>
+      </div>
+
+      {/* Carousel Builder */}
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <CarouselBuilder />
       </div>
     </div>
   );

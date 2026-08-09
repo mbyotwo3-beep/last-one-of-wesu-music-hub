@@ -1,10 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import useEmblaCarousel from "embla-carousel-react";
 import { Crown, TrendingUp } from "lucide-react";
 import { getNewReleases, getTrendingSongs, getFeaturedAlbums } from "@/lib/music.functions";
 import { SongRow } from "@/components/mobile/shared/SongRow";
 import { StorageImage } from "@/components/StorageImage";
+import { CarouselShelf } from "@/components/CarouselShelf";
+import { getActiveCarousels } from "@/lib/carousel.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 const newReleasesQO = queryOptions({
   queryKey: ["new-releases"],
@@ -36,11 +39,24 @@ export function MobileHome() {
   const { data: featured } = useSuspenseQuery(featuredQO);
   const { data: newReleases } = useSuspenseQuery(newReleasesQO);
   const { data: trending } = useSuspenseQuery(trendingQO);
+  const carouselsFn = useServerFn(getActiveCarousels);
+
+  const { data: carousels } = useQuery({
+    queryKey: ["active-carousels"],
+    queryFn: () => carouselsFn(),
+    staleTime: 60 * 1000,
+  });
 
   const [emblaRef] = useEmblaCarousel({ loop: false, align: "start", dragFree: true });
 
   return (
     <div className="pb-6">
+      {/* Custom Carousels configured by Admin / Superadmin */}
+      {carousels && carousels.map((carousel) => (
+        <div key={carousel.id} className="px-2">
+          <CarouselShelf carousel={carousel} />
+        </div>
+      ))}
       {/* Featured Carousel */}
       {featured.length > 0 && (
         <div className="mb-6">

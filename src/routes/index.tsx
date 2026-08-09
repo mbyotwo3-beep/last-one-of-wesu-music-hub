@@ -16,6 +16,8 @@ import {
   ArtistTile,
   PlaylistTile,
 } from "@/components/discover/TrackCard";
+import { CarouselShelf } from "@/components/CarouselShelf";
+import { getActiveCarousels } from "@/lib/carousel.functions";
 
 const discoverQO = queryOptions({
   queryKey: ["home-discover"],
@@ -58,6 +60,14 @@ function HomePage() {
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
   const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
+  const carouselsFn = useServerFn(getActiveCarousels);
+
+  const { data: carousels } = useQuery({
+    queryKey: ["active-carousels"],
+    queryFn: () => carouselsFn(),
+    staleTime: 60 * 1000,
+  });
+
   const { data: forYouData } = useQuery({
     queryKey: ["for-you", user?.id],
     queryFn: () => forYouFn(),
@@ -129,6 +139,11 @@ function HomePage() {
             </div>
           </section>
         )}
+
+        {/* Custom Carousels configured by Admin / Superadmin */}
+        {carousels && carousels.map((carousel) => (
+          <CarouselShelf key={carousel.id} carousel={carousel} />
+        ))}
 
         {user && recentlyPlayed && recentlyPlayed.length > 0 && (
           <HorizontalShelf title="Recently Played" showAllLink="/library">
