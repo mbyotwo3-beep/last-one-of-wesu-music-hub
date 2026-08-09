@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { verifyPayment } from "@/lib/payments.functions";
 
 type SuccessSearch = {
   ref?: string;
@@ -26,11 +28,21 @@ function CheckoutSuccessPage() {
   const { ref } = Route.useSearch();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const verifyFn = useServerFn(verifyPayment);
 
   const { data: transaction, isLoading } = useQuery({
     queryKey: ["transaction", ref],
     queryFn: async () => {
       if (!ref || !user) return null;
+      // Ask the server to reconcile with Lenco directly. This settles mobile
+      // money as soon as the customer approves the prompt on their phone,
+      // without depending on webhook delivery.
+      try {
+        const res: any = await verifyFn({ data: { transactionId: ref } });
+        if (res?.transaction) return res.transaction;
+      } catch {
+        // fall through to a plain read
+      }
       const { data } = await supabase
         .from("payment_transactions")
         .select("*")
@@ -42,7 +54,7 @@ function CheckoutSuccessPage() {
     refetchInterval: (q) => {
       const status = (q.state.data as any)?.status;
       if (status === "completed" || status === "failed") return false;
-      return 2000;
+      return 3000;
     },
     refetchIntervalInBackground: true,
   });
