@@ -130,50 +130,60 @@ function SuperadminPage() {
 
 function LabelsTab() {
   const [rows, setRows] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   useQuery({
     queryKey: ["super-labels"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("labels")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setRows(data ?? []);
-      return data ?? [];
+      try {
+        const { data, error } = await supabase
+          .from("labels")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        setRows(data ?? []);
+        return data ?? [];
+      } catch (err) {
+        setError((err as Error).message);
+        return [];
+      }
     },
   });
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-secondary text-muted-foreground">
-          <tr>
-            <th className="text-left p-3">Label</th>
-            <th className="text-left p-3">Status</th>
-            <th className="text-left p-3">Commission %</th>
-            <th className="text-left p-3">Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((l) => (
-            <tr key={l.id} className="border-t border-border">
-              <td className="p-3 font-medium">{l.name}</td>
-              <td className="p-3">
-                <span className="text-xs">{l.status}</span>
-              </td>
-              <td className="p-3">{l.commission_pct}%</td>
-              <td className="p-3 text-xs text-muted-foreground">
-                {new Date(l.created_at).toLocaleDateString()}
-              </td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
+    <div className="space-y-4">
+      {error && <div className="text-destructive text-sm">Error: {error}</div>}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary text-muted-foreground">
             <tr>
-              <td colSpan={4} className="p-6 text-center text-muted-foreground">
-                No labels yet.
-              </td>
+              <th className="text-left p-3">Label</th>
+              <th className="text-left p-3">Status</th>
+              <th className="text-left p-3">Commission %</th>
+              <th className="text-left p-3">Created</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((l) => (
+              <tr key={l.id} className="border-t border-border">
+                <td className="p-3 font-medium">{l.name}</td>
+                <td className="p-3">
+                  <span className="text-xs">{l.status}</span>
+                </td>
+                <td className="p-3">{l.commission_pct}%</td>
+                <td className="p-3 text-xs text-muted-foreground">
+                  {new Date(l.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                  No labels yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -183,11 +193,14 @@ function FeaturedTab() {
   const listFn = useServerFn(listAllFeaturedAdmin);
   const upsertFn = useServerFn(upsertFeaturedSlot);
   const removeFn = useServerFn(removeFeaturedSlot);
-  const { data } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["super-featured"],
     queryFn: () => listFn(),
     retry: 1,
   });
+
+  if (isLoading) return <div className="text-muted-foreground">Loading featured slots…</div>;
+  if (error) return <div className="text-destructive">Error loading featured slots: {(error as Error).message}</div>;
   const upsertM = useMutation({
     mutationFn: upsertFn,
     onSuccess: () => {
@@ -342,15 +355,16 @@ function FeaturedTab() {
 function OverviewTab() {
   const fn = useServerFn(getPlatformStats);
   const listPayoutsFn = useServerFn(listPayouts);
-  const { data, isLoading } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
-  const { data: payouts } = useQuery({
+  const { data, isLoading, error } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
+  const { data: payouts, error: payoutsError } = useQuery({
     queryKey: ["super-payouts-overview"],
     queryFn: () => listPayoutsFn(),
     retry: 1,
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
-  if (!data) return null;
+  if (error) return <div className="text-destructive">Error loading stats: {(error as Error).message}</div>;
+  if (!data) return <div className="text-muted-foreground">No data available</div>;
 
   const pendingPayouts = payouts?.filter((p: any) => p.status === "pending") ?? [];
 
@@ -419,7 +433,7 @@ function UsersTab() {
   const list = useServerFn(listUsers);
   const grant = useServerFn(grantRole);
   const revoke = useServerFn(revokeRole);
-  const { data: users } = useQuery({
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ["super-users"],
     queryFn: () => list(),
     retry: 1,
@@ -446,7 +460,9 @@ function UsersTab() {
     },
   });
 
-  if (!users) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading users…</div>;
+  if (error) return <div className="text-destructive">Error loading users: {(error as Error).message}</div>;
+  if (!users) return <div className="text-muted-foreground">No users found</div>;
   const roles: Array<"user" | "artist" | "admin" | "superadmin"> = [
     "artist",
     "admin",
@@ -522,12 +538,19 @@ function PlansTab() {
   const qc = useQueryClient();
   const upsert = useServerFn(upsertPlan);
   const [plans, setPlans] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const { isFetching } = useQuery({
     queryKey: ["super-plans"],
     queryFn: async () => {
-      const { data } = await supabase.from("subscription_plans").select("*").order("price_zmw");
-      setPlans(data ?? []);
-      return data ?? [];
+      try {
+        const { data, error } = await supabase.from("subscription_plans").select("*").order("price_zmw");
+        if (error) throw error;
+        setPlans(data ?? []);
+        return data ?? [];
+      } catch (err) {
+        setError((err as Error).message);
+        return [];
+      }
     },
   });
   const upsertM = useMutation({
@@ -545,6 +568,7 @@ function PlansTab() {
 
   return (
     <div className="space-y-6">
+      {error && <div className="text-destructive text-sm">Error: {error}</div>}
       <div className="bg-card border border-border rounded-2xl p-6">
         <h3 className="font-semibold mb-3">New plan</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -606,12 +630,19 @@ function PaymentsTab() {
   const qc = useQueryClient();
   const toggle = useServerFn(togglePaymentMethod);
   const [methods, setMethods] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   useQuery({
     queryKey: ["super-methods"],
     queryFn: async () => {
-      const { data } = await supabase.from("payment_methods").select("*").order("sort_order");
-      setMethods(data ?? []);
-      return data ?? [];
+      try {
+        const { data, error } = await supabase.from("payment_methods").select("*").order("sort_order");
+        if (error) throw error;
+        setMethods(data ?? []);
+        return data ?? [];
+      } catch (err) {
+        setError((err as Error).message);
+        return [];
+      }
     },
   });
   const m = useMutation({
@@ -626,7 +657,9 @@ function PaymentsTab() {
   });
 
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+    <div className="space-y-4">
+      {error && <div className="text-destructive text-sm">Error: {error}</div>}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-secondary text-muted-foreground">
           <tr>
@@ -653,6 +686,7 @@ function PaymentsTab() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -661,7 +695,7 @@ function PayoutsTab() {
   const qc = useQueryClient();
   const list = useServerFn(listPayouts);
   const decide = useServerFn(decidePayout);
-  const { data } = useQuery({ queryKey: ["super-payouts"], queryFn: () => list(), retry: 1 });
+  const { data, isLoading, error } = useQuery({ queryKey: ["super-payouts"], queryFn: () => list(), retry: 1 });
   const m = useMutation({
     mutationFn: decide,
     onSuccess: () => {
@@ -673,7 +707,9 @@ function PayoutsTab() {
     },
   });
 
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading payouts…</div>;
+  if (error) return <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>;
+  if (!data) return <div className="text-muted-foreground">No payouts found</div>;
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
@@ -736,7 +772,7 @@ function SettingsTab() {
   const qc = useQueryClient();
   const get = useServerFn(getSettings);
   const update = useServerFn(updateSettings);
-  const { data } = useQuery({ queryKey: ["super-settings"], queryFn: () => get() });
+  const { data, isLoading, error } = useQuery({ queryKey: ["super-settings"], queryFn: () => get() });
   const m = useMutation({
     mutationFn: update,
     onSuccess: () => {
@@ -765,7 +801,9 @@ function SettingsTab() {
   }
 
 
-  if (!data || site === null) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading settings…</div>;
+  if (error) return <div className="text-destructive">Error loading settings: {(error as Error).message}</div>;
+  if (!data || site === null) return <div className="text-muted-foreground">No settings available</div>;
   return (
     <div className="space-y-4 max-w-2xl">
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
@@ -893,8 +931,10 @@ function SettingsTab() {
 
 function AuditTab() {
   const fn = useServerFn(listAudit);
-  const { data } = useQuery({ queryKey: ["super-audit"], queryFn: () => fn(), retry: 1 });
-  if (!data) return <div className="text-muted-foreground">Loading…</div>;
+  const { data, isLoading, error } = useQuery({ queryKey: ["super-audit"], queryFn: () => fn(), retry: 1 });
+  if (isLoading) return <div className="text-muted-foreground">Loading audit log…</div>;
+  if (error) return <div className="text-destructive">Error loading audit log: {(error as Error).message}</div>;
+  if (!data) return <div className="text-muted-foreground">No audit entries found</div>;
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
