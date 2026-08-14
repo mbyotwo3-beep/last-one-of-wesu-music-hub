@@ -4,7 +4,7 @@ import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
-import { Play } from "lucide-react";
+import { Play, ShoppingBag } from "lucide-react";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -80,42 +80,67 @@ function AlbumPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 pt-6">
-        <button
-          onClick={playFirst}
-          disabled={data.songs.length === 0}
-          className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40 mb-8"
-          aria-label="Play album"
-        >
-          <Play className="size-6 fill-current ml-0.5" />
-        </button>
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            onClick={playFirst}
+            disabled={data.songs.length === 0}
+            className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40"
+            aria-label="Play album"
+          >
+            <Play className="size-6 fill-current ml-0.5" />
+          </button>
+          {Number(album.price) > 0 && (
+            <Link
+              to="/checkout"
+              search={{ plan: "premium_monthly", item: "album", id: album.id }}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary border border-border hover:bg-accent transition-colors cursor-pointer"
+            >
+              <ShoppingBag className="size-4" />
+              Buy Album — {useCurrency.getState().formatPrice(album.price)}
+            </Link>
+          )}
+        </div>
 
         {data.songs.length === 0 ? (
           <p className="text-muted-foreground text-sm">No songs in this album yet.</p>
         ) : (
           <div className="space-y-1">
             {data.songs.map((s, i) => (
-              <button
-                key={s.id}
-                onClick={() =>
-                  setTrack({
-                    id: s.id,
-                    title: s.title,
-                    artistName: artist?.name ?? "Unknown",
-                    coverUrl: album.cover_url,
-                    durationSeconds: s.duration,
-                  })
-                }
-                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors text-left cursor-pointer group"
-              >
-                <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
-                <div className="flex-1">
-                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
+              <div key={s.id} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+                <button
+                  onClick={() =>
+                    setTrack({
+                      id: s.id,
+                      title: s.title,
+                      artistName: artist?.name ?? "Unknown",
+                      coverUrl: album.cover_url,
+                      durationSeconds: s.duration,
+                    })
+                  }
+                  className="flex items-center gap-4 flex-1 text-left cursor-pointer"
+                >
+                  <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                  <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
+                  </div>
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-primary text-sm font-bold">
+                    {useCurrency.getState().formatPrice(s.price)}
+                  </span>
+                  {Number(s.price) > 0 && (
+                    <Link
+                      to="/checkout"
+                      search={{ plan: "premium_monthly", item: "song", id: s.id }}
+                      className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
+                      aria-label={`Buy ${s.title}`}
+                    >
+                      <ShoppingBag className="size-4" />
+                    </Link>
+                  )}
                 </div>
-                <span className="text-primary text-sm font-bold">
-                  {useCurrency.getState().formatPrice(s.price)}
-                </span>
-              </button>
+              </div>
             ))}
           </div>
         )}

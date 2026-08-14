@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Heart, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Heart, Music2, Pause, Play, SkipBack, SkipForward, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { toggleLike } from "@/lib/listener.functions";
@@ -27,6 +27,7 @@ export function NowPlayingScreen() {
   const playing = usePlayer((s) => s.playing);
   const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
+  const loading = usePlayer((s) => s.loading);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const toggleLikeStore = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
@@ -149,10 +150,17 @@ export function NowPlayingScreen() {
         </button>
         <button
           onClick={togglePlay}
-          className="min-h-[56px] min-w-[56px] flex items-center justify-center bg-foreground text-obsidian rounded-full hover:scale-105 transition-transform"
+          disabled={loading}
+          className="min-h-[56px] min-w-[56px] flex items-center justify-center bg-foreground text-obsidian rounded-full hover:scale-105 transition-transform disabled:opacity-30"
           aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? <Pause className="size-6" /> : <Play className="size-6 ml-0.5" />}
+          {playing ? (
+            <Pause className="size-6" />
+          ) : loading ? (
+            <Loader2 className="size-6 animate-spin" />
+          ) : (
+            <Play className="size-6 ml-0.5" />
+          )}
         </button>
         <button
           className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"

@@ -460,10 +460,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                   aria-label={playing ? "Pause" : "Play"}
                 >
-                  {loading ? (
-                    <Loader2 className="size-6 animate-spin" />
-                  ) : playing ? (
+                  {playing ? (
                     <Pause className="size-6" />
+                  ) : loading ? (
+                    <Loader2 className="size-6 animate-spin" />
                   ) : (
                     <Play className="size-6 ml-0.5" />
                   )}
@@ -663,10 +663,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                 aria-label={playing ? "Pause" : "Play"}
               >
-                {loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : playing ? (
+                {playing ? (
                   <Pause className="size-4" />
+                ) : loading ? (
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Play className="size-4 ml-0.5" />
                 )}

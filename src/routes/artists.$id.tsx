@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, UserPlus, UserCheck } from "lucide-react";
+import { CheckCircle2, Play, UserPlus, UserCheck, ShoppingBag } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -191,7 +191,7 @@ function ArtistPage() {
                         durationSeconds: s.duration,
                       })
                     }
-                    className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                    className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
                   >
                     <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
                     <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
@@ -208,17 +208,21 @@ function ArtistPage() {
                       </p>
                     </div>
                   </button>
-                  {Number(s.price ?? 0) > 0 ? (
-                    <Link
-                      to="/checkout"
-                      search={{ plan: "premium_monthly", item: "song", id: s.id }}
-                      className="shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 transition cursor-pointer"
-                    >
-                      Buy {useCurrency.getState().formatPrice(s.price)}
-                    </Link>
-                  ) : (
-                    <span className="shrink-0 text-xs font-semibold text-muted-foreground">Free</span>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {useCurrency.getState().formatPrice(s.price)}
+                    </span>
+                    {Number(s.price ?? 0) > 0 && (
+                      <Link
+                        to="/checkout"
+                        search={{ plan: "premium_monthly", item: "song", id: s.id }}
+                        className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
+                        aria-label={`Buy ${s.title}`}
+                      >
+                        <ShoppingBag className="size-4" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
