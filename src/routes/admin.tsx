@@ -56,6 +56,15 @@ function AdminPage() {
   const pendingVerifsQ = useQuery({ queryKey: ["pending-verifications-count"], queryFn: () => listVerifsFn(), retry: 1 });
   const pendingLabelsQ = useQuery({ queryKey: ["pending-labels-count"], queryFn: () => listLabelsFn(), retry: 1 });
 
+  const tabsError = pendingSongsQ.error || pendingArtistsQ.error || pendingVerifsQ.error || pendingLabelsQ.error;
+  if (tabsError) {
+    return (
+      <div className="text-destructive p-6">
+        Error loading pending counts: {(tabsError as Error).message}
+      </div>
+    );
+  }
+
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "songs", label: "Songs", badge: pendingSongsQ.data?.length },
@@ -138,6 +147,10 @@ function Overview({
 
   const statsQ = useQuery({ queryKey: ["admin-stats"], queryFn: () => statsFn(), retry: 1 });
   const activityQ = useQuery({ queryKey: ["admin-activity"], queryFn: () => activityFn(), retry: 1 });
+
+  if (statsQ.isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
+  if (statsQ.error) return <div className="text-destructive">Error loading stats: {(statsQ.error as Error).message}</div>;
+  if (activityQ.error) return <div className="text-destructive">Error loading activity: {(activityQ.error as Error).message}</div>;
 
   const d = statsQ.data;
 
@@ -279,7 +292,7 @@ function SongMod() {
   const qc = useQueryClient();
   const list = useServerFn(listPendingSongs);
   const mod = useServerFn(moderateSong);
-  const { data, isLoading } = useQuery({ queryKey: ["pending-songs"], queryFn: () => list(), retry: false });
+  const { data, isLoading, error } = useQuery({ queryKey: ["pending-songs"], queryFn: () => list(), retry: false });
   const m = useMutation({
     mutationFn: mod,
     onSuccess: (_, variables) => {
@@ -290,7 +303,8 @@ function SongMod() {
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading songs…</div>;
+  if (error) return <div className="text-destructive">Error loading songs: {(error as Error).message}</div>;
   if (!data || data.length === 0)
     return (
       <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
@@ -344,7 +358,7 @@ function ArtistMod() {
   const list = useServerFn(listPendingArtists);
   const mod = useServerFn(moderateArtist);
 
-  const { data: pendingArtists, isLoading } = useQuery({
+  const { data: pendingArtists, isLoading, error } = useQuery({
     queryKey: ["pending-artists"],
     queryFn: () => list(),
     retry: false,
@@ -360,7 +374,8 @@ function ArtistMod() {
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading artists…</div>;
+  if (error) return <div className="text-destructive">Error loading artists: {(error as Error).message}</div>;
 
   return (
     <div className="space-y-4">
@@ -417,7 +432,7 @@ function VerificationMod() {
   const listVerifs = useServerFn(listPendingVerifications);
   const modVerif = useServerFn(moderateArtistVerification);
 
-  const { data: pendingVerifications, isLoading } = useQuery({
+  const { data: pendingVerifications, isLoading, error } = useQuery({
     queryKey: ["pending-verifications"],
     queryFn: () => listVerifs(),
     retry: false,
@@ -433,7 +448,8 @@ function VerificationMod() {
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading verifications…</div>;
+  if (error) return <div className="text-destructive">Error loading verifications: {(error as Error).message}</div>;
 
   return (
     <div className="space-y-4">
@@ -496,7 +512,7 @@ function LabelMod() {
   const qc = useQueryClient();
   const listFn = useServerFn(listPendingLabels);
   const modFn = useServerFn(moderateLabel);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["pending-labels"],
     queryFn: () => listFn(),
     retry: false,
@@ -511,7 +527,8 @@ function LabelMod() {
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-muted-foreground">Loading labels…</div>;
+  if (error) return <div className="text-destructive">Error loading labels: {(error as Error).message}</div>;
   if (!data || data.length === 0)
     return (
       <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
@@ -566,13 +583,14 @@ function LabelMod() {
 // ─────────────────────────────────────────────────────────────
 function Diagnostics() {
   const diagFn = useServerFn(getArtistDiagnostics);
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["artist-diagnostics"],
     queryFn: () => diagFn(),
     retry: false,
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading diagnostics…</div>;
+  if (error) return <div className="text-destructive">Error loading diagnostics: {(error as Error).message}</div>;
   if (!data) return <div className="text-muted-foreground">No diagnostic data available.</div>;
 
   const { info, report } = data;

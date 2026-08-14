@@ -201,6 +201,8 @@ function FeaturedTab() {
 
   if (isLoading) return <div className="text-muted-foreground">Loading featured slots…</div>;
   if (error) return <div className="text-destructive">Error loading featured slots: {(error as Error).message}</div>;
+  if (!data) return <div className="text-muted-foreground">No featured slots found</div>;
+  
   const upsertM = useMutation({
     mutationFn: upsertFn,
     onSuccess: () => {
@@ -320,11 +322,11 @@ function FeaturedTab() {
             </tr>
           </thead>
           <tbody>
-            {(data ?? []).map((s: any) => (
+            {data.map((s: any) => (
               <tr key={s.id} className="border-t border-border">
                 <td className="p-3">{s.slot_type}</td>
                 <td className="p-3 text-xs">
-                  {s.target_type}:{s.target_id.slice(0, 8)}…
+                  {s.target_type}:{s.target_id?.slice(0, 8) ?? ""}…
                 </td>
                 <td className="p-3">{s.position}</td>
                 <td className="p-3">{s.active ? "Yes" : "No"}</td>

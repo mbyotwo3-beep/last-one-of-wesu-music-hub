@@ -69,10 +69,13 @@ function Page() {
   const [activePage, setActivePage] = useState("home");
   const [layout, setLayout] = useState<HomepageLayout>(DEFAULT_LAYOUTS.home);
 
-  const { data: all } = useQuery({
+  const { data: all, isLoading, error } = useQuery({
     queryKey: ["homepage-layouts"],
     queryFn: () => loadFn(),
   });
+
+  if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading homepage layouts…</div>;
+  if (error) return <div className="p-12 text-center text-destructive">Error loading layouts: {(error as Error).message}</div>;
 
   useEffect(() => {
     if (all && all[activePage]) setLayout(all[activePage]);
