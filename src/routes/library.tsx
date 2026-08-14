@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Music } from "lucide-react";
+import { Heart, Music, Users } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,13 +48,57 @@ function Page() {
     enabled: !!user?.id,
   });
 
-  if (likedLoading || purchasedLoading) {
+  const { data: followedArtists, isLoading: followingLoading } = useQuery({
+    queryKey: ["followed-artists", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("artist_followers")
+        .select("artists(*)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return data?.map((item: any) => item.artists) ?? [];
+    },
+    enabled: !!user?.id,
+  });
+
+  if (likedLoading || purchasedLoading || followingLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <h1 className="text-3xl font-bold mb-6">My Library</h1>
+
+      <section className="mb-10">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="size-5 text-primary" />
+          <h2 className="text-xl font-semibold">Followed Artists</h2>
+        </div>
+        {!followedArtists || followedArtists.length === 0 ? (
+          <p className="text-muted-foreground">No followed artists yet. Follow artists to see them here.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {followedArtists.map((artist: any) => (
+              <Link
+                key={artist.id}
+                to="/artists/$id"
+                params={{ id: artist.id }}
+                className="group text-center p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-border cursor-pointer"
+              >
+                <StorageImage
+                  bucket="artist-images"
+                  path={artist.avatar_url}
+                  alt={artist.name}
+                  className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
+                />
+                <p className="font-semibold text-sm truncate">{artist.name}</p>
+                <p className="text-xs text-muted-foreground">Artist</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="mb-10">
         <div className="flex items-center gap-2 mb-4">
