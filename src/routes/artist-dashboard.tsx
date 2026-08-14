@@ -78,7 +78,7 @@ function ArtistDashboardPage() {
         </p>
         <a
           href="/become-artist"
-          className="inline-block px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+          className="inline-block px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Apply now
         </a>

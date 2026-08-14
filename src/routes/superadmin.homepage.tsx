@@ -129,7 +129,7 @@ function Page() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
-      <Link to="/superadmin" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1">
+      <Link to="/superadmin" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 cursor-pointer">
         <ArrowLeft className="size-4" /> Back to Superadmin
       </Link>
       <div className="flex items-center justify-between mb-6">
@@ -137,7 +137,7 @@ function Page() {
         <button
           onClick={() => save.mutate({ data: { page: activePage, layout } })}
           disabled={save.isPending}
-          className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-obsidian font-semibold disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-obsidian font-semibold disabled:opacity-50 cursor-pointer hover:scale-105 transition-transform"
         >
           <Save className="size-4" /> {save.isPending ? "Saving…" : "Save"}
         </button>
@@ -148,10 +148,10 @@ function Page() {
           <button
             key={p.key}
             onClick={() => setActivePage(p.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer transition-colors ${
               activePage === p.key
                 ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent"
             }`}
           >
             {p.label}
@@ -164,7 +164,7 @@ function Page() {
           <h2 className="text-lg font-semibold">Shelves</h2>
           <button
             onClick={addShelf}
-            className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-full bg-secondary hover:bg-accent"
+            className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-full bg-secondary hover:bg-accent cursor-pointer transition-colors"
           >
             <Plus className="size-3" /> Add shelf
           </button>
@@ -192,10 +192,122 @@ function Page() {
       </div>
 
       <div className="bg-card border border-border rounded-2xl p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Hero Slider</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Hero Slider</h2>
+          <button
+            onClick={() => {
+              setLayout((p) => ({
+                ...p,
+                hero_slides: [
+                  ...p.hero_slides,
+                  {
+                    id: `slide_${Date.now()}`,
+                    title: "New Slide",
+                    subtitle: "Subtitle",
+                    image_url: "",
+                    gradient: "rgba(250, 36, 60, 0.8)",
+                    link_url: "",
+                  },
+                ],
+              }));
+            }}
+            className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-full bg-secondary hover:bg-accent cursor-pointer"
+          >
+            <Plus className="size-3" /> Add slide
+          </button>
+        </div>
         <p className="text-xs text-muted-foreground mb-4">
-          {layout.hero_slides.length} slide{layout.hero_slides.length === 1 ? "" : "s"}. Slide editor coming — for now, page defaults to no slides.
+          {layout.hero_slides.length} slide{layout.hero_slides.length === 1 ? "" : "s"}
         </p>
+        <div className="space-y-3">
+          {layout.hero_slides.map((slide, idx) => (
+            <div key={slide.id} className="p-4 bg-secondary/40 border border-border rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Slide {idx + 1}</span>
+                <button
+                  onClick={() => {
+                    setLayout((p) => ({
+                      ...p,
+                      hero_slides: p.hero_slides.filter((s) => s.id !== slide.id),
+                    }));
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-destructive cursor-pointer"
+                  aria-label="Delete slide"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              <input
+                value={slide.title}
+                onChange={(e) => {
+                  setLayout((p) => ({
+                    ...p,
+                    hero_slides: p.hero_slides.map((s) =>
+                      s.id === slide.id ? { ...s, title: e.target.value } : s
+                    ),
+                  }));
+                }}
+                placeholder="Title"
+                className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={slide.subtitle}
+                onChange={(e) => {
+                  setLayout((p) => ({
+                    ...p,
+                    hero_slides: p.hero_slides.map((s) =>
+                      s.id === slide.id ? { ...s, subtitle: e.target.value } : s
+                    ),
+                  }));
+                }}
+                placeholder="Subtitle"
+                className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={slide.image_url}
+                onChange={(e) => {
+                  setLayout((p) => ({
+                    ...p,
+                    hero_slides: p.hero_slides.map((s) =>
+                      s.id === slide.id ? { ...s, image_url: e.target.value } : s
+                    ),
+                  }));
+                }}
+                placeholder="Image URL"
+                className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={slide.link_url}
+                onChange={(e) => {
+                  setLayout((p) => ({
+                    ...p,
+                    hero_slides: p.hero_slides.map((s) =>
+                      s.id === slide.id ? { ...s, link_url: e.target.value } : s
+                    ),
+                  }));
+                }}
+                placeholder="Link URL (optional)"
+                className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={slide.gradient}
+                onChange={(e) => {
+                  setLayout((p) => ({
+                    ...p,
+                    hero_slides: p.hero_slides.map((s) =>
+                      s.id === slide.id ? { ...s, gradient: e.target.value } : s
+                    ),
+                  }));
+                }}
+                placeholder="Gradient (e.g., rgba(250, 36, 60, 0.8))"
+                className="w-full bg-background border border-border rounded px-3 py-2 text-sm font-mono"
+              />
+            </div>
+          ))}
+          {layout.hero_slides.length === 0 && (
+            <p className="text-sm text-muted-foreground py-4 text-center">No slides. Add one to get started.</p>
+          )}
+        </div>
       </div>
 
       {/* Carousel Builder */}
@@ -233,7 +345,7 @@ function SortableShelfRow({
       <button
         {...attributes}
         {...listeners}
-        className="text-muted-foreground hover:text-foreground cursor-grab p-1"
+        className="text-muted-foreground hover:text-foreground cursor-grab p-1 cursor-pointer"
         aria-label="Drag"
       >
         <GripVertical className="size-4" />
@@ -274,14 +386,14 @@ function SortableShelfRow({
       )}
       <button
         onClick={() => onUpdate({ visible: !shelf.visible })}
-        className="p-1.5 text-muted-foreground hover:text-foreground"
+        className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
         aria-label={shelf.visible ? "Hide" : "Show"}
       >
         {shelf.visible ? <Eye className="size-4" /> : <EyeOff className="size-4 opacity-50" />}
       </button>
       <button
         onClick={onRemove}
-        className="p-1.5 text-muted-foreground hover:text-destructive"
+        className="p-1.5 text-muted-foreground hover:text-destructive cursor-pointer"
         aria-label="Delete"
       >
         <Trash2 className="size-4" />

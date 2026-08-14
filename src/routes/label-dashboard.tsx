@@ -55,7 +55,7 @@ function Page() {
         <h1 className="text-2xl font-bold mb-2">You don't run a label yet</h1>
         <Link
           to="/apply-label"
-          className="inline-block mt-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+          className="inline-block mt-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Apply for a label
         </Link>
@@ -104,7 +104,7 @@ function Page() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${tab === t.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"}`}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-colors ${tab === t.id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground hover:bg-accent"}`}
           >
             <t.icon className="size-4" /> {t.label}
           </button>
@@ -217,7 +217,7 @@ function Roster({ labelId }: { labelId: string }) {
           />
           <button
             onClick={find}
-            className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+            className="px-4 py-2 rounded-full bg-secondary border border-border text-sm cursor-pointer hover:bg-accent transition-colors"
           >
             Search
           </button>
@@ -229,7 +229,7 @@ function Roster({ labelId }: { labelId: string }) {
                 <span>{a.name}</span>
                 <button
                   onClick={() => inviteM.mutate({ data: { label_id: labelId, artist_id: a.id } })}
-                  className="text-xs px-3 py-1 rounded-full bg-primary text-primary-foreground"
+                  className="text-xs px-3 py-1 rounded-full bg-primary text-primary-foreground cursor-pointer hover:scale-105 transition-transform"
                 >
                   Invite
                 </button>
@@ -274,7 +274,7 @@ function Roster({ labelId }: { labelId: string }) {
                 <td className="p-3">
                   <button
                     onClick={() => removeM.mutate({ data: { id: r.id } })}
-                    className="text-xs text-destructive"
+                    className="text-xs text-destructive cursor-pointer hover:underline"
                   >
                     Remove
                   </button>
@@ -396,7 +396,7 @@ function Payouts({ labelId }: { labelId: string }) {
       )}
       <button
         disabled={m.isPending}
-        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
       >
         Request
       </button>
@@ -454,7 +454,7 @@ function Settings({ label }: { label: any }) {
       {m.isSuccess && <p className="text-sm text-primary">Saved.</p>}
       <button
         disabled={m.isPending}
-        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
       >
         Save
       </button>

@@ -91,7 +91,7 @@ function SuperadminPage() {
           </div>
           <Link
             to="/superadmin/homepage"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
           >
             Homepage Builder
           </Link>
@@ -290,7 +290,7 @@ function FeaturedTab() {
         )}
         <button
           disabled={upsertM.isPending || !form.target_id}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
           Add slot
         </button>
@@ -318,7 +318,7 @@ function FeaturedTab() {
                 <td className="p-3">
                   <button
                     onClick={() => removeM.mutate({ data: { id: s.id } })}
-                    className="text-xs text-destructive"
+                    className="text-xs text-destructive cursor-pointer hover:underline"
                   >
                     Remove
                   </button>
