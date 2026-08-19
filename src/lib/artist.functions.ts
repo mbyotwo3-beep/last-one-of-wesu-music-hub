@@ -248,9 +248,14 @@ export const requestPayout = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     
-    // REQUIREMENT: Payout only allowed if money is over K500
-    if (data.amount < 500) {
-      throw new Error("Minimum withdrawal amount is K500 (ZMW 500)");
+    // Get dynamic withdrawal settings
+    const { getWithdrawalConfig } = await import("@/lib/pricing.functions");
+    const withdrawalConfig = await getWithdrawalConfig();
+    const minWithdrawal = withdrawalConfig.min_amount;
+    
+    // REQUIREMENT: Payout only allowed if money is over minimum
+    if (data.amount < minWithdrawal) {
+      throw new Error(`Minimum withdrawal amount is K${minWithdrawal} (ZMW ${minWithdrawal})`);
     }
     
     const { data: artist } = await supabase
@@ -262,8 +267,8 @@ export const requestPayout = createServerFn({ method: "POST" })
     
     // SECURITY: Check available balance
     const available = await getArtistAvailableBalance(supabase, (artist as any).id);
-    if (available <= 500) {
-      throw new Error(`You can only apply for withdrawal if your available balance is over K500 (Current: K${available.toFixed(2)})`);
+    if (available <= minWithdrawal) {
+      throw new Error(`You can only apply for withdrawal if your available balance is over K${minWithdrawal} (Current: K${available.toFixed(2)})`);
     }
     if (data.amount > available) {
       throw new Error(
@@ -320,19 +325,25 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
       throw new Error("Your verification application is already under review");
     }
 
-    // Check follower count (>= 100)
+    // Get dynamic verification settings
+    const { getVerificationConfig } = await import("@/lib/pricing.functions");
+    const verificationConfig = await getVerificationConfig();
+    const minFollowers = verificationConfig.min_followers;
+    const minEarnings = verificationConfig.min_earnings;
+
+    // Check follower count
     const { count: followersCount } = await supabase
       .from("artist_followers")
       .select("id", { count: "exact", head: true })
       .eq("artist_id", (artist as any).id);
 
-    if ((followersCount ?? 0) < 100) {
+    if ((followersCount ?? 0) < minFollowers) {
       throw new Error(
-        `Verification requires at least 100 followers (Currently: ${followersCount ?? 0})`
+        `Verification requires at least ${minFollowers} followers (Currently: ${followersCount ?? 0})`
       );
     }
 
-    // Check total earnings (> 500 ZMW)
+    // Check total earnings
     const { data: songs } = await supabase.from("songs").select("id").eq("artist_id", (artist as any).id);
     const { data: albums } = await supabase.from("albums").select("id").eq("artist_id", (artist as any).id);
     const songIds = (songs ?? []).map((s) => s.id);
@@ -348,9 +359,9 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
       totalRevenue = (sales ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
     }
 
-    if (totalRevenue <= 500) {
+    if (totalRevenue <= minEarnings) {
       throw new Error(
-        `Verification requires total earnings over K500 (Currently: K${totalRevenue.toFixed(2)})`
+        `Verification requires total earnings over K${minEarnings} (Currently: K${totalRevenue.toFixed(2)})`
       );
     }
 

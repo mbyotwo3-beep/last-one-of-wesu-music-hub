@@ -21,6 +21,7 @@ import {
   moderateLabel,
   getArtistDiagnostics,
 } from "@/lib/admin.functions";
+import { getVerificationConfig } from "@/lib/pricing.functions";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileAdmin } from "@/components/mobile/screens/MobileAdmin";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
@@ -431,10 +432,17 @@ function VerificationMod() {
   const qc = useQueryClient();
   const listVerifs = useServerFn(listPendingVerifications);
   const modVerif = useServerFn(moderateArtistVerification);
+  const verificationConfigFn = useServerFn(getVerificationConfig);
 
   const { data: pendingVerifications, isLoading, error } = useQuery({
     queryKey: ["pending-verifications"],
     queryFn: () => listVerifs(),
+    retry: false,
+  });
+
+  const { data: verificationConfig } = useQuery({
+    queryKey: ["verification-config"],
+    queryFn: () => verificationConfigFn(),
     retry: false,
   });
 
@@ -456,7 +464,7 @@ function VerificationMod() {
       <div>
         <h2 className="text-xl font-bold">Artist Verification Requests</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Artists must have ≥100 followers and &gt;K500 in earnings to apply for verification.
+          Artists must have ≥{verificationConfig?.min_followers ?? 100} followers and &gt;K{verificationConfig?.min_earnings ?? 500} in earnings to apply for verification.
           Once approved, they receive the verified badge on their profile.
         </p>
       </div>

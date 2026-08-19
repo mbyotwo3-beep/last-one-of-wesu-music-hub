@@ -16,6 +16,24 @@ export const DEFAULT_PRICING: PricingConfig = {
   free_song_fee: 100,
 };
 
+export interface VerificationConfig {
+  min_followers: number;
+  min_earnings: number;
+}
+
+export const DEFAULT_VERIFICATION: VerificationConfig = {
+  min_followers: 100,
+  min_earnings: 500,
+};
+
+export interface WithdrawalConfig {
+  min_amount: number;
+}
+
+export const DEFAULT_WITHDRAWAL: WithdrawalConfig = {
+  min_amount: 500,
+};
+
 /**
  * Public read of the current pricing config. Read via service role
  * because platform_settings is staff-only; only the single "pricing"
@@ -40,6 +58,51 @@ export const getPricingConfig = createServerFn({ method: "GET" }).handler(
       };
     } catch {
       return DEFAULT_PRICING;
+    }
+  },
+);
+
+/**
+ * Public read of the current verification config.
+ */
+export const getVerificationConfig = createServerFn({ method: "GET" }).handler(
+  async (): Promise<VerificationConfig> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "verification")
+        .maybeSingle();
+      const v = (data?.value as Partial<VerificationConfig> | null) ?? {};
+      return {
+        min_followers: Number(v.min_followers ?? DEFAULT_VERIFICATION.min_followers),
+        min_earnings: Number(v.min_earnings ?? DEFAULT_VERIFICATION.min_earnings),
+      };
+    } catch {
+      return DEFAULT_VERIFICATION;
+    }
+  },
+);
+
+/**
+ * Public read of the current withdrawal config.
+ */
+export const getWithdrawalConfig = createServerFn({ method: "GET" }).handler(
+  async (): Promise<WithdrawalConfig> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "withdrawal")
+        .maybeSingle();
+      const v = (data?.value as Partial<WithdrawalConfig> | null) ?? {};
+      return {
+        min_amount: Number(v.min_amount ?? DEFAULT_WITHDRAWAL.min_amount),
+      };
+    } catch {
+      return DEFAULT_WITHDRAWAL;
     }
   },
 );

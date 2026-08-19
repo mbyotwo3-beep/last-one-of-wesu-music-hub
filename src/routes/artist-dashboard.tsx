@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { requestArtistVerification } from "@/lib/artist.functions";
+import { getVerificationConfig } from "@/lib/pricing.functions";
 import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ function ArtistDashboardPage() {
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getMyArtistOverview);
   const requestVerificationFn = useServerFn(requestArtistVerification);
+  const verificationConfigFn = useServerFn(getVerificationConfig);
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
@@ -41,6 +43,12 @@ function ArtistDashboardPage() {
     queryFn: () => fetchOverview(),
     enabled: !!user,
     retry: 1,
+  });
+
+  const { data: verificationConfig } = useQuery({
+    queryKey: ["verification-config"],
+    queryFn: () => verificationConfigFn(),
+    retry: false,
   });
 
   const verificationMutation = useMutation({
@@ -193,7 +201,7 @@ function ArtistDashboardPage() {
                   ? "Your artist profile is officially verified by Wesu+ staff."
                   : verificationStatus === "pending"
                   ? "Your verification application is currently under review by Admin / Superadmin."
-                  : "Get the verified badge on your profile. Verification requires at least 100 followers and over K500 in total earnings."}
+                  : `Get the verified badge on your profile. Verification requires at least ${verificationConfig?.min_followers ?? 100} followers and over K${verificationConfig?.min_earnings ?? 500} in total earnings.`}
               </p>
             </div>
 
@@ -202,14 +210,14 @@ function ArtistDashboardPage() {
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <span>Followers:</span>
-                    <span className={`font-semibold ${followerCount >= 100 ? "text-primary" : "text-foreground"}`}>
-                      {followerCount} / 100
+                    <span className={`font-semibold ${followerCount >= (verificationConfig?.min_followers ?? 100) ? "text-primary" : "text-foreground"}`}>
+                      {followerCount} / {verificationConfig?.min_followers ?? 100}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Earnings:</span>
-                    <span className={`font-semibold ${data.totalRevenueZmw > 500 ? "text-primary" : "text-foreground"}`}>
-                      K{data.totalRevenueZmw.toFixed(2)} / K500
+                    <span className={`font-semibold ${data.totalRevenueZmw > (verificationConfig?.min_earnings ?? 500) ? "text-primary" : "text-foreground"}`}>
+                      K{data.totalRevenueZmw.toFixed(2)} / K{verificationConfig?.min_earnings ?? 500}
                     </span>
                   </div>
                 </div>

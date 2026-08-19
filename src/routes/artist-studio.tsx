@@ -24,7 +24,7 @@ import { respondToLabelInvite } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlatform } from "@/hooks/use-platform";
 import { MobileArtistStudio } from "@/components/mobile/screens/MobileArtistStudio";
-import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
+import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
 
 
 export const Route = createFileRoute("/artist-studio")({
@@ -770,6 +770,7 @@ function PayoutTab() {
   const overviewFn = useServerFn(getMyArtistOverview);
   const requestFn = useServerFn(requestPayout);
   const listFn = useServerFn(listMyPayouts);
+  const withdrawalFn = useServerFn(getWithdrawalConfig);
   const { data: overview } = useQuery({
     queryKey: ["artist-overview"],
     queryFn: () => overviewFn(),
@@ -778,6 +779,11 @@ function PayoutTab() {
   const { data: payouts } = useQuery({
     queryKey: ["my-payouts"],
     queryFn: () => listFn(),
+    retry: false,
+  });
+  const { data: withdrawalConfig } = useQuery({
+    queryKey: ["withdrawal-config"],
+    queryFn: () => withdrawalFn(),
     retry: false,
   });
   const m = useMutation({
@@ -791,8 +797,9 @@ function PayoutTab() {
     },
   });
   const availableBalance = Number(overview?.totalRevenueZmw ?? 0);
-  const eligible = availableBalance > 500;
-  const [form, setForm] = useState({ amount: 500, method_code: "MTN_MOMO", destination: "" });
+  const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
+  const eligible = availableBalance > minWithdrawal;
+  const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });
 
   return (
     <div className="space-y-6">
@@ -803,15 +810,15 @@ function PayoutTab() {
         </p>
         {!eligible && (
           <p className="text-xs text-amber-500 mt-2">
-            ⚠️ You can only apply for withdrawal when your available money is over K500 (Current: K{availableBalance.toFixed(2)}).
+            ⚠️ You can only apply for withdrawal when your available money is over K{minWithdrawal} (Current: K{availableBalance.toFixed(2)}).
           </p>
         )}
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (form.amount < 500) {
-            toast.error("Minimum withdrawal amount is K500");
+          if (form.amount < minWithdrawal) {
+            toast.error(`Minimum withdrawal amount is K${minWithdrawal}`);
             return;
           }
           m.mutate({ data: form });
@@ -820,13 +827,13 @@ function PayoutTab() {
       >
         <h3 className="font-semibold">Request payout</h3>
         <label className="block text-xs text-muted-foreground">
-          Withdrawal amount (Minimum K500)
+          Withdrawal amount (Minimum K{minWithdrawal})
           <input
             required
             type="number"
-            min="500"
+            min={minWithdrawal}
             step="1"
-            placeholder="Amount (min 500)"
+            placeholder={`Amount (min ${minWithdrawal})`}
             className="w-full px-3 py-2 mt-1 rounded-lg bg-secondary border border-border text-foreground"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}

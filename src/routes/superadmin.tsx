@@ -788,6 +788,8 @@ function SettingsTab() {
   const [site, setSite] = useState<any>(null);
   const [pay, setPay] = useState<any>(null);
   const [pricing, setPricing] = useState<any>(null);
+  const [verification, setVerification] = useState<any>(null);
+  const [withdrawal, setWithdrawal] = useState<any>(null);
   if (data && site === null) {
     setSite(data.site ?? {});
     setPay(data.payments ?? {});
@@ -798,6 +800,17 @@ function SettingsTab() {
         album_min: 150,
         album_max: 250,
         free_song_fee: 100,
+      },
+    );
+    setVerification(
+      data.verification ?? {
+        min_followers: 100,
+        min_earnings: 500,
+      },
+    );
+    setWithdrawal(
+      data.withdrawal ?? {
+        min_amount: 500,
       },
     );
   }
@@ -924,6 +937,62 @@ function SettingsTab() {
           className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Save pricing
+        </button>
+      </div>
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+        <h3 className="font-semibold">Verification Requirements</h3>
+        <p className="text-xs text-muted-foreground">
+          Controls the requirements for artists to get verified.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            Minimum followers
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={verification.min_followers ?? 100}
+              onChange={(e) => setVerification({ ...verification, min_followers: Number(e.target.value) })}
+            />
+          </label>
+          <label className="block text-sm">
+            Minimum earnings (ZMW)
+            <input
+              type="number"
+              min={0}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={verification.min_earnings ?? 500}
+              onChange={(e) => setVerification({ ...verification, min_earnings: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+        <button
+          onClick={() => m.mutate({ data: { key: "verification", value: verification } })}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+        >
+          Save verification
+        </button>
+      </div>
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+        <h3 className="font-semibold">Withdrawal Settings</h3>
+        <p className="text-xs text-muted-foreground">
+          Controls the minimum amount artists can withdraw.
+        </p>
+        <label className="block text-sm">
+          Minimum withdrawal amount (ZMW)
+          <input
+            type="number"
+            min={0}
+            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            value={withdrawal.min_amount ?? 500}
+            onChange={(e) => setWithdrawal({ ...withdrawal, min_amount: Number(e.target.value) })}
+          />
+        </label>
+        <button
+          onClick={() => m.mutate({ data: { key: "withdrawal", value: withdrawal } })}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+        >
+          Save withdrawal
         </button>
       </div>
     </div>
