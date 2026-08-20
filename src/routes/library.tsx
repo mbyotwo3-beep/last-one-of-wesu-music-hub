@@ -3,19 +3,27 @@ import { useQuery } from "@tanstack/react-query";
 import { Heart, Music, Users } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
+import { MobileLibrary } from "@/components/mobile/screens/MobileLibrary";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
   component: () => (
     <RoleGate require="user">
-      <Page />
+      <LibraryRoute />
     </RoleGate>
   ),
   errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
+
+function LibraryRoute() {
+  const platform = usePlatform();
+  const isMobile = useIsMobile();
+  return platform === "native" || isMobile ? <MobileLibrary /> : <Page />;
+}
 
 function Page() {
   const { user } = useAuth();

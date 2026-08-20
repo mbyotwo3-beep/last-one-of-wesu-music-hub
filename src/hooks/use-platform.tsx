@@ -29,3 +29,29 @@ export function usePlatform(): Platform {
 export function useIsNative() {
   return usePlatform() === "native";
 }
+
+/**
+ * Detects if the user is on a mobile device (browser or native).
+ * Uses user agent and screen width detection.
+ */
+export function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const mobileRegex = /android|ipad|iphone|ipod|windows phone|iemobile|blackberry|mobile/i;
+      const isMobileUA = mobileRegex.test(userAgent);
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isMobileUA || isSmallScreen);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}

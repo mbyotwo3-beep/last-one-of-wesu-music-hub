@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { usePlatform } from "@/hooks/use-platform";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileBrowse } from "@/components/mobile/screens/MobileBrowse";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
@@ -98,7 +98,8 @@ export const Route = createFileRoute("/browse")({
 
 function BrowseRoute() {
   const platform = usePlatform();
-  return platform === "native" ? <MobileBrowse /> : <BrowsePage />;
+  const isMobile = useIsMobile();
+  return platform === "native" || isMobile ? <MobileBrowse /> : <BrowsePage />;
 }
 
 function BrowsePage() {

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
-import { usePlatform } from "@/hooks/use-platform";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileHome } from "@/components/mobile/screens/MobileHome";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
@@ -51,7 +51,8 @@ export const Route = createFileRoute("/")({
 
 function IndexRoute() {
   const platform = usePlatform();
-  return platform === "native" ? <MobileHome /> : <HomePage />;
+  const isMobile = useIsMobile();
+  return platform === "native" || isMobile ? <MobileHome /> : <HomePage />;
 }
 
 function HomePage() {

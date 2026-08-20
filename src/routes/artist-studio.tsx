@@ -22,7 +22,7 @@ import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
 import { respondToLabelInvite } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlatform } from "@/hooks/use-platform";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileArtistStudio } from "@/components/mobile/screens/MobileArtistStudio";
 import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
 
@@ -40,7 +40,8 @@ export const Route = createFileRoute("/artist-studio")({
 
 function ArtistStudioRoute() {
   const platform = usePlatform();
-  return platform === "native" ? <MobileArtistStudio /> : <Page />;
+  const isMobile = useIsMobile();
+  return platform === "native" || isMobile ? <MobileArtistStudio /> : <Page />;
 }
 
 type Tab = "upload" | "collabs" | "label" | "features" | "payouts";

@@ -11,7 +11,7 @@ import {
 } from "@/lib/music.functions";
 import { initiatePayment } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { usePlatform } from "@/hooks/use-platform";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileCheckout } from "@/components/mobile/screens/MobileCheckout";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
@@ -48,6 +48,7 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutRoute() {
   const platform = usePlatform();
+  const isMobile = useIsMobile();
   const search = Route.useSearch();
   const navigate = useNavigate();
   // Subscriptions are temporarily disabled — only track/album purchases are supported.
@@ -55,7 +56,7 @@ function CheckoutRoute() {
     if (!search.item || !search.id) navigate({ to: "/browse", replace: true });
   }, [search.item, search.id, navigate]);
   if (!search.item || !search.id) return null;
-  return platform === "native" ? <MobileCheckout planCode={search.plan} /> : <CheckoutPage />;
+  return platform === "native" || isMobile ? <MobileCheckout planCode={search.plan} /> : <CheckoutPage />;
 }
 
 

@@ -22,7 +22,7 @@ import {
   getArtistDiagnostics,
 } from "@/lib/admin.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
-import { usePlatform } from "@/hooks/use-platform";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileAdmin } from "@/components/mobile/screens/MobileAdmin";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
 
@@ -39,7 +39,8 @@ export const Route = createFileRoute("/admin")({
 
 function AdminRoute() {
   const platform = usePlatform();
-  return platform === "native" ? <MobileAdmin /> : <AdminPage />;
+  const isMobile = useIsMobile();
+  return platform === "native" || isMobile ? <MobileAdmin /> : <AdminPage />;
 }
 
 type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "carousels" | "diagnostics";

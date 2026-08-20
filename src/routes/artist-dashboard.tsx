@@ -5,6 +5,7 @@ import { Upload, TrendingUp, DollarSign, Music, BarChart3, Settings, Users, Chec
 import { useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
+import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { requestArtistVerification } from "@/lib/artist.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
