@@ -82,7 +82,7 @@ function CheckoutPage() {
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth" });
+    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
   }, [user, loading, navigate]);
 
   const payFn = useServerFn(initiatePayment);

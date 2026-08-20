@@ -21,7 +21,7 @@ export function RoleGate({ require, children }: Props) {
   useEffect(() => {
     if (loading) return;
     if (access === "redirect-auth") {
-      navigate({ to: "/auth" });
+      navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
       return;
     }
     if (access === "redirect-home") {

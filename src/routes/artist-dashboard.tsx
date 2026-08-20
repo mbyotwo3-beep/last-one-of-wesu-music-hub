@@ -36,7 +36,7 @@ function ArtistDashboardPage() {
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth" });
+    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
   }, [user, loading, navigate]);
 
   const { data, isLoading, error } = useQuery({

@@ -86,7 +86,7 @@ export function BottomTabBar() {
 
   function handleTab(tab: Tab) {
     if (tab.requireAuth && !user) {
-      navigate({ to: "/auth" });
+      navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
     } else {
       navigate({ to: tab.to as any });
     }

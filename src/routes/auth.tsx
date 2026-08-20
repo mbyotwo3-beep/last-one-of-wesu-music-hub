@@ -11,6 +11,9 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in or create an account on Wesu+ Music Streaming." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   component: AuthPage,
 });
 
@@ -23,6 +26,7 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const { redirect } = Route.useSearch();
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -44,7 +48,7 @@ function AuthPage() {
           password,
           options: {
             data: { full_name: name },
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            emailRedirectTo: `${window.location.origin}${redirect || "/dashboard"}`,
           },
         });
         if (error) throw error;
@@ -52,12 +56,12 @@ function AuthPage() {
           setNotice("Account created. Check your email to confirm your address, then sign in.");
           setMode("signin");
         } else {
-          window.location.href = "/dashboard";
+          window.location.href = redirect || "/dashboard";
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.href = "/dashboard";
+        window.location.href = redirect || "/dashboard";
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -178,6 +182,9 @@ function AuthPage() {
             setLoading(true);
             const result = await lovable.auth.signInWithOAuth("google", {
               redirect_uri: window.location.origin,
+              options: {
+                redirectTo: `${window.location.origin}${redirect || "/dashboard"}`,
+              },
             });
             if (result.error) {
               setError(
@@ -185,7 +192,7 @@ function AuthPage() {
               );
             }
             if (!result.redirected && !result.error) {
-              window.location.href = "/dashboard";
+              window.location.href = redirect || "/dashboard";
             }
             setLoading(false);
           }}
