@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ListMusic, ShoppingBag, Crown, Plus, X } from "lucide-react";
+import { ListMusic, ShoppingBag, Crown, Plus, X, Music, Disc } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyOverview } from "@/lib/user.functions";
 import { createPlaylist } from "@/lib/listener.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Mobile Library screen — subscription banner, playlists, recent purchases.
@@ -22,6 +23,36 @@ export function MobileLibrary() {
   const { data, refetch } = useQuery({
     queryKey: ["my-overview", user?.id],
     queryFn: () => fetchOverview(),
+    enabled: !!user,
+  });
+
+  const { data: purchasedSingles } = useQuery({
+    queryKey: ["purchased-singles", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("purchases")
+        .select("songs(*, artists(name))")
+        .eq("user_id", user.id)
+        .is("album_id", null)
+        .order("created_at", { ascending: false });
+      return data?.map((item: any) => item.songs) ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: purchasedAlbums } = useQuery({
+    queryKey: ["purchased-albums", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("purchases")
+        .select("albums(*, artists(name))")
+        .eq("user_id", user.id)
+        .not("album_id", "is", null)
+        .order("created_at", { ascending: false });
+      return data?.map((item: any) => item.albums) ?? [];
+    },
     enabled: !!user,
   });
 
@@ -121,31 +152,69 @@ export function MobileLibrary() {
         )}
       </div>
 
-      {/* Recent Purchases */}
-      <div>
+      {/* Purchased Singles */}
+      <div className="mb-6">
         <div className="flex items-center gap-2 px-4 mb-3">
-          <ShoppingBag className="size-4 text-muted-foreground" />
+          <Music className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-            Recent Purchases
+            Purchased Singles
           </h2>
         </div>
-        {purchases.length === 0 ? (
-          <p className="px-4 text-sm text-muted-foreground">No purchases yet.</p>
+        {!purchasedSingles || purchasedSingles.length === 0 ? (
+          <p className="px-4 text-sm text-muted-foreground">No purchased singles yet.</p>
         ) : (
-          purchases.slice(0, 10).map((p) => {
-            const title =
-              (p.song as { title?: string } | null)?.title ??
-              (p.album as { title?: string } | null)?.title ??
-              "Item";
-            return (
-              <div key={p.id} className="flex items-center justify-between px-4 py-2 min-h-[44px]">
-                <p className="text-sm truncate flex-1">{title}</p>
-                <span className="text-primary text-sm font-bold ml-4">
-                  K{Number(p.amount).toFixed(2)}
-                </span>
+          purchasedSingles.slice(0, 10).map((song: any) => (
+            <Link
+              key={song.id}
+              to="/songs/$id"
+              params={{ id: song.id }}
+              className="flex items-center gap-3 px-4 py-2 min-h-[44px] hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <div className="size-10 rounded-md bg-card flex items-center justify-center shrink-0">
+                <Music className="size-4 text-primary" />
               </div>
-            );
-          })
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{song.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
+              </div>
+              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full">
+                Owned
+              </span>
+            </Link>
+          ))
+        )}
+      </div>
+
+      {/* Purchased Albums */}
+      <div>
+        <div className="flex items-center gap-2 px-4 mb-3">
+          <Disc className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+            Purchased Albums
+          </h2>
+        </div>
+        {!purchasedAlbums || purchasedAlbums.length === 0 ? (
+          <p className="px-4 text-sm text-muted-foreground">No purchased albums yet.</p>
+        ) : (
+          purchasedAlbums.slice(0, 10).map((album: any) => (
+            <Link
+              key={album.id}
+              to="/albums/$id"
+              params={{ id: album.id }}
+              className="flex items-center gap-3 px-4 py-2 min-h-[44px] hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <div className="size-10 rounded-md bg-card flex items-center justify-center shrink-0">
+                <Disc className="size-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{album.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{album.artists?.name ?? "Unknown"}</p>
+              </div>
+              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full">
+                Owned
+              </span>
+            </Link>
+          ))
         )}
       </div>
     </div>

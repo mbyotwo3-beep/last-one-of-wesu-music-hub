@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Music, Users } from "lucide-react";
+import { Heart, Music, Users, Disc } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
@@ -50,8 +50,24 @@ function Page() {
         .from("purchases")
         .select("songs(*, artists(name))")
         .eq("user_id", user.id)
+        .is("album_id", null)
         .order("created_at", { ascending: false });
       return data?.map((item: any) => item.songs) ?? [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading } = useQuery({
+    queryKey: ["purchased-albums", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("purchases")
+        .select("albums(*, artists(name))")
+        .eq("user_id", user.id)
+        .not("album_id", "is", null)
+        .order("created_at", { ascending: false });
+      return data?.map((item: any) => item.albums) ?? [];
     },
     enabled: !!user?.id,
   });
@@ -70,7 +86,7 @@ function Page() {
     enabled: !!user?.id,
   });
 
-  if (likedLoading || purchasedLoading || followingLoading) {
+  if (likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
 
@@ -146,10 +162,10 @@ function Page() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Music className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold">Purchased Songs</h2>
+          <h2 className="text-xl font-semibold">Purchased Singles</h2>
         </div>
         {!purchasedSongs || purchasedSongs.length === 0 ? (
-          <p className="text-muted-foreground">No purchased songs yet.</p>
+          <p className="text-muted-foreground">No purchased singles yet.</p>
         ) : (
           <div className="space-y-2">
             {purchasedSongs.map((song: any) => (
@@ -171,6 +187,39 @@ function Page() {
                   Owned
                 </span>
               </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <div className="flex items-center gap-2 mb-4">
+          <Disc className="size-5 text-primary" />
+          <h2 className="text-xl font-semibold">Purchased Albums</h2>
+        </div>
+        {!purchasedAlbums || purchasedAlbums.length === 0 ? (
+          <p className="text-muted-foreground">No purchased albums yet.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {purchasedAlbums.map((album: any) => (
+              <Link
+                key={album.id}
+                to="/albums/$id"
+                params={{ id: album.id }}
+                className="group text-center p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-border cursor-pointer"
+              >
+                <StorageImage
+                  bucket="album-art"
+                  path={album.cover_url}
+                  alt={album.title}
+                  className="aspect-square w-full rounded-lg overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
+                />
+                <p className="font-semibold text-sm truncate">{album.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{album.artists?.name ?? "Unknown"}</p>
+                <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full mt-2 inline-block">
+                  Owned
+                </span>
+              </Link>
             ))}
           </div>
         )}
