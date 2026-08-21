@@ -5,7 +5,7 @@ import {
   Users, Music, Shield, BarChart3, Check, X, Building2,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, CreditCard,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import {
@@ -40,6 +40,15 @@ export const Route = createFileRoute("/admin")({
 function AdminRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) return null;
+
   return platform === "native" || isMobile ? <MobileAdmin /> : <AdminPage />;
 }
 

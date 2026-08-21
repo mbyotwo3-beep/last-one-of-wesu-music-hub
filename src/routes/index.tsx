@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
+import { useState, useEffect } from "react";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileHome } from "@/components/mobile/screens/MobileHome";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
@@ -52,6 +53,15 @@ export const Route = createFileRoute("/")({
 function IndexRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) return null;
+
   return platform === "native" || isMobile ? <MobileHome /> : <HomePage />;
 }
 

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Wallet, FolderPlus, Users, Building2, Star } from "lucide-react";
@@ -41,6 +41,15 @@ export const Route = createFileRoute("/artist-studio")({
 function ArtistStudioRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) return null;
+
   return platform === "native" || isMobile ? <MobileArtistStudio /> : <Page />;
 }
 

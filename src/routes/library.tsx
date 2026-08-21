@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, Music, Users, Disc } from "lucide-react";
+import { useState, useEffect } from "react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
@@ -22,6 +23,15 @@ export const Route = createFileRoute("/library")({
 function LibraryRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) return null;
+
   return platform === "native" || isMobile ? <MobileLibrary /> : <Page />;
 }
 

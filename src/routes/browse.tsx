@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { MobileBrowse } from "@/components/mobile/screens/MobileBrowse";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
@@ -99,6 +100,15 @@ export const Route = createFileRoute("/browse")({
 function BrowseRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) return null;
+
   return platform === "native" || isMobile ? <MobileBrowse /> : <BrowsePage />;
 }
 

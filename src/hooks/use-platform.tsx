@@ -35,7 +35,15 @@ export function useIsNative() {
  * Uses user agent and screen width detection.
  */
 export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    // Check synchronously during initialization to avoid hydration mismatch
+    if (typeof window === "undefined") return false;
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const mobileRegex = /android|ipad|iphone|ipod|windows phone|iemobile|blackberry|mobile/i;
+    const isMobileUA = mobileRegex.test(userAgent);
+    const isSmallScreen = window.innerWidth < 768;
+    return isMobileUA || isSmallScreen;
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -48,7 +56,6 @@ export function useIsMobile(): boolean {
       setIsMobile(isMobileUA || isSmallScreen);
     };
 
-    checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
