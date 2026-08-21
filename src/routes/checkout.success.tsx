@@ -118,6 +118,28 @@ function CheckoutSuccessPage() {
     return null;
   };
 
+  const handleSuccessRedirect = () => {
+    // Redirect to the purchased item or library
+    if (tx?.item_type === "song" && tx?.item_id) {
+      navigate({ to: "/songs/$id", params: { id: tx.item_id } });
+    } else if (tx?.item_type === "album" && tx?.item_id) {
+      navigate({ to: "/albums/$id", params: { id: tx.item_id } });
+    } else {
+      navigate({ to: "/library" });
+    }
+  };
+
+  const handleFailureRedirect = () => {
+    // Redirect back to checkout to retry
+    if (tx?.item_type === "song" && tx?.item_id) {
+      navigate({ to: "/checkout", search: { item: "song", id: tx.item_id } });
+    } else if (tx?.item_type === "album" && tx?.item_id) {
+      navigate({ to: "/checkout", search: { item: "album", id: tx.item_id } });
+    } else {
+      navigate({ to: "/browse" });
+    }
+  };
+
   const Receipt = () =>
     !tx ? null : (
       <div className="bg-secondary/40 rounded-xl p-5 text-left space-y-3 mb-6 border border-border">
@@ -156,10 +178,10 @@ function CheckoutSuccessPage() {
               </p>
               <Receipt />
               <button
-                onClick={() => navigate({ to: "/dashboard" })}
+                onClick={handleSuccessRedirect}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
-                Go to My Library
+                Go to {tx?.item_type === "album" ? "Album" : "Song"}
               </button>
             </>
           ) : isFailed ? (
@@ -171,7 +193,7 @@ function CheckoutSuccessPage() {
               </p>
               <Receipt />
               <button
-                onClick={() => navigate({ to: "/browse" })}
+                onClick={handleFailureRedirect}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
                 Try Again
