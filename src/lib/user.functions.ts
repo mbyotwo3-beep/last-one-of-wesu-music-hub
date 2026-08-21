@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getPublicSupabase } from "./supabase-public.server";
+import { getVerificationConfig, getWithdrawalConfig } from "./pricing.functions";
 
 export const getMyOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -107,8 +109,11 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
     const totalPlays = songRowsAll.reduce((s, r) => s + (r.play_count ?? 0), 0);
     const totalRevenueZmw = (sales.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
-    const eligibleForVerification = totalFollowers >= 100 && totalRevenueZmw > 500;
-    const eligibleForPayout = totalRevenueZmw > 500;
+    const verificationConfig = await getVerificationConfig();
+    const withdrawalConfig = await getWithdrawalConfig();
+
+    const eligibleForVerification = totalFollowers >= verificationConfig.min_followers && totalRevenueZmw > verificationConfig.min_earnings;
+    const eligibleForPayout = totalRevenueZmw > withdrawalConfig.min_amount;
 
     return {
       artist,
