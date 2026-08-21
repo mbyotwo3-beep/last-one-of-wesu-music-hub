@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Building2, Users, DollarSign, Wallet } from "lucide-react";
+import { Building2, Users, DollarSign, Wallet, Camera } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,7 @@ import {
   updateLabel,
 } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileToBucket } from "@/lib/storage";
 
 export const Route = createFileRoute("/label-dashboard")({
   head: () => ({ meta: [{ title: "Label Dashboard — Wesu+" }] }),
@@ -407,7 +408,16 @@ function Payouts({ labelId }: { labelId: string }) {
 function Settings({ label }: { label: any }) {
   const fn = useServerFn(updateLabel);
   const m = useMutation({
-    mutationFn: fn,
+    mutationFn: async (data: any) => {
+      let logoUrl = data.logo_url;
+      
+      // Upload logo file if provided
+      if (data.logo_file) {
+        logoUrl = await uploadFileToBucket("artist-images", label.id, data.logo_file);
+      }
+      
+      return fn({ data: { id: label.id, name: data.name, bio: data.bio, contact_email: data.contact_email, logo_url } });
+    },
     onSuccess: () => {
       toast.success("Label settings updated successfully");
     },
@@ -420,12 +430,37 @@ function Settings({ label }: { label: any }) {
     bio: label.bio ?? "",
     contact_email: label.contact_email ?? "",
     logo_url: label.logo_url ?? "",
+    logo_file: null as File | null,
   });
+  const [logoPreview, setLogoPreview] = useState<string | null>(label.logo_url ?? null);
+  
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    setForm({ ...form, logo_file: file });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+  
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        m.mutate({ data: { id: label.id, ...form } });
+        m.mutate(form);
       }}
       className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-xl"
     >
@@ -439,12 +474,29 @@ function Settings({ label }: { label: any }) {
         value={form.contact_email}
         onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
       />
-      <input
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.logo_url}
-        onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-        placeholder="Logo URL"
-      />
+      <div>
+        <label className="block text-sm font-medium mb-2">Logo</label>
+        <div className="flex items-center gap-4 mb-3">
+          <div className="w-20 h-20 rounded-lg bg-secondary overflow-hidden">
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Camera className="size-8 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          <div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleLogoChange}
+              className="text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
+          </div>
+        </div>
+      </div>
       <textarea
         rows={4}
         className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
