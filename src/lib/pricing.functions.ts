@@ -35,6 +35,62 @@ export const DEFAULT_WITHDRAWAL: WithdrawalConfig = {
 };
 
 /**
+ * Initialize platform_settings with default values if they don't exist.
+ * This ensures the dynamic config system works from the start.
+ */
+export const initializePlatformSettings = createServerFn({ method: "POST" }).handler(
+  async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      
+      // Initialize pricing
+      await supabaseAdmin
+        .from("platform_settings")
+        .upsert(
+          { key: "pricing", value: DEFAULT_PRICING },
+          { onConflict: "key" }
+        );
+      
+      // Initialize verification
+      await supabaseAdmin
+        .from("platform_settings")
+        .upsert(
+          { key: "verification", value: DEFAULT_VERIFICATION },
+          { onConflict: "key" }
+        );
+      
+      // Initialize withdrawal
+      await supabaseAdmin
+        .from("platform_settings")
+        .upsert(
+          { key: "withdrawal", value: DEFAULT_WITHDRAWAL },
+          { onConflict: "key" }
+        );
+      
+      // Initialize site settings with defaults
+      await supabaseAdmin
+        .from("platform_settings")
+        .upsert(
+          { 
+            key: "site", 
+            value: { 
+              name: "Wesu+", 
+              support_email: "support@wesuplusly.com",
+              commission_pct: 20 
+            } 
+          },
+          { onConflict: "key" }
+        );
+      
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to initialize platform settings:", error);
+      return { success: false, error: (error as Error).message };
+    }
+  },
+);
+
+/**
  * Public read of the current pricing config. Read via service role
  * because platform_settings is staff-only; only the single "pricing"
  * row is exposed, and only numeric fields with defaults.

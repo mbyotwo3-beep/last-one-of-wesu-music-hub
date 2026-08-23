@@ -30,6 +30,7 @@ import {
   markTransactionPaid,
   setPlatformCommission,
 } from "@/lib/superadmin.functions";
+import { initializePlatformSettings } from "@/lib/pricing.functions";
 import { getPlatformStats } from "@/lib/admin.functions";
 import {
   listAllFeaturedAdmin,
@@ -772,19 +773,30 @@ function PayoutsTab() {
 
 function SettingsTab() {
   const qc = useQueryClient();
-  const get = useServerFn(getSettings);
-  const update = useServerFn(updateSettings);
-  const { data, isLoading, error } = useQuery({ queryKey: ["super-settings"], queryFn: () => get() });
+  const getSettingsFn = useServerFn(getSettings);
+  const updateSettingsFn = useServerFn(updateSettings);
+  const initializeSettingsFn = useServerFn(initializePlatformSettings);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["super-settings"],
+    queryFn: () => getSettingsFn(),
+  });
   const m = useMutation({
-    mutationFn: update,
+    mutationFn: updateSettingsFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["super-settings"] });
-      toast.success("Settings saved successfully");
+      toast.success("Settings saved");
     },
-    onError: (error) => {
-      toast.error(`Failed to save settings: ${error.message}`);
-    },
+    onError: (e) => toast.error(`Failed to save: ${(e as Error).message}`),
   });
+  const initM = useMutation({
+    mutationFn: initializeSettingsFn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["super-settings"] });
+      toast.success("Platform settings initialized with defaults");
+    },
+    onError: (e) => toast.error(`Failed to initialize: ${(e as Error).message}`),
+  });
+
   const [site, setSite] = useState<any>(null);
   const [pay, setPay] = useState<any>(null);
   const [pricing, setPricing] = useState<any>(null);
@@ -815,12 +827,18 @@ function SettingsTab() {
     );
   }
 
-
   if (isLoading) return <div className="text-muted-foreground">Loading settings…</div>;
   if (error) return <div className="text-destructive">Error loading settings: {(error as Error).message}</div>;
   if (!data || site === null) return <div className="text-muted-foreground">No settings available</div>;
   return (
     <div className="space-y-4 max-w-2xl">
+      <button
+        onClick={() => initM.mutate()}
+        disabled={initM.isPending}
+        className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
+      >
+        Initialize Platform Settings
+      </button>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
         <h3 className="font-semibold">Site</h3>
         <label className="block text-sm">
