@@ -1,8 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff, Check } from "lucide-react";
+import { toggleFollow } from "@/lib/follow.functions";
+import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
+import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -11,8 +14,12 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in or create an account on Wesu+ Music Streaming." },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; action?: string; artistId?: string; itemId?: string; itemType?: string } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+    action: typeof search.action === "string" ? search.action : undefined,
+    artistId: typeof search.artistId === "string" ? search.artistId : undefined,
+    itemId: typeof search.itemId === "string" ? search.itemId : undefined,
+    itemType: typeof search.itemType === "string" ? search.itemType : undefined,
   }),
   component: AuthPage,
 });
@@ -27,7 +34,8 @@ function AuthPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const { redirect } = Route.useSearch();
+  const { redirect, action, artistId, itemId, itemType } = Route.useSearch();
+  const navigate = useNavigate();
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -62,18 +70,41 @@ function AuthPage() {
           setNotice("Account created. Check your email to confirm your address, then sign in.");
           setMode("signin");
         } else {
-          window.location.href = redirect || "/dashboard";
+          await handlePostAuthAction();
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.href = redirect || "/dashboard";
+        await handlePostAuthAction();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handlePostAuthAction() {
+    // Handle post-authentication actions like follow, save
+    if (action === "follow" && artistId) {
+      try {
+        await toggleFollow({ data: { artist_id: artistId } });
+      } catch (err) {
+        console.error("Failed to execute follow action after auth:", err);
+      }
+    } else if (action === "save" && itemId && itemType) {
+      try {
+        if (itemType === "song") {
+          await saveTrack({ data: { song_id: itemId } });
+        } else if (itemType === "album") {
+          await saveAlbum({ data: { album_id: itemId } });
+        }
+      } catch (err) {
+        console.error("Failed to execute save action after auth:", err);
+      }
+    }
+    // Redirect to the original destination
+    window.location.href = redirect || "/dashboard";
   }
 
   return (

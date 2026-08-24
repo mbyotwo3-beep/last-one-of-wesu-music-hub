@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Play, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
@@ -24,6 +24,21 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const artistName = song.artist?.name ?? "Unknown";
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
+  const navigate = useNavigate();
+
+  const handleSave = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      navigate({
+        to: "/auth",
+        search: { redirect: currentPath, action: "save", itemId: song.id, itemType: "song" }
+      });
+      return;
+    }
+    toggle();
+  };
+
   return (
     <div className="group text-left w-full relative cursor-pointer">
       <button
@@ -55,7 +70,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       {user && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); toggle(); }}
+          onClick={handleSave}
           aria-label={isSaved ? "Unsave track" : "Save track"}
           className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
           style={{ position: "absolute" }}
@@ -94,6 +109,22 @@ export interface AlbumTileData {
 export function AlbumTile({ album }: { album: AlbumTileData }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedAlbum(album.id);
+  const navigate = useNavigate();
+
+  const handleSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      navigate({
+        to: "/auth",
+        search: { redirect: currentPath, action: "save", itemId: album.id, itemType: "album" }
+      });
+      return;
+    }
+    toggle();
+  };
+
   return (
     <div className="group text-left w-full relative cursor-pointer">
       <Link to="/albums/$id" params={{ id: album.id }} className="block cursor-pointer">
@@ -108,7 +139,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
       {user && (
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
+          onClick={handleSave}
           aria-label={isSaved ? "Unsave album" : "Save album"}
           className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
         >

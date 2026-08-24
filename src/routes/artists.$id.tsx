@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
@@ -43,6 +43,7 @@ function ArtistPage() {
   const setTrack = usePlayer((s) => s.setTrack);
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const a = data.artist!;
 
   const [coverBg, setCoverBg] = useState<string | null>(null);
@@ -74,7 +75,11 @@ function ArtistPage() {
 
   const handleFollow = () => {
     if (!user) {
-      toast.error("Sign in to follow artists");
+      const currentPath = window.location.pathname + window.location.search;
+      navigate({
+        to: "/auth",
+        search: { redirect: currentPath, action: "follow", artistId: id }
+      });
       return;
     }
     follow.mutate();
