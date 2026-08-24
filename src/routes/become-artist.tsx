@@ -172,8 +172,8 @@ function Page() {
           </span>
         </label>
         <button
-          disabled={m.isPending}
-          className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+          disabled={m.isPending || !agreedToTerms}
+          className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-50"
         >
           {m.isPending ? "Submitting…" : "Submit application"}
         </button>

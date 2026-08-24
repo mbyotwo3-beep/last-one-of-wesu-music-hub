@@ -184,7 +184,7 @@ function AuthPage() {
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (mode === "signup" && !agreedToTerms)}
             className="w-full py-3 bg-primary text-obsidian rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
           >
             {loading ? (
