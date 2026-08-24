@@ -9,6 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsListenerRouteImport } from './routes/terms-listener'
+import { Route as TermsArtistRouteImport } from './routes/terms-artist'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SongsRouteImport } from './routes/songs'
@@ -50,6 +53,21 @@ import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AlbumsIdRouteImport } from './routes/albums.$id'
 import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
 
+const TermsListenerRoute = TermsListenerRouteImport.update({
+  id: '/terms-listener',
+  path: '/terms-listener',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsArtistRoute = TermsArtistRouteImport.update({
+  id: '/terms-artist',
+  path: '/terms-artist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
@@ -283,6 +301,9 @@ export interface FileRoutesByFullPath {
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
+  '/terms': typeof TermsRoute
+  '/terms-artist': typeof TermsArtistRoute
+  '/terms-listener': typeof TermsListenerRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -325,6 +346,9 @@ export interface FileRoutesByTo {
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
+  '/terms': typeof TermsRoute
+  '/terms-artist': typeof TermsArtistRoute
+  '/terms-listener': typeof TermsListenerRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -368,6 +392,9 @@ export interface FileRoutesById {
   '/songs': typeof SongsRoute
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
+  '/terms': typeof TermsRoute
+  '/terms-artist': typeof TermsArtistRoute
+  '/terms-listener': typeof TermsListenerRoute
   '/albums/$id': typeof AlbumsIdRoute
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -412,6 +439,9 @@ export interface FileRouteTypes {
     | '/songs'
     | '/subscriptions'
     | '/superadmin'
+    | '/terms'
+    | '/terms-artist'
+    | '/terms-listener'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
@@ -454,6 +484,9 @@ export interface FileRouteTypes {
     | '/songs'
     | '/subscriptions'
     | '/superadmin'
+    | '/terms'
+    | '/terms-artist'
+    | '/terms-listener'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
@@ -496,6 +529,9 @@ export interface FileRouteTypes {
     | '/songs'
     | '/subscriptions'
     | '/superadmin'
+    | '/terms'
+    | '/terms-artist'
+    | '/terms-listener'
     | '/albums/$id'
     | '/artists/$id'
     | '/checkout/success'
@@ -539,6 +575,9 @@ export interface RootRouteChildren {
   SongsRoute: typeof SongsRoute
   SubscriptionsRoute: typeof SubscriptionsRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
+  TermsRoute: typeof TermsRoute
+  TermsArtistRoute: typeof TermsArtistRoute
+  TermsListenerRoute: typeof TermsListenerRoute
   ArtistsIdRoute: typeof ArtistsIdRoute
   LabelsSlugRoute: typeof LabelsSlugRoute
   ArtistsIndexRoute: typeof ArtistsIndexRoute
@@ -548,6 +587,27 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms-listener': {
+      id: '/terms-listener'
+      path: '/terms-listener'
+      fullPath: '/terms-listener'
+      preLoaderRoute: typeof TermsListenerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-artist': {
+      id: '/terms-artist'
+      path: '/terms-artist'
+      fullPath: '/terms-artist'
+      preLoaderRoute: typeof TermsArtistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/superadmin': {
       id: '/superadmin'
       path: '/superadmin'
@@ -910,6 +970,9 @@ const rootRouteChildren: RootRouteChildren = {
   SongsRoute: SongsRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
+  TermsRoute: TermsRoute,
+  TermsArtistRoute: TermsArtistRoute,
+  TermsListenerRoute: TermsListenerRoute,
   ArtistsIdRoute: ArtistsIdRoute,
   LabelsSlugRoute: LabelsSlugRoute,
   ArtistsIndexRoute: ArtistsIndexRoute,

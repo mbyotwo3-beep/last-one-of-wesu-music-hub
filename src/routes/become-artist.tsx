@@ -145,6 +145,13 @@ function Page() {
           />
         </label>
         {m.error ? <p className="text-sm text-destructive">{(m.error as Error).message}</p> : null}
+        <p className="text-xs text-muted-foreground">
+          By submitting, you agree to the{" "}
+          <Link to="/terms-artist" className="text-primary hover:underline font-medium">
+            Artist Terms &amp; Conditions
+          </Link>
+          .
+        </p>
         <button
           disabled={m.isPending}
           className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"

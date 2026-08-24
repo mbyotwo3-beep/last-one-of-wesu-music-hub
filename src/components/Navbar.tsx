@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Search, LogOut, UserCircle, Shield, Mic2, Menu, X } from "lucide-react";
+import { Search, LogOut, UserCircle, Shield, Mic2, Menu, X, FileText } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
@@ -169,6 +169,15 @@ export function Navbar() {
                           </span>
                         </Link>
                       )}
+                      <Link
+                        to="/terms"
+                        className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <FileText className="size-4" /> Terms &amp; Conditions
+                        </span>
+                      </Link>
                       <button
                         onClick={async () => {
                           await supabase.auth.signOut();
@@ -268,6 +277,14 @@ export function Navbar() {
                     Superadmin
                   </Link>
                 )}
+                <Link
+                  to="/terms"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                >
+                  <FileText className="size-5" />
+                  Terms &amp; Conditions
+                </Link>
                 <button
                   onClick={async () => {
                     await supabase.auth.signOut();
