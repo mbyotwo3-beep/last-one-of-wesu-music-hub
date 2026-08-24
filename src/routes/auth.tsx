@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff, Check } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -26,6 +26,7 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { redirect } = Route.useSearch();
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -43,6 +44,11 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
+        if (!agreedToTerms) {
+          setError("You must agree to the Terms & Conditions to create an account.");
+          setLoading(false);
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -151,6 +157,31 @@ function AuthPage() {
               </button>
             </div>
           </div>
+          {mode === "signup" && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <div className="relative mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <div className="size-5 rounded border border-white/20 bg-card peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
+                  {agreedToTerms && <Check className="size-3.5 text-obsidian" />}
+                </div>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                I agree to the{" "}
+                <Link to="/terms" className="text-primary hover:underline font-medium">
+                  Terms & Conditions
+                </Link>{" "}
+                and{" "}
+                <Link to="/terms-listener" className="text-primary hover:underline font-medium">
+                  Listener Agreement
+                </Link>
+              </span>
+            </label>
+          )}
           <button
             type="submit"
             disabled={loading}

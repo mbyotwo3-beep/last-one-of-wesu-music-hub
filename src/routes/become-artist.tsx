@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Mic2, Clock, CheckCircle2, XCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { applyAsArtist } from "@/lib/artist.functions";
@@ -23,6 +23,7 @@ function Page() {
   const navigate = useNavigate();
   const apply = useServerFn(applyAsArtist);
   const fetchOverview = useServerFn(getMyArtistOverview);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-artist-overview"],
     queryFn: () => fetchOverview(),
@@ -39,6 +40,15 @@ function Page() {
     },
   });
   const [form, setForm] = useState({ name: "", bio: "", genre: "" });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreedToTerms) {
+      toast.error("You must agree to the Artist Terms & Conditions to submit an application.");
+      return;
+    }
+    m.mutate({ data: form });
+  };
 
   if (isLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
@@ -111,10 +121,7 @@ function Page() {
         Submit your application. An admin will review and approve you to start uploading music.
       </p>
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          m.mutate({ data: form });
-        }}
+        onSubmit={handleSubmit}
         className="bg-card border border-border rounded-2xl p-6 space-y-4"
       >
         <label className="block text-sm">
@@ -145,13 +152,25 @@ function Page() {
           />
         </label>
         {m.error ? <p className="text-sm text-destructive">{(m.error as Error).message}</p> : null}
-        <p className="text-xs text-muted-foreground">
-          By submitting, you agree to the{" "}
-          <Link to="/terms-artist" className="text-primary hover:underline font-medium">
-            Artist Terms &amp; Conditions
-          </Link>
-          .
-        </p>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <div className="relative mt-0.5">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="peer sr-only"
+            />
+            <div className="size-5 rounded border border-white/20 bg-card peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
+              {agreedToTerms && <Check className="size-3.5 text-obsidian" />}
+            </div>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            I agree to the{" "}
+            <Link to="/terms-artist" className="text-primary hover:underline font-medium">
+              Artist Terms &amp; Conditions
+            </Link>
+          </span>
+        </label>
         <button
           disabled={m.isPending}
           className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
