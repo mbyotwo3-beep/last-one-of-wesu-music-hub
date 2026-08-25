@@ -11,8 +11,6 @@ import {
 } from "@/lib/music.functions";
 import { initiatePayment } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { usePlatform, useIsMobile } from "@/hooks/use-platform";
-import { MobileCheckout } from "@/components/mobile/screens/MobileCheckout";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
 const plansQO = queryOptions({ queryKey: ["plans"], queryFn: () => getSubscriptionPlans() });
@@ -47,8 +45,6 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function CheckoutRoute() {
-  const platform = usePlatform();
-  const isMobile = useIsMobile();
   const [isMounted, setIsMounted] = useState(false);
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -64,7 +60,7 @@ function CheckoutRoute() {
 
   // Keep every hook above this guard so hydration cannot change hook order.
   if (!isMounted || !search.item || !search.id) return null;
-  return platform === "native" || isMobile ? <MobileCheckout planCode={search.plan} /> : <CheckoutPage />;
+  return <CheckoutPage />;
 }
 
 
