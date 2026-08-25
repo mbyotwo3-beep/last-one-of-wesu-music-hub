@@ -38,8 +38,6 @@ import {
   removeFeaturedSlot,
 } from "@/lib/features.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlatform } from "@/hooks/use-platform";
-import { MobileAdmin } from "@/components/mobile/screens/MobileAdmin";
 
 export const Route = createFileRoute("/superadmin")({
   head: () => ({ meta: [{ title: "Superadmin — Wesu+" }] }),
@@ -53,8 +51,7 @@ export const Route = createFileRoute("/superadmin")({
 });
 
 function SuperadminRoute() {
-  const platform = usePlatform();
-  return platform === "native" ? <MobileAdmin /> : <SuperadminPage />;
+  return <SuperadminPage />;
 }
 
 type Tab =
@@ -84,7 +81,7 @@ function SuperadminPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
         <div className="flex items-center justify-between gap-3 mb-8">
           <div className="flex items-center gap-3">
             <Shield className="size-6 text-primary" />

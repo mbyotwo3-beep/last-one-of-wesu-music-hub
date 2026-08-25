@@ -34,14 +34,15 @@ import fc from "fast-check";
 
 interface Song {
   id: string;
+  albumId: string | null;
   price: number | null;
   status: "pending" | "approved" | "rejected";
 }
 
 interface User {
   id: string | null; // null = unauthenticated
-  hasActiveSubscription: boolean;
   purchasedSongIds: string[];
+  purchasedAlbumIds: string[];
 }
 
 /**
@@ -53,13 +54,13 @@ function canPlaySong(song: Song, user: User): { allowed: boolean; error?: string
   if (price <= 0) return { allowed: true }; // free song
 
   // Paid song — check auth
-  if (!user.id) return { allowed: false, error: "Subscribe or purchase to play full track" };
+  if (!user.id) return { allowed: false, error: "Purchase to play full track" };
 
-  // Check subscription or purchase
-  if (user.hasActiveSubscription) return { allowed: true };
+  // Check individual song or containing album purchase.
   if (user.purchasedSongIds.includes(song.id)) return { allowed: true };
+  if (song.albumId && user.purchasedAlbumIds.includes(song.albumId)) return { allowed: true };
 
-  return { allowed: false, error: "Subscribe or purchase to play full track" };
+  return { allowed: false, error: "Purchase to play full track" };
 }
 
 /**
@@ -68,19 +69,17 @@ function canPlaySong(song: Song, user: User): { allowed: boolean; error?: string
  */
 function canGetPublicUrl(song: Song): { allowed: boolean; error?: string } {
   const price = song.price ?? 0;
-  if (price > 0) return { allowed: false, error: "This song requires a subscription or purchase" };
+  if (price > 0) return { allowed: false, error: "This song requires a purchase" };
   if (song.status !== "approved") return { allowed: false, error: "Song not found" };
   return { allowed: true };
 }
 
 /**
  * Pure model of ad banner visibility:
- * Show when unauthenticated OR authenticated with no active subscription.
+ * Subscriptions are paused, so the ad banner remains visible for every user.
  */
-function shouldShowAdBanner(user: User): boolean {
-  if (!user.id) return true; // unauthenticated
-  if (!user.hasActiveSubscription) return true; // free registered user
-  return false; // premium subscriber
+function shouldShowAdBanner(_user: User): boolean {
+  return true;
 }
 
 /**
@@ -111,32 +110,28 @@ const userId = fc.uuid();
 
 const paidSong: fc.Arbitrary<Song> = fc.record({
   id: songId,
+  albumId: fc.option(songId, { nil: null }),
   price: fc.float({ min: 1.0, max: 1000.0, noNaN: true }),
   status: fc.constant("approved" as const),
 });
 
 const freeSong: fc.Arbitrary<Song> = fc.record({
   id: songId,
+  albumId: fc.option(songId, { nil: null }),
   price: fc.constantFrom(0, null),
   status: fc.constant("approved" as const),
 });
 
 const unauthUser: fc.Arbitrary<User> = fc.record({
   id: fc.constant(null),
-  hasActiveSubscription: fc.constant(false),
   purchasedSongIds: fc.constant([]),
+  purchasedAlbumIds: fc.constant([]),
 });
 
 const freeUser: fc.Arbitrary<User> = fc.record({
   id: userId.map((id) => id),
-  hasActiveSubscription: fc.constant(false),
   purchasedSongIds: fc.constant([]),
-});
-
-const premiumUser: fc.Arbitrary<User> = fc.record({
-  id: userId.map((id) => id),
-  hasActiveSubscription: fc.constant(true),
-  purchasedSongIds: fc.constant([]),
+  purchasedAlbumIds: fc.constant([]),
 });
 
 // ---------------------------------------------------------------------------
@@ -146,12 +141,12 @@ const premiumUser: fc.Arbitrary<User> = fc.record({
 // ---------------------------------------------------------------------------
 
 describe("Property 1: Access control for paid songs (Req 2.2, 2.3)", () => {
-  it("paid song without subscription or purchase → denied with correct error message", () => {
+  it("paid song without a purchase → denied with correct error message", () => {
     fc.assert(
       fc.property(paidSong, freeUser, (song, user) => {
         const result = canPlaySong(song, user);
         expect(result.allowed).toBe(false);
-        expect(result.error).toBe("Subscribe or purchase to play full track");
+        expect(result.error).toBe("Purchase to play full track");
       }),
       { numRuns: 100 },
     );
@@ -167,9 +162,12 @@ describe("Property 1: Access control for paid songs (Req 2.2, 2.3)", () => {
     );
   });
 
-  it("paid song with active subscription → always allowed", () => {
+  it("paid song with its album purchase record → allowed", () => {
     fc.assert(
-      fc.property(paidSong, premiumUser, (song, user) => {
+      fc.property(paidSong, userId, (song, uid) => {
+        const albumId = song.albumId ?? "album-1";
+        const user: User = { id: uid, purchasedSongIds: [], purchasedAlbumIds: [albumId] };
+        song.albumId = albumId;
         const result = canPlaySong(song, user);
         expect(result.allowed).toBe(true);
       }),
@@ -180,7 +178,7 @@ describe("Property 1: Access control for paid songs (Req 2.2, 2.3)", () => {
   it("paid song with purchase record → allowed", () => {
     fc.assert(
       fc.property(paidSong, userId, (song, uid) => {
-        const user: User = { id: uid, hasActiveSubscription: false, purchasedSongIds: [song.id] };
+        const user: User = { id: uid, purchasedSongIds: [song.id], purchasedAlbumIds: [] };
         const result = canPlaySong(song, user);
         expect(result.allowed).toBe(true);
       }),
@@ -211,7 +209,7 @@ describe("Property 2: Free song public URL (Req 2.5, 3.1)", () => {
       fc.property(paidSong, (song) => {
         const result = canGetPublicUrl(song);
         expect(result.allowed).toBe(false);
-        expect(result.error).toBe("This song requires a subscription or purchase");
+        expect(result.error).toBe("This song requires a purchase");
       }),
       { numRuns: 100 },
     );
@@ -261,7 +259,7 @@ describe("Property 4: Ad banner visibility rule (Req 3.3, 3.5)", () => {
     );
   });
 
-  it("authenticated free user (no subscription) always sees ad banner", () => {
+  it("authenticated user always sees ad banner while subscriptions are paused", () => {
     fc.assert(
       fc.property(freeUser, (user) => {
         expect(shouldShowAdBanner(user)).toBe(true);
@@ -270,25 +268,11 @@ describe("Property 4: Ad banner visibility rule (Req 3.3, 3.5)", () => {
     );
   });
 
-  it("premium subscriber never sees ad banner", () => {
+  it("ad banner visibility does not depend on previous subscription state", () => {
     fc.assert(
-      fc.property(premiumUser, (user) => {
-        expect(shouldShowAdBanner(user)).toBe(false);
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("ad banner state is mutually exclusive with premium subscription", () => {
-    fc.assert(
-      fc.property(fc.boolean(), userId, (hasSub, uid) => {
-        const user: User = { id: uid, hasActiveSubscription: hasSub, purchasedSongIds: [] };
-        const showAd = shouldShowAdBanner(user);
-        if (hasSub) {
-          expect(showAd).toBe(false);
-        } else {
-          expect(showAd).toBe(true);
-        }
+      fc.property(userId, (uid) => {
+        const user: User = { id: uid, purchasedSongIds: [], purchasedAlbumIds: [] };
+        expect(shouldShowAdBanner(user)).toBe(true);
       }),
       { numRuns: 100 },
     );

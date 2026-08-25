@@ -125,7 +125,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { data: song } = await context.supabase
       .from("songs")
-      .select("audio_url, price")
+      .select("audio_url, price, album_id")
       .eq("id", data.song_id)
       .single();
     if (!song) throw new Error("Song not found");
@@ -133,23 +133,28 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
     // Superadmin bypass — full playback everywhere for testing
     const isSuper = await isSuperadminUser(context.supabase, context.userId);
 
-    // Free if priced 0 OR user is subscribed OR user purchased it OR superadmin
+    // Free if priced 0, purchased individually, purchased with its album, or
+    // accessed by a superadmin. Subscriptions are deliberately not an
+    // entitlement while subscription sales are paused.
     if (!isSuper && (song as any).price && Number((song as any).price) > 0) {
-      const [{ data: sub }, { data: purchase }] = await Promise.all([
-        context.supabase
-          .from("subscriptions")
-          .select("id")
-          .eq("user_id", context.userId)
-          .eq("status", "active")
-          .maybeSingle(),
+      const albumId = (song as any).album_id as string | null;
+      const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
           .from("purchases")
           .select("id")
           .eq("user_id", context.userId)
           .eq("song_id", data.song_id)
           .maybeSingle(),
+        albumId
+          ? context.supabase
+              .from("purchases")
+              .select("id")
+              .eq("user_id", context.userId)
+              .eq("album_id", albumId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
-      if (!sub && !purchase) return { url: "", requiresPurchase: true as const };
+      if (!songPurchase && !albumPurchase) return { url: "", requiresPurchase: true as const };
     }
 
     const rawPath = String((song as any).audio_url ?? "");
@@ -193,7 +198,7 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
       .single();
     if (!song) throw new Error("Song not found");
     if ((song as any).price && Number((song as any).price) > 0) {
-      throw new Error("This song requires a subscription or purchase");
+      throw new Error("This song requires a purchase");
     }
     const rawPath = String((song as any).audio_url ?? "");
     if (/^https?:\/\//i.test(rawPath)) {
@@ -221,7 +226,7 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
  * Get a signed audio URL for a short 15-second preview (client-capped).
  *
  * Previews are intentionally public for ALL approved tracks (free and paid)
- * so anonymous listeners can sample songs before buying/subscribing. The
+ * so anonymous listeners can sample songs before buying. The
  * server returns a short-lived (45s) signed URL and the client stops
  * playback at 15s. A determined user could theoretically grab more of the
  * file within the 45s window — this is an accepted trade-off to keep the

@@ -71,7 +71,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
   .validator(
     (d: {
       method_code: string;
-      item_type: "song" | "album" | "subscription";
+      item_type: "song" | "album";
       item_id?: string;
       phone?: string;
     }) => d,
@@ -97,14 +97,6 @@ export const initiatePayment = createServerFn({ method: "POST" })
         .eq("id", data.item_id)
         .maybeSingle();
       authoritativeAmount = row?.price != null ? Number(row.price) : null;
-    } else if (data.item_type === "subscription") {
-      const { data: row } = await supabase
-        .from("subscription_plans")
-        .select("price_zmw,is_active")
-        .eq("id", data.item_id)
-        .maybeSingle();
-      if (row && (row as any).is_active === false) throw new Error("Plan is not active");
-      authoritativeAmount = row?.price_zmw != null ? Number(row.price_zmw) : null;
     }
     if (
       authoritativeAmount == null ||
@@ -152,7 +144,12 @@ export const initiatePayment = createServerFn({ method: "POST" })
       .single();
     if (insertError || !tx) throw new Error(insertError?.message ?? "Insert failed");
 
-    const { initiateMobileMoney, initiateCardCheckout, normalizeZmPhone } = await import(
+    const {
+      initiateMobileMoney,
+      initiateCardCheckout,
+      normalizeLencoOperator,
+      normalizeZmPhone,
+    } = await import(
       "@/lib/lenco.server"
     );
 
@@ -163,7 +160,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
         const result = await initiateMobileMoney({
           amount,
           reference: tx.id,
-          operator: (method as any).lenco_operator,
+          operator: normalizeLencoOperator((method as any).lenco_operator),
           phone: normalizeZmPhone(data.phone!),
           narration: `Wesu+ ${data.item_type}`,
         });

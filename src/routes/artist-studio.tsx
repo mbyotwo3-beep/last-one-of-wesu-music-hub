@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Wallet, FolderPlus, Users, Building2, Star } from "lucide-react";
@@ -22,8 +22,6 @@ import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
 import { respondToLabelInvite } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlatform, useIsMobile } from "@/hooks/use-platform";
-import { MobileArtistStudio } from "@/components/mobile/screens/MobileArtistStudio";
 import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
 
 
@@ -39,18 +37,7 @@ export const Route = createFileRoute("/artist-studio")({
 });
 
 function ArtistStudioRoute() {
-  const platform = usePlatform();
-  const isMobile = useIsMobile();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Don't render until mounted to prevent hydration mismatch
-  if (!isMounted) return null;
-
-  return platform === "native" || isMobile ? <MobileArtistStudio /> : <Page />;
+  return <Page />;
 }
 
 type Tab = "upload" | "collabs" | "label" | "features" | "payouts";
@@ -65,7 +52,7 @@ function Page() {
     { id: "payouts", label: "Payouts", icon: Wallet },
   ];
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
       <h1 className="text-3xl font-bold mb-6">Artist Studio</h1>
       <div className="flex flex-wrap gap-2 mb-8 border-b border-border pb-3">
         {tabs.map((t) => (

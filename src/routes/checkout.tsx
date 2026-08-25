@@ -2,13 +2,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { CreditCard, Smartphone, Check, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { CreditCard, Smartphone, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPaymentMethods,
   getPurchasableItem,
 } from "@/lib/music.functions";
-import { initiatePayment, verifyPayment } from "@/lib/payments.functions";
+import { initiatePayment } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
@@ -90,7 +90,6 @@ function CheckoutPage() {
   const [selectedMethodCode, setSelectedMethodCode] = useState(methods[0]?.code ?? "");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [resultMsg, setResultMsg] = useState<string | null>(null);
-  const [pendingTransactionId, setPendingTransactionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
@@ -124,8 +123,7 @@ function CheckoutPage() {
       }
       if (res?.transactionId) {
         // Mobile money — redirect to success page to poll for status
-        setPendingTransactionId(res.transactionId);
-        setResultMsg(null);
+        navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
         return;
       }
       const successMsg = res?.message ?? "Payment started.";
@@ -155,17 +153,6 @@ function CheckoutPage() {
     return <div className="p-12 text-center text-muted-foreground">Loading item…</div>;
   } else {
     return null;
-  }
-
-  if (pendingTransactionId) {
-    return (
-      <MobileMoneyPaymentStatus
-        transactionId={pendingTransactionId}
-        itemType={itemType}
-        itemId={itemId!}
-        onRetry={() => setPendingTransactionId(null)}
-      />
-    );
   }
 
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
@@ -268,100 +255,6 @@ function CheckoutPage() {
           )}
           Pay ZMW {linePrice.toFixed(2)}
         </button>
-      </div>
-    </div>
-  );
-}
-
-function MobileMoneyPaymentStatus({
-  transactionId,
-  itemType,
-  itemId,
-  onRetry,
-}: {
-  transactionId: string;
-  itemType: "song" | "album";
-  itemId: string;
-  onRetry: () => void;
-}) {
-  const navigate = useNavigate();
-  const verifyFn = useServerFn(verifyPayment);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  const { data: verification, refetch } = useQuery({
-    queryKey: ["payment-verification", transactionId],
-    queryFn: () => verifyFn({ data: { transactionId } }),
-    refetchInterval: (query) => {
-      const status = query.state.data?.transaction?.status ?? query.state.data?.status;
-      return status === "completed" || status === "failed" ? false : 3000;
-    },
-    refetchIntervalInBackground: true,
-    retry: 2,
-  });
-
-  const status = verification?.transaction?.status ?? verification?.status ?? "pending";
-  const isSuccess = status === "completed";
-  const isFailed = status === "failed";
-
-  useEffect(() => {
-    if (isSuccess || isFailed) return;
-    const timer = window.setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [isSuccess, isFailed]);
-
-  const viewPurchase = () => {
-    if (itemType === "album") {
-      navigate({ to: "/albums/$id", params: { id: itemId } });
-      return;
-    }
-    navigate({ to: "/library" });
-  };
-
-  return (
-    <div className="min-h-screen px-6 py-12">
-      <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-        {isSuccess ? (
-          <>
-            <CheckCircle className="mx-auto mb-4 size-16 text-green-500" />
-            <h1 className="text-3xl font-bold">Payment successful</h1>
-            <p className="mt-2 text-muted-foreground">Your {itemType} is now in your library.</p>
-            <button
-              onClick={viewPurchase}
-              className="mt-6 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-            >
-              {itemType === "album" ? "View Album" : "Go to Library"}
-            </button>
-          </>
-        ) : isFailed ? (
-          <>
-            <XCircle className="mx-auto mb-4 size-16 text-red-500" />
-            <h1 className="text-3xl font-bold">Payment failed</h1>
-            <p className="mt-2 text-muted-foreground">
-              {verification?.reason ?? "Lenco could not complete this payment. Please try again."}
-            </p>
-            <button
-              onClick={onRetry}
-              className="mt-6 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
-            >
-              Try Again
-            </button>
-          </>
-        ) : (
-          <>
-            <Loader2 className="mx-auto mb-4 size-16 animate-spin text-primary" />
-            <h1 className="text-3xl font-bold">Approve the payment on your phone</h1>
-            <p className="mt-2 text-muted-foreground">
-              Your mobile-money request is active. Keep this page open while Lenco confirms the result.
-              {elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ""}
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="mt-6 rounded-xl border border-border px-6 py-3 font-semibold hover:bg-accent"
-            >
-              Check payment status
-            </button>
-          </>
-        )}
       </div>
     </div>
   );

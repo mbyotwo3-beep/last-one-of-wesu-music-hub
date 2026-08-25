@@ -7,7 +7,7 @@
  * Auth: Bearer <LENCO_SECRET_KEY>
  *
  * Only the two flows we currently use:
- *  - POST /collections/mobile-money   (mtn-zambia | airtel-zambia | zamtel-zambia)
+ *  - POST /collections/mobile-money   (mtn | airtel | zamtel)
  *  - POST /collections/card           (returns a hosted-checkout URL)
  *
  * Webhook verification (see /api/public/lenco-webhook):
@@ -116,6 +116,23 @@ export interface LencoMobileMoneyResult {
   status: "pending" | "successful" | "failed" | string;
   amount: number;
   fee?: number;
+}
+
+/**
+ * Convert legacy payment-method values to Lenco's current Zambia operator
+ * values. Existing database seeds used names such as `mtn-zambia`, while the
+ * collection API accepts only `mtn`, `airtel`, or `zamtel`.
+ */
+export function normalizeLencoOperator(operator: string): "mtn" | "airtel" | "zamtel" {
+  const value = operator.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  if (value === "mtn" || value === "mtn-zambia" || value === "mtn-zm") return "mtn";
+  if (value === "airtel" || value === "airtel-zambia" || value === "airtel-zm") {
+    return "airtel";
+  }
+  if (value === "zamtel" || value === "zamtel-zambia" || value === "zamtel-zm") {
+    return "zamtel";
+  }
+  throw new Error(`Unsupported Lenco mobile-money operator: ${operator}`);
 }
 
 export async function initiateMobileMoney(

@@ -15,12 +15,12 @@ import { describe, it, expect } from "vitest";
 describe("getPublicAudioUrl: paid song throws correct message", () => {
   function getPublicAudioUrlGuard(price: number | null): void {
     const p = price ?? 0;
-    if (p > 0) throw new Error("This song requires a subscription or purchase");
+    if (p > 0) throw new Error("This song requires a purchase");
   }
 
-  it("paid song (price=10) throws 'This song requires a subscription or purchase'", () => {
+  it("paid song (price=10) throws 'This song requires a purchase'", () => {
     expect(() => getPublicAudioUrlGuard(10)).toThrow(
-      "This song requires a subscription or purchase",
+      "This song requires a purchase",
     );
   });
 
@@ -58,7 +58,7 @@ describe("Ad banner CTA: correct text and route per user type", () => {
     if (!isAuthenticated) {
       return { text: "Sign up free", href: "/auth" };
     }
-    return { text: "Go Premium", href: "/subscriptions" };
+    return { text: "Browse music", href: "/browse" };
   }
 
   it("unauthenticated user sees 'Sign up free' linking to /auth", () => {
@@ -67,10 +67,10 @@ describe("Ad banner CTA: correct text and route per user type", () => {
     expect(cta.href).toBe("/auth");
   });
 
-  it("free registered user sees 'Go Premium' linking to /subscriptions", () => {
+  it("registered user sees 'Browse music' linking to /browse", () => {
     const cta = getAdBannerCTA(true);
-    expect(cta.text).toBe("Go Premium");
-    expect(cta.href).toBe("/subscriptions");
+    expect(cta.text).toBe("Browse music");
+    expect(cta.href).toBe("/browse");
   });
 });
 

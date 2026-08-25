@@ -5,7 +5,7 @@ import {
   Users, Music, Shield, BarChart3, Check, X, Building2,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, CreditCard,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import {
@@ -22,8 +22,6 @@ import {
   getArtistDiagnostics,
 } from "@/lib/admin.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
-import { usePlatform, useIsMobile } from "@/hooks/use-platform";
-import { MobileAdmin } from "@/components/mobile/screens/MobileAdmin";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
 
 export const Route = createFileRoute("/admin")({
@@ -38,18 +36,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminRoute() {
-  const platform = usePlatform();
-  const isMobile = useIsMobile();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Don't render until mounted to prevent hydration mismatch
-  if (!isMounted) return null;
-
-  return platform === "native" || isMobile ? <MobileAdmin /> : <AdminPage />;
+  return <AdminPage />;
 }
 
 type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "carousels" | "diagnostics";
@@ -88,7 +75,7 @@ function AdminPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
         <div className="flex items-center gap-3 mb-8">
           <Shield className="size-6 text-primary" />
           <h1 className="text-3xl font-bold">Admin Panel</h1>
