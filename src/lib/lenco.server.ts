@@ -11,9 +11,9 @@
  *  - POST /collections/card           (returns a hosted-checkout URL)
  *
  * Webhook verification (see /api/public/lenco-webhook):
- *   header "x-lenco-signature" = hex HMAC-SHA256(raw_body, LENCO_WEBHOOK_SECRET)
+ *   header "x-lenco-signature" = hex HMAC-SHA512(raw_body, SHA256(API token))
  */
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 
 const DEFAULT_BASE = "https://api.lenco.co/access/v2";
 
@@ -178,17 +178,18 @@ export async function initiateCardCheckout(input: LencoCardInput): Promise<Lenco
 // ---------- Webhook signature ----------
 
 /**
- * Constant-time verify a Lenco webhook signature.
- * Returns true when the signature matches HMAC-SHA256(rawBody, LENCO_WEBHOOK_SECRET).
+ * Constant-time verify a Lenco webhook signature using Lenco's v2 signing
+ * scheme: HMAC-SHA512 of the raw payload, keyed by SHA256(API token).
  */
 export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
   if (!signature) return false;
-  const secret = process.env.LENCO_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error("[Lenco webhook] LENCO_WEBHOOK_SECRET not configured");
+  const apiToken = process.env.LENCO_SECRET_KEY;
+  if (!apiToken) {
+    console.error("[Lenco webhook] LENCO_SECRET_KEY not configured");
     return false;
   }
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const webhookHashKey = createHash("sha256").update(apiToken).digest("hex");
+  const expected = createHmac("sha512", webhookHashKey).update(rawBody).digest("hex");
   const sig = Buffer.from(signature.trim().toLowerCase(), "utf8");
   const exp = Buffer.from(expected, "utf8");
   if (sig.length !== exp.length) return false;

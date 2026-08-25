@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getMyOverview } from "@/lib/user.functions";
 import { createPlaylist } from "@/lib/listener.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlayer } from "@/stores/player";
 
 /**
  * Mobile Library screen — subscription banner, playlists, recent purchases.
@@ -15,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export function MobileLibrary() {
   const { user } = useAuth();
+  const setTrack = usePlayer((state) => state.setTrack);
   const fetchOverview = useServerFn(getMyOverview);
   const createFn = useServerFn(createPlaylist);
   const [showCreate, setShowCreate] = useState(false);
@@ -164,10 +166,17 @@ export function MobileLibrary() {
           <p className="px-4 text-sm text-muted-foreground">No purchased singles yet.</p>
         ) : (
           purchasedSingles.slice(0, 10).map((song: any) => (
-            <Link
+            <button
               key={song.id}
-              to="/songs/$id"
-              params={{ id: song.id }}
+              onClick={() =>
+                setTrack({
+                  id: song.id,
+                  title: song.title,
+                  artistName: song.artists?.name ?? "Unknown",
+                  coverUrl: song.cover_url,
+                  durationSeconds: song.duration,
+                })
+              }
               className="flex items-center gap-3 px-4 py-2 min-h-[44px] hover:bg-white/5 transition-colors cursor-pointer"
             >
               <div className="size-10 rounded-md bg-card flex items-center justify-center shrink-0">
@@ -180,7 +189,7 @@ export function MobileLibrary() {
               <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full">
                 Owned
               </span>
-            </Link>
+            </button>
           ))
         )}
       </div>

@@ -119,10 +119,9 @@ function CheckoutSuccessPage() {
   };
 
   const handleSuccessRedirect = () => {
-    // Redirect to the purchased item or library
-    if (tx?.item_type === "song" && tx?.item_id) {
-      navigate({ to: "/songs/$id", params: { id: tx.item_id } });
-    } else if (tx?.item_type === "album" && tx?.item_id) {
+    // Albums have a detail route. Songs currently live in Library, so never
+    // navigate to the legacy /songs path (which redirects to Browse).
+    if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/albums/$id", params: { id: tx.item_id } });
     } else {
       navigate({ to: "/library" });
@@ -136,7 +135,7 @@ function CheckoutSuccessPage() {
     } else if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/checkout", search: { item: "album", id: tx.item_id } });
     } else {
-      navigate({ to: "/browse" });
+      navigate({ to: "/library" });
     }
   };
 

@@ -1,22 +1,19 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { CreditCard, Smartphone, Check, Loader2 } from "lucide-react";
+import { CreditCard, Smartphone, Check, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPaymentMethods,
-  getSubscriptionPlans,
   getPurchasableItem,
 } from "@/lib/music.functions";
-import { initiatePayment } from "@/lib/payments.functions";
+import { initiatePayment, verifyPayment } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
-const plansQO = queryOptions({ queryKey: ["plans"], queryFn: () => getSubscriptionPlans() });
 
 type CheckoutSearch = {
-  plan?: string;
   item?: "song" | "album";
   id?: string;
 };
@@ -30,14 +27,13 @@ export const Route = createFileRoute("/checkout")({
   }),
   validateSearch: (s: Record<string, unknown>): CheckoutSearch => {
     const item = s.item === "song" || s.item === "album" ? s.item : undefined;
-    const out: CheckoutSearch = { plan: typeof s.plan === "string" ? s.plan : "premium_monthly" };
+    const out: CheckoutSearch = {};
     if (item) out.item = item;
     if (typeof s.id === "string") out.id = s.id;
     return out;
   },
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(methodsQO);
-    context.queryClient.ensureQueryData(plansQO);
   },
   component: CheckoutRoute,
   errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
@@ -47,43 +43,54 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutRoute() {
   const [isMounted, setIsMounted] = useState(false);
   const search = Route.useSearch();
-  const navigate = useNavigate();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   // Subscriptions are temporarily disabled — only track/album purchases are supported.
-  useEffect(() => {
-    if (!search.item || !search.id) navigate({ to: "/browse", replace: true });
-  }, [search.item, search.id, navigate]);
-
   // Keep every hook above this guard so hydration cannot change hook order.
-  if (!isMounted || !search.item || !search.id) return null;
+  if (!isMounted) return null;
+  if (!search.item || !search.id) return <MissingCheckout />;
   return <CheckoutPage />;
 }
 
+function MissingCheckout() {
+  return (
+    <div className="min-h-screen px-6 py-12">
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+        <h1 className="text-xl font-semibold">Choose a song or album to buy</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This checkout link is incomplete. Your payment has not been started.
+        </p>
+        <Link
+          to="/library"
+          className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+        >
+          Go to Library
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function CheckoutPage() {
   const search = Route.useSearch();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { data: methods } = useSuspenseQuery(methodsQO);
-  const { data: plans } = useSuspenseQuery(plansQO);
 
-  const isPurchase = !!(search.item && search.id);
   const { data: purchasable } = useQuery({
     queryKey: ["purchasable", search.item, search.id],
     queryFn: () =>
       getPurchasableItem({ data: { item_type: search.item!, id: search.id! } }),
-    enabled: isPurchase,
+    enabled: !!search.item && !!search.id,
   });
-
-  const plan = plans.find((p) => p.code === search.plan) ?? plans[0];
 
   const [selectedMethodCode, setSelectedMethodCode] = useState(methods[0]?.code ?? "");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [pendingTransactionId, setPendingTransactionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
@@ -117,7 +124,8 @@ function CheckoutPage() {
       }
       if (res?.transactionId) {
         // Mobile money — redirect to success page to poll for status
-        navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
+        setPendingTransactionId(res.transactionId);
+        setResultMsg(null);
         return;
       }
       const successMsg = res?.message ?? "Payment started.";
@@ -135,23 +143,29 @@ function CheckoutPage() {
   // Resolve line item
   let lineName = "";
   let linePrice = 0;
-  let itemType: "song" | "album" | "subscription" = "subscription";
+  let itemType: "song" | "album" = "song";
   let itemId: string | undefined;
 
-  if (isPurchase && purchasable) {
+  if (purchasable) {
     lineName = `${(purchasable as any).title}${(purchasable as any).artist?.name ? ` — ${(purchasable as any).artist.name}` : ""}`;
     linePrice = Number((purchasable as any).price ?? 0);
     itemType = search.item!;
     itemId = (purchasable as any).id;
-  } else if (!isPurchase && plan) {
-    lineName = `Wesu+ ${plan.name}`;
-    linePrice = Number(plan.price_zmw);
-    itemType = "subscription";
-    itemId = plan.id;
-  } else if (isPurchase && !purchasable) {
+  } else if (!purchasable) {
     return <div className="p-12 text-center text-muted-foreground">Loading item…</div>;
   } else {
     return null;
+  }
+
+  if (pendingTransactionId) {
+    return (
+      <MobileMoneyPaymentStatus
+        transactionId={pendingTransactionId}
+        itemType={itemType}
+        itemId={itemId!}
+        onRetry={() => setPendingTransactionId(null)}
+      />
+    );
   }
 
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
@@ -254,6 +268,100 @@ function CheckoutPage() {
           )}
           Pay ZMW {linePrice.toFixed(2)}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function MobileMoneyPaymentStatus({
+  transactionId,
+  itemType,
+  itemId,
+  onRetry,
+}: {
+  transactionId: string;
+  itemType: "song" | "album";
+  itemId: string;
+  onRetry: () => void;
+}) {
+  const navigate = useNavigate();
+  const verifyFn = useServerFn(verifyPayment);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const { data: verification, refetch } = useQuery({
+    queryKey: ["payment-verification", transactionId],
+    queryFn: () => verifyFn({ data: { transactionId } }),
+    refetchInterval: (query) => {
+      const status = query.state.data?.transaction?.status ?? query.state.data?.status;
+      return status === "completed" || status === "failed" ? false : 3000;
+    },
+    refetchIntervalInBackground: true,
+    retry: 2,
+  });
+
+  const status = verification?.transaction?.status ?? verification?.status ?? "pending";
+  const isSuccess = status === "completed";
+  const isFailed = status === "failed";
+
+  useEffect(() => {
+    if (isSuccess || isFailed) return;
+    const timer = window.setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [isSuccess, isFailed]);
+
+  const viewPurchase = () => {
+    if (itemType === "album") {
+      navigate({ to: "/albums/$id", params: { id: itemId } });
+      return;
+    }
+    navigate({ to: "/library" });
+  };
+
+  return (
+    <div className="min-h-screen px-6 py-12">
+      <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
+        {isSuccess ? (
+          <>
+            <CheckCircle className="mx-auto mb-4 size-16 text-green-500" />
+            <h1 className="text-3xl font-bold">Payment successful</h1>
+            <p className="mt-2 text-muted-foreground">Your {itemType} is now in your library.</p>
+            <button
+              onClick={viewPurchase}
+              className="mt-6 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
+            >
+              {itemType === "album" ? "View Album" : "Go to Library"}
+            </button>
+          </>
+        ) : isFailed ? (
+          <>
+            <XCircle className="mx-auto mb-4 size-16 text-red-500" />
+            <h1 className="text-3xl font-bold">Payment failed</h1>
+            <p className="mt-2 text-muted-foreground">
+              {verification?.reason ?? "Lenco could not complete this payment. Please try again."}
+            </p>
+            <button
+              onClick={onRetry}
+              className="mt-6 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground"
+            >
+              Try Again
+            </button>
+          </>
+        ) : (
+          <>
+            <Loader2 className="mx-auto mb-4 size-16 animate-spin text-primary" />
+            <h1 className="text-3xl font-bold">Approve the payment on your phone</h1>
+            <p className="mt-2 text-muted-foreground">
+              Your mobile-money request is active. Keep this page open while Lenco confirms the result.
+              {elapsedSeconds > 0 ? ` (${elapsedSeconds}s)` : ""}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="mt-6 rounded-xl border border-border px-6 py-3 font-semibold hover:bg-accent"
+            >
+              Check payment status
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
