@@ -32,6 +32,21 @@ export function computeTabs(opts: {
       show: true,
     },
     {
+      to: "/browse",
+      label: "Browse",
+      icon: Grid,
+      ariaLabel: "Browse music",
+      show: true,
+    },
+    {
+      to: "/dashboard",
+      label: "Library",
+      icon: Library,
+      ariaLabel: "My library",
+      requireAuth: true,
+      show: true,
+    },
+    {
       to: "/profile",
       label: "Profile",
       icon: User,
@@ -44,8 +59,7 @@ export function computeTabs(opts: {
       label: "Studio",
       icon: Mic2,
       ariaLabel: "Artist studio",
-      // Only show Studio tab for actual artists — not for pure admins/superadmins
-      show: isArtist && !isAdmin && !isSuperAdmin,
+      show: isArtist || isAdmin || isSuperAdmin,
     },
     {
       to: isSuperAdmin ? "/superadmin" : "/admin",
@@ -53,8 +67,7 @@ export function computeTabs(opts: {
       icon: Shield,
       ariaLabel: "Admin panel",
       show: isAdmin || isSuperAdmin,
-    },
-  ].filter((t) => t.show);
+    },  ].filter((t) => t.show);
 }
 
 export function BottomTabBar() {

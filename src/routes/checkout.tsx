@@ -50,21 +50,20 @@ function CheckoutRoute() {
   const platform = usePlatform();
   const isMobile = useIsMobile();
   const [isMounted, setIsMounted] = useState(false);
+  const search = Route.useSearch();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Don't render until mounted to prevent hydration mismatch
-  if (!isMounted) return null;
-
-  const search = Route.useSearch();
-  const navigate = useNavigate();
   // Subscriptions are temporarily disabled — only track/album purchases are supported.
   useEffect(() => {
     if (!search.item || !search.id) navigate({ to: "/browse", replace: true });
   }, [search.item, search.id, navigate]);
-  if (!search.item || !search.id) return null;
+
+  // Keep every hook above this guard so hydration cannot change hook order.
+  if (!isMounted || !search.item || !search.id) return null;
   return platform === "native" || isMobile ? <MobileCheckout planCode={search.plan} /> : <CheckoutPage />;
 }
 
