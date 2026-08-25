@@ -127,7 +127,7 @@ describe("Property 22: Sign out clears session", () => {
 
   it("documents that supabase.auth.signOut() is called during sign-out flow", () => {
     // This test documents the integration contract:
-    // MobileProfile sign-out calls supabase.auth.signOut() → then navigates to /
+    // The profile sign-out flow calls supabase.auth.signOut() → then navigates to /
     const mockSignOut = vi.fn().mockResolvedValue({ error: null });
     const mockNavigate = vi.fn();
 

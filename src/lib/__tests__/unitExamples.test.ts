@@ -177,7 +177,7 @@ describe("MiniPlayer: loading spinner shown when URL in-flight", () => {
 // ---------------------------------------------------------------------------
 describe("Sign out: navigates to home route", () => {
   it("sign out destination is '/'", () => {
-    // MobileProfile handleSignOut calls navigate({ to: "/" })
+    // The profile screen signs out before navigating home.
     const homeRoute = "/";
     expect(homeRoute).toBe("/");
   });

@@ -10,9 +10,7 @@ import { useUserRoles } from "@/hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
 import { updateProfile } from "@/lib/listener.functions";
 import { uploadFileToBucket } from "@/lib/storage";
-import { usePlatform } from "@/hooks/use-platform";
 import { StorageImage } from "@/components/StorageImage";
-import { MobileProfile } from "@/components/mobile/screens/MobileProfile";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Profile — Wesu+" }] }),
@@ -26,8 +24,7 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfileRoute() {
-  const platform = usePlatform();
-  return platform === "native" ? <MobileProfile /> : <Page />;
+  return <Page />;
 }
 
 function Page() {
@@ -95,7 +92,7 @@ function Page() {
     : null;
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
       {/* Read-Only Profile View */}
       {!isEditing ? (
         <div className="space-y-6">

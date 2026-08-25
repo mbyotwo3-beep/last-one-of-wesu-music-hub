@@ -7,8 +7,6 @@ import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { getMyOverview } from "@/lib/user.functions";
 import { getMyLabel } from "@/lib/labels.functions";
-import { usePlatform } from "@/hooks/use-platform";
-import { MobileLibrary } from "@/components/mobile/screens/MobileLibrary";
 import { useCurrency } from "@/stores/currency";
 
 export const Route = createFileRoute("/dashboard")({
@@ -24,7 +22,6 @@ function DashboardRoute() {
   const { isSuperAdmin, isAdmin, isArtist, loading } = useUserRoles();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const platform = usePlatform();
   const getLabelFn = useServerFn(getMyLabel);
 
   const { data: label } = useQuery({
@@ -51,7 +48,7 @@ function DashboardRoute() {
   if (loading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   if (isSuperAdmin || isAdmin || isArtist || (label && label.status === "approved")) return null;
 
-  return platform === "native" ? <MobileLibrary /> : <DashboardPage />;
+  return <DashboardPage />;
 }
 
 function DashboardPage() {
@@ -84,7 +81,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
         <h1 className="text-3xl font-bold mb-2">My Library</h1>
         <p className="text-muted-foreground mb-8">
           Welcome back{data.profile?.full_name ? `, ${data.profile.full_name}` : ""}.

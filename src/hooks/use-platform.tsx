@@ -4,12 +4,8 @@ export type Platform = "web" | "native";
 
 /**
  * Returns 'native' when running inside the Capacitor Android/iOS wrapper,
- * 'web' otherwise. Use this to render different UIs for the mobile app
- * vs the browser site while sharing the same backend.
- *
- * Example:
- *   const platform = usePlatform();
- *   return platform === 'native' ? <MobileHome /> : <WebHome />;
+ * 'web' otherwise. The shared responsive pages use this for platform-specific
+ * integrations rather than maintaining separate feature implementations.
  */
 export function usePlatform(): Platform {
   const [platform, setPlatform] = useState<Platform>("web");

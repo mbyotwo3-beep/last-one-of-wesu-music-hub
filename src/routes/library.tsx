@@ -1,13 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, Music, Users, Disc } from "lucide-react";
-import { useState, useEffect } from "react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
-import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
-import { MobileLibrary } from "@/components/mobile/screens/MobileLibrary";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -21,18 +18,7 @@ export const Route = createFileRoute("/library")({
 });
 
 function LibraryRoute() {
-  const platform = usePlatform();
-  const isMobile = useIsMobile();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Don't render until mounted to prevent hydration mismatch
-  if (!isMounted) return null;
-
-  return platform === "native" || isMobile ? <MobileLibrary /> : <Page />;
+  return <Page />;
 }
 
 function Page() {
@@ -101,7 +87,7 @@ function Page() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
       <h1 className="text-3xl font-bold mb-6">My Library</h1>
 
       <section className="mb-10">
