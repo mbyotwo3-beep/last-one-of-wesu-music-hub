@@ -287,6 +287,17 @@ function ArtistProfileEditPage() {
               onChange={handleCoverChange}
               className="hidden"
             />
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 transition-colors"
+            >
+              <Camera className="size-4" />
+              {coverFile ? "Change cover photo" : "Upload cover photo"}
+            </button>
+            {coverFile && (
+              <p className="mt-2 truncate text-xs text-primary">Selected: {coverFile.name}</p>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               Recommended: 1500x500px, max 10MB
             </p>

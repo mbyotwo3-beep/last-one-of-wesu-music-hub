@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Wallet, FolderPlus, Users, Building2, Star } from "lucide-react";
+import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -145,6 +145,12 @@ function CollabsTab() {
             placeholder="Search artist by name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void find();
+              }
+            }}
           />
           <button
             type="button"
@@ -381,6 +387,8 @@ function UploadWizard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   const SINGLE_MIN = pricing.song_min;
   const SINGLE_MAX = pricing.song_max;
@@ -393,6 +401,34 @@ function UploadWizard() {
     setTier("paid");
     setPrice(next === "album" ? ALBUM_MIN : SINGLE_MIN);
     if (next === "single") setTracks((t) => t.slice(0, 1));
+  }
+
+  function setCoverFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Cover art must be an image file (JPG, PNG, or WEBP)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Cover art must be smaller than 10MB");
+      return;
+    }
+    setError(null);
+    setCover(file);
+  }
+
+  function setAudioFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    const audioFiles = files.filter(
+      (file) => file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(file.name),
+    );
+    if (audioFiles.length === 0) {
+      setError("Choose at least one audio file (MP3, WAV, M4A, AAC, FLAC, OGG, or OPUS)");
+      return;
+    }
+    setError(null);
+    if (mode === "single") setTracks(audioFiles.slice(0, 1));
+    else setTracks(audioFiles);
   }
 
 
@@ -509,7 +545,30 @@ function UploadWizard() {
   }
 
   return (
-    <div className="space-y-6">
+    <form
+      className="space-y-6"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (step === 1) {
+          setStep(2);
+          return;
+        }
+        if (step === 2) {
+          if (!title.trim()) {
+            setError(`${mode === "album" ? "Album" : "Song"} title is required`);
+            return;
+          }
+          if (tracks.length === 0) {
+            setError("Please choose at least one audio file");
+            return;
+          }
+          setError(null);
+          setStep(3);
+          return;
+        }
+        void submit();
+      }}
+    >
       {/* Stepper */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {[1, 2, 3].map((n) => (
@@ -534,6 +593,7 @@ function UploadWizard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {(["single", "album"] as UploadMode[]).map((m) => (
             <button
+              type="button"
               key={m}
               onClick={() => switchMode(m)}
               className={`text-left p-6 rounded-2xl border-2 transition-colors ${
@@ -553,7 +613,7 @@ function UploadWizard() {
           ))}
           <div className="sm:col-span-2 flex justify-end">
             <button
-              onClick={() => setStep(2)}
+              type="submit"
               className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
             >
               Next →
@@ -565,63 +625,109 @@ function UploadWizard() {
       {/* Step 2: files + metadata */}
       {step === 2 && (
         <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-          <input
-            required
-            placeholder={mode === "album" ? "Album title" : "Song title"}
-            className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium" htmlFor="upload-title">
+            {mode === "album" ? "Album title" : "Song title"}
             <input
-              placeholder="Genre (optional)"
-              className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
-              value={genre}
-              onChange={(e) => setGenre(e.target.value)}
+              id="upload-title"
+              required
+              placeholder={mode === "album" ? "Enter your album title" : "Enter your song title"}
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
-            {mode === "album" && (
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium">
+              Genre <span className="font-normal text-muted-foreground">(optional)</span>
               <input
-                placeholder="Description (optional)"
-                className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Afrobeats, Hip-Hop…"
+                className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
               />
+            </label>
+            {mode === "album" && (
+              <label className="block text-sm font-medium">
+                Description <span className="font-normal text-muted-foreground">(optional)</span>
+                <input
+                  placeholder="Tell listeners about this album"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
             )}
           </div>
 
-          <label className="block text-sm">
-            Cover art (optional)
+          <div className="rounded-xl border border-border bg-secondary/30 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Cover art <span className="font-normal text-muted-foreground">(optional)</span></p>
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG, or WEBP · max 10MB</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="upload-cover"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer hover:brightness-110 transition"
+                >
+                  <ImagePlus className="size-4" />
+                  {cover ? "Change cover art" : "Upload cover art"}
+                </label>
+                {cover && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCover(null);
+                      if (coverInputRef.current) coverInputRef.current.value = "";
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition"
+                  >
+                    <X className="size-3.5" /> Remove
+                  </button>
+                )}
+              </div>
+            </div>
             <input
+              id="upload-cover"
+              ref={coverInputRef}
               type="file"
-              accept="image/*"
-              className="mt-1 block text-xs"
-              onChange={(e) => setCover(e.target.files?.[0] ?? null)}
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              onChange={(e) => setCoverFile(e.target.files?.[0])}
             />
-          </label>
+            {cover && <p className="mt-3 truncate text-xs text-primary">Selected: {cover.name}</p>}
+          </div>
 
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("audio/"));
-              if (mode === "single") setTracks(files.slice(0, 1));
-              else setTracks((prev) => [...prev, ...files]);
+              setAudioFiles(e.dataTransfer.files);
             }}
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30"
+            className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 cursor-pointer hover:border-primary/60 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition"
           >
-            <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm font-medium">Drop audio files here</p>
-            <p className="text-xs text-muted-foreground mb-3">or</p>
-            <input
-              type="file"
-              accept="audio/*"
-              multiple={mode === "album"}
-              className="text-xs"
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                if (mode === "single") setTracks(files.slice(0, 1));
-                else setTracks(files);
+            <FileAudio className="size-8 mx-auto mb-2 text-primary" />
+            <p className="text-sm font-semibold">Choose audio file{mode === "album" ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground mt-1">Drop {mode === "album" ? "one or more tracks" : "an audio file"} here, or use the button below</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                audioInputRef.current?.click();
               }}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 transition"
+            >
+              <Upload className="size-4" />
+              Browse audio files
+            </button>
+            <input
+              id="upload-audio"
+              ref={audioInputRef}
+              type="file"
+              accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
+              multiple={mode === "album"}
+              className="sr-only"
+              onChange={(e) => setAudioFiles(e.target.files ?? [])}
             />
           </div>
 
@@ -631,25 +737,29 @@ function UploadWizard() {
                 <li key={i} className="flex justify-between items-center bg-secondary/30 rounded px-2 py-1">
                   <span className="truncate">{f.name}</span>
                   <button
+                    type="button"
                     onClick={() => setTracks((t) => t.filter((_, j) => j !== i))}
-                    className="text-muted-foreground hover:text-destructive text-xs"
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive text-xs"
                   >
-                    ✕
+                    <X className="size-3.5" /> Remove
                   </button>
                 </li>
               ))}
             </ul>
           )}
 
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
           <div className="flex justify-between">
             <button
+              type="button"
               onClick={() => setStep(1)}
               className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
             >
               ← Back
             </button>
             <button
-              onClick={() => setStep(3)}
+              type="submit"
               disabled={!title.trim() || tracks.length === 0}
               className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40"
             >
@@ -666,6 +776,7 @@ function UploadWizard() {
             <>
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => setTier("free")}
                   className={`p-4 rounded-xl border-2 text-left ${
                     tier === "free" ? "border-primary bg-primary/5" : "border-border"
@@ -677,6 +788,7 @@ function UploadWizard() {
                   </p>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setTier("paid")}
                   className={`p-4 rounded-xl border-2 text-left ${
                     tier === "paid" ? "border-primary bg-primary/5" : "border-border"
@@ -742,13 +854,14 @@ function UploadWizard() {
 
           <div className="flex justify-between">
             <button
+              type="button"
               onClick={() => setStep(2)}
               className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
             >
               ← Back
             </button>
             <button
-              onClick={submit}
+              type="submit"
               disabled={busy}
               className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-40"
             >
@@ -757,7 +870,7 @@ function UploadWizard() {
           </div>
         </div>
       )}
-    </div>
+    </form>
   );
 }
 

@@ -226,6 +226,12 @@ function Roster({ labelId }: { labelId: string }) {
             placeholder="Search by name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void find();
+              }
+            }}
           />
           <button
             onClick={find}
@@ -427,7 +433,15 @@ function Settings({ label }: { label: any }) {
         logoUrl = await uploadFileToBucket("artist-images", label.id, data.logo_file);
       }
       
-      return fn({ data: { id: label.id, name: data.name, bio: data.bio, contact_email: data.contact_email, logo_url } });
+      return fn({
+        data: {
+          id: label.id,
+          name: data.name,
+          bio: data.bio,
+          contact_email: data.contact_email,
+          logo_url: logoUrl,
+        },
+      });
     },
     onSuccess: () => {
       toast.success("Label settings updated successfully");
@@ -475,18 +489,27 @@ function Settings({ label }: { label: any }) {
       }}
       className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-xl"
     >
-      <input
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.name}
-        onChange={(e) => setForm({ ...form, name: e.target.value })}
-      />
-      <input
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.contact_email}
-        onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-      />
+      <label className="block text-sm font-medium">
+        Label name
+        <input
+          required
+          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+      </label>
+      <label className="block text-sm font-medium">
+        Contact email
+        <input
+          type="email"
+          required
+          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={form.contact_email}
+          onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+        />
+      </label>
       <div>
-        <label className="block text-sm font-medium mb-2">Logo</label>
+        <p className="block text-sm font-medium mb-2">Logo</p>
         <div className="flex items-center gap-4 mb-3">
           <div className="w-20 h-20 rounded-lg bg-secondary overflow-hidden">
             {logoPreview ? (
@@ -498,24 +521,39 @@ function Settings({ label }: { label: any }) {
             )}
           </div>
           <div>
+            <label
+              htmlFor="label-logo-upload"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer hover:brightness-110 transition"
+            >
+              <Camera className="size-4" />
+              {form.logo_file ? "Change logo" : "Upload logo"}
+            </label>
             <input
+              id="label-logo-upload"
               type="file"
               accept="image/*"
               onChange={handleLogoChange}
-              className="text-sm"
+              className="sr-only"
             />
             <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
+            {form.logo_file && (
+              <p className="mt-1 max-w-48 truncate text-xs text-primary">Selected: {form.logo_file.name}</p>
+            )}
           </div>
         </div>
       </div>
-      <textarea
-        rows={4}
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.bio}
-        onChange={(e) => setForm({ ...form, bio: e.target.value })}
-      />
+      <label className="block text-sm font-medium">
+        About the label
+        <textarea
+          rows={4}
+          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={form.bio}
+          onChange={(e) => setForm({ ...form, bio: e.target.value })}
+        />
+      </label>
       {m.isSuccess && <p className="text-sm text-primary">Saved.</p>}
       <button
+        type="submit"
         disabled={m.isPending}
         className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
       >
