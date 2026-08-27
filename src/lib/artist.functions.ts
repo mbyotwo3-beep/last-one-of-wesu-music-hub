@@ -355,7 +355,11 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
       const filters: string[] = [];
       if (songIds.length) filters.push(`song_id.in.(${songIds.join(",")})`);
       if (albumIds.length) filters.push(`album_id.in.(${albumIds.join(",")})`);
-      const { data: sales } = await supabaseAdmin.from("purchases").select("amount").or(filters.join(","));
+      const { data: sales } = await supabaseAdmin
+        .from("purchases")
+        .select("amount")
+        .eq("status", "completed")
+        .or(filters.join(","));
       totalRevenue = (sales ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
     }
 

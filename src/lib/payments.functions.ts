@@ -1,6 +1,45 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+type PurchaseItemType = "song" | "album";
+
+function validateTransactionId(input: unknown): { transactionId: string } {
+  if (!input || typeof input !== "object") throw new Error("Invalid payment request");
+  const transactionId = (input as Record<string, unknown>).transactionId;
+  if (typeof transactionId !== "string" || !transactionId.trim()) {
+    throw new Error("transactionId is required");
+  }
+  return { transactionId: transactionId.trim() };
+}
+
+function validatePaymentRequest(input: unknown): {
+  method_code: string;
+  item_type: PurchaseItemType;
+  item_id: string;
+  phone?: string;
+} {
+  if (!input || typeof input !== "object") throw new Error("Invalid payment request");
+  const value = input as Record<string, unknown>;
+  if (typeof value.method_code !== "string" || !value.method_code.trim()) {
+    throw new Error("method_code is required");
+  }
+  if (value.item_type !== "song" && value.item_type !== "album") {
+    throw new Error("Only songs and albums can be purchased at this time");
+  }
+  if (typeof value.item_id !== "string" || !value.item_id.trim()) {
+    throw new Error("item_id is required");
+  }
+  if (value.phone !== undefined && typeof value.phone !== "string") {
+    throw new Error("phone must be a string");
+  }
+  return {
+    method_code: value.method_code.trim(),
+    item_type: value.item_type,
+    item_id: value.item_id.trim(),
+    phone: value.phone?.trim() || undefined,
+  };
+}
+
 /**
  * Poll Lenco for the authoritative state of one of the caller's own
  * transactions and settle it. This is the fallback (and, in practice, the
@@ -10,7 +49,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const verifyPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { transactionId: string }) => d)
+  .validator(validateTransactionId)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -68,18 +107,9 @@ export const verifyPayment = createServerFn({ method: "POST" })
  */
 export const initiatePayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(
-    (d: {
-      method_code: string;
-      item_type: "song" | "album";
-      item_id?: string;
-      phone?: string;
-    }) => d,
-  )
+  .validator(validatePaymentRequest)
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
-
-    if (!data.item_id) throw new Error("item_id is required");
 
     // -- Authoritative price lookup (RLS-safe: uses caller's client) --
     let authoritativeAmount: number | null = null;
@@ -127,7 +157,8 @@ export const initiatePayment = createServerFn({ method: "POST" })
     }
 
     // -- Record the pending transaction --
-    const { data: tx, error: insertError } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: tx, error: insertError } = await supabaseAdmin
       .from("payment_transactions")
       .insert({
         user_id: userId,
@@ -164,7 +195,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
           phone: normalizeZmPhone(data.phone!),
           narration: `Wesu+ ${data.item_type}`,
         });
-        await supabase
+        await supabaseAdmin
           .from("payment_transactions")
           .update({ provider_token: result.id, provider_ref: result.reference } as any)
           .eq("id", tx.id);
@@ -174,7 +205,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
           message: "Check your phone and approve the payment prompt to complete this purchase.",
         };
       } catch (e: any) {
-        await supabase
+        await supabaseAdmin
           .from("payment_transactions")
           .update({ status: "failed" } as any)
           .eq("id", tx.id);
@@ -192,7 +223,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
         redirectUrl: `${appUrl}/checkout/success?ref=${tx.id}`,
         narration: `Wesu+ ${data.item_type}`,
       });
-      await supabase
+      await supabaseAdmin
         .from("payment_transactions")
         .update({ provider_token: result.id, provider_ref: result.reference } as any)
         .eq("id", tx.id);
@@ -219,7 +250,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
           },
         };
       }
-      await supabase
+      await supabaseAdmin
         .from("payment_transactions")
         .update({ status: "failed" } as any)
         .eq("id", tx.id);

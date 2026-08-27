@@ -416,7 +416,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               {isPreview && trackPrice > 0 && (
                 <Link
                   to="/checkout"
-                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                  search={{ item: "song", id: track.id }}
                   onClick={() => setIsExpanded(false)}
                   className="block w-full text-center py-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-semibold hover:bg-amber-500/30 transition-colors"
                 >
@@ -583,7 +583,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               {trackPrice > 0 && (
                 <Link
                   to="/checkout"
-                  search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                  search={{ item: "song", id: track.id }}
                   className="font-semibold text-amber-400 hover:underline"
                 >
                   Buy this track — ZMW {trackPrice.toFixed(2)}

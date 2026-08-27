@@ -220,7 +220,7 @@ function ArtistPage() {
                     {Number(s.price ?? 0) > 0 && (
                       <Link
                         to="/checkout"
-                        search={{ plan: "premium_monthly", item: "song", id: s.id }}
+                        search={{ item: "song", id: s.id }}
                         className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
                         aria-label={`Buy ${s.title}`}
                       >
@@ -259,7 +259,7 @@ function ArtistPage() {
                     {Number(al.price ?? 0) > 0 && (
                       <Link
                         to="/checkout"
-                        search={{ plan: "premium_monthly", item: "album", id: al.id }}
+                        search={{ item: "album", id: al.id }}
                         className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary text-primary-foreground hover:brightness-110 transition"
                       >
                         Buy

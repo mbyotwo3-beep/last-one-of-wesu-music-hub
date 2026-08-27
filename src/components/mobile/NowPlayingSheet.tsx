@@ -212,7 +212,7 @@ export function NowPlayingSheet() {
             {price > 0 && track && (
               <Link
                 to="/checkout"
-                search={{ plan: "premium_monthly", item: "song", id: track.id }}
+                search={{ item: "song", id: track.id }}
                 onClick={closeNowPlaying}
                 className="font-semibold text-amber-200 hover:underline whitespace-nowrap shrink-0 cursor-pointer"
               >

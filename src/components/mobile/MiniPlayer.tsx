@@ -44,7 +44,7 @@ export function MiniPlayer() {
           {trackPrice > 0 && (
             <Link
               to="/checkout"
-              search={{ plan: "premium_monthly", item: "song", id: track.id }}
+              search={{ item: "song", id: track.id }}
               className="font-semibold text-amber-300 hover:underline shrink-0 cursor-pointer"
             >
               Buy K{trackPrice.toFixed(0)}

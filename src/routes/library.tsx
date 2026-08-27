@@ -46,6 +46,7 @@ function Page() {
         .from("purchases")
         .select("songs(*, artists(name))")
         .eq("user_id", user.id)
+        .eq("status", "completed")
         .is("album_id", null)
         .order("created_at", { ascending: false });
       return data?.map((item: any) => item.songs) ?? [];
@@ -61,6 +62,7 @@ function Page() {
         .from("purchases")
         .select("albums(*, artists(name))")
         .eq("user_id", user.id)
+        .eq("status", "completed")
         .not("album_id", "is", null)
         .order("created_at", { ascending: false });
       return data?.map((item: any) => item.albums) ?? [];

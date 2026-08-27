@@ -92,7 +92,7 @@ function AlbumPage() {
           {Number(album.price) > 0 && (
             <Link
               to="/checkout"
-              search={{ plan: "premium_monthly", item: "album", id: album.id }}
+              search={{ item: "album", id: album.id }}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary border border-border hover:bg-accent transition-colors cursor-pointer"
             >
               <ShoppingBag className="size-4" />
@@ -132,7 +132,7 @@ function AlbumPage() {
                   {Number(s.price) > 0 && (
                     <Link
                       to="/checkout"
-                      search={{ plan: "premium_monthly", item: "song", id: s.id }}
+                      search={{ item: "song", id: s.id }}
                       className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
                       aria-label={`Buy ${s.title}`}
                     >

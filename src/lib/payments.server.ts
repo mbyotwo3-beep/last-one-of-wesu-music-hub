@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 interface PaymentTransaction {
   id: string;
   user_id: string;
-  item_type: "song" | "album" | "subscription";
+  item_type: "song" | "album";
   item_id: string | null;
   amount: number;
   currency: string;
@@ -16,49 +16,13 @@ interface PaymentTransaction {
 /**
  * Fulfill a completed payment transaction.
  *
- * - subscription → upsert subscriptions row (status=active, expires_at=now+interval)
- * - song | album  → insert purchases row (status=completed) + revenue split
+ * - song | album → insert a completed purchase and its revenue split.
  */
 export async function fulfillTransaction(tx: PaymentTransaction): Promise<void> {
-  if (tx.item_type === "subscription") {
-    await fulfillSubscription(tx);
-  } else if (tx.item_type === "song" || tx.item_type === "album") {
-    await fulfillPurchase(tx);
+  if (tx.item_type !== "song" && tx.item_type !== "album") {
+    throw new Error("Unsupported payment item type");
   }
-}
-
-async function fulfillSubscription(tx: PaymentTransaction): Promise<void> {
-  // Determine plan interval (default 30 days if not found)
-  let intervalDays = 30;
-  if (tx.item_id) {
-    const { data: plan } = await supabaseAdmin
-      .from("subscription_plans")
-      .select("interval")
-      .eq("id", tx.item_id)
-      .maybeSingle();
-    if (plan?.interval) {
-      const intervalMap: Record<string, number> = {
-        week: 7,
-        month: 30,
-        year: 365,
-      };
-      intervalDays = intervalMap[plan.interval] ?? intervalDays;
-    }
-  }
-
-  const expiresAt = new Date(Date.now() + intervalDays * 24 * 60 * 60 * 1000).toISOString();
-
-  const { error } = await supabaseAdmin.from("subscriptions").upsert(
-    {
-      user_id: tx.user_id,
-      plan: tx.item_id ?? "premium",
-      status: "active",
-      expires_at: expiresAt,
-    } as any,
-    { onConflict: "user_id" },
-  );
-
-  if (error) throw new Error(`fulfillSubscription failed: ${error.message}`);
+  await fulfillPurchase(tx);
 }
 
 async function fulfillPurchase(tx: PaymentTransaction): Promise<void> {
@@ -127,6 +91,23 @@ export async function settleTransaction(
   providerRef?: string | null,
 ): Promise<"completed" | "failed" | "pending"> {
   if (outcome === "failed") {
+    await supabaseAdmin
+      .from("payment_transactions")
+      .update({ status: "failed", provider_ref: providerRef ?? null } as any)
+      .eq("id", transactionId)
+      .eq("status", "pending");
+    return "failed";
+  }
+
+  // A historical or tampered transaction must never activate a subscription
+  // while subscription sales are paused.
+  const { data: current } = await supabaseAdmin
+    .from("payment_transactions")
+    .select("item_type")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (!current) return "pending";
+  if (current.item_type !== "song" && current.item_type !== "album") {
     await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null } as any)

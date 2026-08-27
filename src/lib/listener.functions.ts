@@ -144,6 +144,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
           .select("id")
           .eq("user_id", context.userId)
           .eq("song_id", data.song_id)
+          .eq("status", "completed")
           .maybeSingle(),
         albumId
           ? context.supabase
@@ -151,6 +152,7 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
               .select("id")
               .eq("user_id", context.userId)
               .eq("album_id", albumId)
+              .eq("status", "completed")
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);

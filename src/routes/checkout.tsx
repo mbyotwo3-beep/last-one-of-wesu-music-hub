@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -43,10 +43,17 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutRoute() {
   const [isMounted, setIsMounted] = useState(false);
   const search = Route.useSearch();
+  const isStatusPage = useRouterState({
+    select: (state) => state.location.pathname === "/checkout/success",
+  });
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // The status route is nested beneath `/checkout` but only receives a ref.
+  // Render it before checking the checkout item's query parameters.
+  if (isStatusPage) return <Outlet />;
 
   // Subscriptions are temporarily disabled — only track/album purchases are supported.
   // Keep every hook above this guard so hydration cannot change hook order.
