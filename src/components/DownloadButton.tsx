@@ -20,15 +20,32 @@ export function DownloadButton({ songId, label = "Download" }: { songId: string;
     setError(null);
     try {
       const result = await downloadFn({ data: { song_id: songId } });
+
+      // The signed URL is hosted by Supabase (or the source CDN), so setting
+      // it directly as an anchor href lets the browser navigate to the audio
+      // page. Fetch the bytes first and download a same-origin Blob instead.
+      const response = await fetch(result.url, {
+        credentials: "omit",
+      });
+      if (!response.ok) {
+        throw new Error(`Unable to download file (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("The downloaded file is empty");
+
+      const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = result.url;
+      anchor.href = objectUrl;
       anchor.download = result.filename;
-      anchor.rel = "noopener";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
+      // Keep the object URL alive for the browser's download hand-off, then
+      // release the in-memory Blob.
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (err) {
-      setError((err as Error).message || "Download failed");
+      setError(err instanceof Error ? err.message : "Download failed");
     } finally {
       setLoading(false);
     }
