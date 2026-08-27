@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getNewReleases } from "@/lib/music.functions";
-import { StorageImage } from "@/components/StorageImage";
+import { TrackCard } from "@/components/discover/TrackCard";
 
 export const Route = createFileRoute("/new-music")({
   head: () => ({ meta: [{ title: "New Music — Wesu+" }] }),
@@ -20,11 +20,7 @@ function Page() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {(data ?? []).map((s: any) => (
-            <Link key={s.id} to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="group">
-              <StorageImage bucket="album-art" path={s.cover_url} alt={s.title} className="w-full aspect-square rounded-lg object-cover mb-2 group-hover:opacity-90" />
-              <div className="text-sm font-medium truncate">{s.title}</div>
-              <div className="text-xs text-muted-foreground truncate">{s.artist?.name}</div>
-            </Link>
+            <TrackCard key={s.id} song={s} />
           ))}
         </div>
       )}

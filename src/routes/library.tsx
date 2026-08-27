@@ -147,6 +147,7 @@ function Page() {
                   <p className="font-medium truncate">{song.title}</p>
                   <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
                 </div>
+                {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
                 {song.price && Number(song.price) > 0 && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                     ZMW {Number(song.price).toFixed(2)}

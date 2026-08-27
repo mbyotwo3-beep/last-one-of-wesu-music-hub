@@ -24,6 +24,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getRecentlyPlayed } from "@/lib/play-history.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { DownloadButton } from "@/components/DownloadButton";
 
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
@@ -323,6 +324,7 @@ function TrackListRow({
     title: string;
     cover_url: string | null;
     play_count?: number | null;
+    price?: number | null;
     artist?: { id: string; name: string } | null;
   };
   onPlay: () => void;
@@ -357,6 +359,7 @@ function TrackListRow({
       <span className="text-xs text-muted-foreground hidden sm:inline">
         {(song.play_count ?? 0).toLocaleString()} plays
       </span>
+      {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
     </div>
   );
 }

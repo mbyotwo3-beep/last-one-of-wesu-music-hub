@@ -2,11 +2,17 @@ import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getDownloadAudioUrl } from "@/lib/listener.functions";
+import { useAuth } from "@/hooks/use-auth";
 
 export function DownloadButton({ songId, label = "Download" }: { songId: string; label?: string }) {
+  const { user } = useAuth();
   const downloadFn = useServerFn(getDownloadAudioUrl);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Downloads are an authenticated feature. Hide the control for anonymous
+  // listeners instead of showing a button that can only fail with 401.
+  if (!user) return null;
 
   async function download() {
     if (loading) return;

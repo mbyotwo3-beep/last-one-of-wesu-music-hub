@@ -7,6 +7,7 @@ import { globalSearch } from "@/lib/music.functions";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Music, Disc3, Mic2 } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
+import { DownloadButton } from "@/components/DownloadButton";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -134,24 +135,26 @@ function SearchPage() {
             <ResultSection title="Songs" icon={<Music className="size-4" />}>
               <div className="rounded-xl border border-border overflow-hidden">
                 {songs.map((s) => (
-                  <Link
+                  <div
                     key={s.id}
-                    to="/browse"
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 transition-colors"
                   >
-                    <StorageImage
-                      bucket="album-art"
-                      path={s.cover_url}
-                      alt={s.title}
-                      className="size-12 rounded object-cover bg-muted"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">{s.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {(s.artist as { name?: string } | null)?.name ?? "Unknown"}
+                    <Link to="/browse" className="flex min-w-0 flex-1 items-center gap-3">
+                      <StorageImage
+                        bucket="album-art"
+                        path={s.cover_url}
+                        alt={s.title}
+                        className="size-12 rounded object-cover bg-muted"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{s.title}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {(s.artist as { name?: string } | null)?.name ?? "Unknown"}
+                        </div>
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                    {Number((s as any).price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+                  </div>
                 ))}
               </div>
             </ResultSection>

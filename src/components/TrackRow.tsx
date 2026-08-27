@@ -1,6 +1,7 @@
 import { Play, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
+import { DownloadButton } from "@/components/DownloadButton";
 
 interface TrackRowProps {
   id: string;
@@ -65,6 +66,8 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
           {useCurrency.getState().formatPrice(price)}
         </div>
       )}
+
+      {Number(price ?? 0) <= 0 && <DownloadButton songId={id} />}
 
       {/* Like Button */}
       <button

@@ -7,6 +7,7 @@ import { removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
+import { DownloadButton } from "@/components/DownloadButton";
 
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
@@ -27,7 +28,7 @@ function Page() {
     queryFn: async () => {
       const { data: pl } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song:songs(id,title,duration,cover_url,artist:artists(id,name)))")
+        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
         .eq("id", id)
         .maybeSingle();
       return pl;
@@ -114,10 +115,11 @@ function Page() {
               <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
-                <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
+              <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
                   {s.artist?.name ?? "Unknown"}
                 </Link>
               </div>
+              {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
               <button
                 onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
                 className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"

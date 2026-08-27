@@ -10,6 +10,7 @@ import { useCurrency } from "@/stores/currency";
 import { useEffect, useState } from "react";
 import { resolveImageUrl } from "@/lib/storage-url";
 import { toast } from "sonner";
+import { DownloadButton } from "@/components/DownloadButton";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -227,6 +228,7 @@ function ArtistPage() {
                         <ShoppingBag className="size-4" />
                       </Link>
                     )}
+                    {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
                   </div>
                 </div>
               ))}

@@ -6,6 +6,7 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSavedAlbum } from "@/hooks/use-saved-album";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/stores/currency";
+import { DownloadButton } from "@/components/DownloadButton";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -94,6 +95,11 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         </Link>
       ) : (
         <p className="text-xs text-muted-foreground truncate">{artistName}</p>
+      )}
+      {user && Number(song.price ?? 0) <= 0 && (
+        <div className="mt-2 flex justify-start">
+          <DownloadButton songId={song.id} label="Download" />
+        </div>
       )}
     </div>
   );

@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { DownloadButton } from "@/components/DownloadButton";
 
 
 function formatTime(s: number): string {
@@ -300,6 +301,11 @@ export function NowPlayingSheet() {
             </button>
           )}
         </div>
+        {user && meta && price <= 0 && (
+          <div className="px-6 mb-4">
+            <DownloadButton songId={track.id} label="Download free song" />
+          </div>
+        )}
 
         {/* Seek bar */}
         <div className="px-6 mb-1 shrink-0">

@@ -31,7 +31,7 @@ export const getTrendingSongs = createServerFn({ method: "GET" }).handler(async 
   const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("songs")
-    .select("id,title,play_count,cover_url,artist:artists(id,name)")
+    .select("id,title,play_count,price,cover_url,artist:artists(id,name)")
     .order("play_count", { ascending: false })
     .limit(10);
   if (error) throw new Error(error.message);
@@ -335,7 +335,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
         .limit(12),
       supabase
         .from("songs")
-        .select("id,title,play_count,cover_url,duration,artist:artists(id,name)")
+        .select("id,title,play_count,price,cover_url,duration,artist:artists(id,name)")
         .order("play_count", { ascending: false })
         .limit(10),
       supabase
@@ -372,7 +372,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
     topGenres.map(async (genre) => {
       const { data } = await supabase
         .from("songs")
-        .select("id,title,cover_url,duration,artist:artists(id,name)")
+        .select("id,title,cover_url,duration,price,artist:artists(id,name)")
         .eq("genre", genre)
         .order("play_count", { ascending: false })
         .limit(8);

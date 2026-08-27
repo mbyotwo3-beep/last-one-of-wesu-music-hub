@@ -6,6 +6,8 @@ import { Slider } from "@/components/ui/slider";
 import { toggleLike } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
+import { useTrackMeta } from "@/hooks/use-track-meta";
+import { DownloadButton } from "@/components/DownloadButton";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -31,6 +33,8 @@ export function NowPlayingScreen() {
   const togglePlay = usePlayer((s) => s.togglePlay);
   const toggleLikeStore = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
+  const { data: meta } = useTrackMeta(track?.id);
+  const trackPrice = meta ? Number(meta.price ?? 0) : null;
 
   const toggleLikeFn = useServerFn(toggleLike);
   const [liking, setLiking] = useState(false);
@@ -117,6 +121,11 @@ export function NowPlayingScreen() {
           </button>
         )}
       </div>
+      {user && trackPrice !== null && trackPrice <= 0 && (
+        <div className="mb-4">
+          <DownloadButton songId={track.id} label="Download free song" />
+        </div>
+      )}
 
       {/* Seek slider */}
       <div className="mb-2">
