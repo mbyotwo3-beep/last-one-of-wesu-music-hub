@@ -17,6 +17,8 @@ import {
 } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToBucket } from "@/lib/storage";
+import { getMyLabelAnalytics } from "@/lib/analytics.functions";
+import { AnalyticsSection } from "@/components/AnalyticsSection";
 
 export const Route = createFileRoute("/label-dashboard")({
   head: () => ({ meta: [{ title: "Label Dashboard — Wesu+" }] }),
@@ -123,6 +125,7 @@ function Page() {
 function Overview({ labelId }: { labelId: string }) {
   const rosterFn = useServerFn(listLabelRoster);
   const revFn = useServerFn(listLabelRevenue);
+  const analyticsFn = useServerFn(getMyLabelAnalytics);
   const { data: roster } = useQuery({
     queryKey: ["roster", labelId],
     queryFn: () => rosterFn({ data: { label_id: labelId } }),
@@ -133,20 +136,28 @@ function Overview({ labelId }: { labelId: string }) {
     queryFn: () => revFn({ data: { label_id: labelId } }),
     retry: false,
   });
+  const { data: analytics } = useQuery({
+    queryKey: ["label-analytics", labelId],
+    queryFn: () => analyticsFn(),
+    staleTime: 60_000,
+  });
   return (
-    <div className="grid sm:grid-cols-3 gap-4">
-      <div className="bg-card border border-border rounded-2xl p-6">
-        <p className="text-2xl font-bold">{roster?.length ?? 0}</p>
-        <p className="text-xs text-muted-foreground mt-1">Active artists</p>
+    <div className="space-y-8">
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <p className="text-2xl font-bold">{roster?.length ?? 0}</p>
+          <p className="text-xs text-muted-foreground mt-1">Active artists</p>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <p className="text-2xl font-bold">ZMW {Number(rev?.total ?? 0).toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Lifetime revenue</p>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <p className="text-2xl font-bold">{rev?.splits.length ?? 0}</p>
+          <p className="text-xs text-muted-foreground mt-1">Recent splits</p>
+        </div>
       </div>
-      <div className="bg-card border border-border rounded-2xl p-6">
-        <p className="text-2xl font-bold">ZMW {Number(rev?.total ?? 0).toFixed(2)}</p>
-        <p className="text-xs text-muted-foreground mt-1">Lifetime revenue</p>
-      </div>
-      <div className="bg-card border border-border rounded-2xl p-6">
-        <p className="text-2xl font-bold">{rev?.splits.length ?? 0}</p>
-        <p className="text-xs text-muted-foreground mt-1">Recent splits</p>
-      </div>
+      <AnalyticsSection data={analytics} scope="label" title="Roster audience analytics" />
     </div>
   );
 }

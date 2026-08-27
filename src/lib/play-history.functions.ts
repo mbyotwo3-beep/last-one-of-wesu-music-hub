@@ -16,6 +16,32 @@ export const recordPlay = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Update the active play with the furthest position reached by the listener. */
+export const updatePlayProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { song_id: string; progress_seconds: number }) => d)
+  .handler(async ({ data, context }) => {
+    const progress = Math.max(0, Math.floor(Number(data.progress_seconds) || 0));
+    if (!progress) return { ok: true };
+    const { data: latest, error: readError } = await context.supabase
+      .from("play_history")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("song_id", data.song_id)
+      .order("played_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!latest?.id) return { ok: true };
+    const { error } = await context.supabase
+      .from("play_history")
+      .update({ progress_seconds: progress } as any)
+      .eq("id", latest.id)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 /**
  * Recently played songs — most recent play per song, newest first.
  * Powers the "Continue Listening" / "Recently Played" home shelf.

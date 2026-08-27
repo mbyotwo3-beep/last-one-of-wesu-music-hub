@@ -21,8 +21,10 @@ import {
   moderateLabel,
   getArtistDiagnostics,
 } from "@/lib/admin.functions";
+import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
+import { AnalyticsSection } from "@/components/AnalyticsSection";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — Wesu+" }] }),
@@ -142,9 +144,11 @@ function Overview({
 }) {
   const statsFn = useServerFn(getPlatformStats);
   const activityFn = useServerFn(getRecentActivity);
+  const analyticsFn = useServerFn(getPlatformAnalytics);
 
   const statsQ = useQuery({ queryKey: ["admin-stats"], queryFn: () => statsFn(), retry: 1 });
   const activityQ = useQuery({ queryKey: ["admin-activity"], queryFn: () => activityFn(), retry: 1 });
+  const analyticsQ = useQuery({ queryKey: ["admin-analytics"], queryFn: () => analyticsFn(), retry: 1, staleTime: 60_000 });
 
   if (statsQ.isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
   if (statsQ.error) return <div className="text-destructive">Error loading stats: {(statsQ.error as Error).message}</div>;
@@ -157,7 +161,7 @@ function Overview({
         { label: "Total Users", value: d.totalUsers.toLocaleString(), icon: Users, color: "text-blue-400" },
         { label: "Total Artists", value: (d as any).totalArtists?.toLocaleString() ?? "0", icon: Music, color: "text-purple-400" },
         { label: "Total Songs", value: d.totalSongs.toLocaleString(), icon: Music, color: "text-green-400" },
-        { label: "Active Subscriptions", value: d.premiumSubscribers.toLocaleString(), icon: CreditCard, color: "text-yellow-400" },
+        { label: "Completed purchases (30d)", value: d.completedPurchases30d.toLocaleString(), icon: CreditCard, color: "text-yellow-400" },
         { label: "Revenue (30 days)", value: `ZMW ${d.monthlyRevenueZmw.toFixed(2)}`, icon: TrendingUp, color: "text-primary" },
       ]
     : [];
@@ -185,6 +189,8 @@ function Overview({
           ))}
         </div>
       )}
+
+      <AnalyticsSection data={analyticsQ.data} scope="platform" title="Platform listening analytics" />
 
       {/* Pending action alerts */}
       {pendingItems.length > 0 && (

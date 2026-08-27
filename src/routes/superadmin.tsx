@@ -32,6 +32,8 @@ import {
 } from "@/lib/superadmin.functions";
 import { initializePlatformSettings } from "@/lib/pricing.functions";
 import { getPlatformStats } from "@/lib/admin.functions";
+import { getPlatformAnalytics } from "@/lib/analytics.functions";
+import { AnalyticsSection } from "@/components/AnalyticsSection";
 import {
   listAllFeaturedAdmin,
   upsertFeaturedSlot,
@@ -354,12 +356,19 @@ function FeaturedTab() {
 
 function OverviewTab() {
   const fn = useServerFn(getPlatformStats);
+  const analyticsFn = useServerFn(getPlatformAnalytics);
   const listPayoutsFn = useServerFn(listPayouts);
   const { data, isLoading, error } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
   const { data: payouts, error: payoutsError } = useQuery({
     queryKey: ["super-payouts-overview"],
     queryFn: () => listPayoutsFn(),
     retry: 1,
+  });
+  const { data: analytics } = useQuery({
+    queryKey: ["super-analytics"],
+    queryFn: () => analyticsFn(),
+    retry: 1,
+    staleTime: 60_000,
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
@@ -372,7 +381,7 @@ function OverviewTab() {
     { label: "Total Users", value: data.totalUsers.toLocaleString(), color: "text-blue-400" },
     { label: "Total Artists", value: ((data as any).totalArtists ?? 0).toLocaleString(), color: "text-purple-400" },
     { label: "Total Songs", value: data.totalSongs.toLocaleString(), color: "text-green-400" },
-    { label: "Premium Subscribers", value: data.premiumSubscribers.toLocaleString(), color: "text-yellow-400" },
+    { label: "Completed purchases (30d)", value: data.completedPurchases30d.toLocaleString(), color: "text-yellow-400" },
     {
       label: "Revenue (30 days)",
       value: `ZMW ${data.monthlyRevenueZmw.toFixed(2)}`,
@@ -395,6 +404,8 @@ function OverviewTab() {
           </div>
         ))}
       </div>
+
+      <AnalyticsSection data={analytics} scope="platform" title="Platform listening analytics" />
 
       {/* Pending payout alert */}
       {pendingPayouts.length > 0 && (

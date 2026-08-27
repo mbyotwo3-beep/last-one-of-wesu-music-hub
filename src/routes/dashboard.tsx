@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { getMyOverview } from "@/lib/user.functions";
+import { getMyListenerAnalytics } from "@/lib/analytics.functions";
+import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { getMyLabel } from "@/lib/labels.functions";
 import { useCurrency } from "@/stores/currency";
 
@@ -55,6 +57,7 @@ function DashboardPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const fetchOverview = useServerFn(getMyOverview);
+  const fetchAnalytics = useServerFn(getMyListenerAnalytics);
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
@@ -65,6 +68,12 @@ function DashboardPage() {
     queryKey: ["my-overview", user?.id],
     queryFn: () => fetchOverview(),
     enabled: !!user,
+  });
+  const { data: analytics } = useQuery({
+    queryKey: ["listener-analytics", user?.id],
+    queryFn: () => fetchAnalytics(),
+    enabled: !!user,
+    staleTime: 60_000,
   });
 
   if (loading || !user) return null;
@@ -99,6 +108,10 @@ function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
             </Link>
           ))}
+        </div>
+
+        <div className="mb-10">
+          <AnalyticsSection data={analytics} scope="listener" title="Your listening" />
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 mb-8">

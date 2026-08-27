@@ -28,7 +28,7 @@ import {
   getPreviewAudioUrl,
   incrementPlayCount,
 } from "@/lib/listener.functions";
-import { recordPlay } from "@/lib/play-history.functions";
+import { recordPlay, updatePlayProgress } from "@/lib/play-history.functions";
 import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
@@ -88,6 +88,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const incrementFn = useServerFn(incrementPlayCount);
   const recordPlayFn = useServerFn(recordPlay);
+  const updatePlayProgressFn = useServerFn(updatePlayProgress);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const currentTrackId = useRef<string | null>(null);
+  const trackedHistoryTrackRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
@@ -110,12 +112,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Load audio when track changes
   useEffect(() => {
     if (!track) {
+      const previousId = currentTrackId.current;
+      const previousProgress = usePlayer.getState().progressSeconds;
+      if (user && previousId && !isPreview && previousProgress > 0) {
+        updatePlayProgressFn({ data: { song_id: previousId, progress_seconds: previousProgress } }).catch(() => {});
+      }
       if (currentTrackId.current) stopNative(currentTrackId.current).catch(() => {});
       getAudio().pause();
       currentTrackId.current = null;
       setLoading(false);
       setIsPreview(false);
       setAudioDuration(0);
+      trackedHistoryTrackRef.current = null;
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
         previewTimerRef.current = null;
@@ -125,12 +133,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     if (currentTrackId.current === track.id) return;
 
     if (currentTrackId.current) {
+      const previousId = currentTrackId.current;
+      const previousProgress = usePlayer.getState().progressSeconds;
+      if (user && !isPreview && previousProgress > 0) {
+        updatePlayProgressFn({ data: { song_id: previousId, progress_seconds: previousProgress } }).catch(() => {});
+      }
       stopNative(currentTrackId.current).catch(() => {});
       nativeCleanupRef.current?.();
       nativeCleanupRef.current = null;
     }
 
     currentTrackId.current = track.id;
+    trackedHistoryTrackRef.current = null;
     setError(null);
     setLoading(true);
     setIsPreview(false);
@@ -195,6 +209,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               await playNative(track!.id);
               setLoading(false);
               if (!playing) usePlayer.getState().togglePlay();
+              if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
+                trackedHistoryTrackRef.current = track!.id;
+                recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
+              }
               if (previewMode) {
                 previewTimerRef.current = setTimeout(() => {
                   stopNative(track!.id).catch(() => {});
@@ -210,6 +228,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 }
                 usePlayer.getState().skipNext();
                 if (track && user && !previewMode) {
+                  updatePlayProgressFn({ data: { song_id: track!.id, progress_seconds: Math.floor(track.durationSeconds ?? 0) } }).catch(() => {});
                   incrementFn({ data: { song_id: track!.id } }).catch(() => {});
                 }
               });
@@ -232,7 +251,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const onPlaying = () => {
           setLoading(false);
           // Log the play to build a personalized "Recently Played" shelf.
-          if (user && !previewMode) {
+          if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
+            trackedHistoryTrackRef.current = track!.id;
             recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
           }
         };
@@ -306,6 +326,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     const onEnded = () => {
       const st = usePlayer.getState();
       if (track && user && !isPreview) {
+        updatePlayProgressFn({ data: { song_id: track.id, progress_seconds: Math.floor(audio.currentTime || audio.duration || 0) } }).catch(() => {});
         incrementFn({ data: { song_id: track.id } }).catch(() => {});
       }
       if (st.repeat === "one") {

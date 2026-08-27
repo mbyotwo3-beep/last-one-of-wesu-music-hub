@@ -7,11 +7,13 @@ import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { getMyArtistOverview } from "@/lib/user.functions";
+import { getMyArtistAnalytics } from "@/lib/analytics.functions";
 import { requestArtistVerification } from "@/lib/artist.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
+import { AnalyticsSection } from "@/components/AnalyticsSection";
 
 export const Route = createFileRoute("/artist-dashboard")({
   head: () => ({
@@ -31,6 +33,7 @@ function ArtistDashboardPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getMyArtistOverview);
+  const fetchAnalytics = useServerFn(getMyArtistAnalytics);
   const requestVerificationFn = useServerFn(requestArtistVerification);
   const verificationConfigFn = useServerFn(getVerificationConfig);
   const formatPrice = useCurrency((s) => s.formatPrice);
@@ -44,6 +47,12 @@ function ArtistDashboardPage() {
     queryFn: () => fetchOverview(),
     enabled: !!user,
     retry: 1,
+  });
+  const { data: analytics } = useQuery({
+    queryKey: ["artist-analytics", user?.id],
+    queryFn: () => fetchAnalytics(),
+    enabled: !!user,
+    staleTime: 60_000,
   });
 
   const { data: verificationConfig } = useQuery({
@@ -187,6 +196,10 @@ function ArtistDashboardPage() {
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mb-8">
+          <AnalyticsSection data={analytics} scope="artist" title="Audience analytics" />
         </div>
 
         {/* Verification Status Banner / Application Card */}
