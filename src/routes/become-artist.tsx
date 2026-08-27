@@ -2,11 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic2, Clock, CheckCircle2, XCircle, Check } from "lucide-react";
+import { Mic2, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { applyAsArtist } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
+import { TermsConsent } from "@/components/TermsConsent";
 
 export const Route = createFileRoute("/become-artist")({
   head: () => ({ meta: [{ title: "Become an Artist — Wesu+" }] }),
@@ -47,7 +48,13 @@ function Page() {
       toast.error("You must agree to the Artist Terms & Conditions to submit an application.");
       return;
     }
-    m.mutate({ data: form });
+    m.mutate({
+      data: {
+        ...form,
+        termsAccepted: true,
+        termsVersion: "2025-08-01",
+      },
+    });
   };
 
   if (isLoading) {
@@ -152,25 +159,12 @@ function Page() {
           />
         </label>
         {m.error ? <p className="text-sm text-destructive">{(m.error as Error).message}</p> : null}
-        <label className="flex items-start gap-3 cursor-pointer">
-          <div className="relative mt-0.5">
-            <input
-              type="checkbox"
-              checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="peer sr-only"
-            />
-            <div className="size-5 rounded border border-white/20 bg-card peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
-              {agreedToTerms && <Check className="size-3.5 text-obsidian" />}
-            </div>
-          </div>
-          <span className="text-sm text-muted-foreground">
-            I agree to the{" "}
-            <Link to="/terms-artist" className="text-primary hover:underline font-medium">
-              Artist Terms &amp; Conditions
-            </Link>
-          </span>
-        </label>
+        <TermsConsent
+          kind="artist"
+          checked={agreedToTerms}
+          onCheckedChange={setAgreedToTerms}
+          disabled={m.isPending}
+        />
         <button
           disabled={m.isPending || !agreedToTerms}
           className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-50"

@@ -2,10 +2,11 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff, Check } from "lucide-react";
+import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toggleFollow } from "@/lib/follow.functions";
 import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
+import { TermsConsent } from "@/components/TermsConsent";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -61,7 +62,12 @@ function AuthPage() {
           email,
           password,
           options: {
-            data: { full_name: name },
+            data: {
+              full_name: name,
+              terms_accepted: true,
+              terms_accepted_at: new Date().toISOString(),
+              terms_version: "2025-08-01",
+            },
             emailRedirectTo: `${window.location.origin}${redirect || "/dashboard"}`,
           },
         });
@@ -189,29 +195,12 @@ function AuthPage() {
             </div>
           </div>
           {mode === "signup" && (
-            <label className="flex items-start gap-3 cursor-pointer">
-              <div className="relative mt-0.5">
-                <input
-                  type="checkbox"
-                  checked={agreedToTerms}
-                  onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <div className="size-5 rounded border border-white/20 bg-card peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
-                  {agreedToTerms && <Check className="size-3.5 text-obsidian" />}
-                </div>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                I agree to the{" "}
-                <Link to="/terms" className="text-primary hover:underline font-medium">
-                  Terms & Conditions
-                </Link>{" "}
-                and{" "}
-                <Link to="/terms-listener" className="text-primary hover:underline font-medium">
-                  Listener Agreement
-                </Link>
-              </span>
-            </label>
+            <TermsConsent
+              kind="listener"
+              checked={agreedToTerms}
+              onCheckedChange={setAgreedToTerms}
+              disabled={loading}
+            />
           )}
           <button
             type="submit"
@@ -241,6 +230,15 @@ function AuthPage() {
         <button
           type="button"
           onClick={async () => {
+            // OAuth can create a brand-new account even when the page is still
+            // in sign-in mode, so it must not bypass the terms acknowledgement.
+            if (!agreedToTerms) {
+              setMode("signup");
+              setError(
+                "Review and agree to the Listener Terms & Conditions before continuing with Google.",
+              );
+              return;
+            }
             setLoading(true);
             const result = await lovable.auth.signInWithOAuth("google", {
               redirect_uri: window.location.origin,

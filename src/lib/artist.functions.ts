@@ -26,9 +26,22 @@ async function audit(
 
 export const applyAsArtist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { name: string; bio?: string; genre?: string }) => d)
+  .validator(
+    (d: {
+      name: string;
+      bio?: string;
+      genre?: string;
+      termsAccepted: boolean;
+      termsVersion?: string;
+    }) => d,
+  )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+    if (!data.termsAccepted) {
+      throw new Error("You must agree to the Artist Terms & Conditions before applying.");
+    }
+    const termsVersion = data.termsVersion ?? "2025-08-01";
+    const termsAcceptedAt = new Date().toISOString();
     const { data: existing } = await supabase
       .from("artists")
       .select("id, status")
@@ -51,7 +64,10 @@ export const applyAsArtist = createServerFn({ method: "POST" })
         .select("id, status")
         .single();
       if (error) throw new Error(error.message);
-      await audit(supabase, userId, "artist.reapply", "artist", row!.id);
+      await audit(supabase, userId, "artist.reapply", "artist", row!.id, {
+        terms_version: termsVersion,
+        terms_accepted_at: termsAcceptedAt,
+      });
       return { ok: true, status: row!.status, id: row!.id };
     }
 
@@ -67,7 +83,10 @@ export const applyAsArtist = createServerFn({ method: "POST" })
       .select("id, status")
       .single();
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "artist.apply", "artist", row!.id);
+    await audit(supabase, userId, "artist.apply", "artist", row!.id, {
+      terms_version: termsVersion,
+      terms_accepted_at: termsAcceptedAt,
+    });
     return { ok: true, status: row!.status, id: row!.id };
   });
 
