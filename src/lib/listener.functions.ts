@@ -184,6 +184,68 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
   });
 
 /**
+ * Create a short-lived download URL for an entitled song.
+ * Paid audio is never made public: ownership is checked against completed
+ * song/album purchases before Storage signs the private object.
+ */
+export const getDownloadAudioUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { song_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { data: song, error: songError } = await context.supabase
+      .from("songs")
+      .select("id,title,audio_url,price,album_id,status")
+      .eq("id", data.song_id)
+      .maybeSingle();
+    if (songError) throw new Error(songError.message);
+    if (!song || song.status !== "approved") throw new Error("Song is not available for download");
+
+    const isSuper = await isSuperadminUser(context.supabase, context.userId);
+    if (!isSuper && Number(song.price ?? 0) > 0) {
+      const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
+        context.supabase
+          .from("purchases")
+          .select("id")
+          .eq("user_id", context.userId)
+          .eq("song_id", song.id)
+          .eq("status", "completed")
+          .maybeSingle(),
+        song.album_id
+          ? context.supabase
+              .from("purchases")
+              .select("id")
+              .eq("user_id", context.userId)
+              .eq("album_id", song.album_id)
+              .eq("status", "completed")
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      if (!songPurchase && !albumPurchase) throw new Error("Purchase required before downloading this song");
+    }
+
+    const rawPath = String(song.audio_url ?? "");
+    if (!rawPath || rawPath === "null") throw new Error("Song audio file not found");
+    const extension = rawPath.match(/\.([a-z0-9]{2,5})(?:\?|$)/i)?.[1]?.toLowerCase() ?? "mp3";
+    const safeTitle = String(song.title ?? "song")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "song";
+    const filename = `${safeTitle}.${extension}`;
+
+    if (/^https?:\/\//i.test(rawPath)) {
+      const url = new URL(rawPath);
+      url.searchParams.set("download", filename);
+      return { url: url.toString(), filename };
+    }
+
+    const { data: signed, error } = await context.supabase.storage
+      .from("song-audio")
+      .createSignedUrl(rawPath, 3600, { download: filename });
+    if (error || !signed?.signedUrl) throw new Error(error?.message ?? "Unable to prepare download");
+    return { url: signed.signedUrl, filename };
+  });
+
+/**
  * Get a signed audio URL for a free song without requiring authentication.
  * If the song has a price > 0, throws an error — use getSignedAudioUrl instead.
  * Anonymous listeners hear the song with ads (enforced client-side).

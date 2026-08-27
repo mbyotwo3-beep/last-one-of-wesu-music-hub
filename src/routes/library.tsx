@@ -5,6 +5,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
+import { DownloadButton } from "@/components/DownloadButton";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -184,6 +185,7 @@ function Page() {
                 <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full">
                   Owned
                 </span>
+                <DownloadButton songId={song.id} />
               </div>
             ))}
           </div>

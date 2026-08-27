@@ -5,6 +5,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { Play, ShoppingBag } from "lucide-react";
+import { DownloadButton } from "@/components/DownloadButton";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -129,6 +130,7 @@ function AlbumPage() {
                   <span className="text-primary text-sm font-bold">
                     {useCurrency.getState().formatPrice(s.price)}
                   </span>
+                  <DownloadButton songId={s.id} />
                   {Number(s.price) > 0 && (
                     <Link
                       to="/checkout"
