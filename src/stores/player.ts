@@ -11,6 +11,16 @@ export interface PlayerTrack {
 
 export type RepeatMode = "off" | "all" | "one";
 
+function preserveResolvedAudioUrl(
+  next: PlayerTrack | null,
+  current: PlayerTrack | null,
+): PlayerTrack | null {
+  if (!next || !current || next.id !== current.id || next.audioUrl !== undefined) {
+    return next;
+  }
+  return { ...next, audioUrl: current.audioUrl };
+}
+
 interface PlayerState {
   track: PlayerTrack | null;
   queue: PlayerTrack[];
@@ -26,6 +36,14 @@ interface PlayerState {
   isPreview: boolean;
   setIsPreview: (v: boolean) => void;
   setTrack: (t: PlayerTrack | null) => void;
+  /**
+   * Update the resolved audio URL for the active track.
+   *
+   * `undefined` means the URL is still being resolved, while `null` means
+   * resolution failed or the track has no playable source. Mobile controls
+   * use this distinction to show a spinner only while a request is in flight.
+   */
+  setAudioUrl: (url: string | null | undefined) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
   skipNext: () => void;
   skipPrev: () => void;
@@ -56,10 +74,19 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   isPreview: false,
 
   setIsPreview: (v) => set({ isPreview: v }),
-  setTrack: (t) => set({ track: t, playing: !!t, progressSeconds: 0, liked: false, isPreview: false }),
+  setTrack: (t) =>
+    set((state) => ({
+      track: preserveResolvedAudioUrl(t, state.track),
+      playing: !!t,
+      progressSeconds: 0,
+      liked: false,
+      isPreview: false,
+    })),
+  setAudioUrl: (url) =>
+    set((state) => (state.track ? { track: { ...state.track, audioUrl: url } } : state)),
 
   setQueue: (tracks, startIndex = 0) => {
-    const track = tracks[startIndex] ?? null;
+    const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
     set({ queue: tracks, queueIndex: startIndex, track, playing: !!track, progressSeconds: 0, liked: false });
   },
 
@@ -76,7 +103,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         next = 0;
       }
     }
-    set({ queueIndex: next, track: queue[next], progressSeconds: 0, liked: false, playing: true });
+    set((state) => ({
+      queueIndex: next,
+      track: preserveResolvedAudioUrl(queue[next], state.track),
+      progressSeconds: 0,
+      liked: false,
+      playing: true,
+    }));
   },
 
   skipPrev: () => {
@@ -89,7 +122,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }
     if (!queue.length) return;
     const prev = (queueIndex - 1 + queue.length) % queue.length;
-    set({ queueIndex: prev, track: queue[prev], progressSeconds: 0, liked: false, playing: true });
+    set((state) => ({
+      queueIndex: prev,
+      track: preserveResolvedAudioUrl(queue[prev], state.track),
+      progressSeconds: 0,
+      liked: false,
+      playing: true,
+    }));
   },
 
   togglePlay: () => set((s) => ({ playing: !s.playing })),

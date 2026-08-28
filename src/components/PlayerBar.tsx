@@ -73,6 +73,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const queue = usePlayer((s) => s.queue);
   const queueIndex = usePlayer((s) => s.queueIndex);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const setAudioUrl = usePlayer((s) => s.setAudioUrl);
   const setProgress = usePlayer((s) => s.setProgress);
   const setVolume = usePlayer((s) => s.setVolume);
   const toggleMute = usePlayer((s) => s.toggleMute);
@@ -101,6 +102,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const currentTrackId = useRef<string | null>(null);
   const trackedHistoryTrackRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
+  const audioEventsCleanupRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
@@ -118,6 +120,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         updatePlayProgressFn({ data: { song_id: previousId, progress_seconds: previousProgress } }).catch(() => {});
       }
       if (currentTrackId.current) stopNative(currentTrackId.current).catch(() => {});
+      audioEventsCleanupRef.current?.();
+      audioEventsCleanupRef.current = null;
       getAudio().pause();
       currentTrackId.current = null;
       setLoading(false);
@@ -141,12 +145,17 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       stopNative(currentTrackId.current).catch(() => {});
       nativeCleanupRef.current?.();
       nativeCleanupRef.current = null;
+      audioEventsCleanupRef.current?.();
+      audioEventsCleanupRef.current = null;
     }
 
     currentTrackId.current = track.id;
     trackedHistoryTrackRef.current = null;
     setError(null);
     setLoading(true);
+    // Mobile controls use the shared track URL to distinguish in-flight
+    // resolution from a ready or failed audio source.
+    setAudioUrl(undefined);
     setIsPreview(false);
     setAudioDuration(0);
     if (previewTimerRef.current) {
@@ -159,6 +168,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     audio.src = "";
 
     let retries = 0;
+    const isCurrentTrack = () => currentTrackId.current === track!.id;
     async function loadUrl() {
       try {
         let url: string;
@@ -190,6 +200,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           setShowAd(true);
         }
 
+        // A newer selection may have replaced this request while it was
+        // resolving. Never publish or play an old track's URL on the new one.
+        if (!isCurrentTrack()) return;
+
         // Validate URL is absolute HTTPS/HTTP so the browser can't accidentally
         // resolve a bare filename against the current origin (which caused the
         // OpaqueResponseBlocking errors on wesuplusly.com).
@@ -206,9 +220,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           if (_nativeAvailable) {
             const preloaded = await preloadNative(track!.id, url);
             if (preloaded) {
-              await playNative(track!.id);
+              if (!isCurrentTrack()) {
+                await stopNative(track!.id).catch(() => {});
+                return;
+              }
+              // Native playback is ready only after preload succeeds.
+              setAudioUrl(url);
+              if (usePlayer.getState().playing) {
+                await playNative(track!.id);
+              }
               setLoading(false);
-              if (!playing) usePlayer.getState().togglePlay();
               if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
                 trackedHistoryTrackRef.current = track!.id;
                 recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
@@ -216,7 +237,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               if (previewMode) {
                 previewTimerRef.current = setTimeout(() => {
                   stopNative(track!.id).catch(() => {});
-                  usePlayer.getState().togglePlay();
+                  if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
                   setError("Preview ended. Buy this track for full access.");
 
                 }, 15000);
@@ -232,6 +253,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   incrementFn({ data: { song_id: track!.id } }).catch(() => {});
                 }
               });
+              if (!isCurrentTrack()) {
+                cleanup();
+                await stopNative(track!.id).catch(() => {});
+                return;
+              }
               nativeCleanupRef.current = cleanup;
               return;
             }
@@ -245,10 +271,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           audio.removeEventListener("playing", onPlaying);
           audio.removeEventListener("play", onPlay);
           audio.removeEventListener("error", onError);
+          if (audioEventsCleanupRef.current === cleanupEvents) {
+            audioEventsCleanupRef.current = null;
+          }
         };
-        const onCanPlay = () => setLoading(false);
-        const onPlay = () => setLoading(false);
+        const onCanPlay = () => {
+          if (isCurrentTrack()) setLoading(false);
+        };
+        const onPlay = () => {
+          if (isCurrentTrack()) setLoading(false);
+        };
         const onPlaying = () => {
+          if (!isCurrentTrack()) return;
           setLoading(false);
           // Log the play to build a personalized "Recently Played" shelf.
           if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
@@ -257,8 +291,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           }
         };
         const onError = () => {
+          if (!isCurrentTrack()) return;
           cleanupEvents();
           setLoading(false);
+          setAudioUrl(null);
           setError("Failed to load audio. Please try again.");
           if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
         };
@@ -266,35 +302,51 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         audio.addEventListener("play", onPlay);
         audio.addEventListener("playing", onPlaying);
         audio.addEventListener("error", onError);
+        audioEventsCleanupRef.current = cleanupEvents;
 
         audio.src = url;
         audio.volume = muted ? 0 : volume;
+        // The source is now attached, so mobile controls can safely enable
+        // pause/play even if autoplay is blocked by the browser.
+        setAudioUrl(url);
         try {
-          await audio.play();
+          if (usePlayer.getState().playing) {
+            await audio.play();
+          } else {
+            setLoading(false);
+          }
         } catch (playErr) {
-          // Autoplay blocked or transient — keep listeners so a subsequent
-          // togglePlay from the user still resolves loading via events.
+          // A mobile browser may block the delayed autoplay after the signed
+          // URL request. Keep the source ready and let the user's next tap
+          // start it through the sync effect.
           setLoading(false);
-          throw playErr;
+          if ((playErr as DOMException)?.name === "NotAllowedError") {
+            if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+          } else {
+            throw playErr;
+          }
         }
-        if (!playing) usePlayer.getState().togglePlay();
+
+        if (!isCurrentTrack()) return;
 
         if (previewMode) {
           previewTimerRef.current = setTimeout(() => {
             audio.pause();
-            usePlayer.getState().togglePlay();
+            if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
             setError("Preview ended. Buy this track for full access.");
           }, 15000);
         }
       } catch (err) {
+        if (!isCurrentTrack()) return;
         if (retries < 2) {
           retries++;
           await new Promise((r) => setTimeout(r, 1000));
           return loadUrl();
         }
         setLoading(false);
+        setAudioUrl(null);
         setError((err as Error).message);
-        if (playing) usePlayer.getState().togglePlay();
+        if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
       }
     }
     loadUrl();

@@ -77,7 +77,8 @@ export function NowPlayingSheet() {
   const displayProgress = isDragging ? dragProgress : progressSeconds;
   const progressPct = dur > 0 ? Math.min((displayProgress / dur) * 100, 100) : 0;
 
-  const isLoading = track?.audioUrl === undefined;
+  // Keep pause available while the requested source is still resolving.
+  const isLoading = track?.audioUrl === undefined && !playing;
 
   // Sync volume to audio element
   useEffect(() => {
@@ -360,10 +361,10 @@ export function NowPlayingSheet() {
             className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50 cursor-pointer hover:scale-105"
             aria-label={playing ? "Pause" : "Play"}
           >
-            {isLoading ? (
-              <Loader2 className="size-7 text-black animate-spin" />
-            ) : playing ? (
+            {playing ? (
               <Pause className="size-7 text-black fill-black" />
+            ) : isLoading ? (
+              <Loader2 className="size-7 text-black animate-spin" />
             ) : (
               <Play className="size-7 text-black fill-black ml-1" />
             )}

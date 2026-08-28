@@ -29,7 +29,7 @@ export function NowPlayingScreen() {
   const playing = usePlayer((s) => s.playing);
   const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
-  const loading = usePlayer((s) => s.loading);
+  const audioUrl = usePlayer((s) => s.track?.audioUrl);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const toggleLikeStore = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
@@ -42,6 +42,8 @@ export function NowPlayingScreen() {
   if (!track) return null;
 
   const dur = track.durationSeconds ?? 0;
+  // Keep pause available while the requested source is still resolving.
+  const isLoading = audioUrl === undefined && !playing;
 
   async function handleLike() {
     if (!user || !track || liking) return;
@@ -159,13 +161,13 @@ export function NowPlayingScreen() {
         </button>
         <button
           onClick={togglePlay}
-          disabled={loading}
+          disabled={isLoading}
           className="min-h-[56px] min-w-[56px] flex items-center justify-center bg-foreground text-obsidian rounded-full hover:scale-105 transition-transform disabled:opacity-30"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (
             <Pause className="size-6" />
-          ) : loading ? (
+          ) : isLoading ? (
             <Loader2 className="size-6 animate-spin" />
           ) : (
             <Play className="size-6 ml-0.5" />

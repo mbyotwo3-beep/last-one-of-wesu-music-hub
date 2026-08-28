@@ -27,7 +27,10 @@ export function MiniPlayer() {
 
   if (!track) return null;
 
-  const isLoading = track.audioUrl === undefined;
+  // A track is allowed to be paused while its URL is still resolving. The
+  // player starts in `playing=true`, so loading must never lock the pause
+  // control once playback has been requested.
+  const isLoading = track.audioUrl === undefined && !playing;
   const dur = track.durationSeconds ?? 0;
   const progress = dur > 0 ? Math.min((progressSeconds / dur) * 100, 100) : 0;
 
@@ -96,10 +99,10 @@ export function MiniPlayer() {
               className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all disabled:opacity-40 cursor-pointer rounded-full hover:bg-white/10"
               aria-label={playing ? "Pause" : "Play"}
             >
-              {isLoading ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : playing ? (
+              {playing ? (
                 <Pause className="size-5 fill-white" />
+              ) : isLoading ? (
+                <Loader2 className="size-5 animate-spin" />
               ) : (
                 <Play className="size-5 fill-white" />
               )}
