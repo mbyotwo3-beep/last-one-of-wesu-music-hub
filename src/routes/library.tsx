@@ -22,6 +22,12 @@ function LibraryRoute() {
   return <Page />;
 }
 
+function hasId(value: unknown): value is { id: string } {
+  if (!value || typeof value !== "object") return false;
+  const id = (value as { id?: unknown }).id;
+  return typeof id === "string" && id.length > 0;
+}
+
 function Page() {
   const { user } = useAuth();
 
@@ -34,7 +40,7 @@ function Page() {
         .select("songs(*, artists(name))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      return data?.map((item: any) => item.songs) ?? [];
+      return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
   });
@@ -50,7 +56,7 @@ function Page() {
         .eq("status", "completed")
         .is("album_id", null)
         .order("created_at", { ascending: false });
-      return data?.map((item: any) => item.songs) ?? [];
+      return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
   });
@@ -66,7 +72,7 @@ function Page() {
         .eq("status", "completed")
         .not("album_id", "is", null)
         .order("created_at", { ascending: false });
-      return data?.map((item: any) => item.albums) ?? [];
+      return (data ?? []).map((item: any) => item.albums).filter(hasId);
     },
     enabled: !!user?.id,
   });
@@ -80,7 +86,7 @@ function Page() {
         .select("artists(*)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      return data?.map((item: any) => item.artists) ?? [];
+      return (data ?? []).map((item: any) => item.artists).filter(hasId);
     },
     enabled: !!user?.id,
   });
@@ -88,6 +94,13 @@ function Page() {
   if (likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
+
+  // Relationships can be null when a referenced row was deleted or hidden by
+  // RLS. Keep rendering defensive even if a cached query contains one.
+  const safeLikedSongs = (likedSongs ?? []).filter(hasId);
+  const safePurchasedSongs = (purchasedSongs ?? []).filter(hasId);
+  const safePurchasedAlbums = (purchasedAlbums ?? []).filter(hasId);
+  const safeFollowedArtists = (followedArtists ?? []).filter(hasId);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
@@ -98,11 +111,11 @@ function Page() {
           <Users className="size-5 text-primary" />
           <h2 className="text-xl font-semibold">Followed Artists</h2>
         </div>
-        {!followedArtists || followedArtists.length === 0 ? (
+        {safeFollowedArtists.length === 0 ? (
           <p className="text-muted-foreground">No followed artists yet. Follow artists to see them here.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {followedArtists.map((artist: any) => (
+            {safeFollowedArtists.map((artist: any) => (
               <Link
                 key={artist.id}
                 to="/artists/$id"
@@ -128,11 +141,11 @@ function Page() {
           <Heart className="size-5 text-primary" />
           <h2 className="text-xl font-semibold">Liked Songs</h2>
         </div>
-        {!likedSongs || likedSongs.length === 0 ? (
+        {safeLikedSongs.length === 0 ? (
           <p className="text-muted-foreground">No liked songs yet.</p>
         ) : (
           <div className="space-y-2">
-            {likedSongs.map((song: any) => (
+            {safeLikedSongs.map((song: any) => (
               <div
                 key={song.id}
                 className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
@@ -164,11 +177,11 @@ function Page() {
           <Music className="size-5 text-primary" />
           <h2 className="text-xl font-semibold">Purchased Singles</h2>
         </div>
-        {!purchasedSongs || purchasedSongs.length === 0 ? (
+        {safePurchasedSongs.length === 0 ? (
           <p className="text-muted-foreground">No purchased singles yet.</p>
         ) : (
           <div className="space-y-2">
-            {purchasedSongs.map((song: any) => (
+            {safePurchasedSongs.map((song: any) => (
               <div
                 key={song.id}
                 className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
@@ -198,11 +211,11 @@ function Page() {
           <Disc className="size-5 text-primary" />
           <h2 className="text-xl font-semibold">Purchased Albums</h2>
         </div>
-        {!purchasedAlbums || purchasedAlbums.length === 0 ? (
+        {safePurchasedAlbums.length === 0 ? (
           <p className="text-muted-foreground">No purchased albums yet.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {purchasedAlbums.map((album: any) => (
+            {safePurchasedAlbums.map((album: any) => (
               <Link
                 key={album.id}
                 to="/albums/$id"
