@@ -83,6 +83,7 @@ export const verifyPayment = createServerFn({ method: "POST" })
       tx.id,
       isSuccess ? "successful" : "failed",
       remote.id ?? null,
+      isFailure ? remote.reasonForFailure : null,
     );
 
     const { data: fresh } = await supabase
@@ -205,10 +206,8 @@ export const initiatePayment = createServerFn({ method: "POST" })
           message: "Check your phone and approve the payment prompt to complete this purchase.",
         };
       } catch (e: any) {
-        await supabaseAdmin
-          .from("payment_transactions")
-          .update({ status: "failed" } as any)
-          .eq("id", tx.id);
+        const { settleTransaction } = await import("@/lib/payments.server");
+        await settleTransaction(tx.id, "failed", null, e?.message ?? "Unable to start payment");
         throw new Error(e?.message ?? "Failed to start mobile money payment");
       }
     }
@@ -250,10 +249,8 @@ export const initiatePayment = createServerFn({ method: "POST" })
           },
         };
       }
-      await supabaseAdmin
-        .from("payment_transactions")
-        .update({ status: "failed" } as any)
-        .eq("id", tx.id);
+      const { settleTransaction } = await import("@/lib/payments.server");
+      await settleTransaction(tx.id, "failed", null, e?.message ?? "Unable to start payment");
       throw new Error(e?.message ?? "Failed to start card payment");
     }
   });

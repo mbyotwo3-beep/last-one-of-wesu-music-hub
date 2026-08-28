@@ -110,6 +110,8 @@ function CheckoutSuccessPage() {
   const isFailed = transaction?.status === "failed";
   const isPending = transaction?.status === "pending";
   const tx: any = transaction;
+  const failureReason =
+    typeof tx?.metadata?.failure_reason === "string" ? tx.metadata.failure_reason : null;
 
   const StatusBadge = () => {
     if (isSuccess) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-500 border border-green-500/20">Completed</span>;
@@ -188,7 +190,8 @@ function CheckoutSuccessPage() {
               <XCircle className="size-16 text-red-500 mx-auto mb-4" />
               <h1 className="text-3xl font-bold mb-2">Payment Failed</h1>
               <p className="text-muted-foreground mb-6">
-                Your payment could not be processed. Please try again or contact support.
+                {failureReason ??
+                  "Your payment could not be processed. Please try again or contact support."}
               </p>
               <Receipt />
               <button

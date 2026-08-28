@@ -44,11 +44,31 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         const { settleTransaction } = await import("@/lib/payments.server");
 
         // Our `reference` == payment_transactions.id
-        const { data: row } = await supabaseAdmin
+        let { data: row } = await supabaseAdmin
           .from("payment_transactions")
           .select("*")
           .eq("id", reference ?? "")
           .maybeSingle();
+
+        // Some Lenco webhook payloads omit our reference and only include
+        // Lenco's collection id. Fall back to both provider columns so those
+        // notifications still settle the right transaction.
+        if (!row && providerRef) {
+          const byToken = await supabaseAdmin
+            .from("payment_transactions")
+            .select("*")
+            .eq("provider_token", providerRef)
+            .maybeSingle();
+          row = byToken.data;
+        }
+        if (!row && providerRef) {
+          const byReference = await supabaseAdmin
+            .from("payment_transactions")
+            .select("*")
+            .eq("provider_ref", providerRef)
+            .maybeSingle();
+          row = byReference.data;
+        }
 
         if (!row) {
           console.warn("[Lenco webhook] Unknown reference:", reference);
@@ -73,7 +93,12 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
           // Idempotent: only the caller that wins pending → completed fulfils.
           await settleTransaction(row.id, "successful", providerRef ?? null);
         } else if (isFailure) {
-          await settleTransaction(row.id, "failed", providerRef ?? null);
+          await settleTransaction(
+            row.id,
+            "failed",
+            providerRef ?? null,
+            tx.reasonForFailure ?? tx.reason ?? null,
+          );
         }
 
         return new Response("OK", { status: 200 });

@@ -18,11 +18,11 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 const DEFAULT_BASE = "https://api.lenco.co/access/v2";
 
 function apiBase(): string {
-  return process.env.LENCO_API_URL || DEFAULT_BASE;
+  return (process.env.LENCO_API_URL || DEFAULT_BASE).replace(/\/+$/, "");
 }
 
 function secretKey(): string {
-  const k = process.env.LENCO_SECRET_KEY;
+  const k = process.env.LENCO_SECRET_KEY?.trim();
   if (!k) throw new Error("LENCO_SECRET_KEY is not configured");
   return k;
 }
@@ -30,6 +30,7 @@ function secretKey(): string {
 interface LencoResponse<T> {
   status: boolean;
   message?: string;
+  errorCode?: string;
   data?: T;
 }
 
@@ -52,7 +53,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok || json.status === false) {
     const detail = (json as any).errors ? ` (${JSON.stringify((json as any).errors)})` : "";
     console.error(`[Lenco] ${path} ${res.status}: ${text.slice(0, 500)}`);
-    throw new Error(`Lenco ${path} failed: ${json.message ?? res.statusText}${detail}`);
+    const code = json.errorCode ? ` [code ${json.errorCode}]` : "";
+    throw new Error(`Lenco ${path} failed: ${json.message ?? res.statusText}${code}${detail}`);
   }
   if (!json.data) throw new Error(`Lenco ${path} returned no data`);
   return json.data;
@@ -200,21 +202,39 @@ export async function initiateCardCheckout(input: LencoCardInput): Promise<Lenco
  */
 export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
   if (!signature) return false;
-  const apiToken = process.env.LENCO_SECRET_KEY;
+  const apiToken = process.env.LENCO_SECRET_KEY?.trim();
   if (!apiToken) {
     console.error("[Lenco webhook] LENCO_SECRET_KEY not configured");
     return false;
   }
   const webhookHashKey = createHash("sha256").update(apiToken).digest("hex");
-  const expected = createHmac("sha512", webhookHashKey).update(rawBody).digest("hex");
-  const sig = Buffer.from(signature.trim().toLowerCase(), "utf8");
-  const exp = Buffer.from(expected, "utf8");
-  if (sig.length !== exp.length) return false;
-  try {
-    return timingSafeEqual(sig, exp);
-  } catch {
-    return false;
+  const candidates = [
+    // Official Lenco v2 scheme: HMAC-SHA512(raw body, SHA256(API token)).
+    createHmac("sha512", webhookHashKey).update(rawBody).digest("hex"),
+  ];
+
+  // Keep compatibility with the separate signature key supplied by older
+  // Lenco integrations. Lenco's current API documentation uses the API token
+  // above, but accepting the configured key allows existing webhooks to keep
+  // working while the dashboard configuration is migrated.
+  const configuredWebhookSecret = process.env.LENCO_WEBHOOK_SECRET?.trim();
+  if (configuredWebhookSecret) {
+    candidates.push(
+      createHmac("sha512", configuredWebhookSecret).update(rawBody).digest("hex"),
+      createHmac("sha256", configuredWebhookSecret).update(rawBody).digest("hex"),
+    );
   }
+
+  const sig = Buffer.from(signature.trim().toLowerCase(), "utf8");
+  return candidates.some((expected) => {
+    const exp = Buffer.from(expected, "utf8");
+    if (sig.length !== exp.length) return false;
+    try {
+      return timingSafeEqual(sig, exp);
+    } catch {
+      return false;
+    }
+  });
 }
 
 // ---------- Utilities ----------

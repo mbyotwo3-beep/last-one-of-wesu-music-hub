@@ -89,11 +89,27 @@ export async function settleTransaction(
   transactionId: string,
   outcome: "successful" | "failed",
   providerRef?: string | null,
+  failureReason?: string | null,
 ): Promise<"completed" | "failed" | "pending"> {
   if (outcome === "failed") {
+    // Preserve the original request metadata (including the phone number) and
+    // attach Lenco's reason so the receipt can explain an actual decline.
+    const { data: pending } = await supabaseAdmin
+      .from("payment_transactions")
+      .select("metadata")
+      .eq("id", transactionId)
+      .eq("status", "pending")
+      .maybeSingle();
+    const existingMetadata =
+      pending?.metadata && typeof pending.metadata === "object" && !Array.isArray(pending.metadata)
+        ? pending.metadata
+        : {};
+    const metadata = failureReason
+      ? { ...(existingMetadata as Record<string, unknown>), failure_reason: failureReason }
+      : existingMetadata;
     await supabaseAdmin
       .from("payment_transactions")
-      .update({ status: "failed", provider_ref: providerRef ?? null } as any)
+      .update({ status: "failed", provider_ref: providerRef ?? null, metadata } as any)
       .eq("id", transactionId)
       .eq("status", "pending");
     return "failed";
