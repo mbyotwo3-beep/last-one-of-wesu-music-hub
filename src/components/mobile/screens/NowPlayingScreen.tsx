@@ -33,6 +33,7 @@ export function NowPlayingScreen() {
   const togglePlay = usePlayer((s) => s.togglePlay);
   const toggleLikeStore = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
+  const isPreview = usePlayer((s) => s.isPreview);
   const { data: meta } = useTrackMeta(track?.id);
   const trackPrice = meta ? Number(meta.price ?? 0) : null;
 
@@ -41,7 +42,7 @@ export function NowPlayingScreen() {
 
   if (!track) return null;
 
-  const dur = track.durationSeconds ?? 0;
+  const dur = isPreview ? 15 : (track.durationSeconds ?? 0);
   // Keep pause available while the requested source is still resolving.
   const isLoading = audioUrl === undefined && !playing;
 

@@ -328,14 +328,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         }
 
         if (!isCurrentTrack()) return;
-
-        if (previewMode) {
-          previewTimerRef.current = setTimeout(() => {
-            audio.pause();
-            if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
-            setError("Preview ended. Buy this track for full access.");
-          }, 15000);
-        }
       } catch (err) {
         if (!isCurrentTrack()) return;
         if (retries < 2) {
@@ -364,8 +356,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         else await pauseNative(track.id).catch(() => {});
         return;
       }
-      if (playing && audio.paused && audio.src) audio.play().catch(() => {});
-      else if (!playing && !audio.paused) audio.pause();
+      if (playing && audio.paused && audio.src) {
+        // If preview has ended, replay from 0
+        if (usePlayer.getState().isPreview && audio.currentTime >= 15) {
+          audio.currentTime = 0;
+          setProgress(0);
+        }
+        audio.play().catch(() => {});
+      } else if (!playing && !audio.paused) {
+        audio.pause();
+      }
     }
     syncPlayState();
   }, [playing, track, isNative]);
@@ -373,7 +373,17 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Progress + duration + ended
   useEffect(() => {
     const audio = getAudio();
-    const onTimeUpdate = () => setProgress(Math.floor(audio.currentTime));
+    const onTimeUpdate = () => {
+      const current = audio.currentTime || 0;
+      if (usePlayer.getState().isPreview && current >= 15) {
+        audio.pause();
+        audio.currentTime = 0;
+        setProgress(0);
+        usePlayer.setState({ playing: false, progressSeconds: 0 });
+        return;
+      }
+      setProgress(Math.floor(current));
+    };
     const onMeta = () => setAudioDuration(audio.duration || 0);
     const onEnded = () => {
       const st = usePlayer.getState();
@@ -407,15 +417,17 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   if (audioOnly) return null;
   if (!track) return null;
 
-  const dur = audioDuration || track.durationSeconds || 0;
-  const progressPct = dur > 0 ? (progressSeconds / dur) * 100 : 0;
+  const dur = isPreview ? 15 : (audioDuration || track.durationSeconds || 0);
+  const progressPct = dur > 0 ? Math.min((progressSeconds / dur) * 100, 100) : 0;
 
   function seek(e: React.MouseEvent<HTMLDivElement>) {
     if (!dur) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const newTime = pct * dur;
-    getAudio().currentTime = newTime;
+    const targetDur = isPreview ? 15 : dur;
+    const newTime = pct * targetDur;
+    const audio = getAudio();
+    audio.currentTime = newTime;
     setProgress(Math.floor(newTime));
   }
 

@@ -293,6 +293,8 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
  * so anonymous listeners can sample songs before buying. The
  * server returns a short-lived (45s) signed URL and the client stops
  * playback at 15s. A determined user could theoretically grab more of the
+ * server returns a short-lived (45s) signed URL and the client stops
+ * playback at 15s. A determined user could theoretically grab more of the
  * file within the 45s window — this is an accepted trade-off to keep the
  * "sample before buy" funnel frictionless.
  *
@@ -320,18 +322,15 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       throw new Error("Song audio file not found. Please contact support.");
     }
 
-    // Short-lived signed URL (45s) — enough to start playback; client caps to 15s.
-    // Paid tracks are no longer anon-readable in storage, so sign previews with the
-    // service-role client when available and fall back to anon (free songs) otherwise.
     let signed: { signedUrl: string } | null = null;
     let error: { message: string } | null = null;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const res = await supabaseAdmin.storage.from("song-audio").createSignedUrl(rawPath, 45);
+      const res = await supabaseAdmin.storage.from("song-audio").createSignedUrl(rawPath, 3600);
       signed = res.data;
       error = res.error;
     } catch {
-      const res = await supabase.storage.from("song-audio").createSignedUrl(rawPath, 45);
+      const res = await supabase.storage.from("song-audio").createSignedUrl(rawPath, 3600);
       signed = res.data;
       error = res.error;
     }

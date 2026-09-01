@@ -10,7 +10,6 @@ import {
   SkipForward,
   Volume2,
   Loader2,
-  MoreHorizontal,
   X,
   Radio,
 } from "lucide-react";
@@ -22,7 +21,6 @@ import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { DownloadButton } from "@/components/DownloadButton";
-
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -56,7 +54,6 @@ export function NowPlayingSheet() {
   const price: number = Number(meta?.price ?? 0);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
-
   const shuffle = usePlayer((s) => s.shuffle);
   const repeat = usePlayer((s) => s.repeat);
   const queue = usePlayer((s) => s.queue);
@@ -68,12 +65,11 @@ export function NowPlayingSheet() {
   const [dragProgress, setDragProgress] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
 
-
   const touchStartY = useRef(0);
   const touchCurrentY = useRef(0);
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  const dur = track?.durationSeconds ?? 0;
+  const dur = isPreview ? 15 : (track?.durationSeconds ?? 0);
   const displayProgress = isDragging ? dragProgress : progressSeconds;
   const progressPct = dur > 0 ? Math.min((displayProgress / dur) * 100, 100) : 0;
 
@@ -96,7 +92,7 @@ export function NowPlayingSheet() {
     setProgress(Math.floor(newTime));
   }
 
-  function handleSeekTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+  function handleSeekTouchStart() {
     setIsDragging(true);
     setDragProgress(progressSeconds);
   }
@@ -223,9 +219,6 @@ export function NowPlayingSheet() {
             )}
           </div>
         )}
-
-
-
 
         {/* Album Art — large, with drop shadow */}
         <div className="flex-1 flex items-center justify-center px-8 py-4 min-h-0">

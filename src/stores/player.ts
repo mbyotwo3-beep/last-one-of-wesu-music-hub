@@ -49,6 +49,7 @@ interface PlayerState {
   skipPrev: () => void;
   togglePlay: () => void;
   setProgress: (s: number) => void;
+  seekTo: (seconds: number) => void;
   toggleLike: () => void;
   openNowPlaying: () => void;
   closeNowPlaying: () => void;
@@ -131,8 +132,32 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }));
   },
 
-  togglePlay: () => set((s) => ({ playing: !s.playing })),
+  togglePlay: () => {
+    const { isPreview, progressSeconds, playing } = get();
+    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    // If a 15-second preview has reached the end and user clicks Play, replay from 0
+    if (!playing && isPreview && progressSeconds >= 15) {
+      if (audio) audio.currentTime = 0;
+      set({ progressSeconds: 0, playing: true });
+      return;
+    }
+    set((s) => ({ playing: !s.playing }));
+  },
+
   setProgress: (s) => set({ progressSeconds: s }),
+
+  seekTo: (seconds: number) => {
+    const { isPreview, track } = get();
+    const dur = track?.durationSeconds ?? 0;
+    const maxTime = isPreview ? 15 : dur > 0 ? dur : 100000;
+    const target = Math.max(0, Math.min(seconds, maxTime));
+    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    if (audio) {
+      audio.currentTime = target;
+    }
+    set({ progressSeconds: Math.floor(target) });
+  },
+
   toggleLike: () => set((s) => ({ liked: !s.liked })),
   openNowPlaying: () => set({ nowPlayingOpen: true }),
   closeNowPlaying: () => set({ nowPlayingOpen: false }),
