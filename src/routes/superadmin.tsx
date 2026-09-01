@@ -841,7 +841,7 @@ function SettingsTab() {
   return (
     <div className="space-y-4 max-w-2xl">
       <button
-        onClick={() => initM.mutate()}
+        onClick={() => initM.mutate({})}
         disabled={initM.isPending}
         className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
       >

@@ -240,11 +240,15 @@ function AuthPage() {
               return;
             }
             setLoading(true);
+            // Keep the intended destination out of the OAuth redirect URI:
+            // it must be a public same-origin URL, so stash the path locally.
+            try {
+              sessionStorage.setItem("post_auth_redirect", redirect || "/dashboard");
+            } catch {
+              /* storage unavailable — the fallback below still navigates */
+            }
             const result = await lovable.auth.signInWithOAuth("google", {
               redirect_uri: window.location.origin,
-              options: {
-                redirectTo: `${window.location.origin}${redirect || "/dashboard"}`,
-              },
             });
             if (result.error) {
               setError(

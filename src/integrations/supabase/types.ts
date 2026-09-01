@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -112,6 +112,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          verification_status: string
           verified: boolean
         }
         Insert: {
@@ -132,6 +133,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          verification_status?: string
           verified?: boolean
         }
         Update: {
@@ -152,6 +154,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          verification_status?: string
           verified?: boolean
         }
         Relationships: [
@@ -239,6 +242,83 @@ export type Database = {
           target_id?: string
           target_type?: string
           title?: string | null
+        }
+        Relationships: []
+      }
+      home_carousel_items: {
+        Row: {
+          carousel_id: string
+          created_at: string
+          id: string
+          image_url: string
+          link_url: string
+          position: number
+          subtitle: string | null
+          title: string
+        }
+        Insert: {
+          carousel_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          link_url: string
+          position?: number
+          subtitle?: string | null
+          title: string
+        }
+        Update: {
+          carousel_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          link_url?: string
+          position?: number
+          subtitle?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_carousel_items_carousel_id_fkey"
+            columns: ["carousel_id"]
+            isOneToOne: false
+            referencedRelation: "home_carousels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_carousels: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          position: number
+          show_all_link: string | null
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          show_all_link?: string | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          show_all_link?: string | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }

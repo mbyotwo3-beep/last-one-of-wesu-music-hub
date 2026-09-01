@@ -1,3 +1,4 @@
+import type { Json } from "@/integrations/supabase/types";
 import { createServerFn } from "@tanstack/react-start";
 
 export interface PricingConfig {
@@ -47,7 +48,7 @@ export const initializePlatformSettings = createServerFn({ method: "POST" }).han
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
-          { key: "pricing", value: DEFAULT_PRICING },
+          { key: "pricing", value: DEFAULT_PRICING as unknown as Json },
           { onConflict: "key" }
         );
       
@@ -55,7 +56,7 @@ export const initializePlatformSettings = createServerFn({ method: "POST" }).han
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
-          { key: "verification", value: DEFAULT_VERIFICATION },
+          { key: "verification", value: DEFAULT_VERIFICATION as unknown as Json },
           { onConflict: "key" }
         );
       
@@ -63,7 +64,7 @@ export const initializePlatformSettings = createServerFn({ method: "POST" }).han
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
-          { key: "withdrawal", value: DEFAULT_WITHDRAWAL },
+          { key: "withdrawal", value: DEFAULT_WITHDRAWAL as unknown as Json },
           { onConflict: "key" }
         );
       
