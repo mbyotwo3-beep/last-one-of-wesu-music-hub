@@ -26,9 +26,17 @@ export interface Carousel {
 }
 
 async function assertStaff(supabase: any, userId: string) {
-  const { data, error } = await supabase.rpc("is_staff", { _user_id: userId });
+  // Read the caller's own roles through their RLS-scoped client. The staff
+  // helper itself lives in the private schema and is not callable over the API.
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden: staff only");
+  const roles = (data ?? []).map((r: { role: string }) => r.role);
+  if (!roles.includes("admin") && !roles.includes("superadmin")) {
+    throw new Error("Forbidden: staff only");
+  }
 }
 
 // ─── Public: fetch all active carousels with their items ─────
