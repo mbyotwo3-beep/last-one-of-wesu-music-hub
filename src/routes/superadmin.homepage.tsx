@@ -292,19 +292,6 @@ function Page() {
                 placeholder="Link URL (optional)"
                 className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
               />
-              <input
-                value={slide.gradient}
-                onChange={(e) => {
-                  setLayout((p) => ({
-                    ...p,
-                    hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, gradient: e.target.value } : s
-                    ),
-                  }));
-                }}
-                placeholder="Gradient (e.g., rgba(250, 36, 60, 0.8))"
-                className="w-full bg-background border border-border rounded px-3 py-2 text-sm font-mono"
-              />
             </div>
           ))}
           {layout.hero_slides.length === 0 && (
