@@ -315,6 +315,53 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
   });
 
 /**
+ * Get top 10 songs for each of the top genres (Spotify-style genre shelves).
+ * Returns an array of { genre, songs } where songs are the top 10 by play_count.
+ */
+export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(async () => {
+  const supabase = getPublicSupabase();
+  
+  // Get all genres and their counts
+  const { data: genreRows, error: genreError } = await supabase
+    .from("songs")
+    .select("genre")
+    .not("genre", "is", null)
+    .limit(500);
+  
+  if (genreError) throw new Error(genreError.message);
+  
+  const counts = new Map<string, number>();
+  for (const row of genreRows ?? []) {
+    const g = (row as { genre: string | null }).genre;
+    if (!g) continue;
+    counts.set(g, (counts.get(g) ?? 0) + 1);
+  }
+  
+  // Get top 8 genres by count
+  const topGenres = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([genre]) => genre);
+  
+  // Get top 10 songs for each genre
+  const genreSongs = await Promise.all(
+    topGenres.map(async (genre) => {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("id,title,duration,price,cover_url,play_count,artist:artists(id,name)")
+        .eq("genre", genre)
+        .order("play_count", { ascending: false })
+        .limit(10);
+      
+      if (error) throw new Error(error.message);
+      return { genre, songs: data ?? [] };
+    })
+  );
+  
+  return genreSongs;
+});
+
+/**
  * Everything the desktop home needs in ONE call: hero, new, trending, top artists,
  * recent albums, editorial playlists, and up to 3 mood shelves keyed by top genres.
  */

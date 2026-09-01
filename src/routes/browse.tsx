@@ -12,6 +12,8 @@ import {
   getPublicPlaylists,
   getGenres,
   getSongsByGenre,
+  getTopSongsByGenres,
+  getForYou,
 } from "@/lib/music.functions";
 import {
   TrackCard,
@@ -68,6 +70,16 @@ const genreSongsQO = (genre: string) =>
     staleTime: 5 * 60 * 1000,
     enabled: !!genre,
   });
+const topSongsByGenresQO = queryOptions({
+  queryKey: ["browse-top-genre-songs"],
+  queryFn: () => getTopSongsByGenres(),
+  staleTime: 10 * 60 * 1000,
+});
+const forYouQO = queryOptions({
+  queryKey: ["browse-for-you"],
+  queryFn: () => getForYou(),
+  staleTime: 5 * 60 * 1000,
+});
 
 export const Route = createFileRoute("/browse")({
   head: () => ({
@@ -107,9 +119,17 @@ function BrowsePage() {
   const { data: recentAlbums } = useSuspenseQuery(recentAlbumsQO);
   const { data: playlists } = useSuspenseQuery(playlistsQO);
   const { data: genres } = useSuspenseQuery(genresQO);
+  const { data: topSongsByGenres } = useSuspenseQuery(topSongsByGenresQO);
   const { genre: activeGenre } = Route.useSearch();
   const setTrack = usePlayer((s) => s.setTrack);
   const { user } = useAuth();
+  const forYouFn = useServerFn(getForYou);
+  const { data: forYou } = useQuery({
+    queryKey: ["browse-for-you", user?.id],
+    queryFn: () => forYouFn(),
+    enabled: !!user && !activeGenre,
+    staleTime: 5 * 60 * 1000,
+  });
   const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
   const { data: recentlyPlayed } = useQuery({
     queryKey: ["recently-played", user?.id],
@@ -180,6 +200,16 @@ function BrowsePage() {
               </HorizontalShelf>
             )}
 
+            {user && forYou && forYou.forYou && forYou.forYou.length > 0 && (
+              <HorizontalShelf title="Songs You Might Like" showAllLink="/dashboard">
+                <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+                  {forYou.forYou.map((s: any) => (
+                    <TrackCard key={s.id} song={s} />
+                  ))}
+                </div>
+              </HorizontalShelf>
+            )}
+
             {featured.length > 0 && (
               <HorizontalShelf title="Must-Have Albums" showAllLink="/must-have">
                 <div className="grid grid-flow-col auto-cols-[10rem] md:auto-cols-[12rem] gap-4 min-w-max">
@@ -212,6 +242,18 @@ function BrowsePage() {
                 </div>
               </section>
             )}
+
+            {topSongsByGenres.map(({ genre, songs }) => (
+              songs.length > 0 && (
+                <HorizontalShelf key={genre} title={`Top 10 ${genre}`} showAllLink={`/browse?genre=${encodeURIComponent(genre)}`}>
+                  <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+                    {songs.map((s) => (
+                      <TrackCard key={s.id} song={s} />
+                    ))}
+                  </div>
+                </HorizontalShelf>
+              )
+            ))}
 
             {topArtists.length > 0 && (
               <HorizontalShelf title="Artists You Should Know" showAllLink="/artists">
