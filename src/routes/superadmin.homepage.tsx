@@ -267,12 +267,12 @@ function Page() {
                 className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
               />
               <input
-                value={slide.image_url}
+                value={slide.cover_url ?? ""}
                 onChange={(e) => {
                   setLayout((p) => ({
                     ...p,
                     hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, image_url: e.target.value } : s
+                      s.id === slide.id ? { ...s, cover_url: e.target.value } : s
                     ),
                   }));
                 }}
