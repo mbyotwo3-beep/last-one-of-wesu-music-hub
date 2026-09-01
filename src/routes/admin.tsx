@@ -616,7 +616,7 @@ function SongMod() {
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate({ id: songToDelete.id, reason: deleteReason.trim() || undefined })}
+                onClick={() => deleteMutation.mutate({ data: { id: songToDelete.id, reason: deleteReason.trim() || undefined } })}
                 className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {deleteMutation.isPending ? "Deleting…" : "Permanently Delete"}

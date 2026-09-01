@@ -1269,7 +1269,6 @@ export type Database = {
         Returns: number
       }
       increment_play_count: { Args: { _song_id: string }; Returns: undefined }
-      is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "artist" | "user" | "superadmin"
