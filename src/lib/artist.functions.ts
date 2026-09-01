@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isStaffUser } from "./roles";
 
 // Best-effort audit; RLS may block insert for regular users — never fail the
 // user's action because of this. SUPABASE_SERVICE_ROLE_KEY is not available on
@@ -90,7 +91,6 @@ export const applyAsArtist = createServerFn({ method: "POST" })
     return { ok: true, status: row!.status, id: row!.id };
   });
 
-
 export const updateArtistProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
@@ -116,7 +116,7 @@ export const updateArtistProfile = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- Upload song ----------
+// ---------- Upload & Delete song ----------
 
 export const uploadSong = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -175,6 +175,87 @@ export const uploadSong = createServerFn({ method: "POST" })
       status: "pending",
     });
     return { ok: true, id: song!.id, status: "pending" };
+  });
+
+export const deleteSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; reason?: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Fetch the song details
+    const { data: song, error: songErr } = await supabaseAdmin
+      .from("songs")
+      .select("id, title, artist_id, audio_url, cover_url")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (songErr || !song) {
+      throw new Error("Song not found");
+    }
+
+    // 2. Permission check:
+    // Either the caller is staff (admin/superadmin)
+    // OR the caller is the artist who owns this song
+    const isStaff = await isStaffUser(supabase, userId);
+    let isOwner = false;
+
+    if (!isStaff) {
+      const { data: artist } = await supabase
+        .from("artists")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (artist && (artist as any).id === song.artist_id) {
+        isOwner = true;
+      }
+    }
+
+    if (!isStaff && !isOwner) {
+      throw new Error("Forbidden: You do not have permission to delete this song");
+    }
+
+    // 3. Remove from featured slots if any
+    try {
+      await supabaseAdmin
+        .from("featured_slots")
+        .delete()
+        .eq("target_type", "song")
+        .eq("target_id", song.id);
+    } catch {
+      /* ignore */
+    }
+
+    // 4. Clean up audio file from storage (best-effort)
+    try {
+      if (song.audio_url) {
+        await supabaseAdmin.storage.from("song-audio").remove([song.audio_url]);
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 5. Delete the song row (cascades to likes, playlist_songs, saved_tracks, play_history, song_collaborators)
+    const { error: delError } = await supabaseAdmin
+      .from("songs")
+      .delete()
+      .eq("id", song.id);
+
+    if (delError) {
+      throw new Error(delError.message);
+    }
+
+    // 6. Audit log
+    await audit(supabaseAdmin, userId, "song.delete", "song", song.id, {
+      title: song.title,
+      artist_id: song.artist_id,
+      deleted_by_role: isStaff ? "staff" : "artist",
+      reason: data.reason ?? null,
+    });
+
+    return { ok: true, id: song.id, title: song.title };
   });
 
 // ---------- Albums ----------
@@ -467,7 +548,7 @@ export const listMySongs = createServerFn({ method: "GET" })
     if (!artist) return [];
     const { data } = await context.supabase
       .from("songs")
-      .select("id, title, status, cover_url")
+      .select("id, title, status, cover_url, price, play_count, created_at, genre")
       .eq("artist_id", (artist as any).id)
       .order("created_at", { ascending: false });
     return data ?? [];

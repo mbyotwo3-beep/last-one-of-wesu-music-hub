@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Users, Music, Shield, BarChart3, Check, X, Building2,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, CreditCard,
+  Trash2, Search, Filter,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +13,8 @@ import {
   getPlatformStats,
   getRecentActivity,
   listPendingSongs,
+  listAllSongsAdmin,
+  deleteSong,
   moderateSong,
   listPendingArtists,
   moderateArtist,
@@ -290,66 +293,338 @@ function Overview({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Songs moderation
+// Songs moderation & platform-wide song management
 // ─────────────────────────────────────────────────────────────
 function SongMod() {
   const qc = useQueryClient();
-  const list = useServerFn(listPendingSongs);
+  const listPending = useServerFn(listPendingSongs);
+  const listAll = useServerFn(listAllSongsAdmin);
   const mod = useServerFn(moderateSong);
-  const { data, isLoading, error } = useQuery({ queryKey: ["pending-songs"], queryFn: () => list(), retry: false });
-  const m = useMutation({
+  const del = useServerFn(deleteSong);
+
+  const [subTab, setSubTab] = useState<"pending" | "all">("pending");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [songToDelete, setSongToDelete] = useState<{ id: string; title: string; artistName?: string } | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
+  const pendingQ = useQuery({
+    queryKey: ["pending-songs"],
+    queryFn: () => listPending(),
+    retry: false,
+  });
+
+  const allSongsQ = useQuery({
+    queryKey: ["all-platform-songs", statusFilter, searchTerm],
+    queryFn: () => listAll({ data: { status: statusFilter, search: searchTerm } }),
+    enabled: subTab === "all",
+    retry: false,
+  });
+
+  const modMutation = useMutation({
     mutationFn: mod,
     onSuccess: (_, variables) => {
-      toast.success(`Song ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`);
+      toast.success(`Song ${variables.data.status} successfully`);
       qc.invalidateQueries({ queryKey: ["pending-songs"] });
       qc.invalidateQueries({ queryKey: ["pending-songs-count"] });
+      qc.invalidateQueries({ queryKey: ["all-platform-songs"] });
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading songs…</div>;
-  if (error) return <div className="text-destructive">Error loading songs: {(error as Error).message}</div>;
-  if (!data || data.length === 0)
-    return (
-      <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
-        <CheckCircle2 className="size-5 text-primary" />
-        <p className="text-muted-foreground">No songs awaiting moderation.</p>
-      </div>
-    );
+  const deleteMutation = useMutation({
+    mutationFn: del,
+    onSuccess: (res) => {
+      toast.success(`Song "${res.title}" deleted from platform`);
+      setSongToDelete(null);
+      setDeleteReason("");
+      qc.invalidateQueries({ queryKey: ["pending-songs"] });
+      qc.invalidateQueries({ queryKey: ["pending-songs-count"] });
+      qc.invalidateQueries({ queryKey: ["all-platform-songs"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (error) => toast.error(`Delete failed: ${(error as Error).message}`),
+  });
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground mb-4">{data.length} song(s) waiting for approval</p>
-      {data.map((s: any) => (
-        <div
-          key={s.id}
-          className="bg-card border border-border rounded-xl p-4 flex justify-between items-center"
-        >
-          <div>
-            <p className="font-medium">{s.title}</p>
-            <p className="text-xs text-muted-foreground">{s.artist?.name ?? "Unknown artist"}</p>
-            <span className="inline-flex items-center gap-1 text-[11px] text-yellow-500 mt-1">
-              <Clock className="size-3" /> Pending since {new Date(s.created_at).toLocaleDateString()}
-            </span>
+    <div className="space-y-6">
+      {/* Sub-tab navigation */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSubTab("pending")}
+            className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+              subTab === "pending"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Pending Approval ({pendingQ.data?.length ?? 0})
+          </button>
+          <button
+            onClick={() => setSubTab("all")}
+            className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+              subTab === "all"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Platform Songs
+          </button>
+        </div>
+
+        {subTab === "all" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search song title..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 pr-3 py-1.5 rounded-lg bg-secondary border border-border text-xs w-48 sm:w-60 focus:outline-none focus:border-primary"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs text-foreground cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+              <option value="taken_down">Taken Down</option>
+            </select>
           </div>
-          <div className="flex gap-2">
-            <button
-              disabled={m.isPending}
-              onClick={() => m.mutate({ data: { id: s.id, status: "approved" } })}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-semibold"
-            >
-              <Check className="size-3" /> Approve
-            </button>
-            <button
-              disabled={m.isPending}
-              onClick={() => m.mutate({ data: { id: s.id, status: "rejected" } })}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold"
-            >
-              <X className="size-3" /> Reject
-            </button>
+        )}
+      </div>
+
+      {/* View: Pending Songs */}
+      {subTab === "pending" && (
+        <div className="space-y-4">
+          {pendingQ.isLoading && <div className="text-muted-foreground text-sm">Loading pending songs…</div>}
+          {pendingQ.error && <div className="text-destructive text-sm">Error: {(pendingQ.error as Error).message}</div>}
+
+          {!pendingQ.isLoading && (!pendingQ.data || pendingQ.data.length === 0) ? (
+            <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
+              <CheckCircle2 className="size-5 text-primary" />
+              <p className="text-muted-foreground text-sm">No songs awaiting moderation.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">{pendingQ.data?.length} song(s) waiting for approval</p>
+              {(pendingQ.data ?? []).map((s: any) => (
+                <div
+                  key={s.id}
+                  className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm truncate">{s.title}</p>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full">
+                        <Clock className="size-3" /> Pending Review
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Artist: <span className="font-medium text-foreground">{s.artist?.name ?? "Unknown"}</span>
+                      {s.genre ? ` • ${s.genre}` : ""}
+                      {s.created_at ? ` • Uploaded ${new Date(s.created_at).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      disabled={modMutation.isPending || deleteMutation.isPending}
+                      onClick={() => modMutation.mutate({ data: { id: s.id, status: "approved" } })}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-semibold"
+                    >
+                      <Check className="size-3" /> Approve
+                    </button>
+                    <button
+                      disabled={modMutation.isPending || deleteMutation.isPending}
+                      onClick={() => modMutation.mutate({ data: { id: s.id, status: "rejected" } })}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold"
+                    >
+                      <X className="size-3" /> Reject
+                    </button>
+                    <button
+                      disabled={modMutation.isPending || deleteMutation.isPending}
+                      onClick={() => setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      title="Permanently Delete Song"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* View: All Platform Songs */}
+      {subTab === "all" && (
+        <div className="space-y-4">
+          {allSongsQ.isLoading && <div className="text-muted-foreground text-sm">Loading songs across platform…</div>}
+          {allSongsQ.error && <div className="text-destructive text-sm">Error: {(allSongsQ.error as Error).message}</div>}
+
+          {!allSongsQ.isLoading && (!allSongsQ.data || allSongsQ.data.length === 0) ? (
+            <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
+              <Music className="size-5 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm">No songs match the current search or filters.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Showing {allSongsQ.data?.length} song(s) on platform</p>
+              {(allSongsQ.data ?? []).map((s: any) => {
+                const isPending = s.status === "pending";
+                const isApproved = s.status === "approved";
+                const isRejected = s.status === "rejected";
+                const isTakenDown = s.status === "taken_down";
+
+                return (
+                  <div
+                    key={s.id}
+                    className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-accent/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm truncate">{s.title}</p>
+                        {isApproved && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="size-3" /> Approved
+                          </span>
+                        )}
+                        {isPending && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full">
+                            <Clock className="size-3" /> Pending
+                          </span>
+                        )}
+                        {isRejected && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+                            <AlertTriangle className="size-3" /> Rejected
+                          </span>
+                        )}
+                        {isTakenDown && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                            Taken Down
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Artist: <span className="font-medium text-foreground">{s.artist?.name ?? "Unknown"}</span>
+                        {s.genre ? ` • ${s.genre}` : ""}
+                        {s.price !== undefined ? ` • K${Number(s.price).toFixed(2)}` : ""}
+                        {s.play_count !== undefined ? ` • ${s.play_count.toLocaleString()} plays` : ""}
+                        {s.created_at ? ` • ${new Date(s.created_at).toLocaleDateString()}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!isApproved && (
+                        <button
+                          disabled={modMutation.isPending || deleteMutation.isPending}
+                          onClick={() => modMutation.mutate({ data: { id: s.id, status: "approved" } })}
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-medium"
+                        >
+                          <Check className="size-3" /> Approve
+                        </button>
+                      )}
+                      {isApproved && (
+                        <button
+                          disabled={modMutation.isPending || deleteMutation.isPending}
+                          onClick={() => modMutation.mutate({ data: { id: s.id, status: "taken_down" } })}
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground cursor-pointer transition-colors font-medium"
+                          title="Take down song from active catalog"
+                        >
+                          Take Down
+                        </button>
+                      )}
+                      <button
+                        disabled={modMutation.isPending || deleteMutation.isPending}
+                        onClick={() => setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-destructive/15 text-destructive hover:bg-destructive/25 cursor-pointer transition-colors font-semibold"
+                        title="Permanently Delete Song (Enforce Terms)"
+                      >
+                        <Trash2 className="size-3" /> Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Admin Delete Confirmation Modal */}
+      {songToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-5" />
+                <h3 className="font-semibold text-lg text-foreground">Admin Delete Song</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setSongToDelete(null);
+                  setDeleteReason("");
+                }}
+                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-foreground">"{songToDelete.title}"</strong>
+              {songToDelete.artistName ? ` by ${songToDelete.artistName}` : ""}?
+            </p>
+
+            <p className="text-xs text-muted-foreground bg-destructive/10 border border-destructive/20 rounded-xl p-3">
+              ⚠️ This will permanently remove the audio file, playlists references, and album associations to keep the webapp compliant with terms and conditions.
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Reason for deletion (optional, logged in audit trail):
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Terms & conditions violation, copyright issue"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-xs focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSongToDelete(null);
+                  setDeleteReason("");
+                }}
+                disabled={deleteMutation.isPending}
+                className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-medium hover:bg-accent cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate({ id: songToDelete.id, reason: deleteReason.trim() || undefined })}
+                className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {deleteMutation.isPending ? "Deleting…" : "Permanently Delete"}
+              </button>
+            </div>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

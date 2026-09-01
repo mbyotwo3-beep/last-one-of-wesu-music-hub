@@ -21,6 +21,9 @@
  * Property 6: Upload inserts song with pending status
  * Validates: Requirements 4.3
  *
+ * Property 7: Song deletion RBAC
+ * Validates: Admin deletes any song; artist deletes own; others cannot
+ *
  * Test framework : Vitest
  * PBT library    : fast-check (fc)
  */
@@ -346,6 +349,103 @@ describe("Property 6: Upload inserts song with pending status (Req 4.3)", () => 
         expect(status).not.toBe("rejected");
       }),
       { numRuns: 1 },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Property 7: Song deletion RBAC
+// Validates: Admin can delete any song; artist can only delete their own; others cannot
+// ---------------------------------------------------------------------------
+
+describe("Property 7: Song deletion RBAC", () => {
+  interface DeletionContext {
+    userId: string;
+    isStaff: boolean;
+    artistId: string | null;
+  }
+
+  interface DeletionTargetSong {
+    id: string;
+    artistId: string;
+  }
+
+  function canDeleteSong(ctx: DeletionContext, song: DeletionTargetSong): boolean {
+    if (ctx.isStaff) return true;
+    if (ctx.artistId && ctx.artistId === song.artistId) return true;
+    return false;
+  }
+
+  it("Staff/Admins can delete any song regardless of ownership", () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        fc.option(fc.uuid(), { nil: null }),
+        (staffUserId, songId, songArtistId, staffArtistId) => {
+          const ctx: DeletionContext = {
+            userId: staffUserId,
+            isStaff: true,
+            artistId: staffArtistId,
+          };
+          const song: DeletionTargetSong = { id: songId, artistId: songArtistId };
+          expect(canDeleteSong(ctx, song)).toBe(true);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("Artists can delete their own songs", () => {
+    fc.assert(
+      fc.property(fc.uuid(), fc.uuid(), fc.uuid(), (uid, songId, artistId) => {
+        const ctx: DeletionContext = {
+          userId: uid,
+          isStaff: false,
+          artistId,
+        };
+        const song: DeletionTargetSong = { id: songId, artistId };
+        expect(canDeleteSong(ctx, song)).toBe(true);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("Artists CANNOT delete songs belonging to other artists", () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        (uid, songId, myArtistId, otherArtistId) => {
+          fc.pre(myArtistId !== otherArtistId);
+          const ctx: DeletionContext = {
+            userId: uid,
+            isStaff: false,
+            artistId: myArtistId,
+          };
+          const song: DeletionTargetSong = { id: songId, artistId: otherArtistId };
+          expect(canDeleteSong(ctx, song)).toBe(false);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("Regular users without artist profile cannot delete any song", () => {
+    fc.assert(
+      fc.property(fc.uuid(), fc.uuid(), fc.uuid(), (uid, songId, songArtistId) => {
+        const ctx: DeletionContext = {
+          userId: uid,
+          isStaff: false,
+          artistId: null,
+        };
+        const song: DeletionTargetSong = { id: songId, artistId: songArtistId };
+        expect(canDeleteSong(ctx, song)).toBe(false);
+      }),
+      { numRuns: 100 },
     );
   });
 });

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -338,8 +338,7 @@ function FeaturesTab() {
           type="number"
           min={0}
           step="0.01"
-          className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.feature_rate}
+            value={form.feature_rate}
           onChange={(e) => setForm({ ...form, feature_rate: Number(e.target.value) })}
         />
       </label>
@@ -354,16 +353,14 @@ function FeaturesTab() {
   );
 }
 
-
 // ---------- Unified Upload Wizard (single OR album) ----------
-
-
 
 type UploadMode = "single" | "album";
 
 function UploadWizard() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const uploadFn = useServerFn(uploadSong);
   const createAlbumFn = useServerFn(createAlbum);
   const pricingFn = useServerFn(getPricingConfig);
@@ -431,7 +428,6 @@ function UploadWizard() {
     else setTracks(audioFiles);
   }
 
-
   function validatePricing(): string | null {
     if (mode === "single") {
       if (tier === "free") {
@@ -475,12 +471,14 @@ function UploadWizard() {
             album_id: null,
           },
         });
-        setDone(
-          tier === "free"
-            ? `Song "${title}" submitted. It is waiting for admin approval. Once approved, it will automatically show on the platform (A K${FREE_SONG_FEE} fee applies).`
-            : `Song "${title}" uploaded successfully. It is waiting for approval by an admin. Once approved, it will automatically show on the platform.`,
-        );
+        const successMessage = tier === "free"
+          ? `Song "${title}" submitted. It is waiting for admin approval. Once approved, it will automatically show on the platform (A K${FREE_SONG_FEE} fee applies).`
+          : `Song "${title}" uploaded successfully! Waiting for admin approval.`;
+
+        toast.success(successMessage);
         qc.invalidateQueries({ queryKey: ["my-songs"] });
+        qc.invalidateQueries({ queryKey: ["artist-overview"] });
+        navigate({ to: "/artist-dashboard" });
         return res;
       }
 
@@ -506,10 +504,11 @@ function UploadWizard() {
           },
         });
       }
-      setDone(`Album "${title}" with ${tracks.length} track${tracks.length === 1 ? "" : "s"} uploaded. It is waiting for approval by an admin. Once approved, it will automatically show on the platform.`);
+      toast.success(`Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
-      toast.success("Album uploaded successfully");
+      qc.invalidateQueries({ queryKey: ["artist-overview"] });
+      navigate({ to: "/artist-dashboard" });
     } catch (err) {
       const msg = (err as Error).message;
       setError(msg);
@@ -523,23 +522,31 @@ function UploadWizard() {
     return (
       <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
         <p className="text-lg font-semibold">✓ {done}</p>
-        <button
-          onClick={() => {
-            setDone(null);
-            setStep(1);
-            setTitle("");
-            setDescription("");
-            setGenre("");
-            setCover(null);
-            setTracks([]);
-            setTier("paid");
-            setPrice(SINGLE_MIN);
-            setFeeAgreed(false);
-          }}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
-        >
-          Upload another
-        </button>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => navigate({ to: "/artist-dashboard" })}
+            className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+          >
+            Go to Artist Portal
+          </button>
+          <button
+            onClick={() => {
+              setDone(null);
+              setStep(1);
+              setTitle("");
+              setDescription("");
+              setGenre("");
+              setCover(null);
+              setTracks([]);
+              setTier("paid");
+              setPrice(SINGLE_MIN);
+              setFeeAgreed(false);
+            }}
+            className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold cursor-pointer"
+          >
+            Upload another
+          </button>
+        </div>
       </div>
     );
   }

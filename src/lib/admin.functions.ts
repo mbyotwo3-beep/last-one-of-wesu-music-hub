@@ -86,7 +86,7 @@ export const getRecentActivity = createServerFn({ method: "GET" })
     };
   });
 
-// ---------- Moderation ----------
+// ---------- Moderation & Song Management ----------
 
 export const listPendingSongs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -95,11 +95,38 @@ export const listPendingSongs = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("songs")
-      .select("id,title,created_at,status,artist:artists(name)")
+      .select("id,title,created_at,status,price,genre,play_count,cover_url,audio_url,artist:artists(id,name)")
       .eq("status", "pending")
       .order("created_at", { ascending: false });
     return data ?? [];
   });
+
+export const listAllSongsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d?: { status?: string; search?: string }) => d || {})
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let query = supabaseAdmin
+      .from("songs")
+      .select("id,title,created_at,status,price,genre,play_count,cover_url,audio_url,artist:artists(id,name)")
+      .order("created_at", { ascending: false });
+
+    if (data?.status && data.status !== "all") {
+      query = query.eq("status", data.status);
+    }
+
+    if (data?.search && data.search.trim()) {
+      query = query.ilike("title", `%${data.search.trim()}%`);
+    }
+
+    const { data: songs, error } = await query.limit(200);
+    if (error) throw new Error(error.message);
+    return songs ?? [];
+  });
+
+export { deleteSong } from "./artist.functions";
 
 export const moderateSong = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

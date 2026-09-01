@@ -65,6 +65,7 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
     if (!artist) {
       return {
         artist: null,
+        uploadedSongs: [],
         topSongs: [],
         totalSongs: 0,
         totalPlays: 0,
@@ -78,9 +79,9 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
     const [songRowsRes, albumRowsRes, followersRes] = await Promise.all([
       supabase
         .from("songs")
-        .select("id,title,play_count,price,status,created_at")
+        .select("id,title,play_count,price,status,created_at,cover_url,genre")
         .eq("artist_id", artist.id)
-        .order("play_count", { ascending: false }),
+        .order("created_at", { ascending: false }),
       supabase.from("albums").select("id").eq("artist_id", artist.id),
       supabase
         .from("artist_followers")
@@ -122,6 +123,7 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
 
     return {
       artist,
+      uploadedSongs: songRowsAll,
       topSongs: songRowsAll.slice(0, 10),
       totalSongs: songRowsAll.length,
       totalPlays,

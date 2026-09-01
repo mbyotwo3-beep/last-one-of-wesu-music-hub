@@ -1,14 +1,28 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, TrendingUp, DollarSign, Music, BarChart3, Settings, Users, CheckCircle2, Clock, ShieldAlert } from "lucide-react";
-import { useEffect } from "react";
+import {
+  Upload,
+  TrendingUp,
+  DollarSign,
+  Music,
+  BarChart3,
+  Settings,
+  Users,
+  CheckCircle2,
+  Clock,
+  ShieldAlert,
+  Trash2,
+  AlertTriangle,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { getMyArtistAnalytics } from "@/lib/analytics.functions";
-import { requestArtistVerification } from "@/lib/artist.functions";
+import { requestArtistVerification, deleteSong } from "@/lib/artist.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
@@ -36,7 +50,10 @@ function ArtistDashboardPage() {
   const fetchAnalytics = useServerFn(getMyArtistAnalytics);
   const requestVerificationFn = useServerFn(requestArtistVerification);
   const verificationConfigFn = useServerFn(getVerificationConfig);
+  const deleteSongFn = useServerFn(deleteSong);
   const formatPrice = useCurrency((s) => s.formatPrice);
+
+  const [songToDelete, setSongToDelete] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
@@ -69,6 +86,19 @@ function ArtistDashboardPage() {
     },
     onError: (err: Error) => {
       toast.error(err.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteSongFn,
+    onSuccess: (res) => {
+      toast.success(`Track "${res.title}" deleted successfully.`);
+      setSongToDelete(null);
+      qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
+      qc.invalidateQueries({ queryKey: ["my-songs"] });
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to delete track: ${err.message}`);
     },
   });
 
@@ -148,6 +178,7 @@ function ArtistDashboardPage() {
   const isVerified = data.artist.verified;
   const verificationStatus = (data.artist as any).verification_status ?? "none";
   const followerCount = data.totalFollowers ?? 0;
+  const allTracks = (data as any).uploadedSongs ?? data.topSongs ?? [];
 
   const stats = [
     { label: "Total Followers", value: followerCount.toLocaleString(), icon: Users },
@@ -256,46 +287,80 @@ function ArtistDashboardPage() {
 
         {/* Top / Uploaded Songs */}
         <div className="bg-card border border-border rounded-2xl p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 className="size-5 text-primary" />
-            Uploaded Tracks
-          </h2>
-          {data.topSongs.length === 0 ? (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <BarChart3 className="size-5 text-primary" />
+              Uploaded Tracks ({allTracks.length})
+            </h2>
+            <a
+              href="/artist-studio"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-medium"
+            >
+              <Upload className="size-3.5" /> Upload New Track
+            </a>
+          </div>
+
+          {allTracks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No tracks yet. Open Studio to upload your first song.
             </p>
           ) : (
             <div className="space-y-2">
-              {data.topSongs.map((track: any, i: number) => {
+              {allTracks.map((track: any, i: number) => {
                 const isPending = track.status === "pending";
+                const isRejected = track.status === "rejected";
+                const isTakenDown = track.status === "taken_down";
+                const isApproved = track.status === "approved";
+
                 return (
                   <div
                     key={track.id}
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent transition-colors"
+                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-accent/60 transition-colors border border-border/40"
                   >
                     <span className="w-6 text-sm text-muted-foreground">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium truncate">{track.title}</p>
-                        {isPending ? (
+                        {isPending && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 text-[11px] font-medium shrink-0">
                             <Clock className="size-3" /> Waiting for approval
                           </span>
-                        ) : (
+                        )}
+                        {isApproved && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium shrink-0">
                             <CheckCircle2 className="size-3" /> Approved
                           </span>
                         )}
+                        {isRejected && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[11px] font-medium shrink-0">
+                            <AlertTriangle className="size-3" /> Rejected
+                          </span>
+                        )}
+                        {isTakenDown && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[11px] font-medium shrink-0">
+                            <ShieldAlert className="size-3" /> Taken Down
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {(track.play_count ?? 0).toLocaleString()} listens
+                        {track.genre ? ` • ${track.genre}` : ""}
+                        {track.created_at ? ` • Uploaded ${new Date(track.created_at).toLocaleDateString()}` : ""}
                       </p>
                     </div>
                     <span className="text-sm font-medium">
                       {formatPrice(track.price)}
                     </span>
+                    <button
+                      onClick={() => setSongToDelete({ id: track.id, title: track.title })}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      title="Delete song"
+                      aria-label={`Delete ${track.title}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
                   </div>
                 );
               })}
@@ -303,7 +368,51 @@ function ArtistDashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Song Confirmation Modal */}
+      {songToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-5" />
+                <h3 className="font-semibold text-lg text-foreground">Delete Song</h3>
+              </div>
+              <button
+                onClick={() => setSongToDelete(null)}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-foreground">"{songToDelete.title}"</strong>?
+              This action cannot be undone. All playlists, likes, and streaming records for this song will be removed.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSongToDelete(null)}
+                disabled={deleteMutation.isPending}
+                className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-medium hover:bg-accent cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate({ id: songToDelete.id })}
+                className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {deleteMutation.isPending ? "Deleting…" : "Delete Song"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
