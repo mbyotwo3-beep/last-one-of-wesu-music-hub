@@ -83,11 +83,14 @@ function CheckoutSuccessPage() {
   });
 
   const [pollElapsed, setPollElapsed] = useState(0);
+  const isAwaitingSettlement =
+    transaction?.status === "pending" || transaction?.status === "processing";
+
   useEffect(() => {
-    if (transaction?.status !== "pending") return;
+    if (!isAwaitingSettlement) return;
     const t = setInterval(() => setPollElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [transaction?.status]);
+  }, [isAwaitingSettlement]);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
@@ -108,7 +111,8 @@ function CheckoutSuccessPage() {
 
   const isSuccess = transaction?.status === "completed";
   const isFailed = transaction?.status === "failed";
-  const isPending = transaction?.status === "pending";
+  const isPending =
+    transaction?.status === "pending" || transaction?.status === "processing";
   const tx: any = transaction;
   const failureReason =
     typeof tx?.metadata?.failure_reason === "string" ? tx.metadata.failure_reason : null;
@@ -116,7 +120,7 @@ function CheckoutSuccessPage() {
   const StatusBadge = () => {
     if (isSuccess) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-500 border border-green-500/20">Completed</span>;
     if (isFailed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-500 border border-red-500/20">Failed</span>;
-    if (isPending) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">Pending</span>;
+    if (isPending) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">Processing</span>;
     return null;
   };
 

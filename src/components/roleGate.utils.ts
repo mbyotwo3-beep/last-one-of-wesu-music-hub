@@ -5,7 +5,7 @@
  * Feature: wesu-plus-completion
  */
 
-export type AppRole = "user" | "artist" | "admin" | "superadmin";
+export type AppRole = "user" | "artist" | "admin" | "superadmin" | "label";
 
 export type AccessResult = "allowed" | "redirect-auth" | "redirect-home";
 

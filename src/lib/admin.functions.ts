@@ -249,7 +249,64 @@ export const moderateLabel = createServerFn({ method: "POST" })
       .update({ status: data.status })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    if (data.status === "approved") {
+      const { data: owner } = await supabaseAdmin
+        .from("labels")
+        .select("owner_user_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (owner?.owner_user_id) {
+        const { error: roleError } = await supabaseAdmin
+          .from("user_roles")
+          .upsert(
+            { user_id: owner.owner_user_id, role: "label" } as any,
+            { onConflict: "user_id,role" },
+          );
+        if (roleError) throw new Error(`Label was approved but role assignment failed: ${roleError.message}`);
+      }
+    }
     await audit(context.userId, `label.${data.status}`, "label", data.id);
+    return { ok: true };
+  });
+
+// ---------- Payout review ----------
+
+export const listPayoutsForStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("payouts")
+      .select("id,amount,method_code,destination,status,notes,requested_at,processed_at,artist:artists(name),label:labels(name)")
+      .order("requested_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const reviewPayout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; decision: "approved" | "rejected"; notes?: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const notes = data.notes?.trim() || null;
+    if (notes && notes.length > 1_000) throw new Error("Payout note must be at most 1,000 characters");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: payout, error } = await supabaseAdmin
+      .from("payouts")
+      .update({
+        status: data.decision,
+        notes,
+        processed_by: context.userId,
+      } as any)
+      .eq("id", data.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!payout) throw new Error("Payout is no longer pending review");
+    await audit(context.userId, `payout.${data.decision}`, "payout", data.id, { notes });
     return { ok: true };
   });
 

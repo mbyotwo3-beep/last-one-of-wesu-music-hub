@@ -1271,7 +1271,7 @@ export type Database = {
       increment_play_count: { Args: { _song_id: string }; Returns: undefined }
     }
     Enums: {
-      app_role: "admin" | "artist" | "user" | "superadmin"
+      app_role: "admin" | "artist" | "user" | "superadmin" | "label"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1399,7 +1399,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "artist", "user", "superadmin"],
+      app_role: ["admin", "artist", "user", "superadmin", "label"],
     },
   },
 } as const

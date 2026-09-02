@@ -7,6 +7,12 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // The shared config defaults Nitro to Cloudflare. Keep that target for
+  // local/Cloudflare previews, but make Vercel builds emit Vercel functions.
+  // Vercel provides this environment variable during every deployment.
+  nitro: {
+    preset: process.env.VERCEL ? "vercel" : "cloudflare-module",
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

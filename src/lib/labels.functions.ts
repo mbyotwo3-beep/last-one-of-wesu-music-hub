@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isStaffUser } from "./roles";
 
 async function audit(
   actorId: string,
@@ -24,11 +24,47 @@ function slugify(s: string) {
     .slice(0, 60);
 }
 
+/** Resolve a label only for its owner or a member of platform staff. */
+async function assertLabelManager(client: unknown, userId: string, labelId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [isStaff, result] = await Promise.all([
+    isStaffUser(client, userId),
+    supabaseAdmin
+      .from("labels")
+      .select("id, owner_user_id, status, commission_pct")
+      .eq("id", labelId)
+      .maybeSingle(),
+  ]);
+  if (result.error) throw new Error(result.error.message);
+  if (!result.data || (!isStaff && result.data.owner_user_id !== userId)) {
+    throw new Error("Forbidden");
+  }
+  return result.data as {
+    id: string;
+    owner_user_id: string;
+    status: string;
+    commission_pct: number;
+  };
+}
+
 export const applyForLabel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { name: string; bio?: string; contact_email?: string; logo_url?: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin
+      .from("labels")
+      .select("id, status")
+      .eq("owner_user_id", userId)
+      .maybeSingle();
+    if (existing) {
+      throw new Error(
+        existing.status === "rejected"
+          ? "Your label application was rejected. Contact support before applying again."
+          : "You already have a label application.",
+      );
+    }
     const slug = slugify(data.name) + "-" + Math.random().toString(36).slice(2, 6);
     const { data: row, error } = await supabase
       .from("labels")
@@ -54,12 +90,14 @@ export const updateLabel = createServerFn({ method: "POST" })
       d,
   )
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    await assertLabelManager(context.supabase, userId, data.id);
     const patch: any = {};
     for (const k of ["name", "bio", "contact_email", "logo_url"] as const) {
       if (data[k] !== undefined) patch[k] = data[k];
     }
-    const { error } = await supabase.from("labels").update(patch).eq("id", data.id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("labels").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(userId, "label.update", "label", data.id, patch);
     return { ok: true };
@@ -118,15 +156,31 @@ export const inviteArtistToLabel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { label_id: string; artist_id: string; royalty_pct?: number }) => d)
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
-    
-    // SECURITY: Validate royalty percentage
-    const royalty = data.royalty_pct ?? 80;
+    const { userId } = context;
+    const label = await assertLabelManager(context.supabase, userId, data.label_id);
+    if (label.status !== "approved") throw new Error("Only approved labels can invite artists");
+
+    // The label's commission is the default; a manager may negotiate another
+    // royalty for a particular artist, within the database's 0–100 bound.
+    const royalty = data.royalty_pct ?? 100 - Number(label.commission_pct ?? 15);
     if (!Number.isFinite(royalty) || royalty < 0 || royalty > 100) {
       throw new Error("royalty_pct must be between 0 and 100");
     }
-    
-    const { error } = await supabase.from("label_artists").insert({
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: artist }, { data: existing }] = await Promise.all([
+      supabaseAdmin.from("artists").select("id, status").eq("id", data.artist_id).maybeSingle(),
+      supabaseAdmin
+        .from("label_artists")
+        .select("id, status")
+        .eq("label_id", data.label_id)
+        .eq("artist_id", data.artist_id)
+        .maybeSingle(),
+    ]);
+    if (!artist || artist.status !== "approved") throw new Error("Artist is not approved");
+    if (existing) throw new Error(`Artist already has a ${existing.status} relationship with this label`);
+
+    const { error } = await supabaseAdmin.from("label_artists").insert({
       label_id: data.label_id,
       artist_id: data.artist_id,
       royalty_pct: royalty,
@@ -143,7 +197,22 @@ export const respondToLabelInvite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { id: string; accept: boolean }) => d)
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
+    const { userId, supabase } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ownArtist } = await supabaseAdmin
+      .from("artists")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ownArtist) throw new Error("Artist profile required");
+    const { data: invite } = await supabaseAdmin
+      .from("label_artists")
+      .select("label_id, artist_id, status")
+      .eq("id", data.id)
+      .eq("artist_id", ownArtist.id)
+      .maybeSingle();
+    if (!invite || invite.status !== "invited") throw new Error("Label invitation not found");
+
     if (data.accept) {
       const { data: row, error } = await supabase
         .from("label_artists")
@@ -153,17 +222,17 @@ export const respondToLabelInvite = createServerFn({ method: "POST" })
         .single();
       if (error) throw new Error(error.message);
       // attach label to artist
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin
         .from("artists")
         .update({ label_id: (row as any).label_id })
         .eq("id", (row as any).artist_id);
       await audit(userId, "label.invite.accept", "label_artists", data.id);
     } else {
-      await supabase
+      const { error } = await supabase
         .from("label_artists")
-        .update({ status: "removed" } as any)
+        .update({ status: "declined" } as any)
         .eq("id", data.id);
+      if (error) throw new Error(error.message);
       await audit(userId, "label.invite.decline", "label_artists", data.id);
     }
     return { ok: true };
@@ -185,24 +254,9 @@ export const setArtistRoyalty = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!row) throw new Error("Roster entry not found");
 
-    const { data: ownedLabel } = await supabaseAdmin
-      .from("labels")
-      .select("id")
-      .eq("id", (row as any).label_id)
-      .eq("owner_user_id", context.userId)
-      .maybeSingle();
-    const ownerCheck = Boolean(ownedLabel);
-    const { data: roles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-    const isStaff = (roles ?? []).some((r: any) => r.role === "admin" || r.role === "superadmin");
+    await assertLabelManager(context.supabase, context.userId, (row as any).label_id);
 
-    if (!ownerCheck && !isStaff) {
-      throw new Error("Only the label owner can change royalty percentage");
-    }
-
-    const { error } = await supabaseAdmin
+    const { error } = await context.supabase
       .from("label_artists")
       .update({ royalty_pct: data.royalty_pct } as any)
       .eq("id", data.id);
@@ -217,22 +271,23 @@ export const removeArtistFromLabel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { id: string }) => d)
   .handler(async ({ context, data }) => {
-    const { data: row } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
       .from("label_artists")
-      .select("artist_id")
+      .select("artist_id, label_id")
       .eq("id", data.id)
       .maybeSingle();
-    await context.supabase
+    if (!row) throw new Error("Roster entry not found");
+    await assertLabelManager(context.supabase, context.userId, (row as any).label_id);
+    const { error } = await context.supabase
       .from("label_artists")
       .update({ status: "removed" } as any)
       .eq("id", data.id);
-    if (row) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin
-        .from("artists")
-        .update({ label_id: null })
-        .eq("id", (row as any).artist_id);
-    }
+    if (error) throw new Error(error.message);
+    await supabaseAdmin
+      .from("artists")
+      .update({ label_id: null })
+      .eq("id", (row as any).artist_id);
     await audit(context.userId, "label.remove_artist", "label_artists", data.id);
     return { ok: true };
   });
@@ -241,7 +296,9 @@ export const listLabelRoster = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((d: { label_id: string }) => d)
   .handler(async ({ context, data }) => {
-    const { data: rows } = await context.supabase
+    await assertLabelManager(context.supabase, context.userId, data.label_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await supabaseAdmin
       .from("label_artists")
       .select(
         "id, status, royalty_pct, joined_at, artists!inner(id, name, avatar_url, monthly_listeners)",
@@ -254,7 +311,9 @@ export const listLabelRevenue = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((d: { label_id: string }) => d)
   .handler(async ({ context, data }) => {
-    const { data: splits } = await context.supabase
+    await assertLabelManager(context.supabase, context.userId, data.label_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: splits } = await supabaseAdmin
       .from("revenue_splits")
       .select("amount, created_at, payee_role, artist_id")
       .eq("label_id", data.label_id)
@@ -267,7 +326,7 @@ export const listLabelRevenue = createServerFn({ method: "GET" })
 /**
  * Calculate available balance for label payout
  */
-async function getLabelAvailableBalance(supabase: SupabaseClient, labelId: string): Promise<number> {
+async function getLabelAvailableBalance(supabase: any, labelId: string): Promise<number> {
   // Get total earned from revenue splits
   const { data: splits } = await supabase
     .from("revenue_splits")
@@ -282,7 +341,7 @@ async function getLabelAvailableBalance(supabase: SupabaseClient, labelId: strin
     .from("payouts")
     .select("amount")
     .eq("label_id", labelId)
-    .in("status", ["completed", "pending"]);
+    .in("status", ["pending", "approved", "processing", "paid", "completed"]);
   
   const totalPaid = (payouts ?? []).reduce((sum, p: any) => sum + Number(p.amount || 0), 0);
   
@@ -301,19 +360,24 @@ export const requestLabelPayout = createServerFn({ method: "POST" })
     }
     
     if (data.amount > 1000000) {
-      throw new Error("Payout amount cannot exceed $1,000,000");
+      throw new Error("Payout amount cannot exceed ZMW 1,000,000");
     }
-    
+    const label = await assertLabelManager(context.supabase, context.userId, data.label_id);
+    if (label.owner_user_id !== context.userId) {
+      throw new Error("Only the label owner can request a label payout");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // SECURITY: Check available balance
-    const available = await getLabelAvailableBalance(context.supabase, data.label_id);
+    const available = await getLabelAvailableBalance(supabaseAdmin, data.label_id);
     if (data.amount > available) {
       throw new Error(
-        `Insufficient balance. Available: $${available.toFixed(2)}, Requested: $${data.amount.toFixed(2)}`
+        `Insufficient balance. Available: ZMW ${available.toFixed(2)}, Requested: ZMW ${data.amount.toFixed(2)}`
       );
     }
     
     const { error } = await context.supabase.from("payouts").insert({
       label_id: data.label_id,
+      artist_id: null,
       amount: data.amount,
       method_code: data.method_code,
       destination: data.destination,

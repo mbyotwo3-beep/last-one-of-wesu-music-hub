@@ -23,6 +23,8 @@ import {
   listPendingLabels,
   moderateLabel,
   getArtistDiagnostics,
+  listPayoutsForStaff,
+  reviewPayout,
 } from "@/lib/admin.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
@@ -44,7 +46,7 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "carousels" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "carousels" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -74,6 +76,7 @@ function AdminPage() {
     { id: "artists", label: "Artists", badge: pendingArtistsQ.data?.length },
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
+    { id: "payouts", label: "Payouts" },
     { id: "carousels", label: "Carousels" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
@@ -122,6 +125,7 @@ function AdminPage() {
         {tab === "artists" && <ArtistMod />}
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
+        {tab === "payouts" && <PayoutMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
@@ -860,6 +864,120 @@ function LabelMod() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Payout moderation
+// ─────────────────────────────────────────────────────────────
+function PayoutMod() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listPayoutsForStaff);
+  const reviewFn = useServerFn(reviewPayout);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["staff-payouts"],
+    queryFn: () => listFn(),
+    retry: false,
+  });
+  const review = useMutation({
+    mutationFn: reviewFn,
+    onSuccess: (_, variables) => {
+      toast.success(`Payout ${variables.data.decision}.`);
+      qc.invalidateQueries({ queryKey: ["staff-payouts"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (err) => toast.error(`Payout review failed: ${(err as Error).message}`),
+  });
+
+  if (isLoading) return <div className="text-muted-foreground">Loading payout requests…</div>;
+  if (error) return <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>;
+
+  const payouts = data ?? [];
+  const pending = payouts.filter((p: any) => p.status === "pending");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold">Payout requests</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Review completed-sale earnings before sending funds. Approving a request records the
+          review; it does not initiate a bank or mobile-money transfer.
+        </p>
+      </div>
+
+      {pending.length === 0 ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6">
+          <CheckCircle2 className="size-5 text-primary" />
+          <p className="text-sm text-muted-foreground">No payout requests await review.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {pending.map((p: any) => {
+            const payee = p.label?.name ? `Label: ${p.label.name}` : `Artist: ${p.artist?.name ?? "Unknown"}`;
+            return (
+              <div key={p.id} className="rounded-2xl border border-border bg-card p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold">{payee}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      ZMW {Number(p.amount).toFixed(2)} · {p.method_code} · requested {new Date(p.requested_at).toLocaleString()}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-muted-foreground">Destination: {p.destination}</p>
+                  </div>
+                  <span className="w-fit rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-semibold text-yellow-500">
+                    Pending review
+                  </span>
+                </div>
+                <label className="mt-4 block text-xs font-medium text-muted-foreground">
+                  Review note (optional)
+                  <input
+                    value={notes[p.id] ?? ""}
+                    onChange={(event) => setNotes((current) => ({ ...current, [p.id]: event.target.value }))}
+                    maxLength={1000}
+                    placeholder="Visible in the audit trail"
+                    className="mt-1 w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground"
+                  />
+                </label>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    disabled={review.isPending}
+                    onClick={() => review.mutate({ data: { id: p.id, decision: "approved", notes: notes[p.id] } })}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
+                  >
+                    <Check className="size-3" /> Approve review
+                  </button>
+                  <button
+                    disabled={review.isPending}
+                    onClick={() => review.mutate({ data: { id: p.id, decision: "rejected", notes: notes[p.id] } })}
+                    className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                  >
+                    <X className="size-3" /> Reject
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {payouts.filter((p: any) => p.status !== "pending").length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-border px-5 py-3 text-sm font-semibold">Reviewed requests</div>
+          <div className="divide-y divide-border">
+            {payouts
+              .filter((p: any) => p.status !== "pending")
+              .map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+                  <span>{p.label?.name ?? p.artist?.name ?? "Unknown payee"}</span>
+                  <span className="text-muted-foreground">ZMW {Number(p.amount).toFixed(2)}</span>
+                  <span className="capitalize text-muted-foreground">{p.status}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

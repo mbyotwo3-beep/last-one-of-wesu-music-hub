@@ -61,7 +61,14 @@ export const verifyPayment = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (!tx) return { status: "not_found" as const };
-    if (tx.status !== "pending") {
+    if (tx.status === "completed" || tx.status === "failed") {
+      return { status: tx.status as string, transaction: tx };
+    }
+
+    // A completed mobile-money collection can occasionally lose the server
+    // request between entitlement creation and the final ledger update. Let a
+    // subsequent status poll safely resume that recovery path.
+    if (tx.status !== "pending" && tx.status !== "fulfillment_failed" && tx.status !== "processing") {
       return { status: tx.status as string, transaction: tx };
     }
 
