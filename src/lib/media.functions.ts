@@ -26,7 +26,7 @@ export const signUploadUrl = createServerFn({ method: "POST" })
 export const signImageUrl = createServerFn({ method: "POST" })
   .validator((d: { bucket: Exclude<MediaBucketName, "song-audio">; path: string }) => d)
   .handler(async ({ data }) => {
-    if (!BUCKETS.includes(data.bucket) || data.bucket === "song-audio") {
+    if (!BUCKETS.includes(data.bucket) || (data.bucket as string) === "song-audio") {
       throw new Error("Unknown bucket");
     }
     if (!data.path) throw new Error("Missing path");
