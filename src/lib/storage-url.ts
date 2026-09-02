@@ -1,13 +1,10 @@
-import { supabase } from "@/integrations/supabase/client";
+import { signImageUrl } from "@/lib/media.functions";
 
 /**
- * Storage buckets in this project are private, but album-art / artist-images
- * / user-avatars all have anon SELECT policies on storage.objects. That means
- * anyone can mint a signed URL for a stored path via the browser client.
- *
- * These helpers turn a raw storage path (as stored in the DB) into a URL the
- * browser can render, and cache the result so we don't re-sign on every
- * render. Values that already look like an absolute URL are returned as-is.
+ * Media lives in a private Cloudflare R2 bucket. These helpers turn a raw
+ * stored path (as kept in the DB) into a short-lived signed URL the browser
+ * can render, and cache the result so we don't re-sign on every render.
+ * Values that already look like an absolute URL are returned as-is.
  */
 
 export type ImageBucket = "album-art" | "artist-images" | "user-avatars";
