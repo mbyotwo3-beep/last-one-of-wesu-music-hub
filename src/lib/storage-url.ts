@@ -27,13 +27,11 @@ export async function resolveImageUrl(
   if (pending) return pending;
   const p = (async () => {
     // 60-min signed URL — plenty for a page view; cached in-memory for the tab.
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 60);
-    if (error || !data?.signedUrl) throw error ?? new Error("sign failed");
-    cache.set(key, data.signedUrl);
+    const { url } = await signImageUrl({ data: { bucket, path } });
+    if (!url) throw new Error("sign failed");
+    cache.set(key, url);
     inflight.delete(key);
-    return data.signedUrl;
+    return url;
   })();
   inflight.set(key, p);
   return p;
