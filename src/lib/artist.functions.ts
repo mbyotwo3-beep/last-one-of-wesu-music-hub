@@ -231,6 +231,8 @@ export const deleteSong = createServerFn({ method: "POST" })
     // 4. Clean up audio file from storage (best-effort)
     try {
       if (song.audio_url) {
+        const { r2Delete, isR2Configured } = await import("./r2.server");
+        if (isR2Configured()) await r2Delete("song-audio", song.audio_url);
         await supabaseAdmin.storage.from("song-audio").remove([song.audio_url]);
       }
     } catch {
