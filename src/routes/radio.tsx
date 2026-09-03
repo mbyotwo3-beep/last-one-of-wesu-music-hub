@@ -24,6 +24,23 @@ interface RadioStation {
 }
 
 export const Route = createFileRoute("/radio")({
+  head: () => ({
+    meta: [
+      { title: "Live Radio — Wesu+" },
+      {
+        name: "description",
+        content:
+          "Tune into live Zambian and African radio stations, streamed free inside Wesu+.",
+      },
+      { property: "og:title", content: "Live Radio — Wesu+" },
+      {
+        property: "og:description",
+        content: "Tune into live Zambian and African radio stations, streamed free inside Wesu+.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: RadioPage,
 });
 
