@@ -568,7 +568,7 @@ export type Database = {
       payouts: {
         Row: {
           amount: number
-          artist_id: string
+          artist_id: string | null
           destination: string
           gross_amount: number | null
           id: string
@@ -587,7 +587,7 @@ export type Database = {
         }
         Insert: {
           amount: number
-          artist_id: string
+          artist_id?: string | null
           destination: string
           gross_amount?: number | null
           id?: string
@@ -606,7 +606,7 @@ export type Database = {
         }
         Update: {
           amount?: number
-          artist_id?: string
+          artist_id?: string | null
           destination?: string
           gross_amount?: number | null
           id?: string
