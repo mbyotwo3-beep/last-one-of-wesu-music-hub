@@ -180,17 +180,9 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       throw new Error("Song audio file not found. Please contact support.");
     }
 
-    // Sign via the authenticated user's client — storage RLS grants access
-    // to entitled listeners (owner, staff, subscribed, or purchased).
-    // The public read policy allows this for approved songs without service role.
-    const { data: signed, error } = await context.supabase.storage
-      .from("song-audio")
-      .createSignedUrl(rawPath, 3600);
-    if (error || !signed?.signedUrl) {
-      console.error("Audio URL signing error:", error);
-      throw new Error(error?.message ?? "Unable to sign audio URL. Please ensure the song is approved.");
-    }
-    return { url: signed.signedUrl };
+    // Entitlement was verified above; mint a short-lived signed read URL.
+    const { signMediaUrl } = await import("./media.server");
+    return { url: await signMediaUrl("song-audio", rawPath, { expiresIn: 3600 }) };
   });
 
 /**
@@ -248,11 +240,9 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
       return { url: url.toString(), filename };
     }
 
-    const { data: signed, error } = await context.supabase.storage
-      .from("song-audio")
-      .createSignedUrl(rawPath, 3600, { download: filename });
-    if (error || !signed?.signedUrl) throw new Error(error?.message ?? "Unable to prepare download");
-    return { url: signed.signedUrl, filename };
+    const { signMediaUrl } = await import("./media.server");
+    const url = await signMediaUrl("song-audio", rawPath, { expiresIn: 3600, download: filename });
+    return { url, filename };
   });
 
 /**
@@ -284,16 +274,8 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
       throw new Error("Song audio file not found. Please contact support.");
     }
 
-    // Sign via the anon client — the "song-audio public read for approved songs"
-    // storage policy authorizes this without a service-role key.
-    const { data: signed, error } = await supabase.storage
-      .from("song-audio")
-      .createSignedUrl(rawPath, 3600);
-    if (error || !signed?.signedUrl) {
-      console.error("Public audio URL signing error:", error);
-      throw new Error(error?.message ?? "Audio temporarily unavailable. Please ensure the song is approved.");
-    }
-    return { url: signed.signedUrl };
+    const { signMediaUrl } = await import("./media.server");
+    return { url: await signMediaUrl("song-audio", rawPath, { expiresIn: 3600 }) };
   });
 
 /**
@@ -332,22 +314,8 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
       throw new Error("Song audio file not found. Please contact support.");
     }
 
-    let signed: { signedUrl: string } | null = null;
-    let error: { message: string } | null = null;
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const res = await supabaseAdmin.storage.from("song-audio").createSignedUrl(rawPath, 3600);
-      signed = res.data;
-      error = res.error;
-    } catch {
-      const res = await supabase.storage.from("song-audio").createSignedUrl(rawPath, 3600);
-      signed = res.data;
-      error = res.error;
-    }
-    if (error || !signed?.signedUrl) {
-      console.error("Preview audio URL signing error:", error);
-      throw new Error(error?.message ?? "Preview temporarily unavailable. Please ensure the song is approved.");
-    }
+    const { signMediaUrl } = await import("./media.server");
+    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 3600 }) };
     return { url: signed.signedUrl };
   });
 

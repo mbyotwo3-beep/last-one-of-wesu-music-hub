@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
@@ -81,6 +81,18 @@ function CheckoutSuccessPage() {
       return null;
     },
   });
+
+  // Once the payment settles, every entitlement-dependent query in the app
+  // (library, purchases, signed audio URLs, track access) is stale. Refresh
+  // them immediately so the unlocked content works without a page reload.
+  const queryClient = useQueryClient();
+  const settledStatus = (transaction as any)?.status;
+  useEffect(() => {
+    if (settledStatus !== "completed") return;
+    queryClient.invalidateQueries({
+      predicate: (q) => q.queryKey[0] !== "transaction",
+    });
+  }, [settledStatus, queryClient]);
 
   const [pollElapsed, setPollElapsed] = useState(0);
   const isAwaitingSettlement =

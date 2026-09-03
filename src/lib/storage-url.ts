@@ -1,13 +1,10 @@
-import { supabase } from "@/integrations/supabase/client";
+import { signImageUrl } from "@/lib/media.functions";
 
 /**
- * Storage buckets in this project are private, but album-art / artist-images
- * / user-avatars all have anon SELECT policies on storage.objects. That means
- * anyone can mint a signed URL for a stored path via the browser client.
- *
- * These helpers turn a raw storage path (as stored in the DB) into a URL the
- * browser can render, and cache the result so we don't re-sign on every
- * render. Values that already look like an absolute URL are returned as-is.
+ * Media lives in a private Cloudflare R2 bucket. These helpers turn a raw
+ * stored path (as kept in the DB) into a short-lived signed URL the browser
+ * can render, and cache the result so we don't re-sign on every render.
+ * Values that already look like an absolute URL are returned as-is.
  */
 
 export type ImageBucket = "album-art" | "artist-images" | "user-avatars";
@@ -30,13 +27,11 @@ export async function resolveImageUrl(
   if (pending) return pending;
   const p = (async () => {
     // 60-min signed URL — plenty for a page view; cached in-memory for the tab.
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 60);
-    if (error || !data?.signedUrl) throw error ?? new Error("sign failed");
-    cache.set(key, data.signedUrl);
+    const { url } = await signImageUrl({ data: { bucket, path } });
+    if (!url) throw new Error("sign failed");
+    cache.set(key, url);
     inflight.delete(key);
-    return data.signedUrl;
+    return url;
   })();
   inflight.set(key, p);
   return p;
