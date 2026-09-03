@@ -343,7 +343,7 @@ async function getLabelAvailableBalance(supabase: any, labelId: string): Promise
     .eq("label_id", labelId)
     .in("status", ["pending", "approved", "processing", "paid", "completed"]);
   
-  const totalPaid = (payouts ?? []).reduce((sum, p: any) => sum + Number(p.amount || 0), 0);
+  const totalPaid = (payouts ?? []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
   
   return Math.max(0, totalEarned - totalPaid);
 }
