@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /superadmin
+Disallow: /dashboard
+Disallow: /checkout
+Disallow: /profile
+Disallow: /library
+Disallow: /notifications
+Disallow: /artist-dashboard
+Disallow: /label-dashboard
+Disallow: /artist-studio
+
+Sitemap: https://www.wesuplusly.com/sitemap.xml
