@@ -1,13 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Trash2, ListMusic, ArrowLeft } from "lucide-react";
+import { Play, Trash2, ListMusic, ArrowLeft, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareButton } from "@/components/ShareButton";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
@@ -22,6 +24,7 @@ function Page() {
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
   const removeFn = useServerFn(removeFromPlaylist);
+  const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
     queryKey: ["playlist", id],
@@ -50,6 +53,8 @@ function Page() {
     .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
     .map((ps: any) => ps.song)
     .filter(Boolean);
+  const isOwner = (data as any).user_id === user?.id;
+  const isPublic = (data as any).is_public === true;
 
   function playAll() {
     if (!songs.length) return;
@@ -81,6 +86,11 @@ function Page() {
             <p className="text-muted-foreground mb-2">{(data as any).description}</p>
           )}
           <p className="text-sm text-muted-foreground">{songs.length} songs</p>
+          {!isPublic && (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Lock className="size-3.5" /> Private playlist
+            </p>
+          )}
         </div>
       </div>
 
@@ -91,6 +101,14 @@ function Page() {
       >
         <Play className="size-5 fill-current" /> Play
       </button>
+      {isPublic && (
+        <ShareButton
+          path={`/playlists/${id}`}
+          title={(data as any).name}
+          text={`Listen to ${(data as any).name} on Wesu+`}
+          className="ml-3 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 text-sm font-bold transition-colors hover:bg-accent"
+        />
+      )}
 
       {songs.length === 0 ? (
         <p className="text-muted-foreground py-12 text-center">No songs yet. Add from any song page.</p>
@@ -120,13 +138,21 @@ function Page() {
                 </Link>
               </div>
               {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-              <button
+              <ShareButton
+                path={`/songs/${s.id}`}
+                title={s.title}
+                text={`Listen to ${s.title} by ${s.artist?.name ?? "an artist"} on Wesu+`}
+                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              />
+              {isOwner && (
+                <button
                 onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
                 className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
                 aria-label="Remove"
               >
                 <Trash2 className="size-4" />
               </button>
+              )}
             </div>
           ))}
         </div>

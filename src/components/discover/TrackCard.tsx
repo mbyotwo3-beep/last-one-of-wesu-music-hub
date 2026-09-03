@@ -7,6 +7,7 @@ import { useSavedAlbum } from "@/hooks/use-saved-album";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareButton } from "@/components/ShareButton";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -96,11 +97,17 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       ) : (
         <p className="text-xs text-muted-foreground truncate">{artistName}</p>
       )}
-      {user && Number(song.price ?? 0) <= 0 && (
-        <div className="mt-2 flex justify-start">
+      <div className="mt-2 flex items-center gap-1 justify-start">
+        {user && Number(song.price ?? 0) <= 0 && (
           <DownloadButton songId={song.id} label="Download" />
-        </div>
-      )}
+        )}
+        <ShareButton
+          path={`/songs/${song.id}`}
+          title={song.title}
+          text={`Listen to ${song.title} by ${artistName} on Wesu+`}
+          className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        />
+      </div>
     </div>
   );
 }

@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ListMusic, Plus, Trash2, Edit2 } from "lucide-react";
+import { ListMusic, Plus, Trash2 } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
-import { createPlaylist, deletePlaylist, addToPlaylist } from "@/lib/listener.functions";
+import { createPlaylist, deletePlaylist } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useUserRoles } from "@/hooks/use-roles";
+import { ShareButton } from "@/components/ShareButton";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({ meta: [{ title: "My Playlists — Wesu+" }] }),
@@ -22,13 +24,13 @@ export const Route = createFileRoute("/playlists")({
 
 function Page() {
   const { user } = useAuth();
+  const { isAdmin } = useUserRoles();
   const qc = useQueryClient();
   const createFn = useServerFn(createPlaylist);
   const deleteFn = useServerFn(deletePlaylist);
-  const addFn = useServerFn(addToPlaylist);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [newPlaylist, setNewPlaylist] = useState({ name: "", description: "", is_public: false });
+  const [newPlaylist, setNewPlaylist] = useState({ name: "", description: "", make_public: false });
 
   const { data: playlists, isLoading } = useQuery({
     queryKey: ["my-playlists", user?.id],
@@ -49,7 +51,7 @@ function Page() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       setShowCreate(false);
-      setNewPlaylist({ name: "", description: "", is_public: false });
+      setNewPlaylist({ name: "", description: "", make_public: false });
       toast.success("Playlist created successfully");
     },
     onError: (error) => {
@@ -109,14 +111,20 @@ function Page() {
               value={newPlaylist.description}
               onChange={(e) => setNewPlaylist({ ...newPlaylist, description: e.target.value })}
             />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={newPlaylist.is_public}
-                onChange={(e) => setNewPlaylist({ ...newPlaylist, is_public: e.target.checked })}
-              />{" "}
-              Make playlist public
-            </label>
+            {isAdmin ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={newPlaylist.make_public}
+                  onChange={(e) => setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })}
+                />
+                Publish as an editorial playlist
+              </label>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Your playlist will be private. Only Wesu+ staff can publish editorial playlists.
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -171,6 +179,14 @@ function Page() {
               >
                 <Trash2 className="size-4" />
               </button>
+              {playlist.is_public && (
+                <ShareButton
+                  path={`/playlists/${playlist.id}`}
+                  title={playlist.name}
+                  text={`Listen to ${playlist.name} on Wesu+`}
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                />
+              )}
             </div>
           ))}
         </div>

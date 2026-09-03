@@ -46,6 +46,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LabelsIndexRouteImport } from './routes/labels.index'
 import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
 import { Route as SuperadminHomepageRouteImport } from './routes/superadmin.homepage'
+import { Route as SongsIdRouteImport } from './routes/songs.$id'
 import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
 import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
@@ -238,6 +239,11 @@ const SuperadminHomepageRoute = SuperadminHomepageRouteImport.update({
   path: '/homepage',
   getParentRoute: () => SuperadminRoute,
 } as any)
+const SongsIdRoute = SongsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SongsRoute,
+} as any)
 const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -298,7 +304,7 @@ export interface FileRoutesByFullPath {
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
-  '/songs': typeof SongsRoute
+  '/songs': typeof SongsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/terms': typeof TermsRoute
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
@@ -343,7 +350,7 @@ export interface FileRoutesByTo {
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
-  '/songs': typeof SongsRoute
+  '/songs': typeof SongsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/terms': typeof TermsRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
@@ -389,7 +397,7 @@ export interface FileRoutesById {
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
-  '/songs': typeof SongsRoute
+  '/songs': typeof SongsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/terms': typeof TermsRoute
@@ -400,6 +408,7 @@ export interface FileRoutesById {
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
   '/playlists/$id': typeof PlaylistsIdRoute
+  '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
@@ -447,6 +456,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/songs/$id'
     | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
@@ -492,6 +502,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/songs/$id'
     | '/superadmin/homepage'
     | '/artists'
     | '/labels'
@@ -537,6 +548,7 @@ export interface FileRouteTypes {
     | '/checkout/success'
     | '/labels/$slug'
     | '/playlists/$id'
+    | '/songs/$id'
     | '/superadmin/homepage'
     | '/artists/'
     | '/labels/'
@@ -572,7 +584,7 @@ export interface RootRouteChildren {
   RecentlyAddedRoute: typeof RecentlyAddedRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SearchRoute: typeof SearchRoute
-  SongsRoute: typeof SongsRoute
+  SongsRoute: typeof SongsRouteWithChildren
   SubscriptionsRoute: typeof SubscriptionsRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
   TermsRoute: typeof TermsRoute
@@ -846,6 +858,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperadminHomepageRouteImport
       parentRoute: typeof SuperadminRoute
     }
+    '/songs/$id': {
+      id: '/songs/$id'
+      path: '/$id'
+      fullPath: '/songs/$id'
+      preLoaderRoute: typeof SongsIdRouteImport
+      parentRoute: typeof SongsRoute
+    }
     '/playlists/$id': {
       id: '/playlists/$id'
       path: '/$id'
@@ -926,6 +945,16 @@ const PlaylistsRouteWithChildren = PlaylistsRoute._addFileChildren(
   PlaylistsRouteChildren,
 )
 
+interface SongsRouteChildren {
+  SongsIdRoute: typeof SongsIdRoute
+}
+
+const SongsRouteChildren: SongsRouteChildren = {
+  SongsIdRoute: SongsIdRoute,
+}
+
+const SongsRouteWithChildren = SongsRoute._addFileChildren(SongsRouteChildren)
+
 interface SuperadminRouteChildren {
   SuperadminHomepageRoute: typeof SuperadminHomepageRoute
 }
@@ -967,7 +996,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecentlyAddedRoute: RecentlyAddedRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SearchRoute: SearchRoute,
-  SongsRoute: SongsRoute,
+  SongsRoute: SongsRouteWithChildren,
   SubscriptionsRoute: SubscriptionsRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
   TermsRoute: TermsRoute,

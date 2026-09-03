@@ -189,6 +189,20 @@ export const getAlbumWithSongs = createServerFn({ method: "GET" })
     return { album: album.data, songs: songs.data ?? [] };
   });
 
+export const getSongById = createServerFn({ method: "GET" })
+  .validator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    const supabase = getPublicSupabase();
+    const { data: song, error } = await supabase
+      .from("songs")
+      .select("id,title,duration,price,cover_url,genre,explicit,play_count,created_at,artist:artists(id,name)")
+      .eq("id", data.id)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return song;
+  });
+
 // ---------- Purchasable item lookup (song or album) ----------
 
 export const getPurchasableItem = createServerFn({ method: "GET" })

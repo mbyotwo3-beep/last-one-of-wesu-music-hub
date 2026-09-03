@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
-import { isSuperadminUser } from "./roles";
+import { isStaffUser, isSuperadminUser } from "./roles";
 
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -41,15 +41,25 @@ export const updateProfile = createServerFn({ method: "POST" })
 
 export const createPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { name: string; description?: string; is_public?: boolean }) => d)
+  .validator((d: { name: string; description?: string; make_public?: boolean }) => d)
   .handler(async ({ context, data }) => {
+    const name = data.name?.trim();
+    if (!name) throw new Error("Playlist name is required");
+    if (name.length > 120) throw new Error("Playlist name must be at most 120 characters");
+    const description = data.description?.trim() || null;
+    if (description && description.length > 1_000) {
+      throw new Error("Playlist description must be at most 1,000 characters");
+    }
+    const isStaff = await isStaffUser(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
       .from("playlists")
       .insert({
         user_id: context.userId,
-        name: data.name,
-        description: data.description ?? null,
-        is_public: data.is_public ?? false,
+        name,
+        description,
+        // Listener and artist playlists are private. Only platform staff can
+        // intentionally publish an editorial playlist to Browse.
+        is_public: isStaff && data.make_public === true,
       } as any)
       .select("id")
       .single();

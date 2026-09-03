@@ -11,6 +11,8 @@ import { useEffect, useState } from "react";
 import { resolveImageUrl } from "@/lib/storage-url";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
+import { SocialLinks } from "@/components/SocialLinks";
+import { ShareButton } from "@/components/ShareButton";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -155,6 +157,7 @@ function ArtistPage() {
             >
               <Play className="size-6 fill-current ml-0.5" />
             </button>
+            <ShareButton path={`/artists/${a.id}`} title={a.name} text={`Listen to ${a.name} on Wesu+`} />
             <button
               onClick={handleFollow}
               disabled={follow.isPending}
@@ -175,6 +178,9 @@ function ArtistPage() {
         {a.bio && (
           <p className="text-sm text-muted-foreground max-w-2xl mb-10 leading-relaxed">{a.bio}</p>
         )}
+        <div className="mb-10">
+          <SocialLinks links={a.social_links} />
+        </div>
 
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Popular</h2>
@@ -229,6 +235,12 @@ function ArtistPage() {
                       </Link>
                     )}
                     {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+                    <ShareButton
+                      path={`/songs/${s.id}`}
+                      title={s.title}
+                      text={`Listen to ${s.title} by ${a.name} on Wesu+`}
+                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    />
                   </div>
                 </div>
               ))}
