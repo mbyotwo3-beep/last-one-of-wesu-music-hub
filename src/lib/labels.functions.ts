@@ -334,7 +334,7 @@ async function getLabelAvailableBalance(supabase: any, labelId: string): Promise
     .eq("label_id", labelId)
     .eq("payee_role", "label");
   
-  const totalEarned = (splits ?? []).reduce((sum, s: any) => sum + Number(s.amount || 0), 0);
+  const totalEarned = (splits ?? []).reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0);
   
   // Get total already paid or pending
   const { data: payouts } = await supabase
