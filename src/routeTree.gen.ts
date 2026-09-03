@@ -53,6 +53,7 @@ import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
 import { Route as SongsIdRouteImport } from './routes/songs.$id'
 import { Route as SuperadminHomepageRouteImport } from './routes/superadmin.homepage'
 import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
+import { Route as ApiPublicSitemapRouteImport } from './routes/api/public/sitemap'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -274,6 +275,11 @@ const ApiPublicLencoWebhookRoute = ApiPublicLencoWebhookRouteImport.update({
   path: '/api/public/lenco-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSitemapRoute = ApiPublicSitemapRouteImport.update({
+  id: '/api/public/sitemap',
+  path: '/api/public/sitemap',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
+  '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -366,6 +373,7 @@ export interface FileRoutesByTo {
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
+  '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -413,6 +421,7 @@ export interface FileRoutesById {
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
+  '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -461,6 +470,7 @@ export interface FileRouteTypes {
     | '/artists/'
     | '/labels/'
     | '/api/public/lenco-webhook'
+    | '/api/public/sitemap'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -507,6 +517,7 @@ export interface FileRouteTypes {
     | '/artists'
     | '/labels'
     | '/api/public/lenco-webhook'
+    | '/api/public/sitemap'
   id:
     | '__root__'
     | '/'
@@ -553,6 +564,7 @@ export interface FileRouteTypes {
     | '/artists/'
     | '/labels/'
     | '/api/public/lenco-webhook'
+    | '/api/public/sitemap'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -595,6 +607,7 @@ export interface RootRouteChildren {
   ArtistsIndexRoute: typeof ArtistsIndexRoute
   LabelsIndexRoute: typeof LabelsIndexRoute
   ApiPublicLencoWebhookRoute: typeof ApiPublicLencoWebhookRoute
+  ApiPublicSitemapRoute: typeof ApiPublicSitemapRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -907,6 +920,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicLencoWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/sitemap': {
+      id: '/api/public/sitemap'
+      path: '/api/public/sitemap'
+      fullPath: '/api/public/sitemap'
+      preLoaderRoute: typeof ApiPublicSitemapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1007,6 +1027,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArtistsIndexRoute: ArtistsIndexRoute,
   LabelsIndexRoute: LabelsIndexRoute,
   ApiPublicLencoWebhookRoute: ApiPublicLencoWebhookRoute,
+  ApiPublicSitemapRoute: ApiPublicSitemapRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
