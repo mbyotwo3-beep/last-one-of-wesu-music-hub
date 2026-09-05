@@ -26,6 +26,12 @@ import {
   listPayoutsForStaff,
   reviewPayout,
 } from "@/lib/admin.functions";
+import {
+  listStuckTransactions,
+  reconcileTransaction,
+  reconcileAllTransactions,
+  cancelStuckTransaction,
+} from "@/lib/reconcile.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
@@ -46,7 +52,7 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "carousels" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -77,6 +83,7 @@ function AdminPage() {
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
     { id: "payouts", label: "Payouts" },
+    { id: "payments", label: "Payments" },
     { id: "carousels", label: "Carousels" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
@@ -126,6 +133,7 @@ function AdminPage() {
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
         {tab === "payouts" && <PayoutMod />}
+        {tab === "payments" && <PaymentsMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
@@ -1079,6 +1087,133 @@ function Diagnostics() {
           <p className="text-xs text-muted-foreground mt-3">
             To fix: Re-approve these artists via the Artists tab.
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Payments — transactions that never reached a final outcome
+// ─────────────────────────────────────────────────────────────
+function PaymentsMod() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listStuckTransactions);
+  const recheckFn = useServerFn(reconcileTransaction);
+  const recheckAllFn = useServerFn(reconcileAllTransactions);
+  const cancelFn = useServerFn(cancelStuckTransaction);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["stuck-transactions"],
+    queryFn: () => listFn(),
+    retry: false,
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["stuck-transactions"] });
+
+  const recheckM = useMutation({
+    mutationFn: (id: string) => recheckFn({ data: { transactionId: id } }),
+    onSuccess: (r) => {
+      toast.success(
+        r.status === "completed"
+          ? "Payment confirmed and the buyer now has access."
+          : r.status === "failed"
+            ? "Provider reports this payment failed."
+            : "Still waiting on the customer to approve.",
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const recheckAllM = useMutation({
+    mutationFn: () => recheckAllFn({}),
+    onSuccess: (r) => {
+      toast.success(
+        `Checked ${r.checked}: ${r.completed} confirmed, ${r.failed} failed, ${r.stillPending} still waiting.`,
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const cancelM = useMutation({
+    mutationFn: (id: string) => cancelFn({ data: { transactionId: id } }),
+    onSuccess: () => {
+      toast.success("Marked as abandoned.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-muted-foreground">Loading payments…</div>;
+  if (error) return <div className="text-destructive">Error loading payments: {(error as Error).message}</div>;
+
+  const rows = data ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold">Unfinished payments</h2>
+          <p className="text-sm text-muted-foreground">
+            Payments that never reached a final outcome. Re-check asks the payment provider what really happened.
+          </p>
+        </div>
+        <button
+          onClick={() => recheckAllM.mutate()}
+          disabled={recheckAllM.isPending || rows.length === 0}
+          className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          <CreditCard className="size-4" />
+          {recheckAllM.isPending ? "Checking…" : "Re-check all"}
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">
+          No unfinished payments. Everything has settled.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((t) => (
+            <div
+              key={t.id}
+              className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <p className="font-semibold">
+                  {t.currency} {t.amount.toFixed(2)}{" "}
+                  <span className="text-xs font-normal text-muted-foreground uppercase">
+                    {t.method_code.replace(/_/g, " ")}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t.item_type} · {t.phone ?? t.buyer_email ?? "no contact"} ·{" "}
+                  {new Date(t.created_at).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
+                  {t.status.replace(/_/g, " ")}
+                </span>
+                <button
+                  onClick={() => recheckM.mutate(t.id)}
+                  disabled={recheckM.isPending}
+                  className="text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50"
+                >
+                  Re-check
+                </button>
+                <button
+                  onClick={() => cancelM.mutate(t.id)}
+                  disabled={cancelM.isPending}
+                  className="text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive hover:bg-destructive/25 disabled:opacity-50"
+                >
+                  Mark abandoned
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
