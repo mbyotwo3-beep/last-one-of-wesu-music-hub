@@ -315,7 +315,9 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     }
 
     const { signMediaUrl } = await import("./media.server");
-    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 3600 }) };
+    // Preview links are deliberately short-lived (45s) so an unauthenticated
+    // sampler cannot reuse the URL to download the full paid track.
+    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 45 }) };
     return { url: signed.signedUrl };
   });
 
