@@ -52,7 +52,7 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "carousels" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -83,6 +83,7 @@ function AdminPage() {
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
     { id: "payouts", label: "Payouts" },
+    { id: "payments", label: "Payments" },
     { id: "carousels", label: "Carousels" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
@@ -132,6 +133,7 @@ function AdminPage() {
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
         {tab === "payouts" && <PayoutMod />}
+        {tab === "payments" && <PaymentsMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
