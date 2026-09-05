@@ -285,8 +285,6 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
  * so anonymous listeners can sample songs before buying. The
  * server returns a short-lived (45s) signed URL and the client stops
  * playback at 15s. A determined user could theoretically grab more of the
- * server returns a short-lived (45s) signed URL and the client stops
- * playback at 15s. A determined user could theoretically grab more of the
  * file within the 45s window — this is an accepted trade-off to keep the
  * "sample before buy" funnel frictionless.
  *
@@ -315,7 +313,9 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     }
 
     const { signMediaUrl } = await import("./media.server");
-    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 3600 }) };
+    // Preview links are deliberately short-lived (45s) so an unauthenticated
+    // sampler cannot reuse the URL to download the full paid track.
+    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 45 }) };
     return { url: signed.signedUrl };
   });
 
