@@ -285,8 +285,6 @@ export const getPublicAudioUrl = createServerFn({ method: "POST" })
  * so anonymous listeners can sample songs before buying. The
  * server returns a short-lived (45s) signed URL and the client stops
  * playback at 15s. A determined user could theoretically grab more of the
- * server returns a short-lived (45s) signed URL and the client stops
- * playback at 15s. A determined user could theoretically grab more of the
  * file within the 45s window — this is an accepted trade-off to keep the
  * "sample before buy" funnel frictionless.
  *
