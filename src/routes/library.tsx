@@ -116,21 +116,7 @@ function Page() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {safeFollowedArtists.map((artist: any) => (
-              <Link
-                key={artist.id}
-                to="/artists/$id"
-                params={{ id: artist.id }}
-                className="group text-center p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-border cursor-pointer"
-              >
-                <StorageImage
-                  bucket="artist-images"
-                  path={artist.avatar_url}
-                  alt={artist.name}
-                  className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
-                />
-                <p className="font-semibold text-sm truncate">{artist.name}</p>
-                <p className="text-xs text-muted-foreground">Artist</p>
-              </Link>
+              <FollowedArtistCard key={artist.id} artist={artist} userId={user?.id ?? null} />
             ))}
           </div>
         )}
