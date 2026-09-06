@@ -90,6 +90,8 @@ function ArtistPage() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: followQK });
+      // Keep the "Followed Artists" list in the library in sync straight away.
+      qc.invalidateQueries({ queryKey: ["followed-artists"] });
     },
   });
 

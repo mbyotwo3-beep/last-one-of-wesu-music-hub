@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Heart, Music, Users, Disc } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Heart, Music, Users, Disc, UserCheck, UserMinus } from "lucide-react";
+import { toast } from "sonner";
+import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,21 +118,7 @@ function Page() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {safeFollowedArtists.map((artist: any) => (
-              <Link
-                key={artist.id}
-                to="/artists/$id"
-                params={{ id: artist.id }}
-                className="group text-center p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-border cursor-pointer"
-              >
-                <StorageImage
-                  bucket="artist-images"
-                  path={artist.avatar_url}
-                  alt={artist.name}
-                  className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
-                />
-                <p className="font-semibold text-sm truncate">{artist.name}</p>
-                <p className="text-xs text-muted-foreground">Artist</p>
-              </Link>
+              <FollowedArtistCard key={artist.id} artist={artist} userId={user?.id ?? null} />
             ))}
           </div>
         )}
@@ -238,6 +226,89 @@ function Page() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * One followed artist, with a Spotify-style Following/Unfollow control.
+ * The toggle updates the count and the button optimistically, and removes the
+ * card from this list as soon as the unfollow lands.
+ */
+function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | null }) {
+  const qc = useQueryClient();
+  const followQK = ["follow", artist.id, userId];
+
+  const followQuery = useQuery({
+    queryKey: followQK,
+    queryFn: () => getFollowState({ data: { artist_id: artist.id, user_id: userId } }),
+    initialData: { count: Number(artist.follower_count ?? 0), following: true },
+  });
+
+  const mutation = useMutation({
+    mutationFn: () => toggleFollow({ data: { artist_id: artist.id } }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: followQK });
+      const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
+      if (prev) {
+        qc.setQueryData(followQK, {
+          following: !prev.following,
+          count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
+        });
+      }
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      toast.error(e.message);
+    },
+    onSuccess: (res) => {
+      toast.success(res.following ? `Following ${artist.name}` : `Unfollowed ${artist.name}`);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: followQK });
+      qc.invalidateQueries({ queryKey: ["followed-artists"] });
+    },
+  });
+
+  const following = !!followQuery.data?.following;
+  const count = followQuery.data?.count ?? 0;
+
+  return (
+    <div className="text-center p-4 rounded-xl hover:bg-accent/40 transition-colors border border-transparent hover:border-border">
+      <Link to="/artists/$id" params={{ id: artist.id }} className="group block">
+        <StorageImage
+          bucket="artist-images"
+          path={artist.avatar_url}
+          alt={artist.name}
+          className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-border mb-3 object-cover"
+        />
+        <p className="font-semibold text-sm truncate">{artist.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {count.toLocaleString()} follower{count === 1 ? "" : "s"}
+        </p>
+      </Link>
+      <button
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
+        aria-pressed={following}
+        className={`group mt-3 w-full px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors inline-flex items-center justify-center gap-1.5 ${
+          following
+            ? "border-primary text-primary bg-primary/10 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+            : "border-foreground/30 hover:border-foreground text-foreground"
+        }`}
+      >
+        {following ? (
+          <>
+            <UserCheck className="size-3.5 group-hover:hidden" />
+            <UserMinus className="size-3.5 hidden group-hover:block" />
+            <span className="group-hover:hidden">Following</span>
+            <span className="hidden group-hover:inline">Unfollow</span>
+          </>
+        ) : (
+          "Follow"
+        )}
+      </button>
     </div>
   );
 }

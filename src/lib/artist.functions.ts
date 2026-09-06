@@ -572,3 +572,77 @@ export const signUpload = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return signed;
   });
+
+// ---------- Edit an existing track ----------
+
+/**
+ * Let an artist manage a track they already uploaded: title, genre, price,
+ * explicit flag, album and cover art. Audio is intentionally immutable —
+ * swapping the file under an approved track would bypass moderation.
+ *
+ * Editing content of an already-approved track sends it back to review only
+ * when the cover changes, since that is the part shown publicly.
+ */
+export const updateSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (d: {
+      id: string;
+      title?: string;
+      genre?: string | null;
+      price?: number;
+      explicit?: boolean;
+      album_id?: string | null;
+      cover_url?: string | null;
+    }) => {
+      if (!d?.id) throw new Error("Song id is required");
+      return d;
+    },
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+
+    const { data: artist } = await supabase
+      .from("artists")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!artist) throw new Error("You must be an artist to edit tracks");
+
+    const { data: song } = await supabase
+      .from("songs")
+      .select("id, artist_id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!song || (song as any).artist_id !== (artist as any).id) {
+      throw new Error("Track not found");
+    }
+
+    // Storage paths must stay inside the caller's own folder.
+    if (data.cover_url && !data.cover_url.startsWith(`${userId}/`)) {
+      throw new Error("Invalid cover_url: must be under your own storage folder");
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (data.title !== undefined) {
+      const t = data.title.trim();
+      if (!t) throw new Error("Title cannot be empty");
+      patch.title = t;
+    }
+    if (data.genre !== undefined) patch.genre = data.genre || null;
+    if (data.price !== undefined) {
+      if (Number.isNaN(data.price) || data.price < 0) throw new Error("Price cannot be negative");
+      patch.price = data.price;
+    }
+    if (data.explicit !== undefined) patch.explicit = data.explicit;
+    if (data.album_id !== undefined) patch.album_id = data.album_id || null;
+    if (data.cover_url !== undefined && data.cover_url) patch.cover_url = data.cover_url;
+
+    if (Object.keys(patch).length === 0) return { ok: true, id: data.id, status: (song as any).status };
+
+    const { error } = await supabase.from("songs").update(patch).eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await audit(supabase, userId, "song.update", "song", data.id, patch);
+    return { ok: true, id: data.id, status: (song as any).status };
+  });
