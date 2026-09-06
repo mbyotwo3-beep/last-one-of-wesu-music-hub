@@ -170,3 +170,49 @@ export const cancelStuckTransaction = createServerFn({ method: "POST" })
 
     return { id: data.transactionId, status: "failed" };
   });
+
+export type AdminTransaction = StuckTransaction & {
+  settled_at: string | null;
+  provider: string;
+};
+
+/**
+ * Full payment ledger for staff: every transaction with its status, amount and
+ * the moment it reached a final state. `settled_at` uses `updated_at` for rows
+ * that finished, since that is when the settle step wrote the outcome.
+ */
+export const listAllTransactions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d?: { status?: string; limit?: number }) => d ?? {})
+  .handler(async ({ context, data }): Promise<AdminTransaction[]> => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = supabaseAdmin
+      .from("payment_transactions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(data.limit ?? 200, 500));
+    if (data.status && data.status !== "all") q = q.eq("status", data.status);
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const FINAL = ["completed", "failed", "refunded"];
+    return (rows ?? []).map((t: any) => ({
+      id: t.id,
+      amount: Number(t.amount ?? 0),
+      currency: t.currency ?? "ZMW",
+      method_code: t.method_code,
+      status: t.status,
+      item_type: t.item_type,
+      item_id: t.item_id ?? null,
+      provider_ref: t.provider_ref ?? null,
+      provider: t.provider ?? "lenco",
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+      settled_at: FINAL.includes(t.status) ? t.updated_at : null,
+      buyer_email: t.metadata?.email ?? null,
+      phone: t.metadata?.phone ?? null,
+    }));
+  });
