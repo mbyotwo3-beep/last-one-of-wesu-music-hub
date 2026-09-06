@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, UserPlus, UserCheck, ShoppingBag } from "lucide-react";
+import { CheckCircle2, Play, UserPlus, UserCheck, UserMinus, ShoppingBag } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -68,12 +68,29 @@ function ArtistPage() {
 
   const follow = useMutation({
     mutationFn: () => toggleFollow({ data: { artist_id: id } }),
+    // Optimistic flip so the button label switches instantly, like Spotify.
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: followQK });
+      const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
+      if (prev) {
+        qc.setQueryData(followQK, {
+          following: !prev.following,
+          count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
+        });
+      }
+      return { prev };
+    },
+    onError: (e: Error, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      toast.error(e.message);
+    },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: followQK });
       qc.invalidateQueries({ queryKey: ["similar-artists", id] });
       toast.success(res.following ? `Following ${a.name}` : `Unfollowed ${a.name}`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: followQK });
+    },
   });
 
   const handleFollow = () => {
@@ -161,14 +178,27 @@ function ArtistPage() {
             <button
               onClick={handleFollow}
               disabled={follow.isPending}
-              className={`px-6 py-2 rounded-full border font-semibold text-sm transition-colors flex items-center gap-2 ${
+              aria-pressed={following}
+              title={following ? `Unfollow ${a.name}` : `Follow ${a.name}`}
+              className={`group px-6 py-2 rounded-full border font-semibold text-sm transition-colors flex items-center gap-2 min-w-[7.5rem] justify-center ${
                 following
-                  ? "border-primary text-primary bg-primary/10"
-                  : "border-white/30 hover:border-white text-white"
+                  ? "border-primary text-primary bg-primary/10 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+                  : "border-foreground/30 hover:border-foreground text-foreground"
               }`}
             >
-              {following ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
-              {following ? "Following" : "Follow"}
+              {following ? (
+                <>
+                  <UserCheck className="size-4 group-hover:hidden" />
+                  <UserMinus className="size-4 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="size-4" />
+                  Follow
+                </>
+              )}
             </button>
           </div>
         </div>
