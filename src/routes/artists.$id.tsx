@@ -178,14 +178,27 @@ function ArtistPage() {
             <button
               onClick={handleFollow}
               disabled={follow.isPending}
-              className={`px-6 py-2 rounded-full border font-semibold text-sm transition-colors flex items-center gap-2 ${
+              aria-pressed={following}
+              title={following ? `Unfollow ${a.name}` : `Follow ${a.name}`}
+              className={`group px-6 py-2 rounded-full border font-semibold text-sm transition-colors flex items-center gap-2 min-w-[7.5rem] justify-center ${
                 following
-                  ? "border-primary text-primary bg-primary/10"
-                  : "border-white/30 hover:border-white text-white"
+                  ? "border-primary text-primary bg-primary/10 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+                  : "border-foreground/30 hover:border-foreground text-foreground"
               }`}
             >
-              {following ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
-              {following ? "Following" : "Follow"}
+              {following ? (
+                <>
+                  <UserCheck className="size-4 group-hover:hidden" />
+                  <UserMinus className="size-4 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="size-4" />
+                  Follow
+                </>
+              )}
             </button>
           </div>
         </div>
