@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, UserPlus, UserCheck, ShoppingBag } from "lucide-react";
+import { CheckCircle2, Play, UserPlus, UserCheck, UserMinus, ShoppingBag } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
