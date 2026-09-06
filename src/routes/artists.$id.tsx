@@ -68,12 +68,29 @@ function ArtistPage() {
 
   const follow = useMutation({
     mutationFn: () => toggleFollow({ data: { artist_id: id } }),
+    // Optimistic flip so the button label switches instantly, like Spotify.
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: followQK });
+      const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
+      if (prev) {
+        qc.setQueryData(followQK, {
+          following: !prev.following,
+          count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
+        });
+      }
+      return { prev };
+    },
+    onError: (e: Error, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      toast.error(e.message);
+    },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: followQK });
       qc.invalidateQueries({ queryKey: ["similar-artists", id] });
       toast.success(res.following ? `Following ${a.name}` : `Unfollowed ${a.name}`);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: followQK });
+    },
   });
 
   const handleFollow = () => {
