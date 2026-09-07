@@ -1,5 +1,5 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { Home, Search, Library, User, Mic2, Shield, Menu, X, LogOut, Play, Grid, Radio, Clock, Disc, ListMusic, Heart, Music } from "lucide-react";
+import { Home, Search, Library, User, Mic2, Shield, Menu, X, LogOut, Play, Grid, Mic, Clock, Disc, ListMusic, Heart, Music } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
@@ -221,13 +221,13 @@ export function BottomTabBar() {
             </button>
             <button
               onClick={() => {
-                navigate({ to: "/radio" });
+                navigate({ to: "/podcast" });
                 setMenuOpen(false);
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
             >
-              <Radio className="size-5" />
-              <span className="text-sm font-medium">Radio</span>
+              <Mic className="size-5" />
+              <span className="text-sm font-medium">Podcast</span>
             </button>
 
             {/* Library Section */}

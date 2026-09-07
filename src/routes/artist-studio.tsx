@@ -383,6 +383,8 @@ function UploadWizard() {
   const [description, setDescription] = useState(() => sessionStorage.getItem("upload-wizard-description") || "");
   const [genre, setGenre] = useState(() => sessionStorage.getItem("upload-wizard-genre") || "");
   const [releaseDate, setReleaseDate] = useState(() => sessionStorage.getItem("upload-wizard-releaseDate") || "");
+  const [hasFeature, setHasFeature] = useState(() => sessionStorage.getItem("upload-wizard-hasFeature") === "true");
+  const [hasLabel, setHasLabel] = useState(() => sessionStorage.getItem("upload-wizard-hasLabel") === "true");
   const [tier, setTier] = useState<"free" | "paid">(() => {
     const saved = sessionStorage.getItem("upload-wizard-tier");
     return (saved as "free" | "paid") || "paid";
@@ -400,42 +402,29 @@ function UploadWizard() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  // Persist form state to sessionStorage
+  // Persist form state to sessionStorage - combined into single effect
   useEffect(() => {
-    sessionStorage.setItem("upload-wizard-step", step.toString());
-  }, [step]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-mode", mode);
-  }, [mode]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-title", title);
-  }, [title]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-description", description);
-  }, [description]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-genre", genre);
-  }, [genre]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-releaseDate", releaseDate);
-  }, [releaseDate]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-tier", tier);
-  }, [tier]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-price", price.toString());
-  }, [price]);
-
-  useEffect(() => {
-    sessionStorage.setItem("upload-wizard-feeAgreed", feeAgreed.toString());
-  }, [feeAgreed]);
+    const formData = {
+      step: step.toString(),
+      mode,
+      title,
+      description,
+      genre,
+      releaseDate,
+      hasFeature: hasFeature.toString(),
+      hasLabel: hasLabel.toString(),
+      tier,
+      price: price.toString(),
+      feeAgreed: feeAgreed.toString(),
+    };
+    
+    // Only write if data exists to avoid unnecessary writes
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        sessionStorage.setItem(`upload-wizard-${key}`, value);
+      }
+    });
+  }, [step, mode, title, description, genre, releaseDate, hasFeature, hasLabel, tier, price, feeAgreed]);
 
   // Clear sessionStorage on successful upload
   const clearSessionStorage = () => {
@@ -445,6 +434,8 @@ function UploadWizard() {
     sessionStorage.removeItem("upload-wizard-description");
     sessionStorage.removeItem("upload-wizard-genre");
     sessionStorage.removeItem("upload-wizard-releaseDate");
+    sessionStorage.removeItem("upload-wizard-hasFeature");
+    sessionStorage.removeItem("upload-wizard-hasLabel");
     sessionStorage.removeItem("upload-wizard-tier");
     sessionStorage.removeItem("upload-wizard-price");
     sessionStorage.removeItem("upload-wizard-feeAgreed");
@@ -533,6 +524,8 @@ function UploadWizard() {
             price: tier === "free" ? 0 : price,
             album_id: null,
             release_date: releaseDate || undefined,
+            has_feature: hasFeature,
+            has_label: hasLabel,
           },
         });
         const successMessage = tier === "free"
@@ -567,6 +560,8 @@ function UploadWizard() {
             cover_url,
             price,
             album_id: album.id,
+            has_feature: hasFeature,
+            has_label: hasLabel,
           },
         });
       }
@@ -605,6 +600,8 @@ function UploadWizard() {
               setDescription("");
               setGenre("");
               setReleaseDate("");
+              setHasFeature(false);
+              setHasLabel(false);
               setCover(null);
               setTracks([]);
               setTier("paid");
@@ -743,6 +740,28 @@ function UploadWizard() {
                 />
               </label>
             )}
+          </div>
+
+          {/* Feature and Label */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasFeature}
+                onChange={(e) => setHasFeature(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span>Has Feature</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasLabel}
+                onChange={(e) => setHasLabel(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span>Has Label</span>
+            </label>
           </div>
 
           <div className="rounded-xl border border-border bg-secondary/30 p-4">

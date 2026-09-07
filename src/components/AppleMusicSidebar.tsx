@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Search, Play, Grid, Radio, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
+import { Search, Play, Grid, Mic, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,7 +14,7 @@ export function AppleMusicSidebar() {
   const mainNav = [
     { to: "/", label: "Listen Now", icon: Play },
     { to: "/browse", label: "Browse", icon: Grid, highlight: true },
-    { to: "/radio", label: "Radio", icon: Radio },
+    { to: "/podcast", label: "Podcast", icon: Mic },
   ];
 
   const libraryNav = [

@@ -74,9 +74,9 @@ const sections = [
             <p className="font-semibold text-foreground text-sm">Premium Songs</p>
             <p className="text-muted-foreground text-sm mt-1">
               Artists set their own selling price. Wesu+ retains{" "}
-              <span className="text-primary font-bold">18%</span> of each sale
+              <span className="text-primary font-bold">20%</span> of each sale
               or revenue generated, while the remaining{" "}
-              <span className="text-primary font-bold">82%</span> is paid to the
+              <span className="text-primary font-bold">80%</span> is paid to the
               artist.
             </p>
           </div>
@@ -86,19 +86,19 @@ const sections = [
           <div className="flex h-4">
             <div
               className="bg-primary flex items-center justify-center"
-              style={{ width: "82%" }}
+              style={{ width: "80%" }}
             />
             <div
               className="bg-muted flex items-center justify-center"
-              style={{ width: "18%" }}
+              style={{ width: "20%" }}
             />
           </div>
           <div className="flex text-xs px-3 py-2 justify-between text-muted-foreground">
             <span>
-              <span className="text-primary font-semibold">82%</span> — Artist
+              <span className="text-primary font-semibold">80%</span> — Artist
             </span>
             <span>
-              <span className="font-semibold">18%</span> — Wesu+
+              <span className="font-semibold">20%</span> — Wesu+
             </span>
           </div>
         </div>

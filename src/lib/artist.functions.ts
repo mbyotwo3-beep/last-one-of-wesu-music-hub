@@ -130,13 +130,15 @@ export const uploadSong = createServerFn({ method: "POST" })
       price?: number;
       album_id?: string | null;
       release_date?: string | null;
+      has_feature?: boolean;
+      has_label?: boolean;
     }) => d,
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     const { data: artist } = await supabase
       .from("artists")
-      .select("id, status, verified")
+      .select("id, status, verified, label_id")
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("You must be an approved artist to upload");
@@ -154,6 +156,11 @@ export const uploadSong = createServerFn({ method: "POST" })
       throw new Error("Invalid cover_url: must be under your own storage folder");
     }
 
+    // If has_label is true, ensure artist is signed to a label
+    if (data.has_label && !(artist as any).label_id) {
+      throw new Error("You must be signed to a label to upload a label release");
+    }
+
     // Songs require admin approval before showing on the platform.
     const { data: song, error } = await supabase
       .from("songs")
@@ -168,6 +175,7 @@ export const uploadSong = createServerFn({ method: "POST" })
         artist_id: (artist as any).id,
         status: "pending",
         release_date: data.release_date ?? null,
+        label_id: data.has_label ? (artist as any).label_id : null,
       } as any)
       .select("id")
       .single();
@@ -176,6 +184,8 @@ export const uploadSong = createServerFn({ method: "POST" })
       title: data.title,
       status: "pending",
       release_date: data.release_date,
+      has_feature: data.has_feature,
+      has_label: data.has_label,
     });
     return { ok: true, id: song!.id, status: "pending" };
   });

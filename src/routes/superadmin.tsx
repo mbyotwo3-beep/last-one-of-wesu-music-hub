@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Shield,
   Users,
@@ -814,30 +814,33 @@ function SettingsTab() {
   const [pricing, setPricing] = useState<any>(null);
   const [verification, setVerification] = useState<any>(null);
   const [withdrawal, setWithdrawal] = useState<any>(null);
-  if (data && site === null) {
-    setSite(data.site ?? {});
-    setPay(data.payments ?? {});
-    setPricing(
-      data.pricing ?? {
-        song_min: 10,
-        song_max: 100,
-        album_min: 150,
-        album_max: 250,
-        free_song_fee: 100,
-      },
-    );
-    setVerification(
-      data.verification ?? {
-        min_followers: 100,
-        min_earnings: 500,
-      },
-    );
-    setWithdrawal(
-      data.withdrawal ?? {
-        min_amount: 500,
-      },
-    );
-  }
+
+  useEffect(() => {
+    if (data && site === null) {
+      setSite(data.site ?? {});
+      setPay(data.payments ?? {});
+      setPricing(
+        data.pricing ?? {
+          song_min: 10,
+          song_max: 100,
+          album_min: 150,
+          album_max: 250,
+          free_song_fee: 100,
+        },
+      );
+      setVerification(
+        data.verification ?? {
+          min_followers: 100,
+          min_earnings: 500,
+        },
+      );
+      setWithdrawal(
+        data.withdrawal ?? {
+          min_amount: 500,
+        },
+      );
+    }
+  }, [data, site]);
 
   if (isLoading) return <div className="text-muted-foreground">Loading settings…</div>;
   if (error) return <div className="text-destructive">Error loading settings: {(error as Error).message}</div>;
@@ -870,11 +873,13 @@ function SettingsTab() {
           />
         </label>
         <label className="block text-sm">
-          Commission %
+          Commission % (for non-free songs)
           <input
             type="number"
+            min={0}
+            max={100}
             className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={site.commission_pct ?? 0}
+            value={site.commission_pct ?? 20}
             onChange={(e) => setSite({ ...site, commission_pct: Number(e.target.value) })}
           />
         </label>
