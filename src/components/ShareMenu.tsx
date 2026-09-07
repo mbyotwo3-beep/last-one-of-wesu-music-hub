@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { MoreVertical, Heart, ListMusic, Plus, User, Share2, Disc, Copy, Check, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -29,6 +30,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const toggleLikeFn = useServerFn(toggleLike);
   const addToPlaylistFn = useServerFn(addToPlaylist);
@@ -102,6 +104,34 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
+
+  const handleLike = () => {
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      navigate({
+        to: "/auth",
+        search: { redirect: currentPath, action: "like", itemId: songId, itemType: "song" }
+      });
+      setIsOpen(false);
+      return;
+    }
+    if (songId) likeMutation.mutate({ data: { song_id: songId } });
+    setIsOpen(false);
+  };
+
+  const handleAddToPlaylistClick = () => {
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      navigate({
+        to: "/auth",
+        search: { redirect: currentPath, action: "addPlaylist", itemId: songId, itemType: "song" }
+      });
+      setIsOpen(false);
+      return;
+    }
+    setShowPlaylistModal(true);
+    setIsOpen(false);
+  };
 
   const handleAddToPlaylist = (playlistId: string) => {
     if (songId) {
@@ -195,10 +225,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
           {type === "song" && (
             <>
               <button
-                onClick={() => {
-                  if (songId) likeMutation.mutate({ data: { song_id: songId } });
-                  setIsOpen(false);
-                }}
+                onClick={handleLike}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <Heart className={`size-4 ${isLiked ? "fill-primary text-primary" : ""}`} />
@@ -206,10 +233,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               </button>
               
               <button
-                onClick={() => {
-                  setShowPlaylistModal(true);
-                  setIsOpen(false);
-                }}
+                onClick={handleAddToPlaylistClick}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <ListMusic className="size-4" />

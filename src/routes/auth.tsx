@@ -6,6 +6,7 @@ import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toggleFollow } from "@/lib/follow.functions";
 import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
+import { toggleLike } from "@/lib/listener.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 
 export const Route = createFileRoute("/auth")({
@@ -91,7 +92,7 @@ function AuthPage() {
   }
 
   async function handlePostAuthAction() {
-    // Handle post-authentication actions like follow, save
+    // Handle post-authentication actions like follow, save, like
     if (action === "follow" && artistId) {
       try {
         await toggleFollow({ data: { artist_id: artistId } });
@@ -108,6 +109,17 @@ function AuthPage() {
       } catch (err) {
         console.error("Failed to execute save action after auth:", err);
       }
+    } else if (action === "like" && itemId && itemType === "song") {
+      try {
+        await toggleLike({ data: { song_id: itemId } });
+      } catch (err) {
+        console.error("Failed to execute like action after auth:", err);
+      }
+    } else if (action === "addPlaylist" && itemId && itemType === "song") {
+      // For add to playlist, we redirect back to the page and let the user add to playlist
+      // since we need them to select which playlist
+      window.location.href = redirect || "/dashboard";
+      return;
     }
     // Redirect to the original destination
     window.location.href = redirect || "/dashboard";
