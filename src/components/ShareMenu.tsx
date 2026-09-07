@@ -186,6 +186,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     setCopied(true);
     toast.success("Link copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
+    setIsOpen(false);
   };
 
   const handleGoToArtist = (artistId: string) => {
@@ -196,6 +197,12 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     if (albumId) {
       window.location.href = `/albums/${albumId}`;
     }
+  };
+
+  const handleFollow = () => {
+    // For artist type, add follow option
+    setIsOpen(false);
+    // This would need to be implemented with actual follow logic
   };
 
   useEffect(() => {
@@ -303,6 +310,54 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
             </>
           )}
 
+          {type === "artist" && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+              >
+                <Share2 className="size-4" />
+                Share artist
+              </button>
+              <div className="border-t border-border" />
+            </>
+          )}
+
+          {type === "album" && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+              >
+                <Share2 className="size-4" />
+                Share album
+              </button>
+              <div className="border-t border-border" />
+            </>
+          )}
+
+          {type === "playlist" && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+              >
+                <Share2 className="size-4" />
+                Share playlist
+              </button>
+              <div className="border-t border-border" />
+            </>
+          )}
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -311,7 +366,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left border-t border-border"
           >
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? "Link copied" : "Copy song link"}
+            {copied ? "Link copied" : `Copy ${type} link`}
           </button>
         </div>,
         document.body
