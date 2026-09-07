@@ -29,6 +29,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const [copied, setCopied] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -160,7 +161,8 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     }
   };
 
-  const handleToggle = () => {
+  const handleToggle = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const scrollX = window.scrollX || window.pageXOffset;
@@ -198,7 +200,14 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // Close if click is outside both the button and the menu
+      if (
+        buttonRef.current && 
+        !buttonRef.current.contains(target) &&
+        menuRef.current &&
+        !menuRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -219,13 +228,17 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
       {isOpen && createPortal(
         <div 
+          ref={menuRef}
           className="fixed w-52 bg-card rounded-lg shadow-2xl z-[9999] overflow-hidden border border-border"
           style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
         >
           {type === "song" && (
             <>
               <button
-                onClick={handleLike}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLike();
+                }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <Heart className={`size-4 ${isLiked ? "fill-primary text-primary" : ""}`} />
@@ -233,7 +246,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               </button>
               
               <button
-                onClick={handleAddToPlaylistClick}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToPlaylistClick();
+                }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <ListMusic className="size-4" />
@@ -241,7 +257,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               </button>
 
               <button
-                onClick={handleAddToQueue}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToQueue();
+                }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <Plus className="size-4" />
@@ -255,7 +274,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   {songArtists.map((a: any) => (
                     <button
                       key={a.id}
-                      onClick={() => handleGoToArtist(a.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGoToArtist(a.id);
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                     >
                       <User className="size-4" />
@@ -268,7 +290,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
               {albumId && (
                 <button
-                  onClick={handleGoToAlbum}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGoToAlbum();
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                 >
                   <Disc className="size-4" />
@@ -279,7 +304,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
           )}
 
           <button
-            onClick={handleCopyLink}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyLink();
+            }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left border-t border-border"
           >
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
