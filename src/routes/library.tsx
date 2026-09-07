@@ -6,9 +6,12 @@ import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { usePlayer } from "@/stores/player";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -295,11 +298,55 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
 }
 
 /**
- * Liked song card with like button and remove from library functionality.
+ * Liked song card with like button, preview/play functionality, and remove from library.
  */
 function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const qc = useQueryClient();
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
+  const player = usePlayer();
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+
+  const isPlaying = player.playing && player.track?.id === song.id;
+  const isPaid = song.price && Number(song.price) > 0;
+
+  const handlePlay = async () => {
+    try {
+      if (isPlaying) {
+        player.togglePlay();
+        return;
+      }
+
+      if (isPaid) {
+        // Use preview URL for paid songs
+        const { url } = await getPreviewFn({ data: { song_id: song.id } });
+        player.setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: song.artists?.name ?? "Unknown",
+          coverUrl: song.cover_url,
+          audioUrl: url,
+        });
+        player.setIsPreview(true);
+        player.togglePlay();
+        toast.info(`🎵 Previewing "${song.title}" (15s)`);
+      } else {
+        // Full playback for free songs
+        const { data: signedUrl } = await supabase
+          .rpc("get_public_audio_url", { _song_id: song.id });
+        player.setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: song.artists?.name ?? "Unknown",
+          coverUrl: song.cover_url,
+          audioUrl: signedUrl,
+        });
+        player.setIsPreview(false);
+        player.togglePlay();
+      }
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
+  };
 
   const removeMutation = useMutation({
     mutationFn: async () => {
@@ -347,6 +394,21 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
         <p className="font-medium truncate">{song.title}</p>
         <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
       </div>
+      <button
+        onClick={handlePlay}
+        className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+        title={isPaid ? "Preview (15s)" : "Play"}
+      >
+        {isPlaying ? (
+          <div className="flex items-center gap-0.5">
+            <div className="w-1 h-3 bg-current animate-pulse" />
+            <div className="w-1 h-4 bg-current animate-pulse delay-75" />
+            <div className="w-1 h-3 bg-current animate-pulse delay-150" />
+          </div>
+        ) : (
+          <Play className="size-4 fill-current" />
+        )}
+      </button>
       {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
       {song.price && Number(song.price) > 0 && (
         <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
