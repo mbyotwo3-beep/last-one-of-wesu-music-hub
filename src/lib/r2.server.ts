@@ -13,7 +13,7 @@ import { AwsClient } from "aws4fetch";
  * upload is a presigned PUT scoped to the caller's own folder.
  */
 
-export type MediaBucket = "song-audio" | "album-art" | "artist-images" | "user-avatars";
+export type MediaBucket = "song-audio" | "album-art" | "artist-images" | "user-avatars" | "label-images" | "hero-images";
 
 const R2_ENDPOINT = "https://231415d20c628abc20c285627e045eb0.r2.cloudflarestorage.com";
 const R2_BUCKET = "wesu";

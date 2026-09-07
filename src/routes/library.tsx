@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Music, Users, Disc, UserCheck, UserMinus } from "lucide-react";
+import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play } from "lucide-react";
 import { toast } from "sonner";
 import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -134,27 +135,7 @@ function Page() {
         ) : (
           <div className="space-y-2">
             {safeLikedSongs.map((song: any) => (
-              <div
-                key={song.id}
-                className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
-              >
-                <StorageImage
-                  bucket="album-art"
-                  path={song.cover_url}
-                  alt={song.title}
-                  className="size-12 rounded object-cover bg-muted"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{song.title}</p>
-                  <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
-                </div>
-                {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
-                {song.price && Number(song.price) > 0 && (
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    ZMW {Number(song.price).toFixed(2)}
-                  </span>
-                )}
-              </div>
+              <LikedSongCard key={song.id} song={song} userId={user?.id ?? null} />
             ))}
           </div>
         )}
@@ -308,6 +289,77 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
         ) : (
           "Follow"
         )}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Liked song card with like button and remove from library functionality.
+ */
+function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
+  const qc = useQueryClient();
+  const { isSaved, toggle, loading } = useSavedTrack(song.id);
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId) return;
+      const { error } = await supabase
+        .from("song_likes")
+        .delete()
+        .eq("user_id", userId)
+        .eq("song_id", song.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(`🗑️ Removed "${song.title}" from liked songs`);
+      qc.invalidateQueries({ queryKey: ["liked-songs", userId] });
+      qc.invalidateQueries({ queryKey: ["saved-track-ids", userId] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove: ${(error as Error).message}`);
+    },
+  });
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group">
+      <div className="relative">
+        <StorageImage
+          bucket="album-art"
+          path={song.cover_url}
+          alt={song.title}
+          className="size-12 rounded object-cover bg-muted"
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggle();
+          }}
+          disabled={loading}
+          className="absolute -top-1 -right-1 size-6 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform"
+        >
+          <Heart 
+            className={`size-3 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
+          />
+        </button>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{song.title}</p>
+        <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
+      </div>
+      {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
+      {song.price && Number(song.price) > 0 && (
+        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+          ZMW {Number(song.price).toFixed(2)}
+        </span>
+      )}
+      <button
+        onClick={() => removeMutation.mutate()}
+        disabled={removeMutation.isPending}
+        className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+        title="Remove from liked songs"
+      >
+        <X className="size-4" />
       </button>
     </div>
   );
