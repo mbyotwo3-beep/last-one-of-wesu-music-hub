@@ -236,17 +236,29 @@
 
   [data-sonner-toast][data-type="success"] {
     border-color: var(--color-primary);
-    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.05) 100%);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.08) 100%);
+  }
+
+  [data-sonner-toast][data-type="success"] [data-icon] {
+    color: var(--color-primary);
   }
 
   [data-sonner-toast][data-type="error"] {
     border-color: var(--color-destructive);
-    background: linear-gradient(135deg, var(--color-card) 0%, rgba(255, 59, 48, 0.05) 100%);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(255, 59, 48, 0.08) 100%);
+  }
+
+  [data-sonner-toast][data-type="error"] [data-icon] {
+    color: var(--color-destructive);
   }
 
   [data-sonner-toast][data-type="info"] {
     border-color: var(--color-primary);
-    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.05) 100%);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.08) 100%);
+  }
+
+  [data-sonner-toast][data-type="info"] [data-icon] {
+    color: var(--color-primary);
   }
 
   [data-sonner-title] {
