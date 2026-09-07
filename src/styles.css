@@ -224,4 +224,53 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Custom Sonner Toast Styling to match Apple Music theme */
+  [data-sonner-toast] {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    font-family: var(--font-sans);
+  }
+
+  [data-sonner-toast][data-type="success"] {
+    border-color: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.05) 100%);
+  }
+
+  [data-sonner-toast][data-type="error"] {
+    border-color: var(--color-destructive);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(255, 59, 48, 0.05) 100%);
+  }
+
+  [data-sonner-toast][data-type="info"] {
+    border-color: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-card) 0%, rgba(250, 36, 60, 0.05) 100%);
+  }
+
+  [data-sonner-title] {
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  [data-sonner-description] {
+    color: var(--color-muted-foreground);
+  }
+
+  [data-sonner-close-button] {
+    color: var(--color-muted-foreground);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+
+  [data-sonner-close-button]:hover {
+    opacity: 1;
+    color: var(--color-foreground);
+  }
+
+  /* Dark mode toast adjustments */
+  .dark [data-sonner-toast] {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
 }
