@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Check, Loader2, User, X } from "lucide-react";
+import { Camera, Check, Loader2, User, X, Instagram, Twitter, Facebook, Youtube, Music, Apple } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { getMyArtistProfile } from "@/lib/user.functions";
@@ -162,6 +162,7 @@ function ArtistProfileEditPage() {
     },
     onSuccess: () => {
       toast.success("🎨 Artist profile updated successfully!");
+      queryClient.invalidateQueries({ queryKey: ["my-artist-profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["artist-overview"] });
     },
     onError: (error) => {
@@ -399,35 +400,57 @@ function ArtistProfileEditPage() {
             <h3 className="text-lg font-semibold mb-4">Social Links</h3>
             <div className="space-y-4">
               {[
-                { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourhandle" },
-                { key: "twitter", label: "Twitter/X", placeholder: "twitter.com/yourhandle" },
-                { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourpage" },
-                { key: "youtube", label: "YouTube", placeholder: "youtube.com/@yourchannel" },
-                { key: "spotify", label: "Spotify", placeholder: "open.spotify.com/artist/..." },
-                { key: "apple_music", label: "Apple Music", placeholder: "music.apple.com/artist/..." },
-              ].map((social) => (
-                <div key={social.key}>
-                  <label htmlFor={social.key} className="block text-sm font-medium mb-2">
-                    {social.label}
-                  </label>
-                  <input
-                    id={social.key}
-                    type="url"
-                    value={formData.social_links[social.key as keyof typeof formData.social_links]}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        social_links: {
-                          ...formData.social_links,
-                          [social.key]: e.target.value,
-                        },
-                      })
-                    }
-                    className="w-full px-4 py-2.5 rounded-lg bg-card border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors"
-                    placeholder={social.placeholder}
-                  />
-                </div>
-              ))}
+                { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourhandle", icon: Instagram },
+                { key: "twitter", label: "Twitter/X", placeholder: "twitter.com/yourhandle", icon: Twitter },
+                { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourpage", icon: Facebook },
+                { key: "youtube", label: "YouTube", placeholder: "youtube.com/@yourchannel", icon: Youtube },
+                { key: "spotify", label: "Spotify", placeholder: "open.spotify.com/artist/...", icon: Music },
+                { key: "apple_music", label: "Apple Music", placeholder: "music.apple.com/artist/...", icon: Apple },
+              ].map((social) => {
+                const Icon = social.icon;
+                const linkValue = formData.social_links[social.key as keyof typeof formData.social_links];
+                const fullLink = linkValue && (linkValue.startsWith('http') ? linkValue : `https://${linkValue}`);
+                
+                return (
+                  <div key={social.key}>
+                    <label htmlFor={social.key} className="block text-sm font-medium mb-2">
+                      {social.label}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <Icon className="size-4" />
+                      </div>
+                      <input
+                        id={social.key}
+                        type="url"
+                        value={linkValue}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            social_links: {
+                              ...formData.social_links,
+                              [social.key]: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-card border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors"
+                        placeholder={social.placeholder}
+                      />
+                      {fullLink && (
+                        <a
+                          href={fullLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
+                          aria-label={`Open ${social.label} link`}
+                        >
+                          <Check className="size-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
