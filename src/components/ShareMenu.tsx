@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MoreVertical, Heart, ListMusic, Plus, User, Share2, Disc, Copy, Check, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,7 +26,8 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [copied, setCopied] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { user } = useAuth();
   const qc = useQueryClient();
   const toggleLikeFn = useServerFn(toggleLike);
@@ -128,6 +130,19 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     }
   };
 
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const scrollX = window.scrollX || window.pageXOffset;
+      const scrollY = window.scrollY || window.pageYOffset;
+      setMenuPosition({
+        top: rect.bottom + scrollY + 4,
+        right: window.innerWidth - rect.right - scrollX,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
   const handleCopyLink = () => {
     let url = window.location.origin;
     if (type === "song" && songId) url += `/songs/${songId}`;
@@ -153,7 +168,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -162,17 +177,21 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   }, []);
 
   return (
-    <div className="relative" ref={menuRef}>
+    <>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={handleToggle}
         className={`text-muted-foreground hover:text-foreground transition-colors cursor-pointer ${className || ""}`}
         aria-label="More options"
       >
         <MoreVertical className="size-5" />
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-52 bg-card rounded-lg shadow-2xl z-[100] overflow-hidden border border-border">
+      {isOpen && createPortal(
+        <div 
+          className="fixed w-52 bg-card rounded-lg shadow-2xl z-[9999] overflow-hidden border border-border"
+          style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+        >
           {type === "song" && (
             <>
               <button
@@ -242,11 +261,12 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
             {copied ? "Link copied" : "Copy song link"}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showPlaylistModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+      {showPlaylistModal && createPortal(
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
           <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground text-lg">Add to playlist</h3>
@@ -300,8 +320,9 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
