@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play } from "lucide-react";
+import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
@@ -154,25 +154,7 @@ function Page() {
         ) : (
           <div className="space-y-2">
             {safePurchasedSongs.map((song: any) => (
-              <div
-                key={song.id}
-                className="bg-card border border-border rounded-xl p-4 flex items-center gap-4"
-              >
-                <StorageImage
-                  bucket="album-art"
-                  path={song.cover_url}
-                  alt={song.title}
-                  className="size-12 rounded object-cover bg-muted"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{song.title}</p>
-                  <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
-                </div>
-                <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full">
-                  Owned
-                </span>
-                <DownloadButton songId={song.id} />
-              </div>
+              <PurchasedSongCard key={song.id} song={song} userId={user?.id ?? null} />
             ))}
           </div>
         )}
@@ -226,7 +208,7 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
   const followQuery = useQuery({
     queryKey: followQK,
     queryFn: () => getFollowState({ data: { artist_id: artist.id, user_id: userId } }),
-    initialData: { count: Number(artist.follower_count ?? 0), following: true },
+    enabled: !!userId,
   });
 
   const mutation = useMutation({
@@ -369,13 +351,13 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   });
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group">
-      <div className="relative">
+    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group hover:bg-accent/30 transition-colors">
+      <div className="relative shrink-0">
         <StorageImage
           bucket="album-art"
           path={song.cover_url}
           alt={song.title}
-          className="size-12 rounded object-cover bg-muted"
+          className="size-14 rounded-lg object-cover bg-muted"
         />
         <button
           onClick={(e) => {
@@ -383,46 +365,128 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
             toggle();
           }}
           disabled={loading}
-          className="absolute -top-1 -right-1 size-6 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform"
+          className="absolute -top-1.5 -right-1.5 size-7 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-border"
+          title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
         >
           <Heart 
-            className={`size-3 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
+            className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
           />
         </button>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{song.title}</p>
+        <p className="font-medium truncate text-foreground">{song.title}</p>
         <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
       </div>
-      <button
-        onClick={handlePlay}
-        className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
-        title={isPaid ? "Preview (15s)" : "Play"}
-      >
-        {isPlaying ? (
-          <div className="flex items-center gap-0.5">
-            <div className="w-1 h-3 bg-current animate-pulse" />
-            <div className="w-1 h-4 bg-current animate-pulse delay-75" />
-            <div className="w-1 h-3 bg-current animate-pulse delay-150" />
-          </div>
-        ) : (
-          <Play className="size-4 fill-current" />
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handlePlay}
+          className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl"
+          title={isPlaying ? "Pause" : (isPaid ? "Preview (15s)" : "Play")}
+        >
+          {isPlaying ? (
+            <Pause className="size-4 fill-current" />
+          ) : (
+            <Play className="size-4 fill-current" />
+          )}
+        </button>
+        {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
+        {song.price && Number(song.price) > 0 && (
+          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+            ZMW {Number(song.price).toFixed(2)}
+          </span>
         )}
-      </button>
-      {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
-      {song.price && Number(song.price) > 0 && (
-        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-          ZMW {Number(song.price).toFixed(2)}
+        <button
+          onClick={() => removeMutation.mutate()}
+          disabled={removeMutation.isPending}
+          className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+          title="Remove from liked songs"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Purchased song card with play/pause and like functionality.
+ */
+function PurchasedSongCard({ song, userId }: { song: any; userId: string | null }) {
+  const { isSaved, toggle, loading } = useSavedTrack(song.id);
+  const player = usePlayer();
+
+  const isPlaying = player.playing && player.track?.id === song.id;
+
+  const handlePlay = async () => {
+    try {
+      if (isPlaying) {
+        player.togglePlay();
+        return;
+      }
+
+      // Purchased songs have full playback
+      const { data: signedUrl } = await supabase
+        .rpc("get_public_audio_url", { _song_id: song.id });
+      player.setTrack({
+        id: song.id,
+        title: song.title,
+        artistName: song.artists?.name ?? "Unknown",
+        coverUrl: song.cover_url,
+        audioUrl: signedUrl,
+      });
+      player.setIsPreview(false);
+      player.togglePlay();
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group hover:bg-accent/30 transition-colors">
+      <div className="relative shrink-0">
+        <StorageImage
+          bucket="album-art"
+          path={song.cover_url}
+          alt={song.title}
+          className="size-14 rounded-lg object-cover bg-muted"
+        />
+        {userId && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle();
+            }}
+            disabled={loading}
+            className="absolute -top-1.5 -right-1.5 size-7 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-border"
+            title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
+          >
+            <Heart 
+              className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
+            />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate text-foreground">{song.title}</p>
+        <p className="text-sm text-muted-foreground truncate">{song.artists?.name ?? "Unknown"}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handlePlay}
+          className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl"
+          title={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? (
+            <Pause className="size-4 fill-current" />
+          ) : (
+            <Play className="size-4 fill-current" />
+          )}
+        </button>
+        <DownloadButton songId={song.id} />
+        <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full font-medium">
+          Owned
         </span>
-      )}
-      <button
-        onClick={() => removeMutation.mutate()}
-        disabled={removeMutation.isPending}
-        className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
-        title="Remove from liked songs"
-      >
-        <X className="size-4" />
-      </button>
+      </div>
     </div>
   );
 }
