@@ -232,7 +232,6 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
       toast.success(res.following ? `❤️ Following ${artist.name}!` : `👋 Unfollowed ${artist.name}`);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: followQK });
       qc.invalidateQueries({ queryKey: ["followed-artists"] });
     },
   });
