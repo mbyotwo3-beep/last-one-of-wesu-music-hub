@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -349,6 +349,40 @@ function HeroSlideForm({
     initialData?.image_url || null
   );
 
+  // Persist form data to sessionStorage to prevent data loss when navigating away
+  useEffect(() => {
+    const formKey = initialData ? `hero-slide-edit-${initialData.image_url}` : "hero-slide-new";
+    if (!initialData) {
+      // Only persist for new forms, not edits
+      sessionStorage.setItem(formKey, JSON.stringify(formData));
+    }
+  }, [formData, initialData]);
+
+  // Load saved form data on mount for new forms
+  useEffect(() => {
+    if (!initialData) {
+      const saved = sessionStorage.getItem("hero-slide-new");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setFormData(parsed);
+          if (parsed.image_url) {
+            setImagePreview(parsed.image_url);
+          }
+        } catch (e) {
+          console.error("Failed to load saved form data", e);
+        }
+      }
+    }
+  }, [initialData]);
+
+  // Clear saved form data on successful save or cancel
+  const clearSavedData = () => {
+    if (!initialData) {
+      sessionStorage.removeItem("hero-slide-new");
+    }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -385,6 +419,7 @@ function HeroSlideForm({
       toast.error("Please fill in all required fields");
       return;
     }
+    clearSavedData();
     onSave({
       title: formData.title.trim(),
       description: formData.description.trim(),
@@ -515,7 +550,10 @@ function HeroSlideForm({
           {isPending ? "Saving…" : initialData ? "Update Slide" : "Create Slide"}
         </button>
         <button
-          onClick={onCancel}
+          onClick={() => {
+            clearSavedData();
+            onCancel();
+          }}
           disabled={isPending}
           className="px-4 py-2 rounded-full bg-secondary text-sm"
         >

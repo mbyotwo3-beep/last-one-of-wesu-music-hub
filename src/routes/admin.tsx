@@ -84,7 +84,7 @@ function AdminPage() {
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
     { id: "payouts", label: "Payouts" },
-    { id: "payments", label: "Payments" },
+    { id: "payments", label: "Transaction Reconciliation" },
     { id: "carousels", label: "Carousels" },
     { id: "hero-carousel", label: "Hero Carousel" },
     { id: "diagnostics", label: "Diagnostics" },

@@ -74,7 +74,7 @@ function SuperadminPage() {
     { id: "users", label: "Users & Roles", icon: Users },
     { id: "plans", label: "Plans", icon: CreditCard },
     { id: "payments", label: "Payment Methods", icon: CreditCard },
-    { id: "payouts", label: "Payouts", icon: Wallet },
+    { id: "payouts", label: "Payout Decisions", icon: Wallet },
     { id: "labels", label: "Labels", icon: Building2 },
     { id: "featured", label: "Featured", icon: Star },
     { id: "settings", label: "Settings", icon: SettingsIcon },
