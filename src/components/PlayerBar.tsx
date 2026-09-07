@@ -716,7 +716,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             <div className="flex items-center gap-2 relative z-10">
               {user && (
                 <button
-                  onClick={handleLike}
+                  onClick={toggleLike}
                   className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
                   aria-label={liked ? "Unlike" : "Like"}
                 >
