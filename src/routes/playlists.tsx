@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUserRoles } from "@/hooks/use-roles";
-import { ShareButton } from "@/components/ShareButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({ meta: [{ title: "My Playlists — Wesu+" }] }),
@@ -180,10 +180,10 @@ function Page() {
                 <Trash2 className="size-4" />
               </button>
               {playlist.is_public && (
-                <ShareButton
-                  path={`/playlists/${playlist.id}`}
-                  title={playlist.name}
-                  text={`Listen to ${playlist.name} on Wesu+`}
+                <ShareMenu
+                  playlistId={playlist.id}
+                  playlistName={playlist.name}
+                  type="playlist"
                   className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 />
               )}

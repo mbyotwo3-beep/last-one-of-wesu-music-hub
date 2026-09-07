@@ -539,3 +539,37 @@ export const getForYou = createServerFn({ method: "GET" })
         .map(([id, v]) => ({ id, ...v.artist })),
     };
   });
+
+export const getSongArtists = createServerFn({ method: "GET" })
+  .validator((d: { song_id: string }) => d)
+  .handler(async ({ data }) => {
+    const supabase = getPublicSupabase();
+    const { data: song } = await supabase
+      .from("songs")
+      .select("artist_id, album_id")
+      .eq("id", data.song_id)
+      .single();
+    if (!song) throw new Error("Song not found");
+
+    const { data: mainArtist } = await supabase
+      .from("artists")
+      .select("id, name")
+      .eq("id", song.artist_id)
+      .single();
+
+    const { data: collaborators } = await supabase
+      .from("song_collaborators")
+      .select("artist:artists(id, name), role")
+      .eq("song_id", data.song_id);
+
+    const artists = [mainArtist].filter(Boolean);
+    if (collaborators) {
+      collaborators.forEach((c: any) => {
+        if (c.artist && !artists.find((a: any) => a.id === c.artist.id)) {
+          artists.push(c.artist);
+        }
+      });
+    }
+
+    return artists;
+  });

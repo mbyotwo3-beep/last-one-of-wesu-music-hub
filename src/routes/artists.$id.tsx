@@ -12,7 +12,7 @@ import { resolveImageUrl } from "@/lib/storage-url";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { SocialLinks } from "@/components/SocialLinks";
-import { ShareButton } from "@/components/ShareButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -176,7 +176,11 @@ function ArtistPage() {
             >
               <Play className="size-6 fill-current ml-0.5" />
             </button>
-            <ShareButton path={`/artists/${a.id}`} title={a.name} text={`Listen to ${a.name} on Wesu+`} />
+            <ShareMenu
+              artistId={a.id}
+              artistName={a.name}
+              type="artist"
+            />
             <button
               onClick={handleFollow}
               disabled={follow.isPending}
@@ -267,10 +271,13 @@ function ArtistPage() {
                       </Link>
                     )}
                     {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-                    <ShareButton
-                      path={`/songs/${s.id}`}
-                      title={s.title}
-                      text={`Listen to ${s.title} by ${a.name} on Wesu+`}
+                    <ShareMenu
+                      songId={s.id}
+                      songTitle={s.title}
+                      albumId={s.album_id}
+                      artistId={a.id}
+                      artistName={a.name}
+                      type="song"
                       className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     />
                   </div>

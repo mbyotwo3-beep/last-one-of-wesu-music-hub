@@ -4,7 +4,7 @@ import { Music2, Play, ShoppingBag } from "lucide-react";
 import { getSongById } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
-import { ShareButton } from "@/components/ShareButton";
+import { ShareMenu } from "@/components/ShareMenu";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 
@@ -102,10 +102,13 @@ function SongPage() {
               <ShoppingBag className="size-5" /> Buy {useCurrency.getState().formatPrice(song!.price)}
             </Link>
           )}
-          <ShareButton
-            path={`/songs/${song!.id}`}
-            title={song!.title}
-            text={`Listen to ${song!.title} by ${artist?.name ?? "an artist"} on Wesu+`}
+          <ShareMenu
+            songId={song!.id}
+            songTitle={song!.title}
+            albumId={song!.album_id}
+            artistId={artist?.id}
+            artistName={artist?.name}
+            type="song"
           />
         </div>
       </div>

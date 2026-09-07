@@ -8,7 +8,7 @@ import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
-import { ShareButton } from "@/components/ShareButton";
+import { ShareMenu } from "@/components/ShareMenu";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/playlists/$id")({
@@ -102,10 +102,10 @@ function Page() {
         <Play className="size-5 fill-current" /> Play
       </button>
       {isPublic && (
-        <ShareButton
-          path={`/playlists/${id}`}
-          title={(data as any).name}
-          text={`Listen to ${(data as any).name} on Wesu+`}
+        <ShareMenu
+          playlistId={id}
+          playlistName={(data as any).name}
+          type="playlist"
           className="ml-3 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 text-sm font-bold transition-colors hover:bg-accent"
         />
       )}
@@ -138,10 +138,12 @@ function Page() {
                 </Link>
               </div>
               {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-              <ShareButton
-                path={`/songs/${s.id}`}
-                title={s.title}
-                text={`Listen to ${s.title} by ${s.artist?.name ?? "an artist"} on Wesu+`}
+              <ShareMenu
+                songId={s.id}
+                songTitle={s.title}
+                artistId={s.artist?.id}
+                artistName={s.artist?.name}
+                type="song"
                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               />
               {isOwner && (

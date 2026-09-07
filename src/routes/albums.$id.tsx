@@ -6,7 +6,7 @@ import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { Play, ShoppingBag } from "lucide-react";
 import { DownloadButton } from "@/components/DownloadButton";
-import { ShareButton } from "@/components/ShareButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -101,7 +101,13 @@ function AlbumPage() {
               Buy Album — {useCurrency.getState().formatPrice(album.price)}
             </Link>
           )}
-          <ShareButton path={`/albums/${album.id}`} title={album.title} text={`Listen to ${album.title} on Wesu+`} />
+          <ShareMenu
+            albumId={album.id}
+            albumTitle={album.title}
+            artistId={artist?.id}
+            artistName={artist?.name}
+            type="album"
+          />
         </div>
 
         {data.songs.length === 0 ? (
@@ -133,10 +139,14 @@ function AlbumPage() {
                     {useCurrency.getState().formatPrice(s.price)}
                   </span>
                   <DownloadButton songId={s.id} />
-                  <ShareButton
-                    path={`/songs/${s.id}`}
-                    title={s.title}
-                    text={`Listen to ${s.title} on Wesu+`}
+                  <ShareMenu
+                    songId={s.id}
+                    songTitle={s.title}
+                    albumId={album.id}
+                    albumTitle={album.title}
+                    artistId={artist?.id}
+                    artistName={artist?.name}
+                    type="song"
                     className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   />
                   {Number(s.price) > 0 && (
