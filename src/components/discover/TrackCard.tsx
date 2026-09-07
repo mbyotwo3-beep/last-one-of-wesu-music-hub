@@ -80,35 +80,38 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
       )}
-      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
-      {song.price != null && (
-        <p className="text-xs font-medium text-primary">
-          {useCurrency.getState().formatPrice(song.price)}
-        </p>
-      )}
-      {song.artist?.id ? (
-        <Link
-          to="/artists/$id"
-          params={{ id: song.artist.id }}
-          className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
-        >
-          {artistName}
-        </Link>
-      ) : (
-        <p className="text-xs text-muted-foreground truncate">{artistName}</p>
-      )}
-      <div className="mt-2 flex items-center gap-1 justify-start">
-        {user && Number(song.price ?? 0) <= 0 && (
-          <DownloadButton songId={song.id} label="Download" />
-        )}
-        <ShareMenu
-          songId={song.id}
-          songTitle={song.title}
-          artistId={song.artist?.id}
-          artistName={artistName}
-          type="song"
-          className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        />
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
+          {song.price != null && (
+            <p className="text-xs font-medium text-primary">
+              {useCurrency.getState().formatPrice(song.price)}
+            </p>
+          )}
+          {song.artist?.id ? (
+            <Link
+              to="/artists/$id"
+              params={{ id: song.artist.id }}
+              className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
+            >
+              {artistName}
+            </Link>
+          ) : (
+            <p className="text-xs text-muted-foreground truncate">{artistName}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {user && Number(song.price ?? 0) <= 0 && (
+            <DownloadButton songId={song.id} label="Download" />
+          )}
+          <ShareMenu
+            songId={song.id}
+            songTitle={song.title}
+            artistId={song.artist?.id}
+            artistName={artistName}
+            type="song"
+          />
+        </div>
       </div>
     </div>
   );
