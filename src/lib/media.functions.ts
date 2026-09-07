@@ -1,22 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type MediaBucketName = "song-audio" | "album-art" | "artist-images" | "user-avatars" | "label-images";
+export type MediaBucketName = "song-audio" | "album-art" | "artist-images" | "user-avatars" | "label-images" | "hero-images";
 
-const BUCKETS: MediaBucketName[] = ["song-audio", "album-art", "artist-images", "user-avatars", "label-images"];
+const BUCKETS: MediaBucketName[] = ["song-audio", "album-art", "artist-images", "user-avatars", "label-images", "hero-images"];
 
 /**
  * Presigned PUT for a direct browser → R2 upload.
  * Falls back to Supabase storage if R2 is not configured.
- * The key is always scoped to the caller's own folder.
+ * The key is scoped to the caller's own folder by default, or a custom folder if provided.
  */
 export const signUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { bucket: MediaBucketName; filename: string }) => d)
+  .validator((d: { bucket: MediaBucketName; filename: string; folder?: string }) => d)
   .handler(async ({ context, data }) => {
     if (!BUCKETS.includes(data.bucket)) throw new Error("Unknown bucket");
     const safe = (data.filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
-    const path = `${context.userId}/${Date.now()}-${safe}`;
+    // Use custom folder if provided, otherwise use userId
+    const folder = data.folder || context.userId;
+    const path = `${folder}/${Date.now()}-${safe}`;
     const { r2SignedPutUrl, isR2Configured } = await import("./r2.server");
     
     if (isR2Configured()) {

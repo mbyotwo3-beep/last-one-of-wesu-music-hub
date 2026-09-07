@@ -3,14 +3,16 @@ import { signUploadUrl, type MediaBucketName } from "@/lib/media.functions";
 /**
  * Upload a File straight to Cloudflare R2 or Supabase storage using a short-lived presigned PUT
  * URL minted by the server, and return the stored path.
- * Path layout: <user_id>/<timestamp>-<safe-name>
+ * Path layout: <folder>/<timestamp>-<safe-name> (defaults to user_id folder)
  */
 export async function uploadFileToBucket(
   bucket: MediaBucketName,
-  _userId: string,
+  folder: string,
   file: File,
 ): Promise<string> {
-  const { url, path, provider } = await signUploadUrl({ data: { bucket, filename: file.name } });
+  const { url, path, provider } = await signUploadUrl({ 
+    data: { bucket, filename: file.name, folder } 
+  });
 
   const res = await fetch(url, {
     method: "PUT",
