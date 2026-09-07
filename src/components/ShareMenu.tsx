@@ -172,7 +172,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-card rounded-lg shadow-2xl z-50 overflow-hidden border border-border">
+        <div className="absolute right-0 top-full mt-2 w-52 bg-card rounded-lg shadow-2xl z-[100] overflow-hidden border border-border">
           {type === "song" && (
             <>
               <button
@@ -180,7 +180,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   if (songId) likeMutation.mutate({ data: { song_id: songId } });
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <Heart className={`size-4 ${isLiked ? "fill-primary text-primary" : ""}`} />
                 {isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -191,7 +191,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   setShowPlaylistModal(true);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <ListMusic className="size-4" />
                 Add to playlist
@@ -199,13 +199,13 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
               <button
                 onClick={handleAddToQueue}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
                 <Plus className="size-4" />
                 Add to queue
               </button>
 
-              <div className="border-t border-border my-1" />
+              <div className="border-t border-border" />
 
               {songArtists && songArtists.length > 0 && (
                 <>
@@ -213,20 +213,20 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                     <button
                       key={a.id}
                       onClick={() => handleGoToArtist(a.id)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                     >
                       <User className="size-4" />
                       Go to artist
                     </button>
                   ))}
-                  <div className="border-t border-border my-1" />
+                  <div className="border-t border-border" />
                 </>
               )}
 
               {albumId && (
                 <button
                   onClick={handleGoToAlbum}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                 >
                   <Disc className="size-4" />
                   Go to album
@@ -237,7 +237,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
           <button
             onClick={handleCopyLink}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left border-t border-border"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left border-t border-border"
           >
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
             {copied ? "Link copied" : "Copy song link"}
@@ -246,7 +246,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       )}
 
       {showPlaylistModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
           <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground text-lg">Add to playlist</h3>

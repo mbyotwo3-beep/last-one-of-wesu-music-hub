@@ -80,7 +80,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
       )}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
           {song.price != null && (
