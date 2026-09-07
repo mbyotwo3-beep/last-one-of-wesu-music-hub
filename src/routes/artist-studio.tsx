@@ -90,7 +90,7 @@ function CollabsTab() {
   const m = useMutation({
     mutationFn: inviteFn,
     onSuccess: () => {
-      toast.success("Collaborator invite sent successfully");
+      toast.success("🎵 Collaborator invite sent successfully!");
     },
     onError: (error) => {
       toast.error(`Failed to send invite: ${error.message}`);
@@ -220,7 +220,7 @@ function LabelTab() {
     mutationFn: respondFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-label-invites"] });
-      toast.success("Label invite response recorded");
+      toast.success("🤝 Label invite response recorded!");
     },
     onError: (error) => {
       toast.error(`Failed to respond to invite: ${error.message}`);
@@ -230,7 +230,7 @@ function LabelTab() {
     mutationFn: leaveFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-label-invites"] });
-      toast.success("Successfully left label");
+      toast.success("🚀 Successfully left label. You're now independent!");
     },
     onError: (error) => {
       toast.error(`Failed to leave label: ${error.message}`);
@@ -296,7 +296,7 @@ function FeaturesTab() {
   const m = useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      toast.success("Feature settings saved successfully");
+      toast.success("⚡ Feature settings saved successfully!");
     },
     onError: (error) => {
       toast.error(`Failed to save settings: ${error.message}`);
@@ -472,8 +472,8 @@ function UploadWizard() {
           },
         });
         const successMessage = tier === "free"
-          ? `Song "${title}" submitted. It is waiting for admin approval. Once approved, it will automatically show on the platform (A K${FREE_SONG_FEE} fee applies).`
-          : `Song "${title}" uploaded successfully! Waiting for admin approval.`;
+          ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
+          : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
 
         toast.success(successMessage);
         qc.invalidateQueries({ queryKey: ["my-songs"] });
@@ -504,7 +504,7 @@ function UploadWizard() {
           },
         });
       }
-      toast.success(`Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
+      toast.success(`💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
@@ -621,7 +621,7 @@ function UploadWizard() {
           <div className="sm:col-span-2 flex justify-end">
             <button
               type="submit"
-              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+              className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
             >
               Next →
             </button>
@@ -919,17 +919,18 @@ function PayoutTab() {
   const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
       <div className="bg-card border border-border rounded-2xl p-6">
         <p className="text-sm text-muted-foreground">Available earnings</p>
         <p className="text-3xl font-bold mt-1">
           ZMW {availableBalance.toFixed(2)}
         </p>
-        {!eligible && (
-          <p className="text-xs text-amber-500 mt-2">
-            ⚠️ You can only apply for withdrawal when your available money is over K{minWithdrawal} (Current: K{availableBalance.toFixed(2)}).
-          </p>
-        )}
+        <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
+          {eligible 
+            ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
+            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`
+          }
+        </div>
       </div>
       <form
         onSubmit={(e) => {

@@ -790,8 +790,12 @@ function SettingsTab() {
   });
   const m = useMutation({
     mutationFn: updateSettingsFn,
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["super-settings"] });
+      // Invalidate all config query keys so changes propagate to all user roles
+      qc.invalidateQueries({ queryKey: ["pricing-config"] });
+      qc.invalidateQueries({ queryKey: ["verification-config"] });
+      qc.invalidateQueries({ queryKey: ["withdrawal-config"] });
       toast.success("Settings saved");
     },
     onError: (e) => toast.error(`Failed to save: ${(e as Error).message}`),

@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToBucket } from "@/lib/storage";
 import { getMyLabelAnalytics } from "@/lib/analytics.functions";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
+import { getWithdrawalConfig } from "@/lib/pricing.functions";
 
 export const Route = createFileRoute("/label-dashboard")({
   head: () => ({ meta: [{ title: "Label Dashboard — Wesu+" }] }),
@@ -177,7 +178,7 @@ function Roster({ labelId }: { labelId: string }) {
     mutationFn: inviteFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", labelId] });
-      toast.success("Artist invited successfully");
+      toast.success("🎤 Artist invited successfully!");
     },
     onError: (error) => {
       toast.error(`Failed to invite artist: ${error.message}`);
@@ -187,7 +188,7 @@ function Roster({ labelId }: { labelId: string }) {
     mutationFn: royaltyFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", labelId] });
-      toast.success("Royalty percentage updated");
+      toast.success("💰 Royalty percentage updated!");
     },
     onError: (error) => {
       toast.error(`Failed to update royalty: ${error.message}`);
@@ -197,7 +198,7 @@ function Roster({ labelId }: { labelId: string }) {
     mutationFn: removeFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", labelId] });
-      toast.success("Artist removed from label");
+      toast.success("👋 Artist removed from label roster.");
     },
     onError: (error) => {
       toast.error(`Failed to remove artist: ${error.message}`);
@@ -362,35 +363,78 @@ function Revenue({ labelId }: { labelId: string }) {
 
 function Payouts({ labelId }: { labelId: string }) {
   const fn = useServerFn(requestLabelPayout);
+  const withdrawalFn = useServerFn(getWithdrawalConfig);
+  const { data: labelData } = useQuery({
+    queryKey: ["label-data", labelId],
+    queryFn: async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("labels")
+        .select("*")
+        .eq("id", labelId)
+        .single();
+      return data;
+    },
+    retry: false,
+  });
+  const { data: withdrawalConfig } = useQuery({
+    queryKey: ["withdrawal-config"],
+    queryFn: () => withdrawalFn(),
+    retry: false,
+  });
   const m = useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      toast.success("Payout request submitted successfully");
+      toast.success("💵 Payout request submitted successfully!");
     },
     onError: (error) => {
       toast.error(`Payout request failed: ${error.message}`);
     },
   });
-  const [form, setForm] = useState({ amount: 0, method_code: "MTN_MOMO", destination: "" });
+  const availableBalance = Number(labelData?.total_revenue ?? 0);
+  const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
+  const eligible = availableBalance > minWithdrawal;
+  const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        m.mutate({ data: { label_id: labelId, ...form } });
-      }}
-      className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-md"
-    >
-      <h3 className="font-semibold">Request label payout</h3>
-      <input
-        required
-        type="number"
-        min="1"
-        step="0.01"
-        placeholder="Amount"
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.amount}
-        onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-      />
+    <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <p className="text-sm text-muted-foreground">Available earnings</p>
+        <p className="text-3xl font-bold mt-1">
+          ZMW {availableBalance.toFixed(2)}
+        </p>
+        <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
+          {eligible 
+            ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
+            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`
+          }
+        </div>
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (form.amount < minWithdrawal) {
+            toast.error(`Minimum withdrawal amount is K${minWithdrawal}`);
+            return;
+          }
+          m.mutate({ data: { label_id: labelId, ...form } });
+        }}
+        className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-md"
+      >
+        <h3 className="font-semibold">Request label payout</h3>
+        <label className="block text-xs text-muted-foreground">
+          Withdrawal amount (Minimum K{minWithdrawal})
+          <input
+            required
+            type="number"
+            min={minWithdrawal}
+            step="0.01"
+            placeholder="Amount"
+            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+          />
+        </label>
       <select
         className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
         value={form.method_code}
@@ -413,12 +457,13 @@ function Payouts({ labelId }: { labelId: string }) {
         <p className="text-sm text-primary">Submitted — pending superadmin approval.</p>
       )}
       <button
-        disabled={m.isPending}
-        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
+        disabled={!eligible || m.isPending}
+        className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Request
+        {m.isPending ? "Submitting..." : "Request Payout"}
       </button>
     </form>
+    </div>
   );
 }
 
@@ -430,7 +475,7 @@ function Settings({ label }: { label: any }) {
       
       // Upload logo file if provided
       if (data.logo_file) {
-        logoUrl = await uploadFileToBucket("artist-images", label.id, data.logo_file);
+        logoUrl = await uploadFileToBucket("label-images", label.id, data.logo_file);
       }
       
       return fn({
@@ -444,7 +489,7 @@ function Settings({ label }: { label: any }) {
       });
     },
     onSuccess: () => {
-      toast.success("Label settings updated successfully");
+      toast.success("🏷️ Label settings updated successfully!");
     },
     onError: (error) => {
       toast.error(`Failed to update settings: ${error.message}`);
@@ -555,9 +600,9 @@ function Settings({ label }: { label: any }) {
       <button
         type="submit"
         disabled={m.isPending}
-        className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
+        className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Save
+        {m.isPending ? "Saving..." : "Save Settings"}
       </button>
     </form>
   );

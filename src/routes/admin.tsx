@@ -35,6 +35,7 @@ import {
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
+import { HeroCarouselBuilder } from "@/components/HeroCarouselBuilder";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 
 export const Route = createFileRoute("/admin")({
@@ -52,7 +53,7 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "hero-carousel" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -85,6 +86,7 @@ function AdminPage() {
     { id: "payouts", label: "Payouts" },
     { id: "payments", label: "Payments" },
     { id: "carousels", label: "Carousels" },
+    { id: "hero-carousel", label: "Hero Carousel" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
 
@@ -135,6 +137,7 @@ function AdminPage() {
         {tab === "payouts" && <PayoutMod />}
         {tab === "payments" && <PaymentsMod />}
         {tab === "carousels" && <CarouselBuilder />}
+        {tab === "hero-carousel" && <HeroCarouselBuilder />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
     </div>

@@ -81,7 +81,7 @@ function ArtistDashboardPage() {
   const verificationMutation = useMutation({
     mutationFn: requestVerificationFn,
     onSuccess: () => {
-      toast.success("Verification application submitted! Waiting for admin review.");
+      toast.success("🎉 Verification application submitted! You're one step closer to the verified badge!");
       qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
     },
     onError: (err: Error) => {
@@ -92,7 +92,7 @@ function ArtistDashboardPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteSongFn,
     onSuccess: (res) => {
-      toast.success(`Track "${res.title}" deleted successfully.`);
+      toast.success(`🗑️ Track "${res.title}" deleted successfully.`);
       setSongToDelete(null);
       qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });

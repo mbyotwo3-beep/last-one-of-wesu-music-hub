@@ -16,6 +16,8 @@ import {
 } from "@/components/discover/TrackCard";
 import { CarouselShelf } from "@/components/CarouselShelf";
 import { getActiveCarousels } from "@/lib/carousel.functions";
+import { HeroCarousel } from "@/components/HeroCarousel";
+import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
 
 const discoverQO = queryOptions({
   queryKey: ["home-discover"],
@@ -58,10 +60,17 @@ function HomePage() {
   const forYouFn = useServerFn(getForYou);
   const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
   const carouselsFn = useServerFn(getActiveCarousels);
+  const heroSlidesFn = useServerFn(getActiveHeroSlides);
 
   const { data: carousels } = useQuery({
     queryKey: ["active-carousels"],
     queryFn: () => carouselsFn(),
+    staleTime: 60 * 1000,
+  });
+
+  const { data: heroSlides } = useQuery({
+    queryKey: ["active-hero-slides"],
+    queryFn: () => heroSlidesFn(),
     staleTime: 60 * 1000,
   });
 
@@ -98,7 +107,20 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="lg:max-w-[calc(100vw-16rem)] lg:ml-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
-        {heroPick && (
+        {/* Hero Carousel - Netlify-style with auto-rotation */}
+        {heroSlides && heroSlides.length > 0 ? (
+          <HeroCarousel 
+            slides={heroSlides.map(slide => ({
+              id: slide.id,
+              title: slide.title,
+              description: slide.description,
+              imageUrl: slide.image_url,
+              videoUrl: slide.video_url || undefined,
+              ctaText: slide.cta_text,
+              ctaLink: slide.cta_link,
+            }))}
+          />
+        ) : heroPick && (
           <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
             <StorageImage
               bucket="album-art"

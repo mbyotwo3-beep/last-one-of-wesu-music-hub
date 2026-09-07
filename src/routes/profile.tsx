@@ -63,7 +63,7 @@ function Page() {
       return await update(data);
     },
     onSuccess: () => {
-      toast.success("Profile updated successfully!");
+      toast.success("✅ Profile updated successfully!");
       setIsEditing(false);
     },
     onError: (error) => {
@@ -277,7 +277,7 @@ function Page() {
                       try {
                         const path = await uploadFileToBucket("user-avatars", user.id, f);
                         setForm((s) => ({ ...s, avatar_url: path }));
-                        toast.success("Avatar uploaded!");
+                        toast.success("📸 Avatar uploaded successfully!");
                       } catch (err) {
                         toast.error(`Avatar upload failed: ${(err as Error).message}`);
                       } finally {

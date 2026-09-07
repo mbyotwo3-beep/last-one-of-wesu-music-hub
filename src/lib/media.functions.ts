@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type MediaBucketName = "song-audio" | "album-art" | "artist-images" | "user-avatars";
+export type MediaBucketName = "song-audio" | "album-art" | "artist-images" | "user-avatars" | "label-images";
 
-const BUCKETS: MediaBucketName[] = ["song-audio", "album-art", "artist-images", "user-avatars"];
+const BUCKETS: MediaBucketName[] = ["song-audio", "album-art", "artist-images", "user-avatars", "label-images"];
 
 /**
  * Presigned PUT for a direct browser → R2 upload.

@@ -86,7 +86,7 @@ function ArtistPage() {
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["similar-artists", id] });
-      toast.success(res.following ? `Following ${a.name}` : `Unfollowed ${a.name}`);
+      toast.success(res.following ? `❤️ You're now following ${a.name}!` : `👋 Unfollowed ${a.name}`);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: followQK });
