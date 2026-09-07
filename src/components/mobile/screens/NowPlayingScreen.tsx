@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareMenu } from "@/components/ShareMenu";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -27,18 +29,14 @@ export function NowPlayingScreen() {
   const { user } = useAuth();
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
-  const liked = usePlayer((s) => s.liked);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const audioUrl = usePlayer((s) => s.track?.audioUrl);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const toggleLikeStore = usePlayer((s) => s.toggleLike);
   const setProgress = usePlayer((s) => s.setProgress);
   const isPreview = usePlayer((s) => s.isPreview);
   const { data: meta } = useTrackMeta(track?.id);
   const trackPrice = meta ? Number(meta.price ?? 0) : null;
-
-  const toggleLikeFn = useServerFn(toggleLike);
-  const [liking, setLiking] = useState(false);
+  const { isSaved, toggle: toggleSaved } = useSavedTrack(track?.id);
 
   if (!track) return null;
 
@@ -46,15 +44,9 @@ export function NowPlayingScreen() {
   // Keep pause available while the requested source is still resolving.
   const isLoading = audioUrl === undefined && !playing;
 
-  async function handleLike() {
-    if (!user || !track || liking) return;
-    setLiking(true);
-    try {
-      await toggleLikeFn({ data: { song_id: track.id } });
-      toggleLikeStore();
-    } finally {
-      setLiking(false);
-    }
+  function handleLike() {
+    if (!user || !track) return;
+    toggleSaved();
   }
 
   function handleSeek(values: number[]) {
@@ -105,24 +97,32 @@ export function NowPlayingScreen() {
         </div>
       </div>
 
-      {/* Track info + like */}
+      {/* Track info + like + share */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1 min-w-0 mr-4">
           <h2 className="text-xl font-bold truncate">{track.title}</h2>
           <p className="text-muted-foreground truncate">{track.artistName}</p>
         </div>
-        {user && (
-          <button
-            onClick={handleLike}
-            disabled={liking}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label={liked ? "Unlike" : "Like"}
-          >
-            <Heart
-              className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`}
-            />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {user && (
+            <button
+              onClick={handleLike}
+              disabled={false}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label={isSaved ? "Unlike" : "Like"}
+            >
+              <Heart
+                className={`size-6 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground"}`}
+              />
+            </button>
+          )}
+          <ShareMenu
+            songId={track.id}
+            songTitle={track.title}
+            artistName={track.artistName}
+            type="song"
+          />
+        </div>
       </div>
       {user && trackPrice !== null && trackPrice <= 0 && (
         <div className="mb-4">

@@ -33,6 +33,7 @@ import { Link } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { ShareMenu } from "@/components/ShareMenu";
 
 import {
   preloadNative,
@@ -712,15 +713,25 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <p className="text-xs text-gray-300 truncate">{track.artistName}</p>
               )}
             </div>
-            {user && (
-              <button
-                onClick={toggleLike}
-                className="ml-2 shrink-0 p-1.5 rounded-full hover:bg-white/10"
-                aria-label={liked ? "Unlike" : "Like"}
-              >
-                <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`} />
-              </button>
-            )}
+            <div className="flex items-center gap-1">
+              {user && (
+                <button
+                  onClick={toggleLike}
+                  className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
+                  aria-label={liked ? "Unlike" : "Like"}
+                >
+                  <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`} />
+                </button>
+              )}
+              <ShareMenu
+                songId={track.id}
+                songTitle={track.title}
+                artistId={artistId}
+                artistName={track.artistName}
+                albumId={albumId}
+                type="song"
+              />
+            </div>
           </div>
 
           {/* Center: Controls + progress */}
