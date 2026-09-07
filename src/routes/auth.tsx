@@ -27,17 +27,17 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  const navigate = useNavigate();
+  const search = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const { redirect, action, artistId, itemId, itemType } = Route.useSearch();
-  const navigate = useNavigate();
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const { redirect, action, artistId, itemId, itemType } = search;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -118,11 +118,11 @@ function AuthPage() {
     } else if (action === "addPlaylist" && itemId && itemType === "song") {
       // For add to playlist, we redirect back to the page and let the user add to playlist
       // since we need them to select which playlist
-      window.location.href = redirect || "/dashboard";
+      navigate({ to: redirect || "/dashboard" });
       return;
     }
     // Redirect to the original destination
-    window.location.href = redirect || "/dashboard";
+    navigate({ to: redirect || "/dashboard" });
   }
 
   return (
@@ -268,7 +268,7 @@ function AuthPage() {
               );
             }
             if (!result.redirected && !result.error) {
-              window.location.href = redirect || "/dashboard";
+              navigate({ to: redirect || "/dashboard" });
             }
             setLoading(false);
           }}

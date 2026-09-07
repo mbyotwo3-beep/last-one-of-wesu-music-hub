@@ -190,12 +190,14 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   };
 
   const handleGoToArtist = (artistId: string) => {
-    window.location.href = `/artists/${artistId}`;
+    navigate({ to: "/artists/$id", params: { id: artistId } });
+    setIsOpen(false);
   };
 
   const handleGoToAlbum = () => {
     if (albumId) {
-      window.location.href = `/albums/${albumId}`;
+      navigate({ to: "/albums/$id", params: { id: albumId } });
+      setIsOpen(false);
     }
   };
 
