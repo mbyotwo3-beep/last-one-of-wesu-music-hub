@@ -7,6 +7,7 @@ const BUCKETS: MediaBucketName[] = ["song-audio", "album-art", "artist-images", 
 
 /**
  * Presigned PUT for a direct browser → R2 upload.
+ * Falls back to Supabase storage if R2 is not configured.
  * The key is always scoped to the caller's own folder.
  */
 export const signUploadUrl = createServerFn({ method: "POST" })
@@ -17,9 +18,20 @@ export const signUploadUrl = createServerFn({ method: "POST" })
     const safe = (data.filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
     const path = `${context.userId}/${Date.now()}-${safe}`;
     const { r2SignedPutUrl, isR2Configured } = await import("./r2.server");
-    if (!isR2Configured()) throw new Error("Object storage is not configured");
-    const url = await r2SignedPutUrl(data.bucket, path);
-    return { url, path };
+    
+    if (isR2Configured()) {
+      const url = await r2SignedPutUrl(data.bucket, path);
+      return { url, path, provider: "r2" as const };
+    }
+    
+    // Fallback to Supabase storage
+    const { data: signed, error } = await context.supabase.storage
+      .from(data.bucket)
+      .createSignedUploadUrl(path);
+    
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
+    
+    return { url: signed.signedUrl, path, provider: "supabase" as const };
   });
 
 /** Short-lived read URL for cover art / avatars (publicly viewable media). */
