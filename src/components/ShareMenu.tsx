@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Heart, ListMusic, Plus, User, Share2, Disc, Copy, Check } from "lucide-react";
+import { MoreVertical, Heart, ListMusic, Plus, User, Share2, Disc, Copy, Check, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
@@ -76,7 +76,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     mutationFn: toggleLikeFn,
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["song-like", songId, user?.id] });
-      toast.success(data.liked ? "❤️ Added to Liked Songs" : "💔 Removed from Liked Songs");
+      toast.success(data.liked ? "Added to Liked Songs" : "Removed from Liked Songs");
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
@@ -86,7 +86,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       setShowPlaylistModal(false);
-      toast.success("✓ Added to playlist");
+      toast.success("Added to playlist");
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
@@ -124,7 +124,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         coverUrl: undefined,
       };
       addToQueue([...currentQueue, newTrack], currentQueue.length);
-      toast.success("✓ Added to queue");
+      toast.success("Added to queue");
     }
   };
 
@@ -137,7 +137,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     
     navigator.clipboard.writeText(url);
     setCopied(true);
-    toast.success("✓ Link copied to clipboard");
+    toast.success("Link copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -165,14 +165,14 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`p-2 rounded-full hover:bg-accent transition-colors cursor-pointer ${className || ""}`}
+        className={`text-muted-foreground hover:text-foreground transition-colors cursor-pointer ${className || ""}`}
         aria-label="More options"
       >
-        <MoreVertical className="size-4" />
+        <MoreVertical className="size-5" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 w-48 bg-[#282828] rounded-lg shadow-2xl z-50 overflow-hidden border border-white/10">
           {type === "song" && (
             <>
               <button
@@ -180,10 +180,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   if (songId) likeMutation.mutate({ data: { song_id: songId } });
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left"
               >
-                <Heart className={`size-4 ${isLiked ? "fill-primary text-primary" : ""}`} />
-                {isLiked ? "Remove from Liked" : "Add to Liked"}
+                <Heart className={`size-4 ${isLiked ? "fill-[#1db954] text-[#1db954]" : ""}`} />
+                {isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
               </button>
               
               <button
@@ -191,7 +191,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   setShowPlaylistModal(true);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left"
               >
                 <ListMusic className="size-4" />
                 Add to playlist
@@ -199,32 +199,34 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
               <button
                 onClick={handleAddToQueue}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left"
               >
                 <Plus className="size-4" />
                 Add to queue
               </button>
 
+              <div className="border-t border-white/10 my-1" />
+
               {songArtists && songArtists.length > 0 && (
-                <div className="border-t border-border">
-                  <div className="px-4 py-2 text-xs text-muted-foreground font-medium">Go to artist</div>
+                <>
                   {songArtists.map((a: any) => (
                     <button
                       key={a.id}
                       onClick={() => handleGoToArtist(a.id)}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-accent transition-colors cursor-pointer pl-8"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left"
                     >
                       <User className="size-4" />
-                      {a.name}
+                      Go to artist
                     </button>
                   ))}
-                </div>
+                  <div className="border-t border-white/10 my-1" />
+                </>
               )}
 
               {albumId && (
                 <button
                   onClick={handleGoToAlbum}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors cursor-pointer border-t border-border"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left"
                 >
                   <Disc className="size-4" />
                   Go to album
@@ -235,57 +237,68 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
           <button
             onClick={handleCopyLink}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors cursor-pointer border-t border-border"
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors cursor-pointer text-left border-t border-white/10"
           >
-            {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? "Copied!" : "Copy link"}
+            {copied ? <Check className="size-4 text-[#1db954]" /> : <Copy className="size-4" />}
+            {copied ? "Link copied" : "Copy song link"}
           </button>
         </div>
       )}
 
       {showPlaylistModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md">
-            <h3 className="font-semibold mb-4">Add to playlist</h3>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#282828] rounded-lg p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-white text-lg">Add to playlist</h3>
+              <button
+                onClick={() => setShowPlaylistModal(false)}
+                className="text-muted-foreground hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
             
-            <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+            <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
               {playlists?.map((p: any) => (
                 <button
                   key={p.id}
                   onClick={() => handleAddToPlaylist(p.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-white/10 transition-colors cursor-pointer text-left"
                 >
-                  <ListMusic className="size-4" />
-                  {p.name}
+                  <ListMusic className="size-4 text-muted-foreground" />
+                  <span className="text-white">{p.name}</span>
                 </button>
               ))}
             </div>
 
-            <form onSubmit={handleCreatePlaylist} className="space-y-3">
-              <input
-                type="text"
-                placeholder="New playlist name"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={createPlaylistMutation.isPending || !newPlaylistName.trim()}
-                  className="flex-1 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 cursor-pointer"
-                >
-                  {createPlaylistMutation.isPending ? "Creating..." : "Create new"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPlaylistModal(false)}
-                  className="px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <div className="border-t border-white/10 pt-4">
+              <form onSubmit={handleCreatePlaylist} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="New playlist name"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-md bg-[#3e3e3e] border border-white/10 text-white placeholder:text-muted-foreground focus:outline-none focus:border-[#1db954]"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={createPlaylistMutation.isPending || !newPlaylistName.trim()}
+                    className="flex-1 px-6 py-3 rounded-full bg-[#1db954] text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform cursor-pointer"
+                  >
+                    {createPlaylistMutation.isPending ? "Creating..." : "Create"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPlaylistModal(false)}
+                    className="px-6 py-3 rounded-full bg-[#3e3e3e] text-white text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
