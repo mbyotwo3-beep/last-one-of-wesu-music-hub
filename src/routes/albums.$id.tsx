@@ -107,6 +107,7 @@ function AlbumPage() {
             artistId={artist?.id}
             artistName={artist?.name}
             type="album"
+            className="relative z-20"
           />
         </div>
 
@@ -134,7 +135,7 @@ function AlbumPage() {
                     <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
                   </div>
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative z-10">
                   <span className="text-primary text-sm font-bold">
                     {useCurrency.getState().formatPrice(s.price)}
                   </span>
@@ -143,22 +144,11 @@ function AlbumPage() {
                     songId={s.id}
                     songTitle={s.title}
                     albumId={album.id}
-                    albumTitle={album.title}
                     artistId={artist?.id}
                     artistName={artist?.name}
                     type="song"
-                    className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="relative z-20"
                   />
-                  {Number(s.price) > 0 && (
-                    <Link
-                      to="/checkout"
-                      search={{ item: "song", id: s.id }}
-                      className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
-                      aria-label={`Buy ${s.title}`}
-                    >
-                      <ShoppingBag className="size-4" />
-                    </Link>
-                  )}
                 </div>
               </div>
             ))}

@@ -183,6 +183,7 @@ function ArtistPage() {
               artistId={a.id}
               artistName={a.name}
               type="artist"
+              className="relative z-20"
             />
             <button
               onClick={handleFollow}
@@ -281,7 +282,7 @@ function ArtistPage() {
                       artistId={a.id}
                       artistName={a.name}
                       type="song"
-                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
                     />
                   </div>
                 </div>

@@ -184,7 +184,7 @@ function Page() {
                   playlistId={playlist.id}
                   playlistName={playlist.name}
                   type="playlist"
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
                 />
               )}
             </div>

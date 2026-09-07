@@ -27,7 +27,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [copied, setCopied] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -167,9 +167,27 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       const rect = buttonRef.current.getBoundingClientRect();
       const scrollX = window.scrollX || window.pageXOffset;
       const scrollY = window.scrollY || window.pageYOffset;
+      
+      // Calculate position like Spotify - align to right of button, but ensure it doesn't go off-screen
+      const menuWidth = 208; // w-52 = 13rem = 208px
+      const spaceOnRight = window.innerWidth - rect.right;
+      const spaceOnLeft = rect.left;
+      
+      let leftPosition;
+      if (spaceOnRight >= menuWidth) {
+        // Enough space on right, align to button's right edge
+        leftPosition = rect.right + scrollX;
+      } else if (spaceOnLeft >= menuWidth) {
+        // Not enough space on right, align to button's left edge
+        leftPosition = rect.left + scrollX - menuWidth;
+      } else {
+        // Not enough space on either side, align to right edge of screen with padding
+        leftPosition = window.innerWidth - menuWidth - 16 + scrollX;
+      }
+      
       setMenuPosition({
         top: rect.bottom + scrollY + 4,
-        right: window.innerWidth - rect.right - scrollX,
+        left: leftPosition,
       });
     }
     setIsOpen(!isOpen);
@@ -239,7 +257,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         <div 
           ref={menuRef}
           className="fixed w-52 bg-card rounded-lg shadow-2xl z-[9999] overflow-hidden border border-border"
-          style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+          style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
         >
           {type === "song" && (
             <>

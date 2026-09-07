@@ -80,7 +80,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
       )}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 mt-2">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
           {song.price != null && (
@@ -93,6 +93,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
               to="/artists/$id"
               params={{ id: song.artist.id }}
               className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
+              onClick={(e) => e.stopPropagation()}
             >
               {artistName}
             </Link>
@@ -100,7 +101,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             <p className="text-xs text-muted-foreground truncate">{artistName}</p>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 relative z-10">
           {user && Number(song.price ?? 0) <= 0 && (
             <DownloadButton songId={song.id} label="Download" />
           )}
@@ -110,6 +111,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             artistId={song.artist?.id}
             artistName={artistName}
             type="song"
+            className="relative z-20"
           />
         </div>
       </div>

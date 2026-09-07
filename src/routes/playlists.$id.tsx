@@ -106,7 +106,7 @@ function Page() {
           playlistId={id}
           playlistName={(data as any).name}
           type="playlist"
-          className="ml-3 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 text-sm font-bold transition-colors hover:bg-accent"
+          className="ml-3 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-6 py-3 text-sm font-bold transition-colors hover:bg-accent relative z-20"
         />
       )}
 
@@ -144,7 +144,7 @@ function Page() {
                 artistId={s.artist?.id}
                 artistName={s.artist?.name}
                 type="song"
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
               />
               {isOwner && (
                 <button

@@ -109,6 +109,7 @@ function SongPage() {
             artistId={artist?.id}
             artistName={artist?.name}
             type="song"
+            className="relative z-20"
           />
         </div>
       </div>

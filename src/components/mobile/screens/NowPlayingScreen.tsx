@@ -121,6 +121,7 @@ export function NowPlayingScreen() {
             songTitle={track.title}
             artistName={track.artistName}
             type="song"
+            className="relative z-20"
           />
         </div>
       </div>

@@ -713,10 +713,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <p className="text-xs text-gray-300 truncate">{track.artistName}</p>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 relative z-10">
               {user && (
                 <button
-                  onClick={toggleLike}
+                  onClick={handleLike}
                   className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
                   aria-label={liked ? "Unlike" : "Like"}
                 >
@@ -730,6 +730,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 artistName={track.artistName}
                 albumId={albumId}
                 type="song"
+                className="relative z-20"
               />
             </div>
           </div>
