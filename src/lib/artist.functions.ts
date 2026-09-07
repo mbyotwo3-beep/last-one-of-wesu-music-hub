@@ -129,6 +129,7 @@ export const uploadSong = createServerFn({ method: "POST" })
       genre?: string;
       price?: number;
       album_id?: string | null;
+      release_date?: string | null;
     }) => d,
   )
   .handler(async ({ context, data }) => {
@@ -166,6 +167,7 @@ export const uploadSong = createServerFn({ method: "POST" })
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
         status: "pending",
+        release_date: data.release_date ?? null,
       } as any)
       .select("id")
       .single();
@@ -173,6 +175,7 @@ export const uploadSong = createServerFn({ method: "POST" })
     await audit(supabase, userId, "song.upload", "song", song!.id, {
       title: data.title,
       status: "pending",
+      release_date: data.release_date,
     });
     return { ok: true, id: song!.id, status: "pending" };
   });
@@ -296,7 +299,7 @@ export const createAlbum = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "album.create", "album", album!.id, { title: data.title });
+    await audit(supabase, userId, "album.create", "album", album!.id, { title: data.title, release_date: data.release_date });
     return { ok: true, id: album!.id };
   });
 

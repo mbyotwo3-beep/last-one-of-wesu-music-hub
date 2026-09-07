@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X } from "lucide-react";
+import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -371,21 +371,84 @@ function UploadWizard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mode, setMode] = useState<UploadMode>("single");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [genre, setGenre] = useState("");
-  const [cover, setCover] = useState<File | null>(null);
-  const [tracks, setTracks] = useState<File[]>([]);
-  const [tier, setTier] = useState<"free" | "paid">("paid");
-  const [price, setPrice] = useState<number>(pricing.song_min);
-  const [feeAgreed, setFeeAgreed] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(() => {
+    const saved = sessionStorage.getItem("upload-wizard-step");
+    return saved ? (parseInt(saved) as 1 | 2 | 3) : 1;
+  });
+  const [mode, setMode] = useState<UploadMode>(() => {
+    const saved = sessionStorage.getItem("upload-wizard-mode");
+    return (saved as UploadMode) || "single";
+  });
+  const [title, setTitle] = useState(() => sessionStorage.getItem("upload-wizard-title") || "");
+  const [description, setDescription] = useState(() => sessionStorage.getItem("upload-wizard-description") || "");
+  const [genre, setGenre] = useState(() => sessionStorage.getItem("upload-wizard-genre") || "");
+  const [releaseDate, setReleaseDate] = useState(() => sessionStorage.getItem("upload-wizard-releaseDate") || "");
+  const [tier, setTier] = useState<"free" | "paid">(() => {
+    const saved = sessionStorage.getItem("upload-wizard-tier");
+    return (saved as "free" | "paid") || "paid";
+  });
+  const [price, setPrice] = useState<number>(() => {
+    const saved = sessionStorage.getItem("upload-wizard-price");
+    return saved ? parseFloat(saved) : pricing.song_min;
+  });
+  const [feeAgreed, setFeeAgreed] = useState(() => sessionStorage.getItem("upload-wizard-feeAgreed") === "true");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
+  const [tracks, setTracks] = useState<File[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+
+  // Persist form state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-step", step.toString());
+  }, [step]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-mode", mode);
+  }, [mode]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-title", title);
+  }, [title]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-description", description);
+  }, [description]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-genre", genre);
+  }, [genre]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-releaseDate", releaseDate);
+  }, [releaseDate]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-tier", tier);
+  }, [tier]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-price", price.toString());
+  }, [price]);
+
+  useEffect(() => {
+    sessionStorage.setItem("upload-wizard-feeAgreed", feeAgreed.toString());
+  }, [feeAgreed]);
+
+  // Clear sessionStorage on successful upload
+  const clearSessionStorage = () => {
+    sessionStorage.removeItem("upload-wizard-step");
+    sessionStorage.removeItem("upload-wizard-mode");
+    sessionStorage.removeItem("upload-wizard-title");
+    sessionStorage.removeItem("upload-wizard-description");
+    sessionStorage.removeItem("upload-wizard-genre");
+    sessionStorage.removeItem("upload-wizard-releaseDate");
+    sessionStorage.removeItem("upload-wizard-tier");
+    sessionStorage.removeItem("upload-wizard-price");
+    sessionStorage.removeItem("upload-wizard-feeAgreed");
+  };
 
   const SINGLE_MIN = pricing.song_min;
   const SINGLE_MAX = pricing.song_max;
@@ -469,6 +532,7 @@ function UploadWizard() {
             genre: genre || undefined,
             price: tier === "free" ? 0 : price,
             album_id: null,
+            release_date: releaseDate || undefined,
           },
         });
         const successMessage = tier === "free"
@@ -478,6 +542,7 @@ function UploadWizard() {
         toast.success(successMessage);
         qc.invalidateQueries({ queryKey: ["my-songs"] });
         qc.invalidateQueries({ queryKey: ["artist-overview"] });
+        clearSessionStorage();
         navigate({ to: "/artist-dashboard" });
         return res;
       }
@@ -490,6 +555,7 @@ function UploadWizard() {
           genre: genre || undefined,
           price,
           cover_url,
+          release_date: releaseDate || undefined,
         },
       });
       for (const file of tracks) {
@@ -508,6 +574,7 @@ function UploadWizard() {
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
+      clearSessionStorage();
       navigate({ to: "/artist-dashboard" });
     } catch (err) {
       const msg = (err as Error).message;
@@ -532,10 +599,12 @@ function UploadWizard() {
           <button
             onClick={() => {
               setDone(null);
+              clearSessionStorage();
               setStep(1);
               setTitle("");
               setDescription("");
               setGenre("");
+              setReleaseDate("");
               setCover(null);
               setTracks([]);
               setTier("paid");
@@ -653,8 +722,18 @@ function UploadWizard() {
                 onChange={(e) => setGenre(e.target.value)}
               />
             </label>
+            <label className="block text-sm font-medium">
+              Release Date <span className="font-normal text-muted-foreground">(optional)</span>
+              <input
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+              />
+            </label>
             {mode === "album" && (
-              <label className="block text-sm font-medium">
+              <label className="block text-sm font-medium col-span-2">
                 Description <span className="font-normal text-muted-foreground">(optional)</span>
                 <input
                   placeholder="Tell listeners about this album"
