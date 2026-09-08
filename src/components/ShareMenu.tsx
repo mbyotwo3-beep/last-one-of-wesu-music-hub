@@ -146,8 +146,11 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       
       // Calculate position like Spotify - align to right of button, but ensure it doesn't go off-screen
       const menuWidth = 208; // w-52 = 13rem = 208px
+      const menuHeight = 300; // Approximate menu height
       const spaceOnRight = window.innerWidth - rect.right;
       const spaceOnLeft = rect.left;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
       
       let leftPosition;
       if (spaceOnRight >= menuWidth) {
@@ -161,8 +164,20 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         leftPosition = window.innerWidth - menuWidth - 16 + scrollX;
       }
       
+      let topPosition;
+      if (spaceBelow >= menuHeight) {
+        // Enough space below, position below button
+        topPosition = rect.bottom + scrollY + 4;
+      } else if (spaceAbove >= menuHeight) {
+        // Not enough space below, position above button
+        topPosition = rect.top + scrollY - menuHeight - 4;
+      } else {
+        // Not enough space on either side, position at bottom of screen with padding
+        topPosition = window.innerHeight - menuHeight - 16 + scrollY;
+      }
+      
       setMenuPosition({
-        top: rect.bottom + scrollY + 4,
+        top: topPosition,
         left: leftPosition,
       });
     }
@@ -311,7 +326,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
@@ -327,7 +342,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
@@ -343,7 +358,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >

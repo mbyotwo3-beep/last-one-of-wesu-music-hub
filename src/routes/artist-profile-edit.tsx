@@ -422,7 +422,7 @@ function ArtistProfileEditPage() {
                       </div>
                       <input
                         id={social.key}
-                        type="url"
+                        type="text"
                         value={linkValue}
                         onChange={(e) =>
                           setFormData({
