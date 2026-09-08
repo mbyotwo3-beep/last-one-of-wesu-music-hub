@@ -94,19 +94,33 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
         return;
       }
-      // If it starts with "uploads/", treat as absolute URL (no bucket resolution needed)
+      // If it starts with "uploads/", resolve through hero-images bucket (legacy support)
       if (slide.imageUrl.startsWith("uploads/")) {
-        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
+        if (cached) {
+          setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
+          return;
+        }
+        try {
+          const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
+          if (url) {
+            setSignedUrls((prev) => new Map(prev).set(slide.id, url));
+          }
+        } catch (e) {
+          console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
+          // Fallback to using the raw URL
+          setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        }
         return;
       }
-      // Otherwise, try to resolve it through album-art bucket
-      const cached = peekImageUrl("album-art" as any, slide.imageUrl);
+      // Otherwise, assume it's in hero-images bucket with user_id folder
+      const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
       if (cached) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
         return;
       }
       try {
-        const url = await resolveImageUrl("album-art" as any, slide.imageUrl);
+        const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
         if (url) {
           setSignedUrls((prev) => new Map(prev).set(slide.id, url));
         }
@@ -123,8 +137,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const currentSlide = slides[currentIndex];
   const signedUrl = signedUrls.get(currentSlide.id) || currentSlide.imageUrl;
 
-  // Check if link is external
-  const isExternalLink = currentSlide.ctaLink.startsWith('http');
+  // Check if link is external (starts with http:// or https://)
+  const isExternalLink = currentSlide.ctaLink.startsWith('http://') || currentSlide.ctaLink.startsWith('https://');
 
   return (
     <div 

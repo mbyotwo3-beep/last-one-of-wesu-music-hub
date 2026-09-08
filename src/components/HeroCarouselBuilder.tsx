@@ -6,6 +6,7 @@ import {
   Link as LinkIcon, Image as ImageIcon, Save, X, Upload, Video,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 import {
   getAllHeroSlides,
   createHeroSlide,
@@ -22,6 +23,7 @@ import { uploadFileToBucket } from "@/lib/storage";
 export function HeroCarouselBuilder() {
   const qc = useQueryClient();
   const [showNewForm, setShowNewForm] = useState(false);
+  const { user } = useAuth();
 
   const getAllFn = useServerFn(getAllHeroSlides);
   const createFn = useServerFn(createHeroSlide);
@@ -405,7 +407,7 @@ function HeroSlideForm({
     reader.readAsDataURL(file);
 
     try {
-      const imageUrl = await uploadFileToBucket("hero-images", "uploads", file);
+      const imageUrl = await uploadFileToBucket("hero-images", user?.id || "uploads", file);
       setFormData({ ...formData, image_url: imageUrl });
       toast.success("🖼️ Image uploaded successfully!");
     } catch (error) {
