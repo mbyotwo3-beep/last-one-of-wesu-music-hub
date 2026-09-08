@@ -653,7 +653,17 @@ export const updateSong = createServerFn({ method: "POST" })
 
     if (Object.keys(patch).length === 0) return { ok: true, id: data.id, status: (song as any).status };
 
-    const { error } = await supabase.from("songs").update(patch).eq("id", data.id);
+    const { error } = await supabase
+      .from("songs")
+      .update(patch as {
+        title?: string;
+        genre?: string | null;
+        price?: number;
+        explicit?: boolean;
+        album_id?: string | null;
+        cover_url?: string;
+      })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
 
     await audit(supabase, userId, "song.update", "song", data.id, patch);

@@ -348,6 +348,17 @@ async function getLabelAvailableBalance(supabase: any, labelId: string): Promise
   return Math.max(0, totalEarned - totalPaid);
 }
 
+/** Staff/label-facing available balance for the payout UI. */
+export const getLabelPayoutBalance = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { label_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertLabelManager(context.supabase, context.userId, data.label_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const available = await getLabelAvailableBalance(supabaseAdmin, data.label_id);
+    return { available };
+  });
+
 export const requestLabelPayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(

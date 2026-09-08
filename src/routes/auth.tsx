@@ -36,7 +36,8 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { redirect, action, artistId, itemId, itemType } = search;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -301,6 +302,7 @@ function AuthPage() {
             onClick={() => {
               setMode(mode === "signin" ? "signup" : "signin");
               setError(null);
+              setNotice(null);
             }}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors block w-full cursor-pointer"
           >

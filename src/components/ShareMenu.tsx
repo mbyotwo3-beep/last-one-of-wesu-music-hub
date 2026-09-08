@@ -335,7 +335,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
@@ -351,7 +351,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
@@ -367,7 +367,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsOpen(false);
+                  handleCopyLink();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >

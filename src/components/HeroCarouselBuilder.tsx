@@ -82,7 +82,7 @@ export function HeroCarouselBuilder() {
       {showNewForm && (
         <HeroSlideForm
           onSave={(data) => {
-            createM.mutate(data);
+            createM.mutate({ data });
             setShowNewForm(false);
           }}
           onCancel={() => setShowNewForm(false)}
@@ -105,19 +105,19 @@ export function HeroCarouselBuilder() {
           idx={idx}
           totalCount={slides?.length ?? 0}
           onToggleActive={() =>
-            updateM.mutate({ id: slide.id, active: !slide.active })
+            updateM.mutate({ data: { id: slide.id, active: !slide.active } })
           }
           onMoveUp={() =>
-            updateM.mutate({ id: slide.id, position: Math.max(0, slide.position - 1) })
+            updateM.mutate({ data: { id: slide.id, position: Math.max(0, slide.position - 1) } })
           }
           onMoveDown={() =>
-            updateM.mutate({ id: slide.id, position: slide.position + 1 })
+            updateM.mutate({ data: { id: slide.id, position: slide.position + 1 } })
           }
           onDelete={() => {
             if (!confirm(`Delete slide "${slide.title}"?`)) return;
-            deleteM.mutate({ id: slide.id });
+            deleteM.mutate({ data: { id: slide.id } });
           }}
-          onUpdate={(d) => updateM.mutate({ id: slide.id, ...d })}
+          onUpdate={(d) => updateM.mutate({ data: { id: slide.id, ...d } })}
           isPending={updateM.isPending || deleteM.isPending}
         />
       ))}

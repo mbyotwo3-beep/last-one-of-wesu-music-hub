@@ -156,7 +156,7 @@ export const getArtistById = createServerFn({ method: "GET" })
         .order("release_date", { ascending: false }),
       supabase
         .from("songs")
-        .select("id,title,duration,price,cover_url,play_count")
+        .select("id,title,duration,price,cover_url,play_count,album_id")
         .eq("artist_id", data.id)
         .order("play_count", { ascending: false })
         .limit(20),
@@ -195,7 +195,7 @@ export const getSongById = createServerFn({ method: "GET" })
     const supabase = getPublicSupabase();
     const { data: song, error } = await supabase
       .from("songs")
-      .select("id,title,duration,price,cover_url,genre,explicit,play_count,created_at,artist:artists(id,name)")
+      .select("id,title,duration,price,cover_url,genre,explicit,play_count,created_at,album_id,artist:artists(id,name)")
       .eq("id", data.id)
       .eq("status", "approved")
       .maybeSingle();

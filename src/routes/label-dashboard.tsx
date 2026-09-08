@@ -13,6 +13,7 @@ import {
   setArtistRoyalty,
   removeArtistFromLabel,
   requestLabelPayout,
+  getLabelPayoutBalance,
   updateLabel,
 } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -362,19 +363,13 @@ function Revenue({ labelId }: { labelId: string }) {
 }
 
 function Payouts({ labelId }: { labelId: string }) {
+  const qc = useQueryClient();
   const fn = useServerFn(requestLabelPayout);
   const withdrawalFn = useServerFn(getWithdrawalConfig);
-  const { data: labelData } = useQuery({
-    queryKey: ["label-data", labelId],
-    queryFn: async () => {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await supabaseAdmin
-        .from("labels")
-        .select("*")
-        .eq("id", labelId)
-        .single();
-      return data;
-    },
+  const balanceFn = useServerFn(getLabelPayoutBalance);
+  const { data: balanceData } = useQuery({
+    queryKey: ["label-payout-balance", labelId],
+    queryFn: () => balanceFn({ data: { label_id: labelId } }),
     retry: false,
   });
   const { data: withdrawalConfig } = useQuery({
@@ -386,12 +381,13 @@ function Payouts({ labelId }: { labelId: string }) {
     mutationFn: fn,
     onSuccess: () => {
       toast.success("💵 Payout request submitted successfully!");
+      qc.invalidateQueries({ queryKey: ["label-payout-balance", labelId] });
     },
     onError: (error) => {
       toast.error(`Payout request failed: ${error.message}`);
     },
   });
-  const availableBalance = Number(labelData?.total_revenue ?? 0);
+  const availableBalance = Number(balanceData?.available ?? 0);
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
   const eligible = availableBalance > minWithdrawal;
   const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });

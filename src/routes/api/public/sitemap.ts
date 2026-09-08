@@ -11,7 +11,7 @@ const STATIC_PATHS = [
   "/hot-tracks",
   "/must-have",
   "/recently-added",
-  "/radio",
+  "/podcast",
   "/playlists",
   "/contact",
   "/terms",

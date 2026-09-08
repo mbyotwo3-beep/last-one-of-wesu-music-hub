@@ -262,12 +262,21 @@ export const setPlatformCommission = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "site")
+      .maybeSingle();
+    const current =
+      row?.value && typeof row.value === "object" && !Array.isArray(row.value)
+        ? (row.value as Record<string, unknown>)
+        : {};
     await supabaseAdmin.from("platform_settings").upsert({
-      key: "commission_pct",
-      value: data.pct as any,
+      key: "site",
+      value: { ...current, commission_pct: data.pct } as any,
       updated_by: context.userId,
       updated_at: new Date().toISOString(),
     });
-    await audit(context.userId, "commission.set", "setting", "commission_pct", { pct: data.pct });
+    await audit(context.userId, "commission.set", "setting", "site", { pct: data.pct });
     return { ok: true };
   });

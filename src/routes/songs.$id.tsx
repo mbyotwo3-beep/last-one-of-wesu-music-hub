@@ -105,7 +105,7 @@ function SongPage() {
           <ShareMenu
             songId={song!.id}
             songTitle={song!.title}
-            albumId={song!.album_id}
+            albumId={song!.album_id ?? undefined}
             artistId={artist?.id}
             artistName={artist?.name}
             type="song"

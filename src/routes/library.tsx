@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl } from "@/lib/listener.functions";
+import { getPreviewAudioUrl, getPublicAudioUrl, getSignedAudioUrl } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -286,6 +286,7 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
   const player = usePlayer();
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const isPlaying = player.playing && player.track?.id === song.id;
   const isPaid = song.price && Number(song.price) > 0;
@@ -312,14 +313,13 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
         toast.info(`🎵 Previewing "${song.title}" (15s)`);
       } else {
         // Full playback for free songs
-        const { data: signedUrl } = await supabase
-          .rpc("get_public_audio_url", { _song_id: song.id });
+        const { url } = await getPublicFn({ data: { song_id: song.id } });
         player.setTrack({
           id: song.id,
           title: song.title,
           artistName: song.artists?.name ?? "Unknown",
           coverUrl: song.cover_url,
-          audioUrl: signedUrl,
+          audioUrl: url,
         });
         player.setIsPreview(false);
         player.togglePlay();
@@ -413,6 +413,7 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
 function PurchasedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
   const player = usePlayer();
+  const getSignedFn = useServerFn(getSignedAudioUrl);
 
   const isPlaying = player.playing && player.track?.id === song.id;
 
@@ -424,14 +425,16 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
       }
 
       // Purchased songs have full playback
-      const { data: signedUrl } = await supabase
-        .rpc("get_public_audio_url", { _song_id: song.id });
+      const result = await getSignedFn({ data: { song_id: song.id } });
+      if (!result.url || ("requiresPurchase" in result && result.requiresPurchase)) {
+        throw new Error("This song requires a purchase");
+      }
       player.setTrack({
         id: song.id,
         title: song.title,
         artistName: song.artists?.name ?? "Unknown",
         coverUrl: song.cover_url,
-        audioUrl: signedUrl,
+        audioUrl: result.url,
       });
       player.setIsPreview(false);
       player.togglePlay();
