@@ -160,6 +160,7 @@ function HeroSlideCard({
     video_url: slide.video_url ?? "",
     cta_text: slide.cta_text,
     cta_link: slide.cta_link,
+    cta_external: slide.cta_external ?? false,
   });
 
   const handleSave = () => {
@@ -170,6 +171,7 @@ function HeroSlideCard({
       video_url: formData.video_url || null,
       cta_text: formData.cta_text,
       cta_link: formData.cta_link,
+      cta_external: formData.cta_external,
     });
     setEditing(false);
   };
@@ -265,6 +267,7 @@ function HeroSlideCard({
                   video_url: slide.video_url ?? "",
                   cta_text: slide.cta_text,
                   cta_link: slide.cta_link,
+                  cta_external: slide.cta_external ?? false,
                 });
               }}
               isPending={isPending}
@@ -292,6 +295,9 @@ function HeroSlideCard({
                   <div>
                     <span className="text-xs text-muted-foreground">CTA:</span>
                     <p className="text-sm font-medium">{slide.cta_text} → {slide.cta_link}</p>
+                    {slide.cta_external && (
+                      <p className="text-xs text-muted-foreground">Opens in new tab</p>
+                    )}
                   </div>
                   {slide.video_url && (
                     <div>
@@ -331,6 +337,7 @@ function HeroSlideForm({
     video_url: string;
     cta_text: string;
     cta_link: string;
+    cta_external: boolean;
   };
   onSave: (data: any) => void;
   onCancel: () => void;
@@ -344,6 +351,7 @@ function HeroSlideForm({
       video_url: "",
       cta_text: "",
       cta_link: "",
+      cta_external: false,
     }
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -429,6 +437,7 @@ function HeroSlideForm({
       video_url: formData.video_url.trim() || undefined,
       cta_text: formData.cta_text.trim(),
       cta_link: formData.cta_link.trim(),
+      cta_external: formData.cta_external,
     });
   };
 
@@ -541,6 +550,20 @@ function HeroSlideForm({
             className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm font-mono"
           />
         </div>
+      </div>
+
+      {/* External Link Checkbox */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="cta-external"
+          checked={formData.cta_external}
+          onChange={(e) => setFormData({ ...formData, cta_external: e.target.checked })}
+          className="w-4 h-4 rounded border-border bg-secondary text-primary focus:ring-primary"
+        />
+        <label htmlFor="cta-external" className="text-sm text-muted-foreground">
+          Open link in new tab (external site)
+        </label>
       </div>
 
       <div className="flex gap-2 pt-2">

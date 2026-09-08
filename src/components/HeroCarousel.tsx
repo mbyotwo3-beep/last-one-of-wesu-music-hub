@@ -11,6 +11,7 @@ export interface HeroSlide {
   videoUrl?: string;
   ctaText: string;
   ctaLink: string;
+  ctaExternal?: boolean;
   gradient?: string;
 }
 
@@ -137,8 +138,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const currentSlide = slides[currentIndex];
   const signedUrl = signedUrls.get(currentSlide.id) || currentSlide.imageUrl;
 
-  // Check if link is external (starts with http:// or https://)
-  const isExternalLink = currentSlide.ctaLink.startsWith('http://') || currentSlide.ctaLink.startsWith('https://');
+  // Use the ctaExternal field to determine if link should open in new tab
+  const isExternalLink = currentSlide.ctaExternal === true;
 
   return (
     <div 

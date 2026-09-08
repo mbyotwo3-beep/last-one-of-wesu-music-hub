@@ -10,6 +10,7 @@ export interface HeroCarouselSlide {
   video_url?: string | null;
   cta_text: string;
   cta_link: string;
+  cta_external: boolean;
   position: number;
   active: boolean;
   created_at: string;
@@ -66,6 +67,7 @@ export const createHeroSlide = createServerFn({ method: "POST" })
       video_url?: string;
       cta_text: string;
       cta_link: string;
+      cta_external?: boolean;
       position?: number;
     }) => d,
   )
@@ -89,6 +91,7 @@ export const createHeroSlide = createServerFn({ method: "POST" })
         video_url: data.video_url ?? null,
         cta_text: data.cta_text,
         cta_link: data.cta_link,
+        cta_external: data.cta_external ?? false,
         position: pos,
         active: true,
       })
@@ -110,6 +113,7 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
       video_url?: string | null;
       cta_text?: string;
       cta_link?: string;
+      cta_external?: boolean;
       position?: number;
       active?: boolean;
     }) => d,
@@ -124,6 +128,7 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
     if (data.video_url !== undefined) patch.video_url = data.video_url;
     if (data.cta_text !== undefined) patch.cta_text = data.cta_text;
     if (data.cta_link !== undefined) patch.cta_link = data.cta_link;
+    if (data.cta_external !== undefined) patch.cta_external = data.cta_external;
     if (data.position !== undefined) patch.position = data.position;
     if (data.active !== undefined) patch.active = data.active;
     const { error } = await (supabaseAdmin as any)

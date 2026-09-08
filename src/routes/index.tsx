@@ -137,6 +137,7 @@ function HomePage() {
                   videoUrl: slide.video_url || undefined,
                   ctaText: slide.cta_text,
                   ctaLink: slide.cta_link,
+                  ctaExternal: slide.cta_external,
                 }))}
               />
             ) : heroPick && (
