@@ -93,7 +93,6 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       return;
     }
     toggle();
-    setIsOpen(false);
   };
 
   const handleAddToPlaylistClick = () => {
