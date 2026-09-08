@@ -5,6 +5,10 @@
 -- Drop old artist-images policies that used artist_id
 DROP POLICY IF EXISTS "artist-images own upload" ON storage.objects;
 DROP POLICY IF EXISTS "artist-images own update" ON storage.objects;
+DROP POLICY IF EXISTS "artist-images owner write" ON storage.objects;
+DROP POLICY IF EXISTS "artist-images owner update" ON storage.objects;
+DROP POLICY IF EXISTS "artist-images owner delete" ON storage.objects;
+DROP POLICY IF EXISTS "artist-images staff all" ON storage.objects;
 
 -- Create new policies that use user_id folder structure (matching uploadFileToBucket)
 CREATE POLICY "artist-images owner write"
