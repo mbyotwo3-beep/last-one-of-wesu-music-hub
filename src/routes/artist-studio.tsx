@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar } from "lucide-react";
+import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar, Copy } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -400,6 +400,8 @@ function UploadWizard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
+  const [labelInviteLink, setLabelInviteLink] = useState<string | null>(null);
   const [cover, setCover] = useState<File | null>(null);
   const [tracks, setTracks] = useState<File[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -551,22 +553,14 @@ function UploadWizard() {
               },
             });
             if ((inviteRes as any).registration_link) {
-              toast.success(
-                `🎵 Song "${title}" uploaded! Share this registration link with the featured artist: ${(inviteRes as any).registration_link}`,
-                { duration: 10000 }
-              );
+              setFeatureInviteLink((inviteRes as any).registration_link);
             } else if ((inviteRes as any).existingUser) {
               toast.success(`🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`);
             }
           } catch (inviteError) {
             console.error("Failed to send feature invitation:", inviteError);
-            toast.success(`🎵 Song "${title}" uploaded! (Could not send feature invitation: ${(inviteError as Error).message})`);
+            toast.error(`Could not send feature invitation: ${(inviteError as Error).message}`);
           }
-        } else {
-          const successMessage = tier === "free"
-            ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
-            : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
-          toast.success(successMessage);
         }
 
         // Handle label invitation
@@ -582,10 +576,7 @@ function UploadWizard() {
               },
             });
             if ((inviteRes as any).registration_link) {
-              toast.success(
-                `🏷️ Share this registration link with the label: ${(inviteRes as any).registration_link}`,
-                { duration: 10000 }
-              );
+              setLabelInviteLink((inviteRes as any).registration_link);
             } else if ((inviteRes as any).existingUser) {
               toast.success(`Label already registered. Please use the label dashboard to complete the process.`);
             }
@@ -595,10 +586,26 @@ function UploadWizard() {
           }
         }
 
+        // Show success message
+        if (!featureInviteLink && !labelInviteLink) {
+          const successMessage = tier === "free"
+            ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
+            : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
+          toast.success(successMessage);
+        } else {
+          toast.success(`🎵 Song "${title}" uploaded successfully!`);
+        }
+
         qc.invalidateQueries({ queryKey: ["my-songs"] });
         qc.invalidateQueries({ queryKey: ["artist-overview"] });
-        clearSessionStorage();
-        navigate({ to: "/artist-dashboard" });
+        
+        // If there are invitation links, show them in the success screen
+        if (featureInviteLink || labelInviteLink) {
+          setDone(`🎵 Song "${title}" uploaded successfully!`);
+        } else {
+          clearSessionStorage();
+          navigate({ to: "/artist-dashboard" });
+        }
         return res;
       }
 
@@ -641,26 +648,33 @@ function UploadWizard() {
             },
           });
           if ((inviteRes as any).registration_link) {
-            toast.success(
-              `💿 Album "${title}" uploaded! Share this registration link with the label: ${(inviteRes as any).registration_link}`,
-              { duration: 10000 }
-            );
+            setLabelInviteLink((inviteRes as any).registration_link);
           } else if ((inviteRes as any).existingUser) {
             toast.success(`💿 Album "${title}" uploaded! Label already registered. Please use the label dashboard to complete the process.`);
           }
         } catch (inviteError) {
           console.error("Failed to send label invitation:", inviteError);
-          toast.success(`💿 Album "${title}" uploaded! (Could not send label invitation: ${(inviteError as Error).message})`);
+          toast.error(`Could not send label invitation: ${(inviteError as Error).message}`);
         }
-      } else {
+      }
+
+      if (!labelInviteLink) {
         toast.success(`💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
+      } else {
+        toast.success(`💿 Album "${title}" uploaded successfully!`);
       }
 
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
-      clearSessionStorage();
-      navigate({ to: "/artist-dashboard" });
+      
+      // If there are invitation links, show them in the success screen
+      if (labelInviteLink) {
+        setDone(`💿 Album "${title}" uploaded successfully!`);
+      } else {
+        clearSessionStorage();
+        navigate({ to: "/artist-dashboard" });
+      }
     } catch (err) {
       const msg = (err as Error).message;
       setError(msg);
@@ -670,10 +684,63 @@ function UploadWizard() {
     }
   }
 
-  if (done) {
+  if (done || featureInviteLink || labelInviteLink) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
-        <p className="text-lg font-semibold">✓ {done}</p>
+      <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-6">
+        <p className="text-lg font-semibold">✓ {done || "Upload Complete!"}</p>
+        
+        {featureInviteLink && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+            <p className="text-sm font-medium">🎤 Featured Artist Invitation</p>
+            <p className="text-xs text-muted-foreground">
+              Copy this registration link and send it to the featured artist via email or messaging app.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={featureInviteLink}
+                className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(featureInviteLink);
+                  toast.success("Link copied to clipboard!");
+                }}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
+              >
+                <Copy className="size-4" /> Copy
+              </button>
+            </div>
+          </div>
+        )}
+
+        {labelInviteLink && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+            <p className="text-sm font-medium">🏷️ Label Invitation</p>
+            <p className="text-xs text-muted-foreground">
+              Copy this registration link and send it to the label via email or messaging app.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={labelInviteLink}
+                className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(labelInviteLink);
+                  toast.success("Link copied to clipboard!");
+                }}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
+              >
+                <Copy className="size-4" /> Copy
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-center gap-3">
           <button
             onClick={() => navigate({ to: "/artist-dashboard" })}
@@ -684,6 +751,8 @@ function UploadWizard() {
           <button
             onClick={() => {
               setDone(null);
+              setFeatureInviteLink(null);
+              setLabelInviteLink(null);
               clearSessionStorage();
               setStep(1);
               setTitle("");
