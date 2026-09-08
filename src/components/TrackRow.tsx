@@ -2,6 +2,7 @@ import { Play, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useServerFn } from "@tanstack/react-start";
 import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { toast } from "sonner";
@@ -22,8 +23,7 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
   const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const liked = usePlayer((s) => s.liked);
-  const toggleLike = usePlayer((s) => s.toggleLike);
+  const { isSaved, toggle } = useSavedTrack(id);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
 
@@ -102,12 +102,12 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
       <button
         onClick={(e) => {
           e.stopPropagation();
-          toggleLike();
+          toggle();
         }}
         className="opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <Heart
-          className={`size-4 ${liked ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+          className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
         />
       </button>
     </div>

@@ -6,8 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
-import { toggleLike, addToPlaylist, createPlaylist } from "@/lib/listener.functions";
+import { addToPlaylist, createPlaylist } from "@/lib/listener.functions";
 import { getSongArtists } from "@/lib/music.functions";
 
 interface ShareMenuProps {
@@ -33,28 +34,12 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const toggleLikeFn = useServerFn(toggleLike);
   const addToPlaylistFn = useServerFn(addToPlaylist);
   const createPlaylistFn = useServerFn(createPlaylist);
   const getSongArtistsFn = useServerFn(getSongArtists);
   const addToQueue = usePlayer((s) => s.setQueue);
   const setTrack = usePlayer((s) => s.setTrack);
-
-  const { data: isLiked } = useQuery({
-    queryKey: ["song-like", songId, user?.id],
-    queryFn: async () => {
-      if (!songId || !user?.id) return false;
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
-        .from("song_likes")
-        .select("song_id")
-        .eq("song_id", songId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      return !!data;
-    },
-    enabled: !!songId && !!user?.id,
-  });
+  const { isSaved, toggle } = useSavedTrack(songId);
 
   const { data: playlists } = useQuery({
     queryKey: ["my-playlists", user?.id],
@@ -75,15 +60,6 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     queryKey: ["song-artists", songId],
     queryFn: () => getSongArtistsFn({ data: { song_id: songId! } }),
     enabled: !!songId && type === "song",
-  });
-
-  const likeMutation = useMutation({
-    mutationFn: toggleLikeFn,
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["song-like", songId, user?.id] });
-      toast.success(data.liked ? "Added to Liked Songs" : "Removed from Liked Songs");
-    },
-    onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
   const addToPlaylistMutation = useMutation({
@@ -116,7 +92,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       setIsOpen(false);
       return;
     }
-    if (songId) likeMutation.mutate({ data: { song_id: songId } });
+    toggle();
     setIsOpen(false);
   };
 
@@ -268,8 +244,8 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >
-                <Heart className={`size-4 ${isLiked ? "fill-primary text-primary" : ""}`} />
-                {isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
+                <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : ""}`} />
+                {isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
               </button>
               
               <button
