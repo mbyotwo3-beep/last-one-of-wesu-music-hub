@@ -95,14 +95,14 @@ function ArtistProfileEditPage() {
         if (avatarFile) {
           console.log("[Artist Profile] Uploading avatar...", {
             bucket: "artist-images",
-            artistId: artist.id,
+            userId: user.id,
             fileName: avatarFile.name,
             fileSize: avatarFile.size,
             fileType: avatarFile.type
           });
           const uploadStart = Date.now();
-          // CRITICAL: Use artist.id for artist-images bucket (RLS policy requires artist_id as folder)
-          avatarUrl = await uploadFileToBucket("artist-images", artist.id, avatarFile);
+          // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
+          avatarUrl = await uploadFileToBucket("artist-images", user.id, avatarFile);
           console.log("[Artist Profile] Avatar uploaded successfully:", {
             path: avatarUrl,
             duration: Date.now() - uploadStart
@@ -113,14 +113,14 @@ function ArtistProfileEditPage() {
         if (coverFile) {
           console.log("[Artist Profile] Uploading cover...", {
             bucket: "artist-images",
-            artistId: artist.id,
+            userId: user.id,
             fileName: coverFile.name,
             fileSize: coverFile.size,
             fileType: coverFile.type
           });
           const uploadStart = Date.now();
-          // CRITICAL: Use artist.id for artist-images bucket (RLS policy requires artist_id as folder)
-          coverUrl = await uploadFileToBucket("artist-images", artist.id, coverFile);
+          // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
+          coverUrl = await uploadFileToBucket("artist-images", user.id, coverFile);
           console.log("[Artist Profile] Cover uploaded successfully:", {
             path: coverUrl,
             duration: Date.now() - uploadStart
