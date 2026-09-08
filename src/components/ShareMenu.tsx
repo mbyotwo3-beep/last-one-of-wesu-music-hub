@@ -31,6 +31,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isPositioned, setIsPositioned] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -140,47 +141,47 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     e?.stopPropagation();
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const scrollX = window.scrollX || window.pageXOffset;
-      const scrollY = window.scrollY || window.pageYOffset;
       
       // Calculate position like Spotify - align to right of button, but ensure it doesn't go off-screen
       const menuWidth = 208; // w-52 = 13rem = 208px
       const menuHeight = 300; // Approximate menu height
-      const spaceOnRight = window.innerWidth - rect.right;
-      const spaceOnLeft = rect.left;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
       
       let leftPosition;
-      if (spaceOnRight >= menuWidth) {
-        // Enough space on right, align to button's right edge
-        leftPosition = rect.right + scrollX;
-      } else if (spaceOnLeft >= menuWidth) {
-        // Not enough space on right, align to button's left edge
-        leftPosition = rect.left + scrollX - menuWidth;
+      // Try to align to right of button
+      if (rect.right + menuWidth <= viewportWidth) {
+        leftPosition = rect.right;
+      } else if (rect.left >= menuWidth) {
+        // Not enough space on right, align to left of button
+        leftPosition = rect.left - menuWidth;
       } else {
-        // Not enough space on either side, align to right edge of screen with padding
-        leftPosition = window.innerWidth - menuWidth - 16 + scrollX;
+        // Not enough space on either side, align to right edge with padding
+        leftPosition = viewportWidth - menuWidth - 8;
       }
       
       let topPosition;
-      if (spaceBelow >= menuHeight) {
-        // Enough space below, position below button
-        topPosition = rect.bottom + scrollY + 4;
-      } else if (spaceAbove >= menuHeight) {
+      // Try to position below button
+      if (rect.bottom + menuHeight <= viewportHeight) {
+        topPosition = rect.bottom + 4;
+      } else if (rect.top >= menuHeight) {
         // Not enough space below, position above button
-        topPosition = rect.top + scrollY - menuHeight - 4;
+        topPosition = rect.top - menuHeight - 4;
       } else {
-        // Not enough space on either side, position at bottom of screen with padding
-        topPosition = window.innerHeight - menuHeight - 16 + scrollY;
+        // Not enough space on either side, position at bottom with padding
+        topPosition = viewportHeight - menuHeight - 8;
       }
       
       setMenuPosition({
         top: topPosition,
         left: leftPosition,
       });
+      setIsPositioned(true);
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+      setIsPositioned(false);
     }
-    setIsOpen(!isOpen);
   };
 
   const handleCopyLink = () => {
@@ -243,10 +244,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         <MoreVertical className="size-5" />
       </button>
 
-      {isOpen && createPortal(
+      {isOpen && isPositioned && createPortal(
         <div 
           ref={menuRef}
-          className="fixed w-52 bg-card rounded-lg shadow-2xl z-[9999] overflow-hidden border border-border"
+          className="fixed w-52 bg-card rounded-lg shadow-2xl z-[99999] overflow-hidden border border-border"
           style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
         >
           {type === "song" && (
