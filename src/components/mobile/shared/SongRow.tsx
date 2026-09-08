@@ -1,6 +1,9 @@
 import { usePlayer } from "@/stores/player";
 import type { PlayerTrack } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
+import { toast } from "sonner";
 
 interface SongRowProps {
   song: {
@@ -21,20 +24,50 @@ interface SongRowProps {
  */
 export function SongRow({ song }: SongRowProps) {
   const setTrack = usePlayer((s) => s.setTrack);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
+  const togglePlay = usePlayer((s) => s.togglePlay);
   const currentTrack = usePlayer((s) => s.track);
   const isActive = currentTrack?.id === song.id;
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
-  const track: PlayerTrack = {
-    id: song.id,
-    title: song.title,
-    artistName: song.artistName,
-    coverUrl: song.coverUrl,
-    durationSeconds: song.durationSeconds,
+  const handlePlay = async () => {
+    try {
+      const isPaid = song.price && Number(song.price) > 0;
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: song.artistName,
+          coverUrl: song.coverUrl,
+          audioUrl: url,
+          durationSeconds: song.durationSeconds,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${song.title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: song.artistName,
+          coverUrl: song.coverUrl,
+          audioUrl: url,
+          durationSeconds: song.durationSeconds,
+        });
+        setIsPreview(false);
+      }
+      togglePlay();
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
   };
 
   return (
     <button
-      onClick={() => setTrack(track)}
+      onClick={handlePlay}
       className={`w-full flex items-center gap-3 px-4 py-2 min-h-[44px] text-left transition-colors hover:bg-white/5 active:bg-white/10 ${
         isActive ? "bg-primary/10" : ""
       }`}

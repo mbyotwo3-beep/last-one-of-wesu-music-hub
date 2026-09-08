@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ShareMenu } from "@/components/ShareMenu";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -44,10 +46,14 @@ function ArtistPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(artistQO(id));
   const setTrack = usePlayer((s) => s.setTrack);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
+  const togglePlay = usePlayer((s) => s.togglePlay);
   const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const a = data.artist!;
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const [coverBg, setCoverBg] = useState<string | null>(null);
   useEffect(() => {
@@ -110,16 +116,41 @@ function ArtistPage() {
     follow.mutate();
   };
 
-  const playAll = () => {
+  const playAll = async () => {
     const first = data.topSongs[0];
     if (!first) return;
-    setTrack({
-      id: first.id,
-      title: first.title,
-      artistName: a.name,
-      coverUrl: first.cover_url,
-      durationSeconds: first.duration,
-    });
+    
+    try {
+      const isPaid = first.price && Number(first.price) > 0;
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: a.name,
+          coverUrl: first.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${first.title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: a.name,
+          coverUrl: first.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(false);
+      }
+      togglePlay();
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
   };
 
   const following = !!followQuery.data?.following;
@@ -234,15 +265,39 @@ function ArtistPage() {
                   className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                 >
                   <button
-                    onClick={() =>
-                      setTrack({
-                        id: s.id,
-                        title: s.title,
-                        artistName: a.name,
-                        coverUrl: s.cover_url,
-                        durationSeconds: s.duration,
-                      })
-                    }
+                    onClick={async () => {
+                      try {
+                        const isPaid = s.price && Number(s.price) > 0;
+                        
+                        if (isPaid) {
+                          const { url } = await getPreviewFn({ data: { song_id: s.id } });
+                          setTrack({
+                            id: s.id,
+                            title: s.title,
+                            artistName: a.name,
+                            coverUrl: s.cover_url,
+                            audioUrl: url,
+                            durationSeconds: s.duration,
+                          });
+                          setIsPreview(true);
+                          toast.info(`🎵 Previewing "${s.title}" (15s)`);
+                        } else {
+                          const { url } = await getPublicFn({ data: { song_id: s.id } });
+                          setTrack({
+                            id: s.id,
+                            title: s.title,
+                            artistName: a.name,
+                            coverUrl: s.cover_url,
+                            audioUrl: url,
+                            durationSeconds: s.duration,
+                          });
+                          setIsPreview(false);
+                        }
+                        togglePlay();
+                      } catch (error) {
+                        toast.error(`Failed to play: ${(error as Error).message}`);
+                      }
+                    }}
                     className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
                   >
                     <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>

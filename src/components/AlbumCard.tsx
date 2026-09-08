@@ -1,6 +1,9 @@
 import { Play } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
+import { toast } from "sonner";
 
 interface AlbumCardProps {
   id: string;
@@ -14,17 +17,44 @@ interface AlbumCardProps {
 
 export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, price }: AlbumCardProps) {
   const setTrack = usePlayer((s) => s.setTrack);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
+  const togglePlay = usePlayer((s) => s.togglePlay);
   const formatPrice = useCurrency((s) => s.formatPrice);
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
-  const handlePlay = () => {
-    setTrack({
-      id,
-      title,
-      artistName: subtitle,
-      coverUrl: imageUrl,
-      audioUrl,
-      durationSeconds: duration,
-    });
+  const handlePlay = async () => {
+    try {
+      const isPaid = price && Number(price) > 0;
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: id } });
+        setTrack({
+          id,
+          title,
+          artistName: subtitle,
+          coverUrl: imageUrl,
+          audioUrl: url,
+          durationSeconds: duration,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: id } });
+        setTrack({
+          id,
+          title,
+          artistName: subtitle,
+          coverUrl: imageUrl,
+          audioUrl: url,
+          durationSeconds: duration,
+        });
+        setIsPreview(false);
+      }
+      togglePlay();
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
   };
 
   return (

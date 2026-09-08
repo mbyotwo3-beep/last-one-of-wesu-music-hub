@@ -8,6 +8,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
+import { toast } from "sonner";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -23,10 +26,14 @@ export interface TrackCardSong {
 /** Cover-first tile for New Music / Made For You style shelves. */
 export function TrackCard({ song }: { song: TrackCardSong }) {
   const setTrack = usePlayer((s) => s.setTrack);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
+  const togglePlay = usePlayer((s) => s.togglePlay);
   const artistName = song.artist?.name ?? "Unknown";
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   const navigate = useNavigate();
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -41,19 +48,48 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
     toggle();
   };
 
+  const handlePlay = async () => {
+    try {
+      const isPaid = song.price && Number(song.price) > 0;
+      
+      if (isPaid) {
+        // Use preview URL for paid songs
+        const { url } = await getPreviewFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName,
+          coverUrl: song.cover_url,
+          audioUrl: url,
+          durationSeconds: song.duration ?? undefined,
+        });
+        setIsPreview(true);
+        togglePlay();
+        toast.info(`🎵 Previewing "${song.title}" (15s)`);
+      } else {
+        // Full playback for free songs
+        const { url } = await getPublicFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName,
+          coverUrl: song.cover_url,
+          audioUrl: url,
+          durationSeconds: song.duration ?? undefined,
+        });
+        setIsPreview(false);
+        togglePlay();
+      }
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
+  };
+
   return (
     <div className="group text-left w-full relative cursor-pointer">
       <button
         type="button"
-        onClick={() =>
-          setTrack({
-            id: song.id,
-            title: song.title,
-            artistName,
-            coverUrl: song.cover_url,
-            durationSeconds: song.duration ?? undefined,
-          })
-        }
+        onClick={handlePlay}
         className="relative block w-full cursor-pointer"
         aria-label={`Play ${song.title}`}
       >
