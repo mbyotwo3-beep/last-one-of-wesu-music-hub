@@ -30,8 +30,11 @@ export function useSavedTrack(songId: string | null | undefined) {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!songId) return;
-      if (isSaved) await unsaveFn({ data: { song_id: songId } });
-      else await saveFn({ data: { song_id: songId } });
+      if (isSaved) {
+        await unsaveFn({ data: { song_id: songId } });
+      } else {
+        await saveFn({ data: { song_id: songId } });
+      }
     },
     onMutate: async () => {
       if (!songId) return;
@@ -41,8 +44,13 @@ export function useSavedTrack(songId: string | null | undefined) {
       qc.setQueryData(["saved-track-ids", user?.id], next);
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (error, _v, ctx) => {
+      console.error("[useSavedTrack] Error toggling saved track:", error);
       if (ctx?.prev) qc.setQueryData(["saved-track-ids", user?.id], ctx.prev);
+      // Import toast dynamically to avoid circular dependency
+      import("sonner").then(({ toast }) => {
+        toast.error("Unable to update liked songs. Please try again.");
+      });
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["saved-track-ids", user?.id] });

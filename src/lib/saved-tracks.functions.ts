@@ -39,7 +39,10 @@ export const saveTrack = createServerFn({ method: "POST" })
       .from("saved_tracks")
       .insert({ user_id: userId, song_id: data.song_id } as any);
     // Ignore duplicate unique-violation (already saved).
-    if (error && !/duplicate|unique/i.test(error.message)) throw new Error(error.message);
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      console.error("[saveTrack] Error:", error);
+      throw new Error("Unable to save track. Please try again.");
+    }
     return { ok: true };
   });
 
@@ -53,6 +56,9 @@ export const unsaveTrack = createServerFn({ method: "POST" })
       .delete()
       .eq("user_id", userId)
       .eq("song_id", data.song_id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("[unsaveTrack] Error:", error);
+      throw new Error("Unable to remove track. Please try again.");
+    }
     return { ok: true };
   });
