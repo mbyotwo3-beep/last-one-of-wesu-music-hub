@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Play, Pause, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { resolveImageUrl, peekImageUrl, invalidateImageUrl } from "@/lib/storage-url";
 
 export interface HeroSlide {
   id: string;
@@ -21,6 +22,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -84,9 +86,37 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     resetProgress();
   }, [currentIndex]);
 
+  // Resolve image URLs for all slides on mount
+  useEffect(() => {
+    slides.forEach(async (slide) => {
+      // If it's already an absolute URL, use it directly
+      if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
+        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        return;
+      }
+      // Otherwise, try to resolve it through album-art bucket
+      const cached = peekImageUrl("album-art" as any, slide.imageUrl);
+      if (cached) {
+        setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
+        return;
+      }
+      try {
+        const url = await resolveImageUrl("album-art" as any, slide.imageUrl);
+        if (url) {
+          setSignedUrls((prev) => new Map(prev).set(slide.id, url));
+        }
+      } catch (e) {
+        console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
+        // Fallback to using the raw URL
+        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+      }
+    });
+  }, [slides]);
+
   if (slides.length === 0) return null;
 
   const currentSlide = slides[currentIndex];
+  const signedUrl = signedUrls.get(currentSlide.id) || currentSlide.imageUrl;
 
   // Check if link is external
   const isExternalLink = currentSlide.ctaLink.startsWith('http');
@@ -115,7 +145,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           <div
             className="absolute inset-0 transition-opacity duration-700 ease-in-out"
             style={{
-              backgroundImage: `url(${currentSlide.imageUrl})`,
+              backgroundImage: `url(${signedUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}
