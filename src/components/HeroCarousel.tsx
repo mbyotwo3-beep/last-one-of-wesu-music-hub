@@ -94,6 +94,11 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
         return;
       }
+      // If it starts with "uploads/", treat as absolute URL (no bucket resolution needed)
+      if (slide.imageUrl.startsWith("uploads/")) {
+        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        return;
+      }
       // Otherwise, try to resolve it through album-art bucket
       const cached = peekImageUrl("album-art" as any, slide.imageUrl);
       if (cached) {
