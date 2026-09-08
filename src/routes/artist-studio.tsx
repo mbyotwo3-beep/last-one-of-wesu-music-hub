@@ -21,6 +21,7 @@ import {
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
 import { respondToLabelInvite } from "@/lib/labels.functions";
+import { inviteArtistForFeature, inviteLabelForRelease } from "@/lib/invitations.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
 
@@ -364,6 +365,8 @@ function UploadWizard() {
   const uploadFn = useServerFn(uploadSong);
   const createAlbumFn = useServerFn(createAlbum);
   const pricingFn = useServerFn(getPricingConfig);
+  const inviteFeatureFn = useServerFn(inviteArtistForFeature);
+  const inviteLabelFn = useServerFn(inviteLabelForRelease);
 
   const { data: pricing = DEFAULT_PRICING } = useQuery({
     queryKey: ["pricing-config"],
@@ -439,6 +442,10 @@ function UploadWizard() {
     sessionStorage.removeItem("upload-wizard-tier");
     sessionStorage.removeItem("upload-wizard-price");
     sessionStorage.removeItem("upload-wizard-feeAgreed");
+    sessionStorage.removeItem("upload-wizard-featureEmail");
+    sessionStorage.removeItem("upload-wizard-featureName");
+    sessionStorage.removeItem("upload-wizard-labelEmail");
+    sessionStorage.removeItem("upload-wizard-labelName");
   };
 
   const SINGLE_MIN = pricing.song_min;
@@ -528,11 +535,66 @@ function UploadWizard() {
             has_label: hasLabel,
           },
         });
-        const successMessage = tier === "free"
-          ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
-          : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
 
-        toast.success(successMessage);
+        // Handle feature artist invitation
+        const featureEmail = sessionStorage.getItem("upload-wizard-featureEmail");
+        const featureName = sessionStorage.getItem("upload-wizard-featureName");
+        if (hasFeature && featureEmail && featureEmail.trim()) {
+          try {
+            const inviteRes = await inviteFeatureFn({
+              data: {
+                song_id: (res as any).id,
+                email: featureEmail.trim(),
+                artist_name: featureName || undefined,
+                role: "featured",
+                split_pct: 0,
+              },
+            });
+            if ((inviteRes as any).registration_link) {
+              toast.success(
+                `🎵 Song "${title}" uploaded! Share this registration link with the featured artist: ${(inviteRes as any).registration_link}`,
+                { duration: 10000 }
+              );
+            } else if ((inviteRes as any).existingUser) {
+              toast.success(`🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`);
+            }
+          } catch (inviteError) {
+            console.error("Failed to send feature invitation:", inviteError);
+            toast.success(`🎵 Song "${title}" uploaded! (Could not send feature invitation: ${(inviteError as Error).message})`);
+          }
+        } else {
+          const successMessage = tier === "free"
+            ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
+            : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
+          toast.success(successMessage);
+        }
+
+        // Handle label invitation
+        const labelEmail = sessionStorage.getItem("upload-wizard-labelEmail");
+        const labelName = sessionStorage.getItem("upload-wizard-labelName");
+        if (hasLabel && labelEmail && labelEmail.trim()) {
+          try {
+            const inviteRes = await inviteLabelFn({
+              data: {
+                song_id: (res as any).id,
+                email: labelEmail.trim(),
+                label_name: labelName || undefined,
+              },
+            });
+            if ((inviteRes as any).registration_link) {
+              toast.success(
+                `🏷️ Share this registration link with the label: ${(inviteRes as any).registration_link}`,
+                { duration: 10000 }
+              );
+            } else if ((inviteRes as any).existingUser) {
+              toast.success(`Label already registered. Please use the label dashboard to complete the process.`);
+            }
+          } catch (inviteError) {
+            console.error("Failed to send label invitation:", inviteError);
+            toast.error(`Could not send label invitation: ${(inviteError as Error).message}`);
+          }
+        }
+
         qc.invalidateQueries({ queryKey: ["my-songs"] });
         qc.invalidateQueries({ queryKey: ["artist-overview"] });
         clearSessionStorage();
@@ -565,7 +627,35 @@ function UploadWizard() {
           },
         });
       }
-      toast.success(`💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
+
+      // Handle label invitation for album
+      const labelEmail = sessionStorage.getItem("upload-wizard-labelEmail");
+      const labelName = sessionStorage.getItem("upload-wizard-labelName");
+      if (hasLabel && labelEmail && labelEmail.trim()) {
+        try {
+          const inviteRes = await inviteLabelFn({
+            data: {
+              album_id: album.id,
+              email: labelEmail.trim(),
+              label_name: labelName || undefined,
+            },
+          });
+          if ((inviteRes as any).registration_link) {
+            toast.success(
+              `💿 Album "${title}" uploaded! Share this registration link with the label: ${(inviteRes as any).registration_link}`,
+              { duration: 10000 }
+            );
+          } else if ((inviteRes as any).existingUser) {
+            toast.success(`💿 Album "${title}" uploaded! Label already registered. Please use the label dashboard to complete the process.`);
+          }
+        } catch (inviteError) {
+          console.error("Failed to send label invitation:", inviteError);
+          toast.success(`💿 Album "${title}" uploaded! (Could not send label invitation: ${(inviteError as Error).message})`);
+        }
+      } else {
+        toast.success(`💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
+      }
+
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
@@ -607,6 +697,10 @@ function UploadWizard() {
               setTier("paid");
               setPrice(SINGLE_MIN);
               setFeeAgreed(false);
+              sessionStorage.removeItem("upload-wizard-featureEmail");
+              sessionStorage.removeItem("upload-wizard-featureName");
+              sessionStorage.removeItem("upload-wizard-labelEmail");
+              sessionStorage.removeItem("upload-wizard-labelName");
             }}
             className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold cursor-pointer"
           >
@@ -763,6 +857,64 @@ function UploadWizard() {
               <span>Has Label</span>
             </label>
           </div>
+
+          {hasFeature && (
+            <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+              <p className="text-sm font-medium">Feature Artist Details</p>
+              <p className="text-xs text-muted-foreground">
+                If the featured artist is not yet registered on Wesu, enter their email to send them a registration link.
+              </p>
+              <input
+                type="email"
+                placeholder="Featured artist's email (if not registered)"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                onChange={(e) => {
+                  const featureEmail = e.target.value;
+                  sessionStorage.setItem("upload-wizard-featureEmail", featureEmail);
+                }}
+                defaultValue={sessionStorage.getItem("upload-wizard-featureEmail") || ""}
+              />
+              <input
+                type="text"
+                placeholder="Featured artist's name (optional)"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                onChange={(e) => {
+                  const featureName = e.target.value;
+                  sessionStorage.setItem("upload-wizard-featureName", featureName);
+                }}
+                defaultValue={sessionStorage.getItem("upload-wizard-featureName") || ""}
+              />
+            </div>
+          )}
+
+          {hasLabel && (
+            <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+              <p className="text-sm font-medium">Label Details</p>
+              <p className="text-xs text-muted-foreground">
+                If the label is not yet registered on Wesu, enter their email to send them a registration link.
+              </p>
+              <input
+                type="email"
+                placeholder="Label's email (if not registered)"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                onChange={(e) => {
+                  const labelEmail = e.target.value;
+                  sessionStorage.setItem("upload-wizard-labelEmail", labelEmail);
+                }}
+                defaultValue={sessionStorage.getItem("upload-wizard-labelEmail") || ""}
+              />
+              <input
+                type="text"
+                placeholder="Label's name (optional)"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                onChange={(e) => {
+                  const labelName = e.target.value;
+                  sessionStorage.setItem("upload-wizard-labelName", labelName);
+                }}
+                defaultValue={sessionStorage.getItem("upload-wizard-labelName") || ""}
+              />
+            </div>
+          )}
 
           <div className="rounded-xl border border-border bg-secondary/30 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
