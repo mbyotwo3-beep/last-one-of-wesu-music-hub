@@ -433,7 +433,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
     topGenres.map(async (genre) => {
       const { data } = await supabase
         .from("songs")
-        .select("id,title,cover_url,duration,price,artist:artists(id,name)")
+        .select("id,title,cover_url,duration,price,album_id,artist:artists(id,name)")
         .eq("genre", genre)
         .order("play_count", { ascending: false })
         .limit(8);

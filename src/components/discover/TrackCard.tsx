@@ -20,6 +20,7 @@ export interface TrackCardSong {
   cover_url: string | null;
   duration?: number | null;
   artist?: Artist;
+  album_id?: string | null;
   price?: number | null;
 }
 
@@ -146,6 +147,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             songTitle={song.title}
             artistId={song.artist?.id}
             artistName={artistName}
+            albumId={song.album_id}
             type="song"
             className="relative z-20"
           />
