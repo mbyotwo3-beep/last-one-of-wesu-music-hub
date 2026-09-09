@@ -80,6 +80,47 @@ export const deletePlaylist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getPlaylistDetails = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { data: playlist, error: playlistError } = await context.supabase
+      .from("playlists")
+      .select("*")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (playlistError) throw new Error(playlistError.message);
+    if (!playlist) throw new Error("Playlist not found");
+    if (playlist.user_id !== context.userId && !playlist.is_public) {
+      throw new Error("Playlist not found");
+    }
+
+    const { data: entries, error: entriesError } = await context.supabase
+      .from("playlist_songs")
+      .select("id, position, added_at, song_id")
+      .eq("playlist_id", data.playlist_id)
+      .order("position", { ascending: true })
+      .order("added_at", { ascending: true });
+    if (entriesError) throw new Error(entriesError.message);
+
+    const songIds = (entries ?? []).map((entry) => entry.song_id);
+    if (songIds.length === 0) return { ...playlist, playlist_songs: [] };
+
+    const { data: songs, error: songsError } = await context.supabase
+      .from("songs")
+      .select("id, title, duration, price, cover_url, artist:artists(id,name)")
+      .in("id", songIds);
+    if (songsError) throw new Error(songsError.message);
+
+    const songsById = new Map((songs ?? []).map((song) => [song.id, song]));
+    return {
+      ...playlist,
+      playlist_songs: (entries ?? [])
+        .map((entry) => ({ ...entry, song: songsById.get(entry.song_id) ?? null }))
+        .filter((entry) => entry.song !== null),
+    };
+  });
+
 export const addToPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)

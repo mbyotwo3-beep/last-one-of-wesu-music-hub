@@ -1,9 +1,8 @@
-import { useRouter } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Heart, Music2, Pause, Play, SkipBack, SkipForward, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
-import { toggleLike } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
 import { useTrackMeta } from "@/hooks/use-track-meta";
@@ -26,6 +25,7 @@ function formatTime(s: number): string {
  */
 export function NowPlayingScreen() {
   const router = useRouter();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
@@ -45,7 +45,19 @@ export function NowPlayingScreen() {
   const isLoading = audioUrl === undefined && !playing;
 
   function handleLike() {
-    if (!user || !track) return;
+    if (!track) return;
+    if (!user) {
+      navigate({
+        to: "/auth",
+        search: {
+          redirect: window.location.pathname + window.location.search,
+          action: "like",
+          itemId: track.id,
+          itemType: "song",
+        },
+      });
+      return;
+    }
     toggleSaved();
   }
 
@@ -104,10 +116,8 @@ export function NowPlayingScreen() {
           <p className="text-muted-foreground truncate">{track.artistName}</p>
         </div>
         <div className="flex items-center gap-2">
-          {user && (
-            <button
+          <button
               onClick={handleLike}
-              disabled={false}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label={isSaved ? "Unlike" : "Like"}
             >
@@ -115,7 +125,6 @@ export function NowPlayingScreen() {
                 className={`size-6 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground"}`}
               />
             </button>
-          )}
           <ShareMenu
             songId={track.id}
             songTitle={track.title}

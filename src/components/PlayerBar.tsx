@@ -29,7 +29,7 @@ import {
   incrementPlayCount,
 } from "@/lib/listener.functions";
 import { recordPlay, updatePlayProgress } from "@/lib/play-history.functions";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
@@ -64,6 +64,7 @@ function fmt(seconds: number): string {
 }
 
 export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
+  const navigate = useNavigate();
   const track = usePlayer((s) => s.track);
   const playing = usePlayer((s) => s.playing);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
@@ -493,11 +494,27 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                     <p className="text-lg text-muted-foreground truncate">{track.artistName}</p>
                   )}
                 </div>
-                {user && (
-                  <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
+                <button
+                  onClick={() => {
+                    if (!user) {
+                      navigate({
+                        to: "/auth",
+                        search: {
+                          redirect: window.location.pathname + window.location.search,
+                          action: "like",
+                          itemId: track.id,
+                          itemType: "song",
+                        },
+                      });
+                      return;
+                    }
+                    toggleLike();
+                  }}
+                  className="shrink-0 ml-4"
+                  aria-label={liked ? "Unlike" : "Like"}
+                >
                     <Heart className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                  </button>
-                )}
+                </button>
               </div>
               {isPreview && trackPrice > 0 && (
                 <Link
@@ -714,15 +731,27 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               )}
             </div>
             <div className="flex items-center gap-2 relative z-10">
-              {user && (
-                <button
-                  onClick={toggleLike}
+              <button
+                  onClick={() => {
+                    if (!user) {
+                      navigate({
+                        to: "/auth",
+                        search: {
+                          redirect: window.location.pathname + window.location.search,
+                          action: "like",
+                          itemId: track.id,
+                          itemType: "song",
+                        },
+                      });
+                      return;
+                    }
+                    toggleLike();
+                  }}
                   className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
                   aria-label={liked ? "Unlike" : "Like"}
                 >
                   <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`} />
-                </button>
-              )}
+              </button>
               <ShareMenu
                 songId={track.id}
                 songTitle={track.title}

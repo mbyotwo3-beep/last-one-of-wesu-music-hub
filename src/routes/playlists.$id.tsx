@@ -2,8 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Play, Trash2, ListMusic, ArrowLeft, Lock } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { removeFromPlaylist } from "@/lib/listener.functions";
+import { getPlaylistDetails, removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
@@ -23,44 +22,15 @@ function Page() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
+  const setTrack = usePlayer((s) => s.setTrack);
+  const getPlaylistFn = useServerFn(getPlaylistDetails);
   const removeFn = useServerFn(removeFromPlaylist);
   const { user } = useAuth();
 
   const { data, error: playlistQueryError, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
-      const { data: pl, error: playlistError } = await supabase
-        .from("playlists")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (playlistError) throw playlistError;
-      if (!pl) return null;
-
-      const { data: entries, error: entriesError } = await supabase
-        .from("playlist_songs")
-        .select("id, position, song_id")
-        .eq("playlist_id", id)
-        .order("position", { ascending: true })
-        .order("added_at", { ascending: true });
-      if (entriesError) throw entriesError;
-
-      const songIds = (entries ?? []).map((entry) => entry.song_id);
-      if (songIds.length === 0) return { ...pl, playlist_songs: [] };
-
-      const { data: songRows, error: songsError } = await supabase
-        .from("songs")
-        .select("id, title, duration, price, cover_url, artist:artists(id,name)")
-        .in("id", songIds);
-      if (songsError) throw songsError;
-
-      const songsById = new Map((songRows ?? []).map((song) => [song.id, song]));
-      return {
-        ...pl,
-        playlist_songs: (entries ?? [])
-          .map((entry) => ({ ...entry, song: songsById.get(entry.song_id) ?? null }))
-          .filter((entry) => entry.song !== null),
-      };
+      return getPlaylistFn({ data: { playlist_id: id } });
     },
   });
 
@@ -151,8 +121,8 @@ function Page() {
             <div
               key={s.id}
               className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
-              onClick={() =>
-                usePlayer.getState().setTrack({
+                      onClick={() =>
+                        setTrack({
                   id: s.id,
                   title: s.title,
                   artistName: s.artist?.name ?? "Unknown",
@@ -161,8 +131,23 @@ function Page() {
                 })
               }
             >
-              <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
-              <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
+                      <button
+                        type="button"
+                        aria-label={`Play ${s.title}`}
+                        className="size-6 flex items-center justify-center text-primary"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setTrack({
+                            id: s.id,
+                            title: s.title,
+                            artistName: s.artist?.name ?? "Unknown",
+                            coverUrl: s.cover_url,
+                            durationSeconds: s.duration,
+                          });
+                        }}
+                      >
+                        <Play className="size-4 fill-current" />
+                      </button>
               <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>

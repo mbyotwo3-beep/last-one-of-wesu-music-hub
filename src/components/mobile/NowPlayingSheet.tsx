@@ -14,7 +14,7 @@ import {
   Radio,
 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
@@ -48,6 +48,7 @@ export function NowPlayingSheet() {
   const isPreview = usePlayer((s) => s.isPreview);
 
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
@@ -285,7 +286,21 @@ export function NowPlayingSheet() {
           </div>
           {user && (
             <button
-              onClick={toggleLike}
+              onClick={() => {
+                if (!user) {
+                  navigate({
+                    to: "/auth",
+                    search: {
+                      redirect: window.location.pathname + window.location.search,
+                      action: "like",
+                      itemId: track?.id,
+                      itemType: "song",
+                    },
+                  });
+                  return;
+                }
+                toggleLike();
+              }}
               className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform cursor-pointer rounded-full hover:bg-white/10"
               aria-label={liked ? "Unlike" : "Like"}
             >

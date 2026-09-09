@@ -188,18 +188,23 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     let url = window.location.origin;
     if (type === "song" && songId) url += `/songs/${songId}`;
     else if (type === "album" && albumId) url += `/albums/${albumId}`;
     else if (type === "artist" && artistId) url += `/artists/${artistId}`;
     else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
     
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    toast.success("Link copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
-    setIsOpen(false);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success(type === "song" ? "Song link copied to clipboard" : "Link copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+      setIsOpen(false);
+    } catch (error) {
+      console.error("[ShareMenu] Failed to copy link:", error);
+      toast.error("Unable to copy link. Please copy it from the address bar.");
+    }
   };
 
   const handleGoToArtist = (artistId: string) => {
