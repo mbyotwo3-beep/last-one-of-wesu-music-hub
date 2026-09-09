@@ -6,6 +6,8 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useServerFn } from "@tanstack/react-start";
 import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
+import { useNavigate } from "@tanstack/react-router";
 
 interface TrackRowProps {
   id: string;
@@ -23,6 +25,8 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
   const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { isSaved, toggle } = useSavedTrack(id);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
@@ -102,8 +106,17 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
       <button
         onClick={(e) => {
           e.stopPropagation();
+          if (!user) {
+            const currentPath = window.location.pathname + window.location.search;
+            navigate({
+              to: "/auth",
+              search: { redirect: currentPath, action: "save", itemId: id, itemType: "song" },
+            });
+            return;
+          }
           toggle();
         }}
+        aria-label={isSaved ? "Remove from liked songs" : "Add to liked songs"}
         className="opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <Heart

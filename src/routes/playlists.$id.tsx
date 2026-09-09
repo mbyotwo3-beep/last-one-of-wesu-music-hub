@@ -29,11 +29,12 @@ function Page() {
   const { data, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
-      const { data: pl } = await supabase
+      const { data: pl, error } = await supabase
         .from("playlists")
         .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
         .eq("id", id)
         .maybeSingle();
+      if (error) throw error;
       return pl;
     },
   });

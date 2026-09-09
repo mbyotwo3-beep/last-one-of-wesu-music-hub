@@ -84,10 +84,20 @@ export const addToPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)
   .handler(async ({ context, data }) => {
+    const { data: playlist, error: playlistError } = await context.supabase
+      .from("playlists")
+      .select("id")
+      .eq("id", data.playlist_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (playlistError) throw new Error(playlistError.message);
+    if (!playlist) throw new Error("Playlist not found or you do not own it");
+
     const { error } = await context.supabase.from("playlist_songs").insert({
       playlist_id: data.playlist_id,
       song_id: data.song_id,
     } as any);
+    if (error && /duplicate|unique/i.test(error.message)) return { ok: true };
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -96,6 +106,15 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)
   .handler(async ({ context, data }) => {
+    const { data: playlist, error: playlistError } = await context.supabase
+      .from("playlists")
+      .select("id")
+      .eq("id", data.playlist_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (playlistError) throw new Error(playlistError.message);
+    if (!playlist) throw new Error("Playlist not found or you do not own it");
+
     const { error } = await context.supabase
       .from("playlist_songs")
       .delete()

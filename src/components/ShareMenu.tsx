@@ -79,11 +79,13 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       if (songId) {
         addToPlaylistMutation.mutate({ data: { playlist_id: data.id, song_id: songId } });
       }
+      setNewPlaylistName("");
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
 
   const handleLike = () => {
+    if (!songId) return;
     if (!user) {
       const currentPath = window.location.pathname + window.location.search;
       navigate({
@@ -94,6 +96,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       return;
     }
     toggle();
+    setIsOpen(false);
   };
 
   const handleAddToPlaylistClick = () => {
@@ -111,15 +114,16 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   };
 
   const handleAddToPlaylist = (playlistId: string) => {
-    if (songId) {
+    if (songId && !addToPlaylistMutation.isPending) {
       addToPlaylistMutation.mutate({ data: { playlist_id: playlistId, song_id: songId } });
     }
   };
 
   const handleCreatePlaylist = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPlaylistName.trim()) return;
-    createPlaylistMutation.mutate({ data: { name: newPlaylistName, description: "", make_public: false } });
+    const name = newPlaylistName.trim();
+    if (!name || createPlaylistMutation.isPending) return;
+    createPlaylistMutation.mutate({ data: { name, description: "", make_public: false } });
   };
 
   const handleAddToQueue = () => {
