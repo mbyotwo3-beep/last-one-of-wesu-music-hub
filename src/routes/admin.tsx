@@ -37,6 +37,7 @@ import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
 import { HeroCarouselBuilder } from "@/components/HeroCarouselBuilder";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
+import { MediaGallery } from "@/components/MediaGallery";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — Wesu+" }] }),
@@ -53,7 +54,7 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "hero-carousel" | "diagnostics";
+type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "hero-carousel" | "media-gallery" | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -87,6 +88,7 @@ function AdminPage() {
     { id: "payments", label: "Transaction Reconciliation" },
     { id: "carousels", label: "Carousels" },
     { id: "hero-carousel", label: "Hero Carousel" },
+    { id: "media-gallery", label: "Media Gallery" },
     { id: "diagnostics", label: "Diagnostics" },
   ];
 
@@ -138,6 +140,7 @@ function AdminPage() {
         {tab === "payments" && <PaymentsMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "hero-carousel" && <HeroCarouselBuilder />}
+        {tab === "media-gallery" && <MediaGallery />}
         {tab === "diagnostics" && <Diagnostics />}
       </div>
     </div>
