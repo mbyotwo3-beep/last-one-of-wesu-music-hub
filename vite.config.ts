@@ -35,5 +35,10 @@ export default defineConfig({
       // Don't externalize crypto for SSR - it's needed on the server
       noExternal: ['crypto', 'node:crypto'],
     },
+    server: {
+      hmr: {
+        overlay: false, // Prevents full-screen error overlays from forcing reloads
+      },
+    },
   },
 });
