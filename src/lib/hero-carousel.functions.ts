@@ -76,7 +76,7 @@ export const createHeroSlide = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Default position = after last slide
     let pos = data.position ?? 0;
-    if (!data.position) {
+    if (data.position === undefined) {
       const { count } = await (supabaseAdmin as any)
         .from("hero_carousel_slides")
         .select("id", { count: "exact", head: true });
@@ -136,6 +136,40 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
       .update(patch)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Staff: move a slide one place up or down while keeping positions contiguous. */
+export const moveHeroSlide = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; direction: "up" | "down" }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("hero_carousel_slides")
+      .select("id")
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const orderedIds = (rows ?? []).map((row: { id: string }) => row.id);
+    const index = orderedIds.indexOf(data.id);
+    const targetIndex = data.direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < 0 || targetIndex >= orderedIds.length) {
+      return { ok: true };
+    }
+
+    [orderedIds[index], orderedIds[targetIndex]] = [orderedIds[targetIndex], orderedIds[index]];
+    const updates = orderedIds.map((id, position) =>
+      (supabaseAdmin as any)
+        .from("hero_carousel_slides")
+        .update({ position, updated_at: new Date().toISOString() })
+        .eq("id", id),
+    );
+    const results = await Promise.all(updates);
+    const failed = results.find((result: { error: unknown }) => result.error);
+    if (failed?.error) throw new Error((failed.error as { message: string }).message);
     return { ok: true };
   });
 

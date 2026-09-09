@@ -87,6 +87,11 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     resetProgress();
   }, [currentIndex]);
 
+  // Keep the selected slide valid when an admin removes or hides slides.
+  useEffect(() => {
+    setCurrentIndex((index) => Math.min(index, Math.max(0, slides.length - 1)));
+  }, [slides.length]);
+
   // Resolve image URLs for all slides on mount
   useEffect(() => {
     slides.forEach(async (slide) => {

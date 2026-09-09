@@ -29,15 +29,16 @@ export function useSavedTrack(songId: string | null | undefined) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!songId) return;
-      if (isSaved) {
+      if (!songId || !user) return;
+      const currentIds = qc.getQueryData<string[]>(["saved-track-ids", user.id]) ?? [];
+      if (currentIds.includes(songId)) {
         await unsaveFn({ data: { song_id: songId } });
       } else {
         await saveFn({ data: { song_id: songId } });
       }
     },
     onMutate: async () => {
-      if (!songId) return;
+      if (!songId || !user) return;
       await qc.cancelQueries({ queryKey: ["saved-track-ids", user?.id] });
       const prev = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? [];
       const next = isSaved ? prev.filter((id) => id !== songId) : [...prev, songId];
@@ -61,7 +62,9 @@ export function useSavedTrack(songId: string | null | undefined) {
 
   return {
     isSaved,
-    toggle: () => mutation.mutate(),
+    toggle: () => {
+      if (user && songId && !mutation.isPending) mutation.mutate();
+    },
     loading: mutation.isPending,
   };
 }

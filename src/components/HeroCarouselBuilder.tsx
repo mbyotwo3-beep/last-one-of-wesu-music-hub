@@ -12,9 +12,11 @@ import {
   createHeroSlide,
   updateHeroSlide,
   deleteHeroSlide,
+  moveHeroSlide,
   type HeroCarouselSlide,
 } from "@/lib/hero-carousel.functions";
 import { uploadFileToBucket } from "@/lib/storage";
+import { StorageImage } from "@/components/StorageImage";
 
 /**
  * HeroCarouselBuilder — full CRUD UI for managing hero carousel slides.
@@ -29,6 +31,7 @@ export function HeroCarouselBuilder() {
   const createFn = useServerFn(createHeroSlide);
   const updateFn = useServerFn(updateHeroSlide);
   const deleteFn = useServerFn(deleteHeroSlide);
+  const moveFn = useServerFn(moveHeroSlide);
 
   const { data: slides, isLoading } = useQuery({
     queryKey: ["all-hero-slides"],
@@ -56,6 +59,11 @@ export function HeroCarouselBuilder() {
   const deleteM = useMutation({
     mutationFn: deleteFn,
     onSuccess: () => { toast.success("🗑️ Hero slide deleted successfully!"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const moveM = useMutation({
+    mutationFn: moveFn,
+    onSuccess: invalidate,
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -105,23 +113,24 @@ export function HeroCarouselBuilder() {
         <HeroSlideCard
           key={slide.id}
           slide={slide}
+          user={user}
           idx={idx}
           totalCount={slides?.length ?? 0}
           onToggleActive={() =>
             updateM.mutate({ data: { id: slide.id, active: !slide.active } })
           }
           onMoveUp={() =>
-            updateM.mutate({ data: { id: slide.id, position: Math.max(0, slide.position - 1) } })
+            moveM.mutate({ data: { id: slide.id, direction: "up" } })
           }
           onMoveDown={() =>
-            updateM.mutate({ data: { id: slide.id, position: slide.position + 1 } })
+            moveM.mutate({ data: { id: slide.id, direction: "down" } })
           }
           onDelete={() => {
             if (!confirm(`Delete slide "${slide.title}"?`)) return;
             deleteM.mutate({ data: { id: slide.id } });
           }}
           onUpdate={(d) => updateM.mutate({ data: { id: slide.id, ...d } })}
-          isPending={updateM.isPending || deleteM.isPending}
+          isPending={updateM.isPending || deleteM.isPending || moveM.isPending}
         />
       ))}
     </div>
@@ -133,6 +142,7 @@ export function HeroCarouselBuilder() {
 // ─────────────────────────────────────────────────────────────
 function HeroSlideCard({
   slide,
+  user,
   idx,
   totalCount,
   onToggleActive,
@@ -143,6 +153,7 @@ function HeroSlideCard({
   isPending,
 }: {
   slide: HeroCarouselSlide;
+  user?: { id: string } | null;
   idx: number;
   totalCount: number;
   onToggleActive: () => void;
@@ -208,8 +219,9 @@ function HeroSlideCard({
         <GripVertical className="size-4 text-muted-foreground/40" />
 
         {/* Thumbnail */}
-        <img
-          src={slide.image_url}
+        <StorageImage
+          bucket="hero-images"
+          path={slide.image_url}
           alt={slide.title}
           className="w-16 h-10 rounded object-cover bg-secondary"
         />
@@ -280,8 +292,9 @@ function HeroSlideCard({
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Slide Preview
                 </h4>
-                <img
-                  src={slide.image_url}
+                <StorageImage
+                  bucket="hero-images"
+                  path={slide.image_url}
                   alt={slide.title}
                   className="w-full aspect-video rounded-lg object-cover"
                 />
@@ -457,7 +470,7 @@ function HeroSlideForm({
         <div className="flex gap-4">
           <div className="relative w-48 h-28 rounded-lg overflow-hidden bg-secondary border border-border">
             {imagePreview ? (
-              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+              <StorageImage bucket="hero-images" path={imagePreview} alt="Preview" className="w-full h-full object-cover" />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
                 No image
