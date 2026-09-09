@@ -26,16 +26,41 @@ function Page() {
   const removeFn = useServerFn(removeFromPlaylist);
   const { user } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, error: playlistQueryError, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
-      const { data: pl, error } = await supabase
+      const { data: pl, error: playlistError } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select("*")
         .eq("id", id)
         .maybeSingle();
-      if (error) throw error;
-      return pl;
+      if (playlistError) throw playlistError;
+      if (!pl) return null;
+
+      const { data: entries, error: entriesError } = await supabase
+        .from("playlist_songs")
+        .select("id, position, song_id")
+        .eq("playlist_id", id)
+        .order("position", { ascending: true })
+        .order("added_at", { ascending: true });
+      if (entriesError) throw entriesError;
+
+      const songIds = (entries ?? []).map((entry) => entry.song_id);
+      if (songIds.length === 0) return { ...pl, playlist_songs: [] };
+
+      const { data: songRows, error: songsError } = await supabase
+        .from("songs")
+        .select("id, title, duration, price, cover_url, artist:artists(id,name)")
+        .in("id", songIds);
+      if (songsError) throw songsError;
+
+      const songsById = new Map((songRows ?? []).map((song) => [song.id, song]));
+      return {
+        ...pl,
+        playlist_songs: (entries ?? [])
+          .map((entry) => ({ ...entry, song: songsById.get(entry.song_id) ?? null }))
+          .filter((entry) => entry.song !== null),
+      };
     },
   });
 
@@ -48,6 +73,13 @@ function Page() {
   });
 
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
+  if (playlistQueryError) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Unable to load this playlist: {(playlistQueryError as Error).message}
+      </div>
+    );
+  }
   if (!data) return <div className="p-12 text-center">Playlist not found</div>;
 
   const songs = ((data as any).playlist_songs ?? [])
