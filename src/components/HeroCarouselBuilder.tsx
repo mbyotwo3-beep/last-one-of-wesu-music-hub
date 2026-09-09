@@ -83,6 +83,7 @@ export function HeroCarouselBuilder() {
       {/* New slide form */}
       {showNewForm && (
         <HeroSlideForm
+          user={user}
           onSave={(data) => {
             createM.mutate({ data });
             setShowNewForm(false);
@@ -253,6 +254,7 @@ function HeroSlideCard({
         <div className="border-t border-border p-4 space-y-5">
           {editing ? (
             <HeroSlideForm
+              user={user}
               initialData={formData}
               onSave={(data) => {
                 onUpdate(data);
@@ -325,11 +327,13 @@ function HeroSlideCard({
 // Slide form (create/edit)
 // ─────────────────────────────────────────────────────────────
 function HeroSlideForm({
+  user,
   initialData,
   onSave,
   onCancel,
   isPending,
 }: {
+  user: any;
   initialData?: {
     title: string;
     description: string;
