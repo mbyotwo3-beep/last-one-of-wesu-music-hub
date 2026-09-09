@@ -4,6 +4,8 @@ import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useServerFn } from "@tanstack/react-start";
+import { useAuth } from "@/hooks/use-auth";
+import { useNavigate } from "@tanstack/react-router";
 import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { toast } from "sonner";
 
@@ -24,6 +26,8 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const { isSaved, toggle } = useSavedTrack(id);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
 
@@ -102,9 +106,23 @@ export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUr
       <button
         onClick={(e) => {
           e.stopPropagation();
+          if (!user) {
+            navigate({
+              to: "/auth",
+              search: {
+                redirect: window.location.pathname + window.location.search,
+                action: "save",
+                itemId: id,
+                itemType: "song",
+              },
+            });
+            return;
+          }
           toggle();
         }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity"
+        disabled={user ? false : undefined}
+        aria-label={isSaved ? `Unlike ${title}` : `Like ${title}`}
+        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
       >
         <Heart
           className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}

@@ -88,7 +88,9 @@ const NavbarComponent = function Navbar() {
           <CurrencyToggle />
           <ThemeToggle />
 
-          {user ? (
+          {isLoading ? (
+            <div className="size-8 rounded-full bg-muted animate-pulse" aria-label="Checking sign-in status" />
+          ) : user ? (
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}

@@ -1,25 +1,49 @@
-import { useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-export function useAuth() {
+interface AuthContextValue {
+  user: User | null;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    let mounted = true;
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) {
+        console.error("[AuthProvider] Failed to restore session:", error);
+      }
+      setUser(data.session?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
+      mounted = false;
       listener.subscription.unsubscribe();
     };
   }, []);
 
-  return { user, loading };
+  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
 }

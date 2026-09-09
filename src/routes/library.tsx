@@ -41,11 +41,12 @@ function Page() {
     queryKey: ["liked-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data } = await supabase
-        .from("song_likes")
+      const { data, error } = await supabase
+        .from("saved_tracks")
         .select("songs(*, artists(name))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+      if (error) throw error;
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
@@ -329,26 +330,6 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
     }
   };
 
-  const removeMutation = useMutation({
-    mutationFn: async () => {
-      if (!userId) return;
-      const { error } = await supabase
-        .from("song_likes")
-        .delete()
-        .eq("user_id", userId)
-        .eq("song_id", song.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success(`🗑️ Removed "${song.title}" from liked songs`);
-      qc.invalidateQueries({ queryKey: ["liked-songs", userId] });
-      qc.invalidateQueries({ queryKey: ["saved-track-ids", userId] });
-    },
-    onError: (error) => {
-      toast.error(`Failed to remove: ${(error as Error).message}`);
-    },
-  });
-
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group hover:bg-accent/30 transition-colors">
       <div className="relative shrink-0">
@@ -395,8 +376,11 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
           </span>
         )}
         <button
-          onClick={() => removeMutation.mutate()}
-          disabled={removeMutation.isPending}
+          onClick={() => {
+            toggle();
+            qc.invalidateQueries({ queryKey: ["liked-songs", userId] });
+          }}
+          disabled={loading}
           className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
           title="Remove from liked songs"
         >

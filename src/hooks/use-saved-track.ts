@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
  * Uses a single cached list of saved IDs so every player surface stays in sync.
  */
 export function useSavedTrack(songId: string | null | undefined) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const qc = useQueryClient();
   const listFn = useServerFn(listSavedTrackIds);
   const saveFn = useServerFn(saveTrack);
@@ -21,7 +21,7 @@ export function useSavedTrack(songId: string | null | undefined) {
   const idsQ = useQuery({
     queryKey: ["saved-track-ids", user?.id],
     queryFn: () => listFn(),
-    enabled: !!user,
+    enabled: !!user && !authLoading,
     staleTime: 60_000,
   });
 
@@ -29,7 +29,7 @@ export function useSavedTrack(songId: string | null | undefined) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!songId) return;
+      if (!songId || !user) throw new Error("You must be signed in to like a song.");
       if (isSaved) {
         await unsaveFn({ data: { song_id: songId } });
       } else {
@@ -37,7 +37,7 @@ export function useSavedTrack(songId: string | null | undefined) {
       }
     },
     onMutate: async () => {
-      if (!songId) return;
+      if (!songId || !user) return;
       await qc.cancelQueries({ queryKey: ["saved-track-ids", user?.id] });
       const prev = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? [];
       const next = isSaved ? prev.filter((id) => id !== songId) : [...prev, songId];
@@ -62,6 +62,6 @@ export function useSavedTrack(songId: string | null | undefined) {
   return {
     isSaved,
     toggle: () => mutation.mutate(),
-    loading: mutation.isPending,
+    loading: authLoading || mutation.isPending,
   };
 }

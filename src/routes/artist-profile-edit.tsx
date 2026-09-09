@@ -9,6 +9,7 @@ import { updateArtistProfile } from "@/lib/artist.functions";
 import { uploadFileToBucket } from "@/lib/storage";
 import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
+import { resolveImageUrl } from "@/lib/storage-url";
 
 export const Route = createFileRoute("/artist-profile-edit")({
   head: () => ({
@@ -77,8 +78,16 @@ function ArtistProfileEditPage() {
           apple_music: (artist.social_links as any)?.apple_music || "",
         },
       });
-      if (artist.avatar_url) setAvatarPreview(artist.avatar_url);
-      if (artist.cover_url) setCoverPreview(artist.cover_url);
+      if (artist.avatar_url) {
+        resolveImageUrl("artist-images", artist.avatar_url)
+          .then((url) => setAvatarPreview(url))
+          .catch((error) => console.error("[Artist Profile] Failed to load avatar:", error));
+      }
+      if (artist.cover_url) {
+        resolveImageUrl("artist-images", artist.cover_url)
+          .then((url) => setCoverPreview(url))
+          .catch((error) => console.error("[Artist Profile] Failed to load cover:", error));
+      }
       setIsInitialized(true);
     }
   }, [artist, isInitialized]);
