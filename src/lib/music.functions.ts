@@ -458,7 +458,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
 
 /**
  * Personalized "For You" data for the signed-in listener.
- * Signals: saved_tracks + song_likes → favorite artists + genres.
+ * Signals: saved_tracks → favorite artists + genres.
  * Returns forYou (mixed picks from favorite genres), byFavoriteArtists
  * (more from artists they've liked), and topArtists (their most-liked artists).
  */
@@ -467,15 +467,11 @@ export const getForYou = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const [savedRes, likedRes] = await Promise.all([
-      supabase.from("saved_tracks").select("song_id").eq("user_id", userId).limit(200),
-      supabase.from("song_likes").select("song_id").eq("user_id", userId).limit(200),
-    ]);
+    const savedRes = await supabase.from("saved_tracks").select("song_id").eq("user_id", userId).limit(200);
 
     const songIds = Array.from(
       new Set([
         ...(savedRes.data ?? []).map((r: any) => r.song_id as string),
-        ...(likedRes.data ?? []).map((r: any) => r.song_id as string),
       ]),
     );
 

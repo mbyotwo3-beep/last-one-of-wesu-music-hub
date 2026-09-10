@@ -3,7 +3,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Heart, Music2, Pause, Play, SkipBack, SkipForward, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
-import { toggleLike } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
 import { useTrackMeta } from "@/hooks/use-track-meta";

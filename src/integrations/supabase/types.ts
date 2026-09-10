@@ -1013,32 +1013,6 @@ export type Database = {
           },
         ]
       }
-      song_likes: {
-        Row: {
-          created_at: string
-          song_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          song_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          song_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "song_likes_song_id_fkey"
-            columns: ["song_id"]
-            isOneToOne: false
-            referencedRelation: "songs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       songs: {
         Row: {
           album_id: string | null

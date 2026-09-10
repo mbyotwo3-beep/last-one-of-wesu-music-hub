@@ -6,7 +6,6 @@ import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toggleFollow } from "@/lib/follow.functions";
 import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
-import { toggleLike } from "@/lib/listener.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 
 export const Route = createFileRoute("/auth")({
@@ -112,7 +111,7 @@ function AuthPage() {
       }
     } else if (action === "like" && itemId && itemType === "song") {
       try {
-        await toggleLike({ data: { song_id: itemId } });
+        await saveTrack({ data: { song_id: itemId } });
       } catch (err) {
         console.error("Failed to execute like action after auth:", err);
       }

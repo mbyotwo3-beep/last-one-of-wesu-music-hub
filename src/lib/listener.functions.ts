@@ -105,30 +105,6 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const toggleLike = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((d: { song_id: string }) => d)
-  .handler(async ({ context, data }) => {
-    const { data: existing } = await context.supabase
-      .from("song_likes")
-      .select("song_id")
-      .eq("song_id", data.song_id)
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (existing) {
-      await context.supabase
-        .from("song_likes")
-        .delete()
-        .eq("song_id", data.song_id)
-        .eq("user_id", context.userId);
-      return { liked: false };
-    }
-    await context.supabase
-      .from("song_likes")
-      .insert({ song_id: data.song_id, user_id: context.userId } as any);
-    return { liked: true };
-  });
-
 export const getSignedAudioUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { song_id: string }) => d)
