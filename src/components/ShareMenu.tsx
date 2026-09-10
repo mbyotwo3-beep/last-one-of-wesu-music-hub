@@ -21,9 +21,10 @@ interface ShareMenuProps {
   playlistId?: string;
   playlistName?: string;
   type: "song" | "album" | "artist" | "playlist";
+  icon?: "more" | "share";
 }
 
-export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, artistName, playlistId, playlistName, type, className }: ShareMenuProps & { className?: string }) {
+export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, artistName, playlistId, playlistName, type, className, icon = "more" }: ShareMenuProps & { className?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
@@ -239,9 +240,9 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         ref={buttonRef}
         onClick={handleToggle}
         className={`text-muted-foreground hover:text-foreground transition-colors cursor-pointer ${className || ""}`}
-        aria-label="More options"
+        aria-label={icon === "share" ? "Share" : "More options"}
       >
-        <MoreVertical className="size-5" />
+        {icon === "share" ? <Share2 className="size-5" /> : <MoreVertical className="size-5" />}
       </button>
 
       {isOpen && isPositioned && createPortal(

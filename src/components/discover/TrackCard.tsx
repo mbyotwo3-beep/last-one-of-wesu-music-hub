@@ -155,6 +155,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             artistName={artistName}
             albumId={song.album_id}
             type="song"
+            icon="share"
             className="relative z-20"
           />
         </div>
@@ -200,21 +201,36 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
         />
         <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{album.title}</p>
       </Link>
-      {user && (
-        <button
-          type="button"
-          onClick={handleSave}
-          aria-label={isSaved ? "Unsave album" : "Save album"}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
-        >
-          <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
-        </button>
-      )}
+      <div className="absolute top-2 right-2 flex gap-1">
+        {user && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              handleSave(e);
+            }}
+            aria-label={isSaved ? "Unsave album" : "Save album"}
+            className="p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
+          >
+            <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
+          </button>
+        )}
+        <ShareMenu
+          albumId={album.id}
+          albumTitle={album.title}
+          artistId={album.artist?.id}
+          artistName={album.artist?.name}
+          type="album"
+          icon="share"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+        />
+      </div>
       {album.artist?.id ? (
         <Link
           to="/artists/$id"
           params={{ id: album.artist.id }}
           className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
+          onClick={(e) => e.preventDefault()}
         >
           {album.artist.name}
         </Link>
@@ -235,22 +251,33 @@ export interface ArtistTileData {
 
 export function ArtistTile({ artist }: { artist: ArtistTileData }) {
   return (
-    <Link
-      to="/artists/$id"
-      params={{ id: artist.id }}
-      className="group text-center w-full block cursor-pointer"
-    >
-      <StorageImage
-        bucket="artist-images"
-        path={artist.avatar_url ?? null}
-        alt={artist.name}
-        className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
-      />
-      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{artist.name}</p>
-      <p className="text-xs text-muted-foreground truncate">
-        {artist.genre ?? "Artist"}
-      </p>
-    </Link>
+    <div className="group text-center w-full relative cursor-pointer">
+      <Link
+        to="/artists/$id"
+        params={{ id: artist.id }}
+        className="block cursor-pointer"
+      >
+        <StorageImage
+          bucket="artist-images"
+          path={artist.avatar_url ?? null}
+          alt={artist.name}
+          className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
+        />
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{artist.name}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {artist.genre ?? "Artist"}
+        </p>
+      </Link>
+      <div className="absolute top-2 right-2">
+        <ShareMenu
+          artistId={artist.id}
+          artistName={artist.name}
+          type="artist"
+          icon="share"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -293,25 +320,36 @@ export interface PlaylistTileData {
 
 export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
   return (
-    <Link
-      to="/playlists/$id"
-      params={{ id: playlist.id }}
-      className="group text-left w-full block cursor-pointer"
-    >
-      <StorageImage
-        bucket="album-art"
-        path={playlist.cover_url ?? null}
-        alt={playlist.name}
-        className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
-      />
-      <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{playlist.name}</p>
-      {playlist.description ? (
-        <p className="text-xs text-muted-foreground line-clamp-2">
-          {playlist.description}
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground">Playlist</p>
-      )}
-    </Link>
+    <div className="group text-left w-full relative cursor-pointer">
+      <Link
+        to="/playlists/$id"
+        params={{ id: playlist.id }}
+        className="block cursor-pointer"
+      >
+        <StorageImage
+          bucket="album-art"
+          path={playlist.cover_url ?? null}
+          alt={playlist.name}
+          className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
+        />
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{playlist.name}</p>
+        {playlist.description ? (
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {playlist.description}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Playlist</p>
+        )}
+      </Link>
+      <div className="absolute top-2 right-2">
+        <ShareMenu
+          playlistId={playlist.id}
+          playlistName={playlist.name}
+          type="playlist"
+          icon="share"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+        />
+      </div>
+    </div>
   );
 }
