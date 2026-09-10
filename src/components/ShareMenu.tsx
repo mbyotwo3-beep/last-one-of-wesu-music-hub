@@ -187,15 +187,41 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
   const handleCopyLink = () => {
     let url = window.location.origin;
-    if (type === "song" && songId) url += `/songs/${songId}`;
-    else if (type === "album" && albumId) url += `/albums/${albumId}`;
-    else if (type === "artist" && artistId) url += `/artists/${artistId}`;
-    else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
+    let title = "";
     
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    toast.success("Link copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+    if (type === "song" && songId) {
+      url += `/songs/${songId}`;
+      title = songTitle || "Song";
+    } else if (type === "album" && albumId) {
+      url += `/albums/${albumId}`;
+      title = albumTitle || "Album";
+    } else if (type === "artist" && artistId) {
+      url += `/artists/${artistId}`;
+      title = artistName || "Artist";
+    } else if (type === "playlist" && playlistId) {
+      url += `/playlists/${playlistId}`;
+      title = playlistName || "Playlist";
+    }
+    
+    // Use Web Share API if available (like Apple Music)
+    if (navigator.share && title) {
+      navigator.share({
+        title: title,
+        url: url,
+      }).catch(() => {
+        // Fallback to clipboard if share fails or is cancelled
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        toast.success("Link copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      });
+    } else {
+      // Fallback for browsers without Web Share API
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success("Link copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    }
     setIsOpen(false);
   };
 
@@ -324,6 +350,19 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                   Go to album
                 </button>
               )}
+
+              <div className="border-t border-border" />
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyLink();
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+              >
+                <Share2 className="size-4" />
+                Share song
+              </button>
             </>
           )}
 
@@ -339,7 +378,6 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                 <Share2 className="size-4" />
                 Share artist
               </button>
-              <div className="border-t border-border" />
             </>
           )}
 
@@ -355,7 +393,6 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                 <Share2 className="size-4" />
                 Share album
               </button>
-              <div className="border-t border-border" />
             </>
           )}
 
@@ -371,19 +408,31 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
                 <Share2 className="size-4" />
                 Share playlist
               </button>
-              <div className="border-t border-border" />
             </>
           )}
+
+          <div className="border-t border-border" />
 
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleCopyLink();
+              // Force copy to clipboard without using Web Share API
+              let url = window.location.origin;
+              if (type === "song" && songId) url += `/songs/${songId}`;
+              else if (type === "album" && albumId) url += `/albums/${albumId}`;
+              else if (type === "artist" && artistId) url += `/artists/${artistId}`;
+              else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
+              
+              navigator.clipboard.writeText(url);
+              setCopied(true);
+              toast.success("Link copied to clipboard");
+              setTimeout(() => setCopied(false), 2000);
+              setIsOpen(false);
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left border-t border-border"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
           >
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? "Link copied" : `Copy ${type} link`}
+            {copied ? "Link copied" : "Copy link"}
           </button>
         </div>,
         document.body
