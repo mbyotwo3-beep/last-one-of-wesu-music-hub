@@ -238,7 +238,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     <>
       <button
         ref={buttonRef}
-        onClick={handleToggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleToggle();
+        }}
         className={`text-muted-foreground hover:text-foreground transition-colors cursor-pointer ${className || ""}`}
         aria-label={icon === "share" ? "Share" : "More options"}
       >

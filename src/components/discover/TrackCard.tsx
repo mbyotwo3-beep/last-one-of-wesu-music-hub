@@ -155,7 +155,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             artistName={artistName}
             albumId={song.album_id}
             type="song"
-            icon="share"
+            icon="more"
             className="relative z-20"
           />
         </div>
@@ -221,7 +221,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
           artistId={album.artist?.id}
           artistName={album.artist?.name}
           type="album"
-          icon="share"
+          icon="more"
           className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
@@ -273,7 +273,7 @@ export function ArtistTile({ artist }: { artist: ArtistTileData }) {
           artistId={artist.id}
           artistName={artist.name}
           type="artist"
-          icon="share"
+          icon="more"
           className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
@@ -346,7 +346,7 @@ export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
           playlistId={playlist.id}
           playlistName={playlist.name}
           type="playlist"
-          icon="share"
+          icon="more"
           className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
