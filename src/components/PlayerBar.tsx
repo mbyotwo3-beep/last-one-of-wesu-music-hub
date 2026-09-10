@@ -51,9 +51,20 @@ function getAudio(): HTMLAudioElement {
   if (!_audio) {
     _audio = new Audio();
     _audio.preload = "auto";
+    _audio.crossOrigin = "anonymous";
     (window as any).__wesuAudio = _audio;
   }
   return _audio;
+}
+
+function cleanupAudio(): void {
+  if (_audio) {
+    _audio.pause();
+    _audio.src = "";
+    _audio.load();
+    _audio = null;
+    delete (window as any).__wesuAudio;
+  }
 }
 
 function fmt(seconds: number): string {
@@ -363,7 +374,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           audio.currentTime = 0;
           setProgress(0);
         }
-        audio.play().catch(() => {});
+        audio.play().catch((err) => {
+          console.error("Audio play error:", err);
+          if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+        });
       } else if (!playing && !audio.paused) {
         audio.pause();
       }
@@ -394,7 +408,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       if (st.repeat === "one") {
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        audio.play().catch((err) => {
+          console.error("Audio replay error:", err);
+        });
         return;
       }
       st.skipNext();
@@ -414,6 +430,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   useEffect(() => {
     getAudio().volume = muted ? 0 : volume;
   }, [volume, muted]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (currentTrackId.current) {
+        stopNative(currentTrackId.current).catch(() => {});
+      }
+      audioEventsCleanupRef.current?.();
+      nativeCleanupRef.current?.();
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+      }
+      cleanupAudio();
+    };
+  }, []);
 
   if (audioOnly) return null;
   if (!track) return null;
