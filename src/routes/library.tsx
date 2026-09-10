@@ -42,7 +42,7 @@ function Page() {
     queryFn: async () => {
       if (!user?.id) return [];
       const { data } = await supabase
-        .from("song_likes")
+        .from("saved_tracks")
         .select("songs(*, artists(name))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -129,15 +129,25 @@ function Page() {
       </section>
 
       <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <Heart className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold">Liked Songs</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Heart className="size-5 text-primary" />
+            <h2 className="text-xl font-semibold">Liked Songs</h2>
+          </div>
+          {safeLikedSongs.length > 0 && (
+            <Link
+              to="/liked-songs"
+              className="text-sm text-primary hover:underline"
+            >
+              View all
+            </Link>
+          )}
         </div>
         {safeLikedSongs.length === 0 ? (
           <p className="text-muted-foreground">No liked songs yet.</p>
         ) : (
           <div className="space-y-2">
-            {safeLikedSongs.map((song: any) => (
+            {safeLikedSongs.slice(0, 5).map((song: any) => (
               <LikedSongCard key={song.id} song={song} userId={user?.id ?? null} />
             ))}
           </div>
@@ -333,7 +343,7 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
     mutationFn: async () => {
       if (!userId) return;
       const { error } = await supabase
-        .from("song_likes")
+        .from("saved_tracks")
         .delete()
         .eq("user_id", userId)
         .eq("song_id", song.id);

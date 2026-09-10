@@ -272,11 +272,11 @@ export function BottomTabBar() {
             {/* Favorites / Liked Songs — always shown when logged in */}
             {user && (
               <button
-                onClick={() => { navigate({ to: "/library" }); setMenuOpen(false); }}
+                onClick={() => { navigate({ to: "/liked-songs" }); setMenuOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
               >
                 <Heart className="size-5" />
-                <span className="text-sm font-medium">Favorites &amp; Liked</span>
+                <span className="text-sm font-medium">Liked Songs</span>
               </button>
             )}
             {/* Dynamic user playlists */}
