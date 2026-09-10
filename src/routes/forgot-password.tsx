@@ -25,7 +25,7 @@ function ForgotPasswordPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "https://www.wesuplusly.com/reset-password",
+        redirectTo: "/reset-password",
       });
       if (error) throw error;
       setSent(true);

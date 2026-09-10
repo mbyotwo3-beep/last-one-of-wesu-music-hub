@@ -46,9 +46,9 @@ export interface SiteConfig {
 
 export const DEFAULT_SITE: SiteConfig = {
   name: "Wesu+",
-  support_email: "support@wesuplusly.com",
+  support_email: "support@wesu.app",
   commission_pct: 20,
-  url: "https://www.wesuplusly.com",
+  url: "https://www.wesuplus.com",
   description: "Stream Zambian and African music. Free & Premium tiers with Mobile Money payments.",
   twitter_handle: "@wesuplus",
 };
@@ -191,11 +191,12 @@ export const getSiteConfig = createServerFn({ method: "GET" }).handler(
         .eq("key", "site")
         .maybeSingle();
       const v = (data?.value as Partial<SiteConfig> | null) ?? {};
+      const appUrl = process.env.APP_URL ?? DEFAULT_SITE.url;
       return {
         name: v.name ?? DEFAULT_SITE.name,
         support_email: v.support_email ?? DEFAULT_SITE.support_email,
         commission_pct: Number(v.commission_pct ?? DEFAULT_SITE.commission_pct),
-        url: v.url ?? DEFAULT_SITE.url,
+        url: v.url ?? appUrl,
         description: v.description ?? DEFAULT_SITE.description,
         twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
       };
@@ -217,11 +218,12 @@ export async function getSiteConfigServer(): Promise<SiteConfig> {
       .eq("key", "site")
       .maybeSingle();
     const v = (data?.value as Partial<SiteConfig> | null) ?? {};
+    const appUrl = process.env.APP_URL ?? DEFAULT_SITE.url;
     return {
       name: v.name ?? DEFAULT_SITE.name,
       support_email: v.support_email ?? DEFAULT_SITE.support_email,
       commission_pct: Number(v.commission_pct ?? DEFAULT_SITE.commission_pct),
-      url: v.url ?? DEFAULT_SITE.url,
+      url: v.url ?? appUrl,
       description: v.description ?? DEFAULT_SITE.description,
       twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
     };

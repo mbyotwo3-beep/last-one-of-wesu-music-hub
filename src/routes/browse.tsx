@@ -89,9 +89,8 @@ export const Route = createFileRoute("/browse")({
         name: "description",
         content: "Discover and stream the best Zambian and African music on Wesu+.",
       },
-      { property: "og:url", content: "https://www.wesuplusly.com/browse" },
     ],
-    links: [{ rel: "canonical", href: "https://www.wesuplusly.com/browse" }],
+    links: [{ rel: "canonical", href: "/browse" }],
   }),
   validateSearch: (search: Record<string, unknown>): { genre?: string } =>
     typeof search.genre === "string" ? { genre: search.genre } : {},

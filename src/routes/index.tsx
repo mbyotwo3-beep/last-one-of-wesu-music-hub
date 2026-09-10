@@ -44,9 +44,8 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Stream the best Zambian and African music. Free & Premium tiers.",
       },
-      { property: "og:url", content: "https://www.wesuplusly.com/" },
     ],
-    links: [{ rel: "canonical", href: "https://www.wesuplusly.com/" }],
+    links: [{ rel: "canonical", href: "/" }],
   }),
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(discoverQO);

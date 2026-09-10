@@ -222,7 +222,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
     }
 
     // Card
-    const email = (claims?.email as string | undefined) ?? "buyer@wesuplusly.com";
+    const email = (claims?.email as string | undefined) ?? siteConfig.support_email;
     try {
       const result = await initiateCardCheckout({
         amount,
