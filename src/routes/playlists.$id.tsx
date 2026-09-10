@@ -71,6 +71,20 @@ function Page() {
     );
   }
 
+  function playSong(index: number) {
+    if (!songs.length) return;
+    setQueue(
+      songs.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        artistName: s.artist?.name ?? "Unknown",
+        coverUrl: s.cover_url,
+        durationSeconds: s.duration,
+      })),
+      index,
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
       <button onClick={() => navigate({ to: "/playlists" })} className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 cursor-pointer transition-colors group">
@@ -121,15 +135,7 @@ function Page() {
               <div
                 key={s.id}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
-                onClick={() =>
-                  usePlayer.getState().setTrack({
-                    id: s.id,
-                    title: s.title,
-                    artistName: s.artist?.name ?? "Unknown",
-                    coverUrl: s.cover_url,
-                    durationSeconds: s.duration,
-                  })
-                }
+                onClick={() => playSong(i)}
               >
                 <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
                 <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
