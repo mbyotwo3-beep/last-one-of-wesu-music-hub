@@ -92,3 +92,20 @@ export function SkeletonShelf({ count = 4 }: { count?: number }) {
     </div>
   );
 }
+
+export function SkeletonNavbar() {
+  return (
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl h-16">
+      <div className="h-full px-4 md:px-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-11 w-32 bg-muted/30 rounded animate-pulse" />
+        </div>
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="h-8 w-8 bg-muted/30 rounded-full animate-pulse" />
+          <div className="h-8 w-8 bg-muted/30 rounded-full animate-pulse" />
+          <div className="h-10 w-24 bg-muted/30 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </nav>
+  );
+}

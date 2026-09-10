@@ -1,12 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { Music2, Play, ShoppingBag } from "lucide-react";
+import { Music2, Play, ShoppingBag, Heart } from "lucide-react";
 import { getSongById } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 
 const songQO = (id: string) =>
   queryOptions({
@@ -40,6 +41,7 @@ function SongPage() {
   const setTrack = usePlayer((state) => state.setTrack);
   const artist = song!.artist as { id: string; name: string } | null;
   const isFree = Number(song!.price ?? 0) <= 0;
+  const { isSaved, toggle } = useSavedTrack(id);
 
   const play = () => {
     setTrack({
@@ -102,6 +104,15 @@ function SongPage() {
               <ShoppingBag className="size-5" /> Buy {useCurrency.getState().formatPrice(song!.price)}
             </Link>
           )}
+          <button
+            onClick={toggle}
+            className="inline-flex items-center gap-2 rounded-full bg-secondary px-6 py-3 font-bold hover:bg-accent transition-colors"
+          >
+            <Heart
+              className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`}
+            />
+            {isSaved ? "Liked" : "Like"}
+          </button>
           <ShareMenu
             songId={song!.id}
             songTitle={song!.title}

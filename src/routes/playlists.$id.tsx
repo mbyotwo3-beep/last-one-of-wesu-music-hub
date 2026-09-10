@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Trash2, ListMusic, ArrowLeft, Lock } from "lucide-react";
+import { Play, Trash2, ListMusic, ArrowLeft, Lock, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useAuth } from "@/hooks/use-auth";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
@@ -114,49 +115,63 @@ function Page() {
         <p className="text-muted-foreground py-12 text-center">No songs yet. Add from any song page.</p>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
-          {songs.map((s: any, i: number) => (
-            <div
-              key={s.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
-              onClick={() =>
-                usePlayer.getState().setTrack({
-                  id: s.id,
-                  title: s.title,
-                  artistName: s.artist?.name ?? "Unknown",
-                  coverUrl: s.cover_url,
-                  durationSeconds: s.duration,
-                })
-              }
-            >
-              <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
-              <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
-              <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
-              <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
-                  {s.artist?.name ?? "Unknown"}
-                </Link>
-              </div>
-              {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-              <ShareMenu
-                songId={s.id}
-                songTitle={s.title}
-                artistId={s.artist?.id}
-                artistName={s.artist?.name}
-                type="song"
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
-              />
-              {isOwner && (
-                <button
-                onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
-                className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
-                aria-label="Remove"
+          {songs.map((s: any, i: number) => {
+            const { isSaved, toggle } = useSavedTrack(s.id);
+            return (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
+                onClick={() =>
+                  usePlayer.getState().setTrack({
+                    id: s.id,
+                    title: s.title,
+                    artistName: s.artist?.name ?? "Unknown",
+                    coverUrl: s.cover_url,
+                    durationSeconds: s.duration,
+                  })
+                }
               >
-                <Trash2 className="size-4" />
-              </button>
-              )}
-            </div>
-          ))}
+                <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
+                <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
+                <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
+                <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                    {s.artist?.name ?? "Unknown"}
+                  </Link>
+                </div>
+                {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle();
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Heart
+                    className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  />
+                </button>
+                <ShareMenu
+                  songId={s.id}
+                  songTitle={s.title}
+                  artistId={s.artist?.id}
+                  artistName={s.artist?.name}
+                  type="song"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
+                />
+                {isOwner && (
+                  <button
+                  onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
+                  className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
+                  aria-label="Remove"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import { CurrencyToggle } from "./CurrencyToggle";
 import { GlobalSearch } from "./GlobalSearch";
 import { StorageImage } from "./StorageImage";
 import { useQuery } from "@tanstack/react-query";
+import { SkeletonButton } from "./Skeleton";
 
 const NavbarComponent = function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -37,6 +38,33 @@ const NavbarComponent = function Navbar() {
   const isLoading = authLoading || rolesLoading;
 
   const navLinks: { to: string; label: string; icon: any }[] = [];
+
+  // During initial auth loading, show skeleton to prevent flicker
+  if (isLoading) {
+    return (
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl h-16">
+        <div className="h-full px-4 md:px-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/"
+              className="flex items-center gap-2"
+              aria-label="Wesu+ home"
+            >
+              <img src="/images/wesu-logo.png" alt="Wesu+" className="h-11 w-auto" />
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden md:block">
+              <SkeletonButton className="w-64" />
+            </div>
+            <CurrencyToggle />
+            <ThemeToggle />
+            <SkeletonButton className="w-24" />
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl h-16">

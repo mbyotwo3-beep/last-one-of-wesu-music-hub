@@ -162,6 +162,7 @@ export const getArtistById = createServerFn({ method: "GET" })
         .limit(20),
     ]);
     if (artist.error) throw new Error(artist.error.message);
+    console.log("[getArtistById] Artist data:", artist.data);
     return {
       artist: artist.data,
       albums: albums.data ?? [],

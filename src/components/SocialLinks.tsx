@@ -12,6 +12,7 @@ const socialIcons: Record<SocialLinkKey, LucideIcon> = {
 
 export function SocialLinks({ links }: { links: unknown }) {
   const entries = collectSocialLinks(links);
+  console.log("[SocialLinks] Input:", links, "Collected entries:", entries);
   if (!entries.length) return null;
 
   return (

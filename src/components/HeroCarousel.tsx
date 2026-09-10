@@ -89,12 +89,17 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
   // Resolve image URLs for all slides on mount
   useEffect(() => {
+    let cancelled = false;
+    
     slides.forEach(async (slide) => {
+      if (cancelled) return;
+      
       // If it's already an absolute URL, use it directly
       if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
         return;
       }
+      
       // If it starts with "uploads/", resolve through hero-images bucket (legacy support)
       if (slide.imageUrl.startsWith("uploads/")) {
         const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
@@ -104,33 +109,43 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         }
         try {
           const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
-          if (url) {
+          if (url && !cancelled) {
             setSignedUrls((prev) => new Map(prev).set(slide.id, url));
           }
         } catch (e) {
           console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
           // Fallback to using the raw URL
-          setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+          if (!cancelled) {
+            setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+          }
         }
         return;
       }
+      
       // Otherwise, assume it's in hero-images bucket with user_id folder
       const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
       if (cached) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
         return;
       }
+      
       try {
         const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
-        if (url) {
+        if (url && !cancelled) {
           setSignedUrls((prev) => new Map(prev).set(slide.id, url));
         }
       } catch (e) {
         console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
         // Fallback to using the raw URL
-        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        if (!cancelled) {
+          setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+        }
       }
     });
+    
+    return () => {
+      cancelled = true;
+    };
   }, [slides]);
 
   if (slides.length === 0) return null;

@@ -19,7 +19,6 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
 import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as PodcastRouteImport } from './routes/podcast'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as NowPlayingRouteImport } from './routes/now-playing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -103,11 +102,6 @@ const RecentlyAddedRoute = RecentlyAddedRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PodcastRoute = PodcastRouteImport.update({
-  id: '/podcast',
-  path: '/podcast',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
@@ -305,7 +299,6 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
-  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -352,7 +345,6 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
-  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -400,7 +392,6 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
-  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -449,7 +440,6 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
-    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -496,7 +486,6 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
-    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -543,7 +532,6 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
-    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -591,7 +579,6 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   NowPlayingRoute: typeof NowPlayingRoute
   PlaylistsRoute: typeof PlaylistsRouteWithChildren
-  PodcastRoute: typeof PodcastRoute
   ProfileRoute: typeof ProfileRoute
   RecentlyAddedRoute: typeof RecentlyAddedRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -680,13 +667,6 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/podcast': {
-      id: '/podcast'
-      path: '/podcast'
-      fullPath: '/podcast'
-      preLoaderRoute: typeof PodcastRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playlists': {
@@ -1011,7 +991,6 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   NowPlayingRoute: NowPlayingRoute,
   PlaylistsRoute: PlaylistsRouteWithChildren,
-  PodcastRoute: PodcastRoute,
   ProfileRoute: ProfileRoute,
   RecentlyAddedRoute: RecentlyAddedRoute,
   ResetPasswordRoute: ResetPasswordRoute,

@@ -4,9 +4,10 @@ import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
-import { Play, ShoppingBag } from "lucide-react";
+import { Play, ShoppingBag, Heart } from "lucide-react";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -115,43 +116,57 @@ function AlbumPage() {
           <p className="text-muted-foreground text-sm">No songs in this album yet.</p>
         ) : (
           <div className="space-y-1">
-            {data.songs.map((s, i) => (
-              <div key={s.id} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
-                <button
-                  onClick={() =>
-                    setTrack({
-                      id: s.id,
-                      title: s.title,
-                      artistName: artist?.name ?? "Unknown",
-                      coverUrl: album.cover_url,
-                      durationSeconds: s.duration,
-                    })
-                  }
-                  className="flex items-center gap-4 flex-1 text-left cursor-pointer"
-                >
-                  <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                  <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
+            {data.songs.map((s, i) => {
+              const { isSaved, toggle } = useSavedTrack(s.id);
+              return (
+                <div key={s.id} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+                  <button
+                    onClick={() =>
+                      setTrack({
+                        id: s.id,
+                        title: s.title,
+                        artistName: artist?.name ?? "Unknown",
+                        coverUrl: album.cover_url,
+                        durationSeconds: s.duration,
+                      })
+                    }
+                    className="flex items-center gap-4 flex-1 text-left cursor-pointer"
+                  >
+                    <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                    <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 relative z-10">
+                    <span className="text-primary text-sm font-bold">
+                      {useCurrency.getState().formatPrice(s.price)}
+                    </span>
+                    <DownloadButton songId={s.id} />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle();
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Heart
+                        className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      />
+                    </button>
+                    <ShareMenu
+                      songId={s.id}
+                      songTitle={s.title}
+                      albumId={album.id}
+                      artistId={artist?.id}
+                      artistName={artist?.name}
+                      type="song"
+                      className="relative z-20"
+                    />
                   </div>
-                </button>
-                <div className="flex items-center gap-2 relative z-10">
-                  <span className="text-primary text-sm font-bold">
-                    {useCurrency.getState().formatPrice(s.price)}
-                  </span>
-                  <DownloadButton songId={s.id} />
-                  <ShareMenu
-                    songId={s.id}
-                    songTitle={s.title}
-                    albumId={album.id}
-                    artistId={artist?.id}
-                    artistName={artist?.name}
-                    type="song"
-                    className="relative z-20"
-                  />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

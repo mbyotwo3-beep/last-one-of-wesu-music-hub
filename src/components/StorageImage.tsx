@@ -20,26 +20,36 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
   const [url, setUrl] = useState<string | null>(() => peekImageUrl(bucket, path));
   const [failed, setFailed] = useState(false);
   const [retried, setRetried] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     let cancel = false;
     setFailed(false);
     setRetried(false);
+    setIsLoading(true);
     if (!path) {
       setUrl(null);
+      setIsLoading(false);
       return;
     }
     const cached = peekImageUrl(bucket, path);
     if (cached) {
       setUrl(cached);
+      setIsLoading(false);
       return;
     }
     resolveImageUrl(bucket, path)
       .then((u) => {
-        if (!cancel) setUrl(u);
+        if (!cancel) {
+          setUrl(u);
+          setIsLoading(false);
+        }
       })
       .catch(() => {
-        if (!cancel) setUrl(null);
+        if (!cancel) {
+          setUrl(null);
+          setIsLoading(false);
+        }
       });
     return () => {
       cancel = true;
@@ -49,14 +59,30 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
   const handleError = () => {
     if (retried || !path) {
       setFailed(true);
+      setIsLoading(false);
       return;
     }
     setRetried(true);
     invalidateImageUrl(bucket, path);
     resolveImageUrl(bucket, path)
       .then((u) => setUrl(u ? `${u}${u.includes("?") ? "&" : "?"}r=${Date.now()}` : null))
-      .catch(() => setFailed(true));
+      .catch(() => {
+        setFailed(true);
+        setIsLoading(false);
+      });
   };
+
+  const handleLoad = () => {
+    setIsLoading(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className={`flex items-center justify-center bg-card animate-pulse ${className ?? ""}`} onClick={onClick}>
+        <Music2 className="size-4 text-muted-foreground opacity-50" />
+      </div>
+    );
+  }
 
   if (!url || failed) {
     return (
@@ -65,5 +91,5 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
       </div>
     );
   }
-  return <img src={url} alt={alt} className={className} loading={loading} onClick={onClick} onError={handleError} />;
+  return <img src={url} alt={alt} className={className} loading={loading} onClick={onClick} onError={handleError} onLoad={handleLoad} />;
 }

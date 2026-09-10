@@ -39,6 +39,7 @@ export const getActiveHeroSlides = createServerFn({ method: "GET" }).handler(asy
     .eq("active", true)
     .order("position", { ascending: true });
   if (error) throw new Error(error.message);
+  console.log("[getActiveHeroSlides] Active slides:", data);
   return (data ?? []) as HeroCarouselSlide[];
 });
 

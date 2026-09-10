@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, UserPlus, UserCheck, UserMinus, ShoppingBag } from "lucide-react";
+import { CheckCircle2, Play, UserPlus, UserCheck, UserMinus, ShoppingBag, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,6 +15,7 @@ import { SocialLinks } from "@/components/SocialLinks";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useServerFn } from "@tanstack/react-start";
 import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
+import { useSavedTrack } from "@/hooks/use-saved-track";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -57,8 +58,21 @@ function ArtistPage() {
 
   const [coverBg, setCoverBg] = useState<string | null>(null);
   useEffect(() => {
-    if (!a.cover_url) return;
-    resolveImageUrl("artist-images", a.cover_url).then(setCoverBg).catch(() => {});
+    let cancelled = false;
+    if (!a.cover_url) {
+      setCoverBg(null);
+      return;
+    }
+    resolveImageUrl("artist-images", a.cover_url)
+      .then((url) => {
+        if (!cancelled) setCoverBg(url);
+      })
+      .catch(() => {
+        if (!cancelled) setCoverBg(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [a.cover_url]);
 
   const followQK = ["follow", id, user?.id ?? null];
@@ -259,89 +273,103 @@ function ArtistPage() {
             <p className="text-muted-foreground text-sm">No songs yet.</p>
           ) : (
             <div className="space-y-1">
-              {data.topSongs.map((s, i) => (
-                <div
-                  key={s.id}
-                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
-                >
-                  <button
-                    onClick={async () => {
-                      try {
-                        const isPaid = s.price && Number(s.price) > 0;
-                        
-                        if (isPaid) {
-                          const { url } = await getPreviewFn({ data: { song_id: s.id } });
-                          setTrack({
-                            id: s.id,
-                            title: s.title,
-                            artistName: a.name,
-                            coverUrl: s.cover_url,
-                            audioUrl: url,
-                            durationSeconds: s.duration,
-                          });
-                          setIsPreview(true);
-                          toast.info(`🎵 Previewing "${s.title}" (15s)`);
-                        } else {
-                          const { url } = await getPublicFn({ data: { song_id: s.id } });
-                          setTrack({
-                            id: s.id,
-                            title: s.title,
-                            artistName: a.name,
-                            coverUrl: s.cover_url,
-                            audioUrl: url,
-                            durationSeconds: s.duration,
-                          });
-                          setIsPreview(false);
-                        }
-                        togglePlay();
-                      } catch (error) {
-                        toast.error(`Failed to play: ${(error as Error).message}`);
-                      }
-                    }}
-                    className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
+              {data.topSongs.map((s, i) => {
+                const { isSaved, toggle } = useSavedTrack(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                   >
-                    <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                    <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
-                    <StorageImage
-                      bucket="album-art"
-                      path={s.cover_url}
-                      alt={s.title}
-                      className="size-10 rounded-md overflow-hidden bg-card object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{s.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(s.play_count ?? 0).toLocaleString()} plays
-                      </p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      {useCurrency.getState().formatPrice(s.price)}
-                    </span>
-                    {Number(s.price ?? 0) > 0 && (
-                      <Link
-                        to="/checkout"
-                        search={{ item: "song", id: s.id }}
-                        className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
-                        aria-label={`Buy ${s.title}`}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const isPaid = s.price && Number(s.price) > 0;
+                          
+                          if (isPaid) {
+                            const { url } = await getPreviewFn({ data: { song_id: s.id } });
+                            setTrack({
+                              id: s.id,
+                              title: s.title,
+                              artistName: a.name,
+                              coverUrl: s.cover_url,
+                              audioUrl: url,
+                              durationSeconds: s.duration,
+                            });
+                            setIsPreview(true);
+                            toast.info(`🎵 Previewing "${s.title}" (15s)`);
+                          } else {
+                            const { url } = await getPublicFn({ data: { song_id: s.id } });
+                            setTrack({
+                              id: s.id,
+                              title: s.title,
+                              artistName: a.name,
+                              coverUrl: s.cover_url,
+                              audioUrl: url,
+                              durationSeconds: s.duration,
+                            });
+                            setIsPreview(false);
+                          }
+                          togglePlay();
+                        } catch (error) {
+                          toast.error(`Failed to play: ${(error as Error).message}`);
+                        }
+                      }}
+                      className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
+                    >
+                      <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                      <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
+                      <StorageImage
+                        bucket="album-art"
+                        path={s.cover_url}
+                        alt={s.title}
+                        className="size-10 rounded-md overflow-hidden bg-card object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{s.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(s.play_count ?? 0).toLocaleString()} plays
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {useCurrency.getState().formatPrice(s.price)}
+                      </span>
+                      {Number(s.price ?? 0) > 0 && (
+                        <Link
+                          to="/checkout"
+                          search={{ item: "song", id: s.id }}
+                          className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
+                          aria-label={`Buy ${s.title}`}
+                        >
+                          <ShoppingBag className="size-4" />
+                        </Link>
+                      )}
+                      {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggle();
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <ShoppingBag className="size-4" />
-                      </Link>
-                    )}
-                    {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-                    <ShareMenu
-                      songId={s.id}
-                      songTitle={s.title}
-                      albumId={s.album_id ?? undefined}
-                      artistId={a.id}
-                      artistName={a.name}
-                      type="song"
-                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
-                    />
+                        <Heart
+                          className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        />
+                      </button>
+                      <ShareMenu
+                        songId={s.id}
+                        songTitle={s.title}
+                        albumId={s.album_id ?? undefined}
+                        artistId={a.id}
+                        artistName={a.name}
+                        type="song"
+                        className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

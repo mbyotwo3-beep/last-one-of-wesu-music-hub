@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Check, Loader2, User, X, Instagram, Twitter, Facebook, Youtube, Music, Apple } from "lucide-react";
+import { Camera, Check, CheckCircle2, Loader2, User, X, Instagram, Twitter, Facebook, Youtube, Music, Apple } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { getMyArtistProfile } from "@/lib/user.functions";
@@ -409,7 +409,8 @@ function ArtistProfileEditPage() {
               ].map((social) => {
                 const Icon = social.icon;
                 const linkValue = formData.social_links[social.key as keyof typeof formData.social_links];
-                const fullLink = linkValue && (linkValue.startsWith('http') ? linkValue : `https://${linkValue}`);
+                const isValid = linkValue && linkValue.trim().length > 0;
+                const fullLink = isValid && (linkValue.startsWith('http') ? linkValue : `https://${linkValue}`);
                 
                 return (
                   <div key={social.key}>
@@ -444,7 +445,7 @@ function ArtistProfileEditPage() {
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
                           aria-label={`Open ${social.label} link`}
                         >
-                          <Check className="size-4" />
+                          <CheckCircle2 className="size-4" />
                         </a>
                       )}
                     </div>
