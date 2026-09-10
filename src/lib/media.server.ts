@@ -34,11 +34,18 @@ async function signSupabaseUrl(
   opts: { expiresIn?: number; download?: string },
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.storage
+  // Use public URL instead of signed URL to support multiple domains
+  const { data } = supabaseAdmin.storage
     .from(bucket)
-    .createSignedUrl(path, opts.expiresIn ?? 3600, opts.download ? { download: opts.download } : undefined);
-  if (error || !data?.signedUrl) throw new Error(error?.message ?? "Unable to sign media URL");
-  return data.signedUrl;
+    .getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error("Unable to get media URL");
+  // Add download parameter if needed
+  if (opts.download) {
+    const url = new URL(data.publicUrl);
+    url.searchParams.set("download", opts.download);
+    return url.toString();
+  }
+  return data.publicUrl;
 }
 
 /** Best-effort one-time copy of a legacy Supabase object into R2. */

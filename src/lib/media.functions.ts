@@ -45,5 +45,6 @@ export const signImageUrl = createServerFn({ method: "POST" })
     }
     if (!data.path) throw new Error("Missing path");
     const { signMediaUrl } = await import("./media.server");
+    // Use public URL instead of signed URL to support multiple domains
     return { url: await signMediaUrl(data.bucket, data.path, { expiresIn: 3600 }) };
   });
