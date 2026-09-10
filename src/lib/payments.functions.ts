@@ -192,7 +192,9 @@ export const initiatePayment = createServerFn({ method: "POST" })
       "@/lib/lenco.server"
     );
 
-    const appUrl = process.env.APP_URL ?? "https://www.wesuplusly.com";
+    const { getSiteConfigServer } = await import("@/lib/pricing.functions");
+    const siteConfig = await getSiteConfigServer();
+    const appUrl = process.env.APP_URL ?? siteConfig.url;
 
     if (isMobile) {
       try {

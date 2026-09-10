@@ -20,15 +20,21 @@ const STATIC_PATHS = [
   "/apply-label",
 ];
 
-function origin() {
-  return (process.env["APP_URL"] || "https://www.wesuplusly.com").replace(/\/+$/, "");
+async function origin() {
+  try {
+    const { getSiteConfigServer } = await import("@/lib/pricing.functions");
+    const siteConfig = await getSiteConfigServer();
+    return (process.env["APP_URL"] || siteConfig.url).replace(/\/+$/, "");
+  } catch {
+    return (process.env["APP_URL"] || "https://www.wesuplusly.com").replace(/\/+$/, "");
+  }
 }
 
 export const Route = createFileRoute("/api/public/sitemap")({
   server: {
     handlers: {
       GET: async () => {
-        const base = origin();
+        const base = await origin();
         const urls = STATIC_PATHS.map(
           (p) => `  <url><loc>${base}${p}</loc></url>`,
         ).join("\n");

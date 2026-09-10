@@ -35,6 +35,24 @@ export const DEFAULT_WITHDRAWAL: WithdrawalConfig = {
   min_amount: 500,
 };
 
+export interface SiteConfig {
+  name: string;
+  support_email: string;
+  commission_pct: number;
+  url: string;
+  description: string;
+  twitter_handle: string;
+}
+
+export const DEFAULT_SITE: SiteConfig = {
+  name: "Wesu+",
+  support_email: "support@wesuplusly.com",
+  commission_pct: 20,
+  url: "https://www.wesuplusly.com",
+  description: "Stream Zambian and African music. Free & Premium tiers with Mobile Money payments.",
+  twitter_handle: "@wesuplus",
+};
+
 /**
  * Initialize platform_settings with default values if they don't exist.
  * This ensures the dynamic config system works from the start.
@@ -74,11 +92,7 @@ export const initializePlatformSettings = createServerFn({ method: "POST" }).han
         .upsert(
           { 
             key: "site", 
-            value: { 
-              name: "Wesu+", 
-              support_email: "support@wesuplusly.com",
-              commission_pct: 20 
-            } 
+            value: DEFAULT_SITE as unknown as Json 
           },
           { onConflict: "key" }
         );
@@ -163,3 +177,55 @@ export const getWithdrawalConfig = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+/**
+ * Public read of the current site config.
+ */
+export const getSiteConfig = createServerFn({ method: "GET" }).handler(
+  async (): Promise<SiteConfig> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await supabaseAdmin
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "site")
+        .maybeSingle();
+      const v = (data?.value as Partial<SiteConfig> | null) ?? {};
+      return {
+        name: v.name ?? DEFAULT_SITE.name,
+        support_email: v.support_email ?? DEFAULT_SITE.support_email,
+        commission_pct: Number(v.commission_pct ?? DEFAULT_SITE.commission_pct),
+        url: v.url ?? DEFAULT_SITE.url,
+        description: v.description ?? DEFAULT_SITE.description,
+        twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
+      };
+    } catch {
+      return DEFAULT_SITE;
+    }
+  },
+);
+
+/**
+ * Server-side helper to get site config (for use in other server functions)
+ */
+export async function getSiteConfigServer(): Promise<SiteConfig> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "site")
+      .maybeSingle();
+    const v = (data?.value as Partial<SiteConfig> | null) ?? {};
+    return {
+      name: v.name ?? DEFAULT_SITE.name,
+      support_email: v.support_email ?? DEFAULT_SITE.support_email,
+      commission_pct: Number(v.commission_pct ?? DEFAULT_SITE.commission_pct),
+      url: v.url ?? DEFAULT_SITE.url,
+      description: v.description ?? DEFAULT_SITE.description,
+      twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
+    };
+  } catch {
+    return DEFAULT_SITE;
+  }
+}
