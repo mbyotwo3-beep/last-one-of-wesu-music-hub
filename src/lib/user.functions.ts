@@ -30,7 +30,7 @@ export const getMyOverview = createServerFn({ method: "GET" })
       supabase
         .from("saved_tracks")
         .select(
-          "id,created_at,song:songs(id,title,cover_url,artist_id,album_id,duration_seconds,artists:artist_id(id,name))",
+          "id,created_at,song:songs(id,title,cover_url,artist_id,album_id,duration,artists:artist_id(id,name))",
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })

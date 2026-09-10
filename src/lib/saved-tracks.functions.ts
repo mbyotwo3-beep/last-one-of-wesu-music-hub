@@ -9,7 +9,7 @@ export const listSavedTracks = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("saved_tracks")
       .select(
-        "id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration_seconds,artists:artist_id(id,name))",
+        "id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration,artists:artist_id(id,name))",
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false });

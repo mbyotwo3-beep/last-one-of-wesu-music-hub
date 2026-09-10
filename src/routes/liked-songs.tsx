@@ -44,7 +44,7 @@ function Page() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("saved_tracks")
-        .select("id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration_seconds,price,artists:artist_id(id,name))")
+        .select("id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration,price,artists:artist_id(id,name))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
