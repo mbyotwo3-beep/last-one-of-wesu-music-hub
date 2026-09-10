@@ -43,6 +43,7 @@ import {
   onNativeComplete,
   isNativeAudioAvailable,
 } from "@/lib/native-audio";
+import { supabase } from "@/integrations/supabase/client";
 
 let _audio: HTMLAudioElement | null = null;
 let _nativeAvailable: boolean | null = null;
@@ -187,7 +188,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         let previewMode = false;
 
         // Get current access token for entitlement-checked preview of paid tracks.
-        const { supabase } = await import("@/integrations/supabase/client");
         const { data: sess } = await supabase.auth.getSession();
         const accessToken = sess.session?.access_token ?? null;
 

@@ -10,6 +10,7 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
 import { addToPlaylist, createPlaylist } from "@/lib/listener.functions";
 import { getSongArtists } from "@/lib/music.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShareMenuProps {
   songId?: string;
@@ -47,7 +48,6 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase
         .from("playlists")
         .select("id, name")
