@@ -114,6 +114,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           type="button"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             handleSave();
           }}
           aria-label={isSaved ? "Unsave track" : "Save track"}
@@ -136,7 +137,10 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
               to="/artists/$id"
               params={{ id: song.artist.id }}
               className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
             >
               {artistName}
             </Link>
@@ -207,6 +211,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
             type="button"
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               handleSave(e);
             }}
             aria-label={isSaved ? "Unsave album" : "Save album"}
@@ -230,7 +235,10 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
           to="/artists/$id"
           params={{ id: album.artist.id }}
           className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
         >
           {album.artist.name}
         </Link>

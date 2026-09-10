@@ -238,7 +238,9 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     <>
       <button
         ref={buttonRef}
+        type="button"
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
           handleToggle();
         }}
