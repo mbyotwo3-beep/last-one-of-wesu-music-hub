@@ -87,10 +87,13 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   };
 
   return (
-    <div className="group text-left w-full relative cursor-pointer">
+    <Link to="/songs/$id" params={{ id: song.id }} className="group text-left w-full relative cursor-pointer block">
       <button
         type="button"
-        onClick={handlePlay}
+        onClick={(e) => {
+          e.preventDefault();
+          handlePlay();
+        }}
         className="relative block w-full cursor-pointer"
         aria-label={`Play ${song.title}`}
       >
@@ -109,7 +112,10 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       {user && (
         <button
           type="button"
-          onClick={handleSave}
+          onClick={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
           aria-label={isSaved ? "Unsave track" : "Save track"}
           className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
           style={{ position: "absolute" }}
@@ -130,7 +136,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
               to="/artists/$id"
               params={{ id: song.artist.id }}
               className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e.preventDefault()}
             >
               {artistName}
             </Link>
@@ -153,7 +159,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
