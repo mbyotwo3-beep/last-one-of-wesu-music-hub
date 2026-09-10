@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 
 interface FeaturedSlide {
@@ -18,6 +18,9 @@ interface HeroSliderProps {
 export function HeroSlider({ slides }: HeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const setTrack = usePlayer((s) => s.setTrack);
+  const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
 
   const nextSlide = () => {
     setCurrentIndex((prev) => (prev + 1) % slides.length);
@@ -35,7 +38,17 @@ export function HeroSlider({ slides }: HeroSliderProps) {
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  const handlePlay = (slide: FeaturedSlide) => {
+  const handlePlay = (slide: FeaturedSlide, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    const isCurrentTrack = currentTrackId === slide.id;
+    
+    if (isCurrentTrack) {
+      // Just toggle play/pause if it's the same track
+      togglePlay();
+      return;
+    }
+    
     setTrack({
       id: slide.id,
       title: slide.title,
@@ -43,14 +56,17 @@ export function HeroSlider({ slides }: HeroSliderProps) {
       coverUrl: slide.imageUrl,
       audioUrl: slide.audioUrl,
     });
+    togglePlay();
   };
 
   if (slides.length === 0) return null;
 
   const currentSlide = slides[currentIndex];
+  const isCurrentTrack = currentTrackId === currentSlide.id;
+  const isPlayingThisTrack = playing && isCurrentTrack;
 
   return (
-    <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[16/9] lg:aspect-[2.39/1] overflow-hidden rounded-2xl mb-8" onClick={() => handlePlay(currentSlide)} style={{ cursor: 'pointer' }}>
+    <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[16/9] lg:aspect-[2.39/1] overflow-hidden rounded-2xl mb-8">
       {/* Slide */}
       <div
         key={currentIndex}
@@ -72,11 +88,15 @@ export function HeroSlider({ slides }: HeroSliderProps) {
           </h2>
           <p className="text-xs sm:text-sm md:text-lg lg:text-xl text-zinc-300 mb-4 md:mb-6">{currentSlide.subtitle}</p>
           <button
-            onClick={() => handlePlay(currentSlide)}
+            onClick={(e) => handlePlay(currentSlide, e)}
             className="inline-flex items-center gap-1.5 px-4 py-2 sm:px-6 sm:py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-xs sm:text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
           >
-            <Play className="size-4 sm:size-5 fill-primary-foreground" />
-            Play Now
+            {isPlayingThisTrack ? (
+              <Pause className="size-4 sm:size-5" />
+            ) : (
+              <Play className="size-4 sm:size-5 fill-primary-foreground" />
+            )}
+            {isPlayingThisTrack ? "Pause" : "Play Now"}
           </button>
         </div>
       </div>

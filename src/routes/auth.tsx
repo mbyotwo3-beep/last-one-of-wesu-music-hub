@@ -7,6 +7,7 @@ import { toggleFollow } from "@/lib/follow.functions";
 import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
 import { TermsConsent } from "@/components/TermsConsent";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -95,25 +96,32 @@ function AuthPage() {
     // Handle post-authentication actions like follow, save, like
     if (action === "follow" && artistId) {
       try {
-        await toggleFollow({ data: { artist_id: artistId } });
+        const result = await toggleFollow({ data: { artist_id: artistId } });
+        toast.success(result.action === "followed" ? "Following artist" : "Unfollowed artist");
       } catch (err) {
         console.error("Failed to execute follow action after auth:", err);
+        toast.error("Failed to follow artist");
       }
     } else if (action === "save" && itemId && itemType) {
       try {
         if (itemType === "song") {
           await saveTrack({ data: { song_id: itemId } });
+          toast.success("Song saved to library");
         } else if (itemType === "album") {
           await saveAlbum({ data: { album_id: itemId } });
+          toast.success("Album saved to library");
         }
       } catch (err) {
         console.error("Failed to execute save action after auth:", err);
+        toast.error("Failed to save item");
       }
     } else if (action === "like" && itemId && itemType === "song") {
       try {
         await saveTrack({ data: { song_id: itemId } });
+        toast.success("Song liked");
       } catch (err) {
         console.error("Failed to execute like action after auth:", err);
+        toast.error("Failed to like song");
       }
     } else if (action === "addPlaylist" && itemId && itemType === "song") {
       // For add to playlist, we redirect back to the page and let the user add to playlist

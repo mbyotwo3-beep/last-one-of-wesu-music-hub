@@ -43,7 +43,7 @@ export const saveTrack = createServerFn({ method: "POST" })
       console.error("[saveTrack] Error:", error);
       throw new Error("Unable to save track. Please try again.");
     }
-    return { ok: true };
+    return { ok: true, action: "saved" };
   });
 
 export const unsaveTrack = createServerFn({ method: "POST" })
@@ -60,5 +60,5 @@ export const unsaveTrack = createServerFn({ method: "POST" })
       console.error("[unsaveTrack] Error:", error);
       throw new Error("Unable to remove track. Please try again.");
     }
-    return { ok: true };
+    return { ok: true, action: "unsaved" };
   });

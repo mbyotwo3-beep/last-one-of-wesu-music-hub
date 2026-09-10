@@ -22,7 +22,7 @@ export const saveAlbum = createServerFn({ method: "POST" })
       .from("saved_albums")
       .insert({ user_id: userId, album_id: data.album_id } as any);
     if (error && !/duplicate|unique/i.test(error.message)) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, action: "saved" };
   });
 
 export const unsaveAlbum = createServerFn({ method: "POST" })
@@ -36,5 +36,5 @@ export const unsaveAlbum = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .eq("album_id", data.album_id);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, action: "unsaved" };
   });

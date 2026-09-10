@@ -6,6 +6,7 @@ import {
   unsaveTrack,
 } from "@/lib/saved-tracks.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 /**
  * Reads/toggles whether the signed-in user has saved (liked) a track.
@@ -31,9 +32,11 @@ export function useSavedTrack(songId: string | null | undefined) {
     mutationFn: async () => {
       if (!songId) return;
       if (isSaved) {
-        await unsaveFn({ data: { song_id: songId } });
+        const result = await unsaveFn({ data: { song_id: songId } });
+        return result;
       } else {
-        await saveFn({ data: { song_id: songId } });
+        const result = await saveFn({ data: { song_id: songId } });
+        return result;
       }
     },
     onMutate: async () => {
@@ -47,10 +50,14 @@ export function useSavedTrack(songId: string | null | undefined) {
     onError: (error, _v, ctx) => {
       console.error("[useSavedTrack] Error toggling saved track:", error);
       if (ctx?.prev) qc.setQueryData(["saved-track-ids", user?.id], ctx.prev);
-      // Import toast dynamically to avoid circular dependency
-      import("sonner").then(({ toast }) => {
-        toast.error("Unable to update liked songs. Please try again.");
-      });
+      toast.error("Unable to update liked songs. Please try again.");
+    },
+    onSuccess: (result) => {
+      if (result?.action === "saved") {
+        toast.success("Added to Liked Songs");
+      } else if (result?.action === "unsaved") {
+        toast.success("Removed from Liked Songs");
+      }
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["saved-track-ids", user?.id] });

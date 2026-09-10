@@ -47,13 +47,13 @@ export const toggleFollow = createServerFn({ method: "POST" })
         .delete()
         .eq("id", (existing as { id: string }).id);
       if (error) throw new Error(error.message);
-      return { following: false };
+      return { following: false, action: "unfollowed" };
     }
     const { error } = await context.supabase
       .from("artist_followers")
       .insert({ user_id: context.userId, artist_id: data.artist_id });
     if (error) throw new Error(error.message);
-    return { following: true };
+    return { following: true, action: "followed" };
   });
 
 /**

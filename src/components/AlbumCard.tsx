@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,13 +19,24 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
   const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
   const formatPrice = useCurrency((s) => s.formatPrice);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
 
+  const isCurrentTrack = currentTrackId === id;
+  const isPlayingThisTrack = playing && isCurrentTrack;
+
   const handlePlay = async () => {
     try {
       const isPaid = price && Number(price) > 0;
+      
+      if (isCurrentTrack) {
+        // Just toggle play/pause if it's the same track
+        togglePlay();
+        return;
+      }
       
       if (isPaid) {
         const { url } = await getPreviewFn({ data: { song_id: id } });
@@ -74,7 +85,11 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
         {/* Play Button */}
         <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors">
-          <Play className="size-5 text-white fill-white ml-0.5" />
+          {isPlayingThisTrack ? (
+            <Pause className="size-5 text-white" />
+          ) : (
+            <Play className="size-5 text-white fill-white ml-0.5" />
+          )}
         </div>
       </div>
 

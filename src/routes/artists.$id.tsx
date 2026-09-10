@@ -107,14 +107,14 @@ function ArtistPage() {
       qc.setQueryData(followQK, (old: any) => ({
         ...old,
         following: res.following,
-        count: Math.max(0, (old?.count ?? 0) + (res.following ? 1 : -1)),
+        count: Math.max(0, old.count + (res.following ? 1 : -1)),
       }));
-      qc.invalidateQueries({ queryKey: ["similar-artists", id] });
-      toast.success(res.following ? `❤️ You're now following ${a.name}!` : `👋 Unfollowed ${a.name}`);
+      toast.success(res.action === "followed" ? `❤️ You're now following ${a.name}!` : `👋 Unfollowed ${a.name}`);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: followQK });
       qc.invalidateQueries({ queryKey: ["followed-artists"] });
+      qc.invalidateQueries({ queryKey: ["similar-artists", id] });
     },
   });
 

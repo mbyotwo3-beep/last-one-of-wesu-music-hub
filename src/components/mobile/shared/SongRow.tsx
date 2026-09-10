@@ -4,6 +4,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useServerFn } from "@tanstack/react-start";
 import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { toast } from "sonner";
+import { Play, Pause } from "lucide-react";
 
 interface SongRowProps {
   song: {
@@ -26,14 +27,23 @@ export function SongRow({ song }: SongRowProps) {
   const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
   const currentTrack = usePlayer((s) => s.track);
   const isActive = currentTrack?.id === song.id;
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
 
+  const isPlayingThisTrack = playing && isActive;
+
   const handlePlay = async () => {
     try {
       const isPaid = song.price && Number(song.price) > 0;
+      
+      if (isActive) {
+        // Just toggle play/pause if it's the same track
+        togglePlay();
+        return;
+      }
       
       if (isPaid) {
         const { url } = await getPreviewFn({ data: { song_id: song.id } });
@@ -90,6 +100,13 @@ export function SongRow({ song }: SongRowProps) {
           {song.price > 0 ? `K${Number(song.price).toFixed(2)}` : "Free"}
         </span>
       )}
+      <div className="shrink-0 w-8 flex justify-center">
+        {isPlayingThisTrack ? (
+          <Pause className="size-4 text-primary" />
+        ) : (
+          <Play className="size-4 text-muted-foreground" />
+        )}
+      </div>
     </button>
   );
 }
