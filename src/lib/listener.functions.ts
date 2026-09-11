@@ -130,6 +130,66 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getPlaylistWithSongs = createServerFn({ method: "GET" })
+  .validator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    const supabase = getPublicSupabase();
+    // 1. Fetch playlist
+    const { data: playlist, error: plError } = await supabase
+      .from("playlists")
+      .select("id,user_id,name,description,cover_url,is_public,created_at")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (plError) throw new Error(plError.message);
+    if (!playlist) return null;
+
+    // 2. Fetch playlist_songs
+    const { data: psRows, error: psError } = await supabase
+      .from("playlist_songs")
+      .select("song_id, position")
+      .eq("playlist_id", data.id)
+      .order("position", { ascending: true });
+
+    if (psError) throw new Error(psError.message);
+
+    const songIds = (psRows ?? []).map((r: any) => r.song_id).filter(Boolean);
+    if (songIds.length === 0) {
+      return { playlist, songs: [] };
+    }
+
+    // 3. Fetch songs
+    const { data: songRows, error: sError } = await supabase
+      .from("songs")
+      .select("id,title,duration,price,cover_url,artist_id,status")
+      .in("id", songIds);
+
+    if (sError) throw new Error(sError.message);
+
+    // 4. Fetch artists for these songs
+    const artistIds = [...new Set((songRows ?? []).map((s: any) => s.artist_id).filter(Boolean))];
+    const { data: artists } = artistIds.length > 0
+      ? await supabase.from("artists").select("id,name").in("id", artistIds)
+      : { data: [] };
+
+    const artistMap = new Map((artists ?? []).map((a: any) => [a.id, a]));
+
+    const songsById = new Map(
+      (songRows ?? []).map((s: any) => [
+        s.id,
+        {
+          ...s,
+          artist: s.artist_id ? artistMap.get(s.artist_id) ?? null : null,
+        },
+      ]),
+    );
+
+    // Preserve playlist position order
+    const orderedSongs = songIds.map((id) => songsById.get(id)).filter(Boolean);
+
+    return { playlist, songs: orderedSongs };
+  });
+
 export const getSignedAudioUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { song_id: string }) => d)

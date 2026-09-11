@@ -53,12 +53,13 @@ interface SongRowProps {
   index: number;
   artist: { id: string; name: string; avatar_url?: string | null } | null;
   albumTracks: any[];
+  albumId: string;
   currentTrackId: string | undefined;
   playing: boolean;
   onPlaySong: (song: any, index: number) => void;
 }
 
-function SongRow({ song: s, index: i, artist, albumTracks, currentTrackId, playing, onPlaySong }: SongRowProps) {
+function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId, currentTrackId, playing, onPlaySong }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -130,7 +131,7 @@ function SongRow({ song: s, index: i, artist, albumTracks, currentTrackId, playi
         <ShareMenu
           songId={s.id}
           songTitle={s.title}
-          albumId={albumTracks[i]?.id}
+          albumId={albumId}
           artistId={artist?.id}
           artistName={artist?.name}
           type="song"
@@ -320,6 +321,7 @@ function AlbumPage() {
                   index={i}
                   artist={artist}
                   albumTracks={albumTracks}
+                  albumId={id}
                   currentTrackId={currentTrackId}
                   playing={playing}
                   onPlaySong={handlePlaySong}

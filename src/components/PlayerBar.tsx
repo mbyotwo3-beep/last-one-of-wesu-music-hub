@@ -477,8 +477,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
       }
-      cleanupAudio();
+      // Only fully destroy the audio source when this is the real visible player
+      // bar (not the hidden audioOnly engine inside MobileShell). Clearing src on
+      // the shared singleton when swapping between mobile/desktop layouts would
+      // abruptly stop any music that is currently playing.
+      if (!audioOnly) {
+        cleanupAudio();
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (audioOnly) return null;

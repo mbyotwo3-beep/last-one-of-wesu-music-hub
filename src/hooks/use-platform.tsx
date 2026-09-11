@@ -37,7 +37,7 @@ export function useIsMobile(): boolean {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const mobileRegex = /android|ipad|iphone|ipod|windows phone|iemobile|blackberry|mobile/i;
     const isMobileUA = mobileRegex.test(userAgent);
-    const isSmallScreen = window.innerWidth < 768;
+    const isSmallScreen = window.innerWidth > 0 && window.innerWidth < 768;
     return isMobileUA || isSmallScreen;
   });
 
@@ -48,7 +48,7 @@ export function useIsMobile(): boolean {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
       const mobileRegex = /android|ipad|iphone|ipod|windows phone|iemobile|blackberry|mobile/i;
       const isMobileUA = mobileRegex.test(userAgent);
-      const isSmallScreen = window.innerWidth < 768;
+      const isSmallScreen = window.innerWidth > 0 && window.innerWidth < 768;
       setIsMobile(isMobileUA || isSmallScreen);
     };
 

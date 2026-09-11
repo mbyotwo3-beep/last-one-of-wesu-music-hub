@@ -10,6 +10,7 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { StorageImage } from "@/components/StorageImage";
+import { getAudio } from "@/lib/audio";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -53,8 +54,7 @@ export function NowPlayingScreen() {
 
   function handleSeek(values: number[]) {
     const newTime = values[0];
-    // Update the HTML audio element via the module-level reference in PlayerBar
-    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    const audio = getAudio();
     if (audio) audio.currentTime = newTime;
     setProgress(newTime);
   }

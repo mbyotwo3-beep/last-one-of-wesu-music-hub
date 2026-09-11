@@ -218,7 +218,6 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
           params={{ id: album.artist.id }}
           className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
           onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
           }}
         >

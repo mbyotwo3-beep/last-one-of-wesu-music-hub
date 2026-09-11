@@ -21,6 +21,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { DownloadButton } from "@/components/DownloadButton";
+import { getAudio } from "@/lib/audio";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -77,7 +78,7 @@ export function NowPlayingSheet() {
 
   // Sync volume to audio element
   useEffect(() => {
-    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    const audio = getAudio();
     if (audio) audio.volume = volume;
   }, [volume]);
 
@@ -86,7 +87,7 @@ export function NowPlayingSheet() {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const newTime = pct * dur;
-    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    const audio = getAudio();
     if (audio) audio.currentTime = newTime;
     setProgress(Math.floor(newTime));
   }
@@ -106,7 +107,7 @@ export function NowPlayingSheet() {
   function handleSeekTouchEnd() {
     if (!isDragging) return;
     setIsDragging(false);
-    const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    const audio = getAudio();
     if (audio) audio.currentTime = dragProgress;
     setProgress(dragProgress);
   }
