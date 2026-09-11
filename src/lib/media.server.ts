@@ -74,3 +74,32 @@ export async function copyFromSupabase(bucket: MediaBucket, path: string): Promi
     return false;
   }
 }
+
+/**
+ * Delete a media object from R2 (if configured) and Supabase storage to reclaim space.
+ * Safe to call even if the object was already deleted or doesn't exist.
+ */
+export async function deleteStoredMedia(bucket: MediaBucket, path: string): Promise<void> {
+  if (!path || typeof path !== "string") return;
+  // Ignore external full URLs
+  if (/^https?:\/\//i.test(path)) return;
+
+  // 1. Delete from R2 if configured
+  if (isR2Configured()) {
+    try {
+      const { r2Delete } = await import("./r2.server");
+      await r2Delete(bucket, path);
+    } catch (err) {
+      console.warn(`[Storage Cleanup] Failed to delete ${path} from R2 bucket ${bucket}:`, err);
+    }
+  }
+
+  // 2. Delete from Supabase Storage
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.storage.from(bucket).remove([path]);
+  } catch (err) {
+    console.warn(`[Storage Cleanup] Failed to delete ${path} from Supabase bucket ${bucket}:`, err);
+  }
+}
+

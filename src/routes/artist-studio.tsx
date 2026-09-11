@@ -2,7 +2,28 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar, Copy, GripVertical, Plus, ListOrdered } from "lucide-react";
+import {
+  Upload,
+  Wallet,
+  FolderPlus,
+  Users,
+  Building2,
+  Star,
+  ImagePlus,
+  FileAudio,
+  X,
+  Calendar,
+  Copy,
+  GripVertical,
+  Plus,
+  ListOrdered,
+  ChevronUp,
+  ChevronDown,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Clock,
+} from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -415,6 +436,32 @@ function UploadWizard() {
   const singleAudioInputRef = useRef<HTMLInputElement>(null);
   const dragSrcIndex = useRef<number | null>(null);
 
+  // Live itemized upload progress state
+  const [uploadStates, setUploadStates] = useState<
+    Array<{
+      id: string;
+      name: string;
+      stage: "waiting" | "uploading" | "saving" | "done" | "error";
+      percent: number;
+      errorMsg?: string;
+    }>
+  >([]);
+  const [overallProgress, setOverallProgress] = useState<number>(0);
+  const [currentStageText, setCurrentStageText] = useState<string>("");
+
+  // Prevent accidental tab close, navigation, or reload while uploading or when files are staged
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (busy || tracks.length > 0 || cover) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved upload progress. Leaving this page will cancel your upload.";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [busy, tracks.length, cover]);
+
   // Persist form state to sessionStorage - combined into single effect
   useEffect(() => {
     const formData = {
@@ -528,6 +575,17 @@ function UploadWizard() {
     dragSrcIndex.current = null;
   }
 
+  function moveTrack(fromIndex: number, direction: -1 | 1) {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= tracks.length) return;
+    setTracks((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   function validatePricing(): string | null {
     if (mode === "single") {
       if (tier === "free") {
@@ -554,13 +612,91 @@ function UploadWizard() {
 
     setError(null);
     setBusy(true);
+
+    // Build the initial upload tracking list
+    const items: Array<{
+      id: string;
+      name: string;
+      stage: "waiting" | "uploading" | "saving" | "done" | "error";
+      percent: number;
+      errorMsg?: string;
+    }> = [];
+
+    if (cover) {
+      items.push({
+        id: "cover-art",
+        name: `Cover Art (${cover.name})`,
+        stage: "waiting",
+        percent: 0,
+      });
+    }
+    if (mode === "album") {
+      items.push({
+        id: "album-meta",
+        name: `Album Package ("${title.trim()}")`,
+        stage: "waiting",
+        percent: 0,
+      });
+    }
+    tracks.forEach((t, idx) => {
+      items.push({
+        id: t.id,
+        name: `Track ${idx + 1}: "${t.title.trim() || t.file.name}"`,
+        stage: "waiting",
+        percent: 0,
+      });
+    });
+
+    setUploadStates(items);
+    setOverallProgress(0);
+
+    const totalSteps = items.length;
+    let completedSteps = 0;
+
+    const calcOverall = (currentPercent: number) => {
+      const overall = Math.round(((completedSteps + currentPercent / 100) / totalSteps) * 100);
+      setOverallProgress(Math.min(99, overall));
+    };
+
     try {
-      const cover_url = cover
-        ? await uploadFileToBucket("album-art", user.id, cover)
-        : undefined;
+      let cover_url: string | undefined = undefined;
+      if (cover) {
+        setCurrentStageText(`Uploading cover art (${cover.name})…`);
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === "cover-art" ? { ...it, stage: "uploading", percent: 0 } : it)),
+        );
+        cover_url = await uploadFileToBucket("album-art", user.id, cover, (pct) => {
+          setUploadStates((prev) =>
+            prev.map((it) => (it.id === "cover-art" ? { ...it, percent: pct } : it)),
+          );
+          calcOverall(pct);
+        });
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === "cover-art" ? { ...it, stage: "done", percent: 100 } : it)),
+        );
+        completedSteps++;
+        calcOverall(0);
+      }
 
       if (mode === "single") {
-        const audio_url = await uploadFileToBucket("song-audio", user.id, tracks[0].file);
+        const trackEntry = tracks[0];
+        setCurrentStageText(`Uploading audio file: "${trackEntry.title.trim() || trackEntry.file.name}"…`);
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === trackEntry.id ? { ...it, stage: "uploading", percent: 0 } : it)),
+        );
+
+        const audio_url = await uploadFileToBucket("song-audio", user.id, trackEntry.file, (pct) => {
+          setUploadStates((prev) =>
+            prev.map((it) => (it.id === trackEntry.id ? { ...it, percent: pct } : it)),
+          );
+          calcOverall(pct);
+        });
+
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === trackEntry.id ? { ...it, stage: "saving", percent: 100 } : it)),
+        );
+        setCurrentStageText("Registering song with platform…");
+
         const res = await uploadFn({
           data: {
             title: title.trim(),
@@ -574,6 +710,13 @@ function UploadWizard() {
             has_label: hasLabel,
           },
         });
+
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === trackEntry.id ? { ...it, stage: "done" } : it)),
+        );
+        completedSteps++;
+        setOverallProgress(100);
+        setCurrentStageText("Upload complete! ✓");
 
         // Handle feature artist invitation
         const featureEmail = sessionStorage.getItem("upload-wizard-featureEmail");
@@ -647,6 +790,11 @@ function UploadWizard() {
       }
 
       // Album flow
+      setCurrentStageText(`Creating album package: "${title.trim()}"…`);
+      setUploadStates((prev) =>
+        prev.map((it) => (it.id === "album-meta" ? { ...it, stage: "saving" } : it)),
+      );
+
       const album = await createAlbumFn({
         data: {
           title: title.trim(),
@@ -657,12 +805,37 @@ function UploadWizard() {
           release_date: releaseDate || undefined,
         },
       });
+
+      setUploadStates((prev) =>
+        prev.map((it) => (it.id === "album-meta" ? { ...it, stage: "done", percent: 100 } : it)),
+      );
+      completedSteps++;
+      calcOverall(0);
+
+      // Upload each song sequentially in the exact ordered arrangement chosen by the artist
       for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
         const entry = tracks[trackIdx];
-        const audio_url = await uploadFileToBucket("song-audio", user.id, entry.file);
+        const trackTitle = entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, "");
+        setCurrentStageText(`Uploading track ${trackIdx + 1} of ${tracks.length}: "${trackTitle}"…`);
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === entry.id ? { ...it, stage: "uploading", percent: 0 } : it)),
+        );
+
+        const audio_url = await uploadFileToBucket("song-audio", user.id, entry.file, (pct) => {
+          setUploadStates((prev) =>
+            prev.map((it) => (it.id === entry.id ? { ...it, percent: pct } : it)),
+          );
+          calcOverall(pct);
+        });
+
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === entry.id ? { ...it, stage: "saving", percent: 100 } : it)),
+        );
+        setCurrentStageText(`Saving track ${trackIdx + 1} of ${tracks.length}: "${trackTitle}"…`);
+
         await uploadFn({
           data: {
-            title: entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, ""),
+            title: trackTitle,
             audio_url,
             cover_url,
             price,
@@ -672,7 +845,16 @@ function UploadWizard() {
             track_number: trackIdx + 1,
           },
         });
+
+        setUploadStates((prev) =>
+          prev.map((it) => (it.id === entry.id ? { ...it, stage: "done" } : it)),
+        );
+        completedSteps++;
+        calcOverall(0);
       }
+
+      setOverallProgress(100);
+      setCurrentStageText("All tracks uploaded and processed successfully! ✓");
 
       // Handle label invitation for album
       const labelEmail = sessionStorage.getItem("upload-wizard-labelEmail");
@@ -718,6 +900,13 @@ function UploadWizard() {
       const msg = (err as Error).message;
       setError(msg);
       toast.error(msg);
+      setUploadStates((prev) =>
+        prev.map((it) =>
+          it.stage === "uploading" || it.stage === "saving"
+            ? { ...it, stage: "error", errorMsg: msg }
+            : it,
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -1097,15 +1286,17 @@ function UploadWizard() {
             <div className="space-y-3">
               {/* Add buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium flex-1 min-w-0">
-                  <ListOrdered className="inline size-4 mr-1 text-primary" />
-                  Tracklist{tracks.length > 0 ? ` — ${tracks.length} song${tracks.length > 1 ? "s" : ""}` : ""}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold flex items-center gap-1.5">
+                    <ListOrdered className="size-4 text-primary" />
+                    Tracklist Order{tracks.length > 0 ? ` (${tracks.length} song${tracks.length > 1 ? "s" : ""})` : ""}
+                  </p>
+                </div>
                 {/* Single add */}
                 <button
                   type="button"
                   onClick={() => singleAudioInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-accent transition"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer"
                 >
                   <Plus className="size-3.5" /> Add song
                 </button>
@@ -1113,7 +1304,7 @@ function UploadWizard() {
                 <button
                   type="button"
                   onClick={() => audioInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:brightness-110 transition"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:brightness-110 transition cursor-pointer"
                 >
                   <Upload className="size-3.5" /> Add multiple
                 </button>
@@ -1136,6 +1327,15 @@ function UploadWizard() {
                 />
               </div>
 
+              {tracks.length > 0 && (
+                <div className="text-xs text-muted-foreground bg-secondary/40 border border-border/60 rounded-xl px-3.5 py-2.5 flex items-center gap-2">
+                  <span className="text-primary font-bold">ℹ</span>
+                  <span>
+                    Tracks will appear on your album in this exact sequence. Use the <strong>↑</strong> and <strong>↓</strong> arrow buttons or drag to arrange your track order.
+                  </span>
+                </div>
+              )}
+
               {tracks.length === 0 ? (
                 /* Drop zone shown when empty */
                 <div
@@ -1147,8 +1347,8 @@ function UploadWizard() {
                   <p className="text-sm text-muted-foreground">Drop audio files here, or use the buttons above</p>
                 </div>
               ) : (
-                /* Drag-to-reorder tracklist */
-                <ul className="space-y-1.5">
+                /* Drag-to-reorder tracklist with Up/Down buttons */
+                <ul className="space-y-2">
                   {tracks.map((entry, i) => (
                     <li
                       key={entry.id}
@@ -1156,34 +1356,77 @@ function UploadWizard() {
                       onDragStart={() => handleDragStart(i)}
                       onDragOver={(e) => handleDragOver(e, i)}
                       onDragEnd={handleDragEnd}
-                      className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2 py-2 group hover:border-primary/40 transition cursor-grab active:cursor-grabbing"
+                      className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 p-2.5 group hover:border-primary/40 transition shadow-sm"
                     >
-                      {/* Track number */}
-                      <span className="shrink-0 w-5 text-xs text-muted-foreground text-right select-none">{i + 1}</span>
                       {/* Drag handle */}
-                      <GripVertical className="shrink-0 size-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
+                      <div
+                        className="shrink-0 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="size-4" />
+                      </div>
+
+                      {/* Track number badge */}
+                      <span className="shrink-0 size-7 rounded-lg bg-secondary border border-border/80 flex items-center justify-center text-xs font-bold font-mono text-muted-foreground select-none">
+                        #{i + 1}
+                      </span>
+
+                      {/* Move Up / Down controls */}
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => moveTrack(i, -1)}
+                          disabled={i === 0}
+                          title="Move track up"
+                          aria-label="Move track up"
+                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                        >
+                          <ChevronUp className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTrack(i, 1)}
+                          disabled={i === tracks.length - 1}
+                          title="Move track down"
+                          aria-label="Move track down"
+                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                        >
+                          <ChevronDown className="size-3.5" />
+                        </button>
+                      </div>
+
                       {/* Editable title */}
                       <input
                         type="text"
                         value={entry.title}
-                        onChange={(e) => setTracks((prev) => prev.map((t, j) => j === i ? { ...t, title: e.target.value } : t))}
+                        onChange={(e) =>
+                          setTracks((prev) =>
+                            prev.map((t, j) => (j === i ? { ...t, title: e.target.value } : t)),
+                          )
+                        }
                         onClick={(e) => e.stopPropagation()}
                         onDragStart={(e) => e.stopPropagation()}
                         placeholder="Track title"
-                        className="flex-1 min-w-0 bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary transition-colors px-0.5 py-0"
+                        className="flex-1 min-w-0 bg-background/60 border border-border/80 rounded-lg px-3 py-1.5 text-sm font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                       />
-                      {/* Filename hint */}
-                      <span className="hidden sm:block shrink-0 max-w-[120px] truncate text-xs text-muted-foreground" title={entry.file.name}>
-                        {entry.file.name}
+
+                      {/* Filename & size hint */}
+                      <span
+                        className="hidden sm:block shrink-0 max-w-[130px] truncate text-xs text-muted-foreground font-mono"
+                        title={`${entry.file.name} (${(entry.file.size / (1024 * 1024)).toFixed(1)} MB)`}
+                      >
+                        {(entry.file.size / (1024 * 1024)).toFixed(1)} MB
                       </span>
+
                       {/* Remove */}
                       <button
                         type="button"
                         onClick={() => setTracks((prev) => prev.filter((_, j) => j !== i))}
-                        className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
                         aria-label="Remove track"
+                        title="Remove track"
                       >
-                        <X className="size-3.5" />
+                        <X className="size-4" />
                       </button>
                     </li>
                   ))}
@@ -1305,20 +1548,136 @@ function UploadWizard() {
             </label>
           )}
 
+          {/* Active Upload Progress Panel */}
+          {(busy || uploadStates.length > 0) && (
+            <div className="bg-secondary/30 border border-primary/30 rounded-2xl p-5 space-y-4 shadow-md">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    {busy ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="size-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-sm sm:text-base text-foreground truncate">
+                      {mode === "album" ? "Uploading Album & Songs" : "Uploading Song"}
+                    </h3>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {currentStageText || "Please keep this tab open until all uploads complete."}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xl font-bold font-mono text-primary">{overallProgress}%</span>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Progress</p>
+                </div>
+              </div>
+
+              {/* Overall Progress Bar */}
+              <div className="w-full bg-secondary rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${overallProgress}%` }}
+                />
+              </div>
+
+              {/* Itemized list of files / tracks */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {uploadStates.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs sm:text-sm transition-all ${
+                      item.stage === "uploading"
+                        ? "border-primary/50 bg-primary/5"
+                        : item.stage === "done"
+                        ? "border-border/60 bg-card/60 text-muted-foreground"
+                        : item.stage === "error"
+                        ? "border-destructive/50 bg-destructive/5 text-destructive"
+                        : "border-border/40 bg-secondary/20 text-muted-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
+                      <div className="shrink-0">
+                        {item.stage === "done" ? (
+                          <CheckCircle2 className="size-4 text-primary" />
+                        ) : item.stage === "uploading" ? (
+                          <Loader2 className="size-4 text-primary animate-spin" />
+                        ) : item.stage === "saving" ? (
+                          <Loader2 className="size-4 text-primary animate-spin" />
+                        ) : item.stage === "error" ? (
+                          <AlertCircle className="size-4 text-destructive" />
+                        ) : (
+                          <Clock className="size-4 text-muted-foreground/60" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate font-medium ${item.stage === "uploading" ? "text-foreground font-semibold" : ""}`}>
+                          {item.name}
+                        </p>
+                        {item.stage === "uploading" && (
+                          <div className="w-full bg-secondary rounded-full h-1.5 mt-1.5 overflow-hidden">
+                            <div
+                              className="bg-primary h-1.5 rounded-full transition-all duration-150"
+                              style={{ width: `${item.percent}%` }}
+                            />
+                          </div>
+                        )}
+                        {item.stage === "error" && item.errorMsg && (
+                          <p className="text-xs text-destructive mt-0.5">{item.errorMsg}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right font-medium">
+                      {item.stage === "done" && (
+                        <span className="text-xs font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10">
+                          Uploaded ✓
+                        </span>
+                      )}
+                      {item.stage === "uploading" && (
+                        <span className="text-xs font-mono font-bold text-primary">
+                          {item.percent}%
+                        </span>
+                      )}
+                      {item.stage === "saving" && (
+                        <span className="text-xs text-muted-foreground animate-pulse">
+                          Saving…
+                        </span>
+                      )}
+                      {item.stage === "waiting" && (
+                        <span className="text-xs text-muted-foreground">
+                          In queue
+                        </span>
+                      )}
+                      {item.stage === "error" && (
+                        <span className="text-xs font-semibold text-destructive">
+                          Failed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex justify-between">
             <button
               type="button"
+              disabled={busy}
               onClick={() => setStep(2)}
-              className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+              className="px-4 py-2 rounded-full bg-secondary border border-border text-sm disabled:opacity-40"
             >
               ← Back
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-40"
+              className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-40 cursor-pointer"
             >
               {busy ? "Uploading…" : mode === "album" ? "Submit album" : "Submit song"}
             </button>

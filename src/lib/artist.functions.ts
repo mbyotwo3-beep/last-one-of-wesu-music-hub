@@ -105,6 +105,32 @@ export const updateArtistProfile = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+
+    // Fetch existing artist photos to delete old ones when replaced
+    const { data: existing } = await supabase
+      .from("artists")
+      .select("avatar_url, cover_url")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existing?.avatar_url && data.avatar_url && data.avatar_url !== existing.avatar_url) {
+      try {
+        const { deleteStoredMedia } = await import("./media.server");
+        await deleteStoredMedia("artist-images", existing.avatar_url);
+      } catch (err) {
+        console.warn("[Artist Update] Could not delete old avatar photo:", err);
+      }
+    }
+
+    if (existing?.cover_url && data.cover_url && data.cover_url !== existing.cover_url) {
+      try {
+        const { deleteStoredMedia } = await import("./media.server");
+        await deleteStoredMedia("artist-images", existing.cover_url);
+      } catch (err) {
+        console.warn("[Artist Update] Could not delete old cover photo:", err);
+      }
+    }
+
     const patch: any = {};
     for (const k of ["name", "bio", "genre", "avatar_url", "cover_url"] as const) {
       if (data[k] !== undefined) patch[k] = data[k];
@@ -242,12 +268,34 @@ export const deleteSong = createServerFn({ method: "POST" })
       /* ignore */
     }
 
-    // 4. Clean up audio file from storage (best-effort)
+    // 4. Clean up audio and cover art files from storage (best-effort)
     try {
       if (song.audio_url) {
         const { r2Delete, isR2Configured } = await import("./r2.server");
         if (isR2Configured()) await r2Delete("song-audio", song.audio_url);
         await supabaseAdmin.storage.from("song-audio").remove([song.audio_url]);
+      }
+      if (song.cover_url) {
+        // Only delete cover art if no other song or album is using it
+        const { data: sharedSong } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("cover_url", song.cover_url)
+          .neq("id", song.id)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: sharedAlbum } = await supabaseAdmin
+          .from("albums")
+          .select("id")
+          .eq("cover_url", song.cover_url)
+          .limit(1)
+          .maybeSingle();
+
+        if (!sharedSong && !sharedAlbum) {
+          const { deleteStoredMedia } = await import("./media.server");
+          await deleteStoredMedia("album-art", song.cover_url);
+        }
       }
     } catch {
       /* ignore */

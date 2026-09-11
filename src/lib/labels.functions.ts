@@ -97,6 +97,25 @@ export const updateLabel = createServerFn({ method: "POST" })
       if (data[k] !== undefined) patch[k] = data[k];
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Clean up old logo from storage if replaced
+    if (data.logo_url) {
+      const { data: existing } = await supabaseAdmin
+        .from("labels")
+        .select("logo_url")
+        .eq("id", data.id)
+        .maybeSingle();
+
+      if (existing?.logo_url && existing.logo_url !== data.logo_url) {
+        try {
+          const { deleteStoredMedia } = await import("./media.server");
+          await deleteStoredMedia("label-images", existing.logo_url);
+        } catch (err) {
+          console.warn("[Label Update] Could not delete old logo photo:", err);
+        }
+      }
+    }
+
     const { error } = await supabaseAdmin.from("labels").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(userId, "label.update", "label", data.id, patch);

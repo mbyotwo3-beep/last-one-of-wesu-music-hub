@@ -48,3 +48,33 @@ export const signImageUrl = createServerFn({ method: "POST" })
     // Use public URL instead of signed URL to support multiple domains
     return { url: await signMediaUrl(data.bucket, data.path, { expiresIn: 3600 }) };
   });
+
+/** Delete an image media object from storage to save storage space (photos only). */
+export const deleteMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { bucket: Exclude<MediaBucketName, "song-audio">; path: string }) => d)
+  .handler(async ({ context, data }) => {
+    const photoBuckets = ["album-art", "artist-images", "user-avatars", "label-images", "hero-images"];
+    if (!photoBuckets.includes(data.bucket)) {
+      throw new Error("Invalid photo bucket for deletion");
+    }
+    if (!data.path || typeof data.path !== "string") {
+      throw new Error("Missing path for deletion");
+    }
+
+    // Security check: must be in caller's own user folder or caller is staff
+    const ownerPrefix = `${context.userId}/`;
+    const isOwner = data.path.startsWith(ownerPrefix);
+    if (!isOwner) {
+      const { isStaffUser } = await import("./roles");
+      const isStaff = await isStaffUser(context.supabase, context.userId);
+      if (!isStaff) {
+        throw new Error("Unauthorized to delete this media file");
+      }
+    }
+
+    const { deleteStoredMedia } = await import("./media.server");
+    await deleteStoredMedia(data.bucket as any, data.path);
+    return { ok: true };
+  });
+

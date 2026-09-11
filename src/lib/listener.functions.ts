@@ -15,9 +15,19 @@ export const updateProfile = createServerFn({ method: "POST" })
     // Check if profile exists
     const { data: existing } = await context.supabase
       .from("profiles")
-      .select("id")
+      .select("id, avatar_url")
       .eq("user_id", context.userId)
       .maybeSingle();
+
+    // Clean up old avatar image from storage if replaced
+    if (existing?.avatar_url && data.avatar_url && data.avatar_url !== existing.avatar_url) {
+      try {
+        const { deleteStoredMedia } = await import("./media.server");
+        await deleteStoredMedia("user-avatars", existing.avatar_url);
+      } catch (err) {
+        console.warn("[Profile Update] Could not delete old avatar photo:", err);
+      }
+    }
     
     let error;
     if (existing) {
