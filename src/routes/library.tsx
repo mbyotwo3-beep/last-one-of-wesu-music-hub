@@ -382,8 +382,8 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={handlePlay}
-          className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl"
-          title={isPlaying ? "Pause" : (isPaid ? "Preview (15s)" : "Play")}
+          className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl cursor-pointer"
+          title={isPlaying ? "Pause" : "Play"}
         >
           {isPlaying ? (
             <Pause className="size-4 fill-current" />
