@@ -44,12 +44,14 @@ function Page() {
       return data ?? [];
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const createM = useMutation({
     mutationFn: createFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       setShowCreate(false);
       setNewPlaylist({ name: "", description: "", make_public: false });
       toast.success("Playlist created successfully");
@@ -63,6 +65,7 @@ function Page() {
     mutationFn: deleteFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       toast.success("Playlist deleted successfully");
     },
     onError: (error) => {

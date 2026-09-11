@@ -50,6 +50,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const safeLikedSongs = (likedSongs ?? []).filter(hasId);

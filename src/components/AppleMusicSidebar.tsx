@@ -36,6 +36,7 @@ export function AppleMusicSidebar() {
       return data ?? [];
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   return (

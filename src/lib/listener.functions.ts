@@ -84,12 +84,37 @@ export const addToPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)
   .handler(async ({ context, data }) => {
+    // Check if song is already in playlist
+    const { data: existing } = await context.supabase
+      .from("playlist_songs")
+      .select("id")
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", data.song_id)
+      .maybeSingle();
+    
+    if (existing) {
+      return { ok: true, alreadyInPlaylist: true };
+    }
+    
+    // Get the current max position for this playlist
+    const { data: maxPos } = await context.supabase
+      .from("playlist_songs")
+      .select("position")
+      .eq("playlist_id", data.playlist_id)
+      .order("position", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    const nextPosition = (maxPos?.position ?? -1) + 1;
+    
     const { error } = await context.supabase.from("playlist_songs").insert({
       playlist_id: data.playlist_id,
       song_id: data.song_id,
+      position: nextPosition,
     } as any);
+    
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, alreadyInPlaylist: false };
   });
 
 export const removeFromPlaylist = createServerFn({ method: "POST" })

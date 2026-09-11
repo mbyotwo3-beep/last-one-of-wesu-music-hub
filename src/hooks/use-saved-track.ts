@@ -23,7 +23,7 @@ export function useSavedTrack(songId: string | null | undefined) {
     queryKey: ["saved-track-ids", user?.id],
     queryFn: () => listFn(),
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const isSaved = !!(songId && idsQ.data?.includes(songId));
@@ -63,6 +63,7 @@ export function useSavedTrack(songId: string | null | undefined) {
       qc.invalidateQueries({ queryKey: ["saved-track-ids", user?.id] });
       qc.invalidateQueries({ queryKey: ["saved-tracks", user?.id] });
       qc.invalidateQueries({ queryKey: ["my-overview", user?.id] });
+      qc.invalidateQueries({ queryKey: ["library", user?.id] });
     },
   });
 

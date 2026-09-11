@@ -56,7 +56,7 @@ const recentAlbumsQO = queryOptions({
 const playlistsQO = queryOptions({
   queryKey: ["browse-playlists"],
   queryFn: () => getPublicPlaylists(),
-  staleTime: 5 * 60 * 1000,
+  staleTime: 0, // Always refetch to ensure immediate updates
 });
 const genresQO = queryOptions({
   queryKey: ["browse-genres"],

@@ -66,10 +66,16 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
 
   const addToPlaylistMutation = useMutation({
     mutationFn: addToPlaylistFn,
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["playlist", variables.data.playlist_id] });
+      if (result?.alreadyInPlaylist) {
+        toast.info("Song already in playlist");
+      } else {
+        toast.success("Added to playlist");
+      }
       setShowPlaylistModal(false);
-      toast.success("Added to playlist");
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
@@ -77,6 +83,8 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const createPlaylistMutation = useMutation({
     mutationFn: createPlaylistFn,
     onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       if (songId) {
         addToPlaylistMutation.mutate({ data: { playlist_id: data.id, song_id: songId } });
       }
@@ -186,7 +194,10 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   };
 
   const handleCopyLink = () => {
-    let url = window.location.origin;
+    // Use the current page's base URL to ensure we get the correct domain
+    // This handles both wesuplus.com and wesuplusly.com correctly
+    const baseUrl = window.location.origin;
+    let url = baseUrl;
     let title = "";
     
     if (type === "song" && songId) {
