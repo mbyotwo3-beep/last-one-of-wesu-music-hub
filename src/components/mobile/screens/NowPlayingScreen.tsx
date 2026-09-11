@@ -9,6 +9,7 @@ import { useTrackMeta } from "@/hooks/use-track-meta";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { StorageImage } from "@/components/StorageImage";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -31,6 +32,8 @@ export function NowPlayingScreen() {
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const audioUrl = usePlayer((s) => s.track?.audioUrl);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const skipNext = usePlayer((s) => s.skipNext);
+  const skipPrev = usePlayer((s) => s.skipPrev);
   const setProgress = usePlayer((s) => s.setProgress);
   const isPreview = usePlayer((s) => s.isPreview);
   const { data: meta } = useTrackMeta(track?.id);
@@ -89,7 +92,12 @@ export function NowPlayingScreen() {
       <div className="flex-1 flex items-center justify-center mb-6">
         <div className="min-h-[280px] min-w-[280px] size-[280px] rounded-2xl overflow-hidden bg-card ring-1 ring-white/10 flex items-center justify-center">
           {track.coverUrl ? (
-            <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+            <StorageImage
+              bucket="album-art"
+              path={track.coverUrl}
+              alt={track.title}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <Music2 className="size-16 text-muted-foreground" />
           )}
@@ -155,6 +163,7 @@ export function NowPlayingScreen() {
       {/* Playback controls */}
       <div className="flex items-center justify-between mb-6">
         <button
+          onClick={skipPrev}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
           aria-label="Previous"
         >
@@ -175,6 +184,7 @@ export function NowPlayingScreen() {
           )}
         </button>
         <button
+          onClick={skipNext}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
           aria-label="Next"
         >
