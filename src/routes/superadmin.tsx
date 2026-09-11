@@ -379,7 +379,7 @@ function OverviewTab() {
   const cards = [
     { label: "Total Users", value: data.totalUsers.toLocaleString(), color: "text-blue-400" },
     { label: "Total Artists", value: ((data as any).totalArtists ?? 0).toLocaleString(), color: "text-purple-400" },
-    { label: "Total Songs", value: data.totalSongs.toLocaleString(), color: "text-green-400" },
+    { label: "Total Songs", value: data.totalSongs.toLocaleString(), color: "text-rose-400" },
     { label: "Completed purchases (30d)", value: data.completedPurchases30d.toLocaleString(), color: "text-yellow-400" },
     {
       label: "Revenue (30 days)",

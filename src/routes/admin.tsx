@@ -182,7 +182,7 @@ function Overview({
     ? [
         { label: "Total Users", value: d.totalUsers.toLocaleString(), icon: Users, color: "text-blue-400" },
         { label: "Total Artists", value: (d as any).totalArtists?.toLocaleString() ?? "0", icon: Music, color: "text-purple-400" },
-        { label: "Total Songs", value: d.totalSongs.toLocaleString(), icon: Music, color: "text-green-400" },
+        { label: "Total Songs", value: d.totalSongs.toLocaleString(), icon: Music, color: "text-rose-400" },
         { label: "Completed purchases (30d)", value: d.completedPurchases30d.toLocaleString(), icon: CreditCard, color: "text-yellow-400" },
         { label: "Revenue (30 days)", value: `ZMW ${d.monthlyRevenueZmw.toFixed(2)}`, icon: TrendingUp, color: "text-primary" },
       ]
@@ -1075,7 +1075,7 @@ function Diagnostics() {
             <p className="text-xs text-muted-foreground mt-1">Total Artists</p>
           </div>
           <div className="bg-accent rounded-xl p-4">
-            <p className="text-2xl font-bold text-green-500">{info.summary.visibleOnArtistsPage}</p>
+            <p className="text-2xl font-bold text-primary">{info.summary.visibleOnArtistsPage}</p>
             <p className="text-xs text-muted-foreground mt-1">Visible on /artists</p>
           </div>
           <div className="bg-accent rounded-xl p-4">

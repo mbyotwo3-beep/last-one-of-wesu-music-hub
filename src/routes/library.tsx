@@ -241,7 +241,7 @@ function Page() {
                 />
                 <p className="font-semibold text-sm truncate">{album.title}</p>
                 <p className="text-xs text-muted-foreground truncate">{album.artists?.name ?? "Unknown"}</p>
-                <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full mt-2 inline-block">
+                <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full mt-2 inline-block font-medium">
                   Owned
                 </span>
               </Link>
@@ -521,7 +521,7 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
           )}
         </button>
         <DownloadButton songId={song.id} />
-        <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full font-medium">
+        <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">
           Owned
         </span>
       </div>

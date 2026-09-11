@@ -130,7 +130,7 @@ function CheckoutSuccessPage() {
     typeof tx?.metadata?.failure_reason === "string" ? tx.metadata.failure_reason : null;
 
   const StatusBadge = () => {
-    if (isSuccess) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-500 border border-green-500/20">Completed</span>;
+    if (isSuccess) return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25">Completed</span>;
     if (isFailed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-500 border border-red-500/20">Failed</span>;
     if (isPending) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">Processing</span>;
     return null;
@@ -188,7 +188,7 @@ function CheckoutSuccessPage() {
         <div className="bg-card border border-white/5 rounded-2xl p-8 text-center">
           {isSuccess ? (
             <>
-              <CheckCircle className="size-16 text-green-500 mx-auto mb-4" />
+              <CheckCircle className="size-16 text-primary mx-auto mb-4" />
               <h1 className="text-3xl font-bold mb-2">Payment Successful!</h1>
               <p className="text-muted-foreground mb-6">
                 Thank you for your purchase — your track is now unlocked.

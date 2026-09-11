@@ -64,7 +64,7 @@ function Page() {
       return await update(data);
     },
     onSuccess: () => {
-      toast.success("✅ Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setIsEditing(false);
       // Invalidate profile-related queries so changes appear immediately
       qc.invalidateQueries({ queryKey: ["profile", user?.id] });
