@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { Music2, Play, Pause, ShoppingBag, Heart } from "lucide-react";
+import { Music2, Play, Pause, ShoppingBag, Heart, ArrowLeft } from "lucide-react";
 import { getSongById } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/songs/$id")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: `${loaderData?.title ?? "Song"} — Wesu+` },
+      { title: `${loaderData?.title ?? "Song"} — Wesu+"` },
       {
         name: "description",
         content: `Listen to ${loaderData?.title ?? "music"} on Wesu+`,
@@ -66,8 +66,15 @@ function SongPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 pb-32">
-      <div className="rounded-3xl bg-gradient-to-br from-primary/30 via-card to-background p-6 md:p-10">
+    <div className="max-w-4xl mx-auto px-6 py-8 pb-32">
+      <button
+        onClick={() => window.history.back()}
+        className="text-sm font-medium text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 cursor-pointer transition-colors group"
+      >
+        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back
+      </button>
+
+      <div className="rounded-3xl bg-gradient-to-br from-primary/30 via-card to-background p-6 md:p-10 shadow-2xl shadow-primary/10 border border-border/50">
         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-7">
           <StorageImage
             bucket="album-art"
