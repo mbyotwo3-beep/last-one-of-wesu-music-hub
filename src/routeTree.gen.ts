@@ -46,6 +46,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LabelsIndexRouteImport } from './routes/labels.index'
 import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
+import { Route as AlbumsIndexRouteImport } from './routes/albums.index'
 import { Route as SuperadminHomepageRouteImport } from './routes/superadmin.homepage'
 import { Route as SongsIdRouteImport } from './routes/songs.$id'
 import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
@@ -241,6 +242,11 @@ const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
   path: '/artists/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlbumsIndexRoute = AlbumsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AlbumsRoute,
+} as any)
 const SuperadminHomepageRoute = SuperadminHomepageRouteImport.update({
   id: '/homepage',
   path: '/homepage',
@@ -330,6 +336,7 @@ export interface FileRoutesByFullPath {
   '/playlists/$id': typeof PlaylistsIdRoute
   '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
+  '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
@@ -338,7 +345,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/albums': typeof AlbumsRouteWithChildren
   '/apply-label': typeof ApplyLabelRoute
   '/artist-dashboard': typeof ArtistDashboardRoute
   '/artist-profile-edit': typeof ArtistProfileEditRoute
@@ -378,6 +384,7 @@ export interface FileRoutesByTo {
   '/playlists/$id': typeof PlaylistsIdRoute
   '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
+  '/albums': typeof AlbumsIndexRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
@@ -427,6 +434,7 @@ export interface FileRoutesById {
   '/playlists/$id': typeof PlaylistsIdRoute
   '/songs/$id': typeof SongsIdRoute
   '/superadmin/homepage': typeof SuperadminHomepageRoute
+  '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
@@ -477,6 +485,7 @@ export interface FileRouteTypes {
     | '/playlists/$id'
     | '/songs/$id'
     | '/superadmin/homepage'
+    | '/albums/'
     | '/artists/'
     | '/labels/'
     | '/api/public/lenco-webhook'
@@ -485,7 +494,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/albums'
     | '/apply-label'
     | '/artist-dashboard'
     | '/artist-profile-edit'
@@ -525,6 +533,7 @@ export interface FileRouteTypes {
     | '/playlists/$id'
     | '/songs/$id'
     | '/superadmin/homepage'
+    | '/albums'
     | '/artists'
     | '/labels'
     | '/api/public/lenco-webhook'
@@ -573,6 +582,7 @@ export interface FileRouteTypes {
     | '/playlists/$id'
     | '/songs/$id'
     | '/superadmin/homepage'
+    | '/albums/'
     | '/artists/'
     | '/labels/'
     | '/api/public/lenco-webhook'
@@ -884,6 +894,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArtistsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/albums/': {
+      id: '/albums/'
+      path: '/'
+      fullPath: '/albums/'
+      preLoaderRoute: typeof AlbumsIndexRouteImport
+      parentRoute: typeof AlbumsRoute
+    }
     '/superadmin/homepage': {
       id: '/superadmin/homepage'
       path: '/homepage'
@@ -952,10 +969,12 @@ declare module '@tanstack/react-router' {
 
 interface AlbumsRouteChildren {
   AlbumsIdRoute: typeof AlbumsIdRoute
+  AlbumsIndexRoute: typeof AlbumsIndexRoute
 }
 
 const AlbumsRouteChildren: AlbumsRouteChildren = {
   AlbumsIdRoute: AlbumsIdRoute,
+  AlbumsIndexRoute: AlbumsIndexRoute,
 }
 
 const AlbumsRouteWithChildren =
