@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ListMusic, Plus, Trash2, Play, Pause, Heart } from "lucide-react";
+import { ListMusic, Plus, Trash2, Play, Pause } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { createPlaylist, deletePlaylist } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,22 +34,6 @@ function Page() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [newPlaylist, setNewPlaylist] = useState({ name: "", description: "", make_public: false });
-
-  // Fetch Liked Songs for the pinned top card
-  const { data: likedSongs } = useQuery({
-    queryKey: ["liked-songs", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data } = await supabase
-        .from("saved_tracks")
-        .select("songs(*, artists(name))")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((item: any) => item.songs).filter(Boolean);
-    },
-    enabled: !!user?.id,
-    staleTime: 0,
-  });
 
   // Fetch Playlists with songs for playback
   const { data: playlists, isLoading } = useQuery({
@@ -93,40 +77,23 @@ function Page() {
     },
   });
 
-  const safeLikedSongs = likedSongs ?? [];
-  const isLikedSongsPlaying = player.playing && safeLikedSongs.some((s: any) => s.id === player.track?.id);
-
-  const handlePlayLikedSongs = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (safeLikedSongs.length === 0) {
-      toast.error("No liked songs to play");
-      return;
-    }
-    if (isLikedSongsPlaying) {
-      player.togglePlay();
-      return;
-    }
-    const currentIdx = safeLikedSongs.findIndex((s: any) => s.id === player.track?.id);
-    if (currentIdx !== -1) {
-      player.togglePlay();
-    } else {
-      const tracks = safeLikedSongs.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        artistName: s.artists?.name ?? "Unknown",
-        coverUrl: s.cover_url,
-        durationSeconds: s.duration,
-      }));
-      player.setQueue(tracks, 0);
-    }
-  };
-
   const handlePlayPlaylist = (playlist: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const songs = (playlist.playlist_songs ?? [])
+    const rawSongs = playlist.playlist_songs ?? [];
+    const songs = rawSongs
       .slice()
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-      .map((ps: any) => ps.song)
+      .map((ps: any) => {
+        let s = ps.song ?? ps.songs;
+        if (Array.isArray(s)) s = s[0];
+        if (!s || !s.id) return null;
+        let art = s.artist ?? s.artists;
+        if (Array.isArray(art)) art = art[0];
+        return {
+          ...s,
+          artist: art ? { id: art.id, name: art.name } : null,
+        };
+      })
       .filter(Boolean);
 
     if (songs.length === 0) {
@@ -231,52 +198,6 @@ function Page() {
       )}
 
       <div className="grid gap-3">
-        {/* Pinned Spotify-style Liked Songs Card */}
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 group hover:border-primary/40 hover:bg-accent/20 transition-all">
-          <Link to="/liked-songs" className="relative shrink-0">
-            <div className="size-14 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-md">
-              <Heart className="size-7 text-white fill-white" />
-            </div>
-          </Link>
-
-          <Link to="/liked-songs" className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                Liked Songs
-              </p>
-              {isLikedSongsPlaying && (
-                <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-                  Playing
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
-              Auto playlist • {safeLikedSongs.length} {safeLikedSongs.length === 1 ? "song" : "songs"}
-            </p>
-          </Link>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handlePlayLikedSongs}
-              disabled={safeLikedSongs.length === 0}
-              className={`size-10 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
-                safeLikedSongs.length === 0
-                  ? "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
-                  : "bg-primary text-primary-foreground hover:brightness-110 hover:scale-105"
-              }`}
-              title={isLikedSongsPlaying ? "Pause" : "Play liked songs"}
-              aria-label={isLikedSongsPlaying ? "Pause liked songs" : "Play liked songs"}
-            >
-              {isLikedSongsPlaying ? (
-                <Pause className="size-4 fill-current" />
-              ) : (
-                <Play className="size-4 fill-current ml-0.5" />
-              )}
-            </button>
-          </div>
-        </div>
-
         {/* User Playlists */}
         {!playlists || playlists.length === 0 ? (
           <div className="text-center py-10 bg-card/50 border border-dashed border-border rounded-xl">
@@ -288,7 +209,11 @@ function Page() {
             const songs = (playlist.playlist_songs ?? [])
               .slice()
               .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-              .map((ps: any) => ps.song)
+              .map((ps: any) => {
+                let s = ps.song ?? ps.songs;
+                if (Array.isArray(s)) s = s[0];
+                return s;
+              })
               .filter(Boolean);
             const songCount = songs.length;
             const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
@@ -335,7 +260,11 @@ function Page() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {playlist.is_public ? "Public" : "Private"} • {songCount} {songCount === 1 ? "song" : "songs"}
+                    <span className={playlist.is_public ? "text-primary font-medium" : ""}>
+                      {playlist.is_public ? "Editorial • Public" : "Personal • Shareable"}
+                    </span>
+                    {" • "}
+                    {songCount} {songCount === 1 ? "song" : "songs"}
                     {playlist.description ? ` • ${playlist.description}` : ""}
                   </p>
                 </Link>
@@ -369,14 +298,12 @@ function Page() {
                     <Trash2 className="size-4" />
                   </button>
 
-                  {playlist.is_public && (
-                    <ShareMenu
-                      playlistId={playlist.id}
-                      playlistName={playlist.name}
-                      type="playlist"
-                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
-                    />
-                  )}
+                  <ShareMenu
+                    playlistId={playlist.id}
+                    playlistName={playlist.name}
+                    type="playlist"
+                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
+                  />
                 </div>
               </div>
             );

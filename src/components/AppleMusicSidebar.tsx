@@ -25,6 +25,7 @@ export function AppleMusicSidebar() {
     { to: "/artists", label: "Artists", icon: Disc },
     { to: "/albums", label: "Albums", icon: Music },
     { to: "/hot-tracks", label: "Songs", icon: ListMusic },
+    { to: "/liked-songs", label: "Liked Songs", icon: Heart },
   ];
 
   // Dynamically fetch user playlists with songs for instant playback
@@ -94,7 +95,11 @@ export function AppleMusicSidebar() {
     const songs = (pl.playlist_songs ?? [])
       .slice()
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-      .map((ps: any) => ps.song)
+      .map((ps: any) => {
+        let s = ps.song ?? ps.songs;
+        if (Array.isArray(s)) s = s[0];
+        return s;
+      })
       .filter(Boolean);
 
     if (songs.length === 0) {
@@ -184,19 +189,40 @@ export function AppleMusicSidebar() {
           {libraryNav.map((item) => {
             const isActive = pathname === item.to;
             const Icon = item.icon;
+            const isLikedItem = item.to === "/liked-songs";
             return (
-              <Link
+              <div
                 key={item.to}
-                to={item.to}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-secondary text-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
-                <Icon className="size-5" />
-                {item.label}
-              </Link>
+                <Link
+                  to={item.to}
+                  className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                >
+                  <Icon className={`size-5 shrink-0 ${isLikedItem && isLikedSongsPlaying ? "text-primary fill-primary" : ""}`} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+                {isLikedItem && safeLikedSongs.length > 0 && (
+                  <button
+                    onClick={handlePlayLikedSongs}
+                    className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
+                      isLikedSongsPlaying ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100"
+                    }`}
+                    title={isLikedSongsPlaying ? "Pause" : "Play Liked Songs"}
+                    aria-label={isLikedSongsPlaying ? "Pause Liked Songs" : "Play Liked Songs"}
+                  >
+                    {isLikedSongsPlaying ? (
+                      <Pause className="size-3.5 fill-current" />
+                    ) : (
+                      <Play className="size-3.5 fill-current" />
+                    )}
+                  </button>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -216,44 +242,17 @@ export function AppleMusicSidebar() {
           </Link>
         </div>
         <nav className="space-y-0.5">
-          {/* Favorites / Liked Songs preset */}
-          <div
-            className={`group/fav flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              pathname === "/liked-songs" || pathname === "/library"
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-            }`}
-          >
-            <Link
-              to="/liked-songs"
-              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
-            >
-              <Heart className={`size-5 shrink-0 ${isLikedSongsPlaying ? "text-red-500 fill-red-500" : "text-primary"}`} />
-              <span className="truncate">Liked Songs</span>
-            </Link>
-            {safeLikedSongs.length > 0 && (
-              <button
-                onClick={handlePlayLikedSongs}
-                className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
-                  isLikedSongsPlaying ? "opacity-100 text-primary" : "opacity-0 group-hover/fav:opacity-100"
-                }`}
-                title={isLikedSongsPlaying ? "Pause" : "Play Liked Songs"}
-                aria-label={isLikedSongsPlaying ? "Pause Liked Songs" : "Play Liked Songs"}
-              >
-                {isLikedSongsPlaying ? (
-                  <Pause className="size-3.5 fill-current" />
-                ) : (
-                  <Play className="size-3.5 fill-current" />
-                )}
-              </button>
-            )}
-          </div>
-
           {/* User's dynamic playlists */}
           {userPlaylists && userPlaylists.length > 0 ? (
             userPlaylists.map((pl: any) => {
               const isPlActive = pathname === `/playlists/${pl.id}`;
-              const songs = (pl.playlist_songs ?? []).map((ps: any) => ps.song).filter(Boolean);
+              const songs = (pl.playlist_songs ?? [])
+                .map((ps: any) => {
+                  let s = ps.song ?? ps.songs;
+                  if (Array.isArray(s)) s = s[0];
+                  return s;
+                })
+                .filter(Boolean);
               const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
 
               return (

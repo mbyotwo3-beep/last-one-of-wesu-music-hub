@@ -84,6 +84,19 @@ export const addToPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)
   .handler(async ({ context, data }) => {
+    // Check if user is owner of the playlist or staff
+    const { data: pl } = await context.supabase
+      .from("playlists")
+      .select("user_id")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+
+    if (!pl) throw new Error("Playlist not found");
+    const isStaff = await isStaffUser(context.supabase, context.userId);
+    if (pl.user_id !== context.userId && !isStaff) {
+      throw new Error("You can only add songs to your own playlists");
+    }
+
     // Check if song is already in playlist
     const { data: existing } = await context.supabase
       .from("playlist_songs")
@@ -121,6 +134,19 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { playlist_id: string; song_id: string }) => d)
   .handler(async ({ context, data }) => {
+    // Check if user is owner of the playlist or staff
+    const { data: pl } = await context.supabase
+      .from("playlists")
+      .select("user_id")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+
+    if (!pl) throw new Error("Playlist not found");
+    const isStaff = await isStaffUser(context.supabase, context.userId);
+    if (pl.user_id !== context.userId && !isStaff) {
+      throw new Error("You can only remove songs from your own playlists");
+    }
+
     const { error } = await context.supabase
       .from("playlist_songs")
       .delete()
@@ -133,7 +159,19 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
 export const getPlaylistWithSongs = createServerFn({ method: "GET" })
   .validator((d: { id: string }) => d)
   .handler(async ({ data }) => {
-    const supabase = getPublicSupabase();
+    // Dynamically load supabaseAdmin if available to allow link-shared playlists to be viewed by friends
+    let supabase: any;
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        supabase = supabaseAdmin;
+      } catch {
+        supabase = getPublicSupabase();
+      }
+    } else {
+      supabase = getPublicSupabase();
+    }
+
     // 1. Fetch playlist
     const { data: playlist, error: plError } = await supabase
       .from("playlists")
@@ -161,7 +199,7 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
     // 3. Fetch songs
     const { data: songRows, error: sError } = await supabase
       .from("songs")
-      .select("id,title,duration,price,cover_url,artist_id,status")
+      .select("id,title,duration,price,cover_url,artist_id,status,audio_url")
       .in("id", songIds);
 
     if (sError) throw new Error(sError.message);
@@ -185,7 +223,7 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
     );
 
     // Preserve playlist position order
-    const orderedSongs = songIds.map((id) => songsById.get(id)).filter(Boolean);
+    const orderedSongs = songIds.map((id: string) => songsById.get(id)).filter(Boolean);
 
     return { playlist, songs: orderedSongs };
   });

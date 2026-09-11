@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { removeFromPlaylist } from "@/lib/listener.functions";
+import { getPlaylistWithSongs, removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
@@ -157,18 +157,56 @@ function Page() {
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
+  const getPlaylistFn = useServerFn(getPlaylistWithSongs);
   const removeFn = useServerFn(removeFromPlaylist);
   const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
+      // 1. Try server function which bypasses RLS and formats songs cleanly
+      try {
+        const res = await getPlaylistFn({ data: { id } });
+        if (res?.playlist) {
+          return {
+            ...res.playlist,
+            songs: res.songs ?? [],
+          };
+        }
+      } catch (err) {
+        console.warn("getPlaylistWithSongs serverFn failed, falling back to client query:", err);
+      }
+
+      // 2. Fallback to client query
       const { data: pl } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select("*, playlist_songs(position, song_id, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
         .eq("id", id)
         .maybeSingle();
-      return pl;
+
+      if (!pl) return null;
+
+      const rawPs = (pl as any).playlist_songs ?? [];
+      const extractedSongs = rawPs
+        .slice()
+        .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+        .map((ps: any) => {
+          let s = ps.song ?? ps.songs;
+          if (Array.isArray(s)) s = s[0];
+          if (!s || !s.id) return null;
+          let art = s.artist ?? s.artists;
+          if (Array.isArray(art)) art = art[0];
+          return {
+            ...s,
+            artist: art ? { id: art.id, name: art.name } : null,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        ...pl,
+        songs: extractedSongs,
+      };
     },
     staleTime: 0, // Always refetch to ensure immediate updates
   });
@@ -181,7 +219,7 @@ function Page() {
       if (prev) {
         const updated = {
           ...prev,
-          playlist_songs: (prev.playlist_songs ?? []).filter((ps: any) => ps.song_id !== variables.data.song_id),
+          songs: (prev.songs ?? []).filter((s: any) => s.id !== variables.data.song_id),
         };
         qc.setQueryData(["playlist", id], updated);
       }
@@ -202,11 +240,7 @@ function Page() {
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   if (!data) return <div className="p-12 text-center">Playlist not found</div>;
 
-  const songs = ((data as any).playlist_songs ?? [])
-    .slice()
-    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-    .map((ps: any) => ps.song)
-    .filter(Boolean);
+  const songs = ((data as any).songs ?? []) as any[];
   const isOwner = (data as any).user_id === user?.id;
   const isPublic = (data as any).is_public === true;
 
@@ -214,7 +248,7 @@ function Page() {
   const queueTracks = songs.map((s: any) => ({
     id: s.id,
     title: s.title,
-    artistName: s.artist?.name ?? "Unknown",
+    artistName: s.artist?.name || s.artists?.name || "Unknown",
     coverUrl: s.cover_url,
     durationSeconds: s.duration,
   }));
@@ -340,8 +374,8 @@ function Page() {
               <Shuffle className="size-4" />
             </button>
 
-            {/* Share */}
-            {isPublic && (
+            {/* Share (Owner or Public) */}
+            {(isOwner || isPublic) && (
               <ShareMenu
                 playlistId={id}
                 playlistName={(data as any).name}
