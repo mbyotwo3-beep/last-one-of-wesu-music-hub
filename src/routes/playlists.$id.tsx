@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Trash2, ListMusic, ArrowLeft, Lock, Heart } from "lucide-react";
+import { Play, Pause, Trash2, ListMusic, ArrowLeft, Lock, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { removeFromPlaylist } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
@@ -25,24 +25,34 @@ interface SongRowProps {
   index: number;
   isOwner: boolean;
   playlistId: string;
+  currentTrackId: string | undefined;
+  playing: boolean;
   onPlay: (index: number) => void;
   onRemove: (songId: string) => void;
 }
 
-function SongRow({ song: s, index: i, isOwner, playlistId, onPlay, onRemove }: SongRowProps) {
+function SongRow({ song: s, index: i, isOwner, playlistId, currentTrackId, playing, onPlay, onRemove }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
+  const isCurrentTrack = currentTrackId === s.id;
+  const isPlayingThisTrack = playing && isCurrentTrack;
 
   return (
     <div
       key={s.id}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
+      className={`flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 cursor-pointer group transition-colors ${isCurrentTrack ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-accent"}`}
       onClick={() => onPlay(i)}
     >
-      <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
-      <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
-      <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
+      {isPlayingThisTrack ? (
+        <Pause className="size-4 text-primary fill-current w-6 shrink-0" />
+      ) : (
+        <>
+          <span className={`text-sm w-6 text-right group-hover:hidden shrink-0 ${isCurrentTrack ? "text-primary font-bold" : "text-muted-foreground"}`}>{i + 1}</span>
+          <Play className="size-4 text-primary fill-current hidden group-hover:block w-6 shrink-0" />
+        </>
+      )}
+      <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
+        <div className={`text-sm font-medium truncate group-hover:text-primary transition-colors ${isCurrentTrack ? "text-primary" : ""}`}>{s.title}</div>
         <Link
           to="/artists/$id"
           params={{ id: s.artist?.id ?? "" }}
@@ -93,6 +103,9 @@ function Page() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
+  const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
   const removeFn = useServerFn(removeFromPlaylist);
   const { user } = useAuth();
 
@@ -145,32 +158,44 @@ function Page() {
   const isOwner = (data as any).user_id === user?.id;
   const isPublic = (data as any).is_public === true;
 
+  // Build the queue tracks array (shared between playAll and playSong)
+  const queueTracks = songs.map((s: any) => ({
+    id: s.id,
+    title: s.title,
+    artistName: s.artist?.name ?? "Unknown",
+    coverUrl: s.cover_url,
+    durationSeconds: s.duration,
+  }));
+
+  // True when any song from this playlist is currently active
+  const isPlaylistActive = playing && songs.some((s: any) => s.id === currentTrackId);
+
   function playAll() {
     if (!songs.length) return;
-    setQueue(
-      songs.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        artistName: s.artist?.name ?? "Unknown",
-        coverUrl: s.cover_url,
-        durationSeconds: s.duration,
-      })),
-      0,
-    );
+    // If this playlist is already active, just toggle play/pause
+    if (isPlaylistActive) {
+      togglePlay();
+      return;
+    }
+    // If current track is in this playlist but paused, resume
+    const currentIndexInPlaylist = songs.findIndex((s: any) => s.id === currentTrackId);
+    if (currentIndexInPlaylist !== -1) {
+      togglePlay();
+      return;
+    }
+    // Start from the beginning
+    setQueue(queueTracks, 0);
   }
 
   function playSong(index: number) {
     if (!songs.length) return;
-    setQueue(
-      songs.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        artistName: s.artist?.name ?? "Unknown",
-        coverUrl: s.cover_url,
-        durationSeconds: s.duration,
-      })),
-      index,
-    );
+    const clickedSong = songs[index];
+    // If tapping the currently playing song → toggle pause/resume
+    if (currentTrackId === clickedSong?.id) {
+      togglePlay();
+      return;
+    }
+    setQueue(queueTracks, index);
   }
 
   return (
@@ -205,7 +230,11 @@ function Page() {
         disabled={!songs.length}
         className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-obsidian font-bold hover:brightness-110 hover:scale-105 transition-all disabled:opacity-40 disabled:hover:scale-100 cursor-pointer mb-6"
       >
-        <Play className="size-5 fill-current" /> Play
+        {isPlaylistActive ? (
+          <><Pause className="size-5 fill-current" /> Pause</>
+        ) : (
+          <><Play className="size-5 fill-current" /> Play</>
+        )}
       </button>
       {isPublic && (
         <ShareMenu
@@ -227,6 +256,8 @@ function Page() {
               index={i}
               isOwner={isOwner}
               playlistId={id}
+              currentTrackId={currentTrackId}
+              playing={playing}
               onPlay={playSong}
               onRemove={(songId) => remove.mutate({ data: { playlist_id: id, song_id: songId } })}
             />

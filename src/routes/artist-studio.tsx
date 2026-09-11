@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar, Copy } from "lucide-react";
+import { Upload, Wallet, FolderPlus, Users, Building2, Star, ImagePlus, FileAudio, X, Calendar, Copy, GripVertical, Plus, ListOrdered } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -358,6 +358,12 @@ function FeaturesTab() {
 
 type UploadMode = "single" | "album";
 
+interface TrackEntry {
+  id: string; // client-side uuid for stable keys
+  file: File;
+  title: string;
+}
+
 function UploadWizard() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -403,9 +409,11 @@ function UploadWizard() {
   const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
   const [labelInviteLink, setLabelInviteLink] = useState<string | null>(null);
   const [cover, setCover] = useState<File | null>(null);
-  const [tracks, setTracks] = useState<File[]>([]);
+  const [tracks, setTracks] = useState<TrackEntry[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const singleAudioInputRef = useRef<HTMLInputElement>(null);
+  const dragSrcIndex = useRef<number | null>(null);
 
   // Persist form state to sessionStorage - combined into single effect
   useEffect(() => {
@@ -460,7 +468,7 @@ function UploadWizard() {
     setMode(next);
     setTier("paid");
     setPrice(next === "album" ? ALBUM_MIN : SINGLE_MIN);
-    if (next === "single") setTracks((t) => t.slice(0, 1));
+    setTracks([]);
   }
 
   function setCoverFile(file: File | undefined) {
@@ -477,18 +485,47 @@ function UploadWizard() {
     setCover(file);
   }
 
-  function setAudioFiles(fileList: FileList | File[]) {
-    const files = Array.from(fileList);
-    const audioFiles = files.filter(
-      (file) => file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(file.name),
-    );
-    if (audioFiles.length === 0) {
+  function audioFilesToEntries(fileList: FileList | File[]): TrackEntry[] {
+    return Array.from(fileList)
+      .filter((f) => f.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(f.name))
+      .map((f) => ({
+        id: `${f.name}-${f.lastModified}-${Math.random()}`,
+        file: f,
+        title: f.name.replace(/\.[^.]+$/, ""),
+      }));
+  }
+
+  function addAudioFiles(fileList: FileList | File[], replace = false) {
+    const entries = audioFilesToEntries(fileList);
+    if (entries.length === 0) {
       setError("Choose at least one audio file (MP3, WAV, M4A, AAC, FLAC, OGG, or OPUS)");
       return;
     }
     setError(null);
-    if (mode === "single") setTracks(audioFiles.slice(0, 1));
-    else setTracks(audioFiles);
+    if (mode === "single" || replace) {
+      setTracks(entries.slice(0, mode === "single" ? 1 : undefined));
+    } else {
+      setTracks((prev) => [...prev, ...entries]);
+    }
+  }
+
+  // drag-to-reorder helpers
+  function handleDragStart(index: number) {
+    dragSrcIndex.current = index;
+  }
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    if (dragSrcIndex.current === null || dragSrcIndex.current === index) return;
+    setTracks((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragSrcIndex.current!, 1);
+      next.splice(index, 0, moved);
+      dragSrcIndex.current = index;
+      return next;
+    });
+  }
+  function handleDragEnd() {
+    dragSrcIndex.current = null;
   }
 
   function validatePricing(): string | null {
@@ -523,7 +560,7 @@ function UploadWizard() {
         : undefined;
 
       if (mode === "single") {
-        const audio_url = await uploadFileToBucket("song-audio", user.id, tracks[0]);
+        const audio_url = await uploadFileToBucket("song-audio", user.id, tracks[0].file);
         const res = await uploadFn({
           data: {
             title: title.trim(),
@@ -620,17 +657,19 @@ function UploadWizard() {
           release_date: releaseDate || undefined,
         },
       });
-      for (const file of tracks) {
-        const audio_url = await uploadFileToBucket("song-audio", user.id, file);
+      for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
+        const entry = tracks[trackIdx];
+        const audio_url = await uploadFileToBucket("song-audio", user.id, entry.file);
         await uploadFn({
           data: {
-            title: file.name.replace(/\.[^.]+$/, ""),
+            title: entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, ""),
             audio_url,
             cover_url,
             price,
             album_id: album.id,
             has_feature: hasFeature,
             has_label: hasLabel,
+            track_number: trackIdx + 1,
           },
         });
       }
@@ -766,6 +805,7 @@ function UploadWizard() {
               setTier("paid");
               setPrice(SINGLE_MIN);
               setFeeAgreed(false);
+              dragSrcIndex.current = null;
               sessionStorage.removeItem("upload-wizard-featureEmail");
               sessionStorage.removeItem("upload-wizard-featureName");
               sessionStorage.removeItem("upload-wizard-labelEmail");
@@ -1024,54 +1064,143 @@ function UploadWizard() {
             {cover && <p className="mt-3 truncate text-xs text-primary">Selected: {cover.name}</p>}
           </div>
 
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              setAudioFiles(e.dataTransfer.files);
-            }}
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 cursor-pointer hover:border-primary/60 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition"
-          >
-            <FileAudio className="size-8 mx-auto mb-2 text-primary" />
-            <p className="text-sm font-semibold">Choose audio file{mode === "album" ? "s" : ""}</p>
-            <p className="text-xs text-muted-foreground mt-1">Drop {mode === "album" ? "one or more tracks" : "an audio file"} here, or use the button below</p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                audioInputRef.current?.click();
-              }}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 transition"
+          {/* ── Audio file area ── */}
+          {mode === "single" ? (
+            /* Single-song: plain drop zone */
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files, true); }}
+              className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 hover:border-primary/60 hover:bg-primary/5 transition"
             >
-              <Upload className="size-4" />
-              Browse audio files
-            </button>
-            <input
-              id="upload-audio"
-              ref={audioInputRef}
-              type="file"
-              accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
-              multiple={mode === "album"}
-              className="sr-only"
-              onChange={(e) => setAudioFiles(e.target.files ?? [])}
-            />
-          </div>
+              <FileAudio className="size-8 mx-auto mb-2 text-primary" />
+              <p className="text-sm font-semibold">{tracks.length > 0 ? tracks[0].file.name : "Choose audio file"}</p>
+              <p className="text-xs text-muted-foreground mt-1">Drop an audio file here, or use the button below</p>
+              <button
+                type="button"
+                onClick={() => audioInputRef.current?.click()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 transition"
+              >
+                <Upload className="size-4" />
+                {tracks.length > 0 ? "Change file" : "Browse audio files"}
+              </button>
+              <input
+                id="upload-audio"
+                ref={audioInputRef}
+                type="file"
+                accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
+                className="sr-only"
+                onChange={(e) => addAudioFiles(e.target.files ?? [], true)}
+              />
+            </div>
+          ) : (
+            /* Album: add one-at-a-time OR bulk + drag-to-reorder list */
+            <div className="space-y-3">
+              {/* Add buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium flex-1 min-w-0">
+                  <ListOrdered className="inline size-4 mr-1 text-primary" />
+                  Tracklist{tracks.length > 0 ? ` — ${tracks.length} song${tracks.length > 1 ? "s" : ""}` : ""}
+                </p>
+                {/* Single add */}
+                <button
+                  type="button"
+                  onClick={() => singleAudioInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-accent transition"
+                >
+                  <Plus className="size-3.5" /> Add song
+                </button>
+                {/* Bulk add */}
+                <button
+                  type="button"
+                  onClick={() => audioInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:brightness-110 transition"
+                >
+                  <Upload className="size-3.5" /> Add multiple
+                </button>
+                {/* hidden inputs */}
+                <input
+                  ref={singleAudioInputRef}
+                  type="file"
+                  accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
+                  className="sr-only"
+                  onChange={(e) => { addAudioFiles(e.target.files ?? []); e.target.value = ""; }}
+                />
+                <input
+                  id="upload-audio"
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => { addAudioFiles(e.target.files ?? []); e.target.value = ""; }}
+                />
+              </div>
 
-          {tracks.length > 0 && (
-            <ul className="text-xs space-y-1">
-              {tracks.map((f, i) => (
-                <li key={i} className="flex justify-between items-center bg-secondary/30 rounded px-2 py-1">
-                  <span className="truncate">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setTracks((t) => t.filter((_, j) => j !== i))}
-                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive text-xs"
-                  >
-                    <X className="size-3.5" /> Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+              {tracks.length === 0 ? (
+                /* Drop zone shown when empty */
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files); }}
+                  className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 hover:border-primary/60 hover:bg-primary/5 transition"
+                >
+                  <FileAudio className="size-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Drop audio files here, or use the buttons above</p>
+                </div>
+              ) : (
+                /* Drag-to-reorder tracklist */
+                <ul className="space-y-1.5">
+                  {tracks.map((entry, i) => (
+                    <li
+                      key={entry.id}
+                      draggable
+                      onDragStart={() => handleDragStart(i)}
+                      onDragOver={(e) => handleDragOver(e, i)}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2 py-2 group hover:border-primary/40 transition cursor-grab active:cursor-grabbing"
+                    >
+                      {/* Track number */}
+                      <span className="shrink-0 w-5 text-xs text-muted-foreground text-right select-none">{i + 1}</span>
+                      {/* Drag handle */}
+                      <GripVertical className="shrink-0 size-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
+                      {/* Editable title */}
+                      <input
+                        type="text"
+                        value={entry.title}
+                        onChange={(e) => setTracks((prev) => prev.map((t, j) => j === i ? { ...t, title: e.target.value } : t))}
+                        onClick={(e) => e.stopPropagation()}
+                        onDragStart={(e) => e.stopPropagation()}
+                        placeholder="Track title"
+                        className="flex-1 min-w-0 bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary transition-colors px-0.5 py-0"
+                      />
+                      {/* Filename hint */}
+                      <span className="hidden sm:block shrink-0 max-w-[120px] truncate text-xs text-muted-foreground" title={entry.file.name}>
+                        {entry.file.name}
+                      </span>
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        onClick={() => setTracks((prev) => prev.filter((_, j) => j !== i))}
+                        className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        aria-label="Remove track"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Drop-on-existing-list */}
+              {tracks.length > 0 && (
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files); }}
+                  className="rounded-lg border-2 border-dashed border-border py-3 text-center text-xs text-muted-foreground hover:border-primary/50 transition"
+                >
+                  Drop more files here to append
+                </div>
+              )}
+            </div>
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}

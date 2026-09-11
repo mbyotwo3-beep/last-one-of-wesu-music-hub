@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play, Pause } from "lucide-react";
+import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play, Pause, ListMusic } from "lucide-react";
 import { toast } from "sonner";
 import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
@@ -34,6 +34,21 @@ function hasId(value: unknown): value is { id: string } {
 
 function Page() {
   const { user } = useAuth();
+
+  const { data: userPlaylists, isLoading: playlistsLoading } = useQuery({
+    queryKey: ["my-playlists", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("playlists")
+        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+    staleTime: 0,
+  });
 
   const { data: likedSongs, isLoading: likedLoading } = useQuery({
     queryKey: ["liked-songs", user?.id],
@@ -99,12 +114,13 @@ function Page() {
     staleTime: 0, // Always refetch to ensure immediate updates
   });
 
-  if (likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
+  if (playlistsLoading || likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
 
   // Relationships can be null when a referenced row was deleted or hidden by
   // RLS. Keep rendering defensive even if a cached query contains one.
+  const safePlaylists = (userPlaylists ?? []).filter(hasId);
   const safeLikedSongs = (likedSongs ?? []).filter(hasId);
   const safePurchasedSongs = (purchasedSongs ?? []).filter(hasId);
   const safePurchasedAlbums = (purchasedAlbums ?? []).filter(hasId);
@@ -151,6 +167,35 @@ function Page() {
           <div className="space-y-2">
             {safeLikedSongs.slice(0, 5).map((song: any) => (
               <LikedSongCard key={song.id} song={song} userId={user?.id ?? null} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ListMusic className="size-5 text-primary" />
+            <h2 className="text-xl font-semibold">Playlists</h2>
+          </div>
+          <Link
+            to="/playlists"
+            className="text-sm text-primary hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        {safePlaylists.length === 0 ? (
+          <p className="text-muted-foreground">
+            No playlists yet.{" "}
+            <Link to="/playlists" className="text-primary hover:underline">
+              Create your first playlist
+            </Link>
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {safePlaylists.map((playlist: any) => (
+              <PlaylistCard key={playlist.id} playlist={playlist} />
             ))}
           </div>
         )}
@@ -479,6 +524,106 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
         <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded-full font-medium">
           Owned
         </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Playlist card in Library with cover art, track count, and instant play/pause.
+ */
+function PlaylistCard({ playlist }: { playlist: any }) {
+  const player = usePlayer();
+
+  const songs = (playlist.playlist_songs ?? [])
+    .slice()
+    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+    .map((ps: any) => ps.song)
+    .filter(Boolean);
+
+  const songCount = songs.length;
+  const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
+  const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (songCount === 0) {
+      toast.error("This playlist has no songs yet");
+      return;
+    }
+    if (isThisPlaylistActive) {
+      player.togglePlay();
+      return;
+    }
+    const currentIdx = songs.findIndex((s: any) => s.id === player.track?.id);
+    if (currentIdx !== -1) {
+      player.togglePlay();
+    } else {
+      const tracks = songs.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        artistName: s.artist?.name || s.artists?.name || "Unknown",
+        coverUrl: s.cover_url,
+        durationSeconds: s.duration,
+      }));
+      player.setQueue(tracks, 0);
+    }
+  };
+
+  return (
+    <div
+      className={`bg-card border rounded-xl p-4 flex items-center gap-4 group hover:bg-accent/30 transition-colors ${
+        isThisPlaylistActive ? "border-primary/50 bg-primary/5" : "border-border"
+      }`}
+    >
+      <Link to="/playlists/$id" params={{ id: playlist.id }} className="relative shrink-0">
+        {firstCover ? (
+          <StorageImage
+            bucket="album-art"
+            path={firstCover}
+            alt={playlist.name}
+            className="size-14 rounded-lg object-cover bg-muted"
+          />
+        ) : (
+          <div className="size-14 rounded-lg bg-secondary/80 border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+            <ListMusic className="size-6" />
+          </div>
+        )}
+      </Link>
+      <Link to="/playlists/$id" params={{ id: playlist.id }} className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">
+            {playlist.name}
+          </p>
+          {isThisPlaylistActive && (
+            <span className="shrink-0 flex items-center gap-1 text-[10px] uppercase font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+              Playing
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground truncate">
+          {playlist.is_public ? "Public" : "Private"} • {songCount} {songCount === 1 ? "song" : "songs"}
+          {playlist.description ? ` • ${playlist.description}` : ""}
+        </p>
+      </Link>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handlePlay}
+          disabled={songCount === 0}
+          className={`size-10 rounded-full flex items-center justify-center transition-colors shadow-lg hover:shadow-xl cursor-pointer ${
+            songCount === 0
+              ? "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          }`}
+          title={isThisPlaylistActive ? "Pause" : "Play"}
+        >
+          {isThisPlaylistActive ? (
+            <Pause className="size-4 fill-current" />
+          ) : (
+            <Play className="size-4 fill-current ml-0.5" />
+          )}
+        </button>
       </div>
     </div>
   );

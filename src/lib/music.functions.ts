@@ -184,6 +184,7 @@ export const getAlbumWithSongs = createServerFn({ method: "GET" })
         .from("songs")
         .select("id,title,duration,price")
         .eq("album_id", data.id)
+        .order("track_number", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true }),
     ]);
     if (album.error) throw new Error(album.error.message);

@@ -1,14 +1,17 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Search, Play, Grid, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
+import { Search, Play, Pause, Grid, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlayer } from "@/stores/player";
+import { toast } from "sonner";
 
 export function AppleMusicSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { user } = useAuth();
+  const player = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
 
   const mainNav = [
@@ -24,14 +27,14 @@ export function AppleMusicSidebar() {
     { to: "/hot-tracks", label: "Songs", icon: ListMusic },
   ];
 
-  // Dynamically fetch user playlists
+  // Dynamically fetch user playlists with songs for instant playback
   const { data: userPlaylists } = useQuery({
     queryKey: ["my-playlists-sidebar", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("playlists")
-        .select("id, name")
+        .select("id, name, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return data ?? [];
@@ -39,6 +42,86 @@ export function AppleMusicSidebar() {
     enabled: !!user?.id,
     staleTime: 0, // Always refetch to ensure immediate updates
   });
+
+  // Fetch Liked Songs for sidebar playback
+  const { data: likedSongs } = useQuery({
+    queryKey: ["liked-songs", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("saved_tracks")
+        .select("songs(*, artists(name))")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return (data ?? []).map((item: any) => item.songs).filter(Boolean);
+    },
+    enabled: !!user?.id,
+    staleTime: 0,
+  });
+
+  const safeLikedSongs = likedSongs ?? [];
+  const isLikedSongsPlaying = player.playing && safeLikedSongs.some((s: any) => s.id === player.track?.id);
+
+  const handlePlayLikedSongs = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (safeLikedSongs.length === 0) {
+      toast.error("No liked songs to play");
+      return;
+    }
+    if (isLikedSongsPlaying) {
+      player.togglePlay();
+      return;
+    }
+    const currentIdx = safeLikedSongs.findIndex((s: any) => s.id === player.track?.id);
+    if (currentIdx !== -1) {
+      player.togglePlay();
+    } else {
+      const tracks = safeLikedSongs.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        artistName: s.artists?.name ?? "Unknown",
+        coverUrl: s.cover_url,
+        durationSeconds: s.duration,
+      }));
+      player.setQueue(tracks, 0);
+    }
+  };
+
+  const handlePlayPlaylist = (pl: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const songs = (pl.playlist_songs ?? [])
+      .slice()
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+      .map((ps: any) => ps.song)
+      .filter(Boolean);
+
+    if (songs.length === 0) {
+      toast.error("This playlist has no songs yet");
+      return;
+    }
+
+    const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+    if (isThisPlaylistActive) {
+      player.togglePlay();
+      return;
+    }
+
+    const currentIdx = songs.findIndex((s: any) => s.id === player.track?.id);
+    if (currentIdx !== -1) {
+      player.togglePlay();
+    } else {
+      const tracks = songs.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        artistName: s.artist?.name || s.artists?.name || "Unknown",
+        coverUrl: s.cover_url,
+        durationSeconds: s.duration,
+      }));
+      player.setQueue(tracks, 0);
+    }
+  };
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 bg-sidebar/80 backdrop-blur-xl border-r border-border">
@@ -134,36 +217,80 @@ export function AppleMusicSidebar() {
         </div>
         <nav className="space-y-0.5">
           {/* Favorites / Liked Songs preset */}
-          <Link
-            to="/library"
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              pathname === "/library"
+          <div
+            className={`group/fav flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname === "/liked-songs" || pathname === "/library"
                 ? "bg-secondary text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             }`}
           >
-            <Heart className="size-5 text-primary" />
-            Favorites & Liked
-          </Link>
+            <Link
+              to="/liked-songs"
+              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+            >
+              <Heart className={`size-5 shrink-0 ${isLikedSongsPlaying ? "text-red-500 fill-red-500" : "text-primary"}`} />
+              <span className="truncate">Liked Songs</span>
+            </Link>
+            {safeLikedSongs.length > 0 && (
+              <button
+                onClick={handlePlayLikedSongs}
+                className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
+                  isLikedSongsPlaying ? "opacity-100 text-primary" : "opacity-0 group-hover/fav:opacity-100"
+                }`}
+                title={isLikedSongsPlaying ? "Pause" : "Play Liked Songs"}
+                aria-label={isLikedSongsPlaying ? "Pause Liked Songs" : "Play Liked Songs"}
+              >
+                {isLikedSongsPlaying ? (
+                  <Pause className="size-3.5 fill-current" />
+                ) : (
+                  <Play className="size-3.5 fill-current" />
+                )}
+              </button>
+            )}
+          </div>
 
           {/* User's dynamic playlists */}
           {userPlaylists && userPlaylists.length > 0 ? (
-            userPlaylists.map((pl) => {
+            userPlaylists.map((pl: any) => {
               const isPlActive = pathname === `/playlists/${pl.id}`;
+              const songs = (pl.playlist_songs ?? []).map((ps: any) => ps.song).filter(Boolean);
+              const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+
               return (
-                <Link
+                <div
                   key={pl.id}
-                  to="/playlists/$id"
-                  params={{ id: pl.id }}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`group/pl flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isPlActive
                       ? "bg-secondary text-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   }`}
                 >
-                  <ListMusic className="size-5" />
-                  <span className="truncate">{pl.name}</span>
-                </Link>
+                  <Link
+                    to="/playlists/$id"
+                    params={{ id: pl.id }}
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                  >
+                    <ListMusic className={`size-5 shrink-0 ${isThisPlaylistActive ? "text-primary" : ""}`} />
+                    <span className="truncate">{pl.name}</span>
+                  </Link>
+
+                  {songs.length > 0 && (
+                    <button
+                      onClick={(e) => handlePlayPlaylist(pl, e)}
+                      className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
+                        isThisPlaylistActive ? "opacity-100 text-primary" : "opacity-0 group-hover/pl:opacity-100"
+                      }`}
+                      title={isThisPlaylistActive ? "Pause" : "Play playlist"}
+                      aria-label={isThisPlaylistActive ? "Pause playlist" : "Play playlist"}
+                    >
+                      {isThisPlaylistActive ? (
+                        <Pause className="size-3.5 fill-current" />
+                      ) : (
+                        <Play className="size-3.5 fill-current" />
+                      )}
+                    </button>
+                  )}
+                </div>
               );
             })
           ) : (
