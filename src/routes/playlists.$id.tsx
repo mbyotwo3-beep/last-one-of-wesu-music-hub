@@ -37,13 +37,32 @@ function Page() {
         .maybeSingle();
       return pl;
     },
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const remove = useMutation({
     mutationFn: removeFn,
+    onMutate: async (variables: any) => {
+      await qc.cancelQueries({ queryKey: ["playlist", id] });
+      const prev = qc.getQueryData<any>(["playlist", id]);
+      if (prev) {
+        const updated = {
+          ...prev,
+          playlist_songs: (prev.playlist_songs ?? []).filter((ps: any) => ps.song_id !== variables.data.song_id),
+        };
+        qc.setQueryData(["playlist", id], updated);
+      }
+      return { prev };
+    },
+    onError: (error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["playlist", id], ctx.prev);
+      toast.error(`Failed to remove: ${(error as Error).message}`);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["playlist", id] });
-      toast.success("Removed");
+      qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      toast.success("Removed from playlist");
     },
   });
 

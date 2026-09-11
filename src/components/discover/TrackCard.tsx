@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Play, Heart } from "lucide-react";
+import { Play, Pause, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
@@ -8,9 +8,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
-import { toast } from "sonner";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -27,14 +24,16 @@ export interface TrackCardSong {
 /** Cover-first tile for New Music / Made For You style shelves. */
 export function TrackCard({ song }: { song: TrackCardSong }) {
   const setTrack = usePlayer((s) => s.setTrack);
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
   const artistName = song.artist?.name ?? "Unknown";
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   const navigate = useNavigate();
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
+
+  const isCurrentTrack = currentTrackId === song.id;
+  const isPlayingThisTrack = playing && isCurrentTrack;
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -49,53 +48,29 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
     toggle();
   };
 
-  const handlePlay = async () => {
-    try {
-      const isPaid = song.price && Number(song.price) > 0;
-      
-      if (isPaid) {
-        // Use preview URL for paid songs
-        const { url } = await getPreviewFn({ data: { song_id: song.id } });
-        setTrack({
-          id: song.id,
-          title: song.title,
-          artistName,
-          coverUrl: song.cover_url,
-          audioUrl: url,
-          durationSeconds: song.duration ?? undefined,
-        });
-        setIsPreview(true);
-        togglePlay();
-        toast.info(`🎵 Previewing "${song.title}" (15s)`);
-      } else {
-        // Full playback for free songs
-        const { url } = await getPublicFn({ data: { song_id: song.id } });
-        setTrack({
-          id: song.id,
-          title: song.title,
-          artistName,
-          coverUrl: song.cover_url,
-          audioUrl: url,
-          durationSeconds: song.duration ?? undefined,
-        });
-        setIsPreview(false);
-        togglePlay();
-      }
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
     }
+    setTrack({
+      id: song.id,
+      title: song.title,
+      artistName,
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration ?? undefined,
+    });
   };
 
   return (
     <Link to="/songs/$id" params={{ id: song.id }} className="group text-left w-full relative cursor-pointer block">
       <button
         type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          handlePlay();
-        }}
+        onClick={handlePlay}
         className="relative block w-full cursor-pointer"
-        aria-label={`Play ${song.title}`}
+        aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
       >
         <StorageImage
           bucket="album-art"
@@ -103,9 +78,13 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           alt={song.title}
           className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <div className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2">
+        <div className={`absolute inset-0 rounded-xl bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}>
           <div className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors">
-            <Play className="size-4 fill-current ml-0.5" />
+            {isPlayingThisTrack ? (
+              <Pause className="size-4 fill-current" />
+            ) : (
+              <Play className="size-4 fill-current ml-0.5" />
+            )}
           </div>
         </div>
       </button>

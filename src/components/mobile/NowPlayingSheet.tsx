@@ -73,8 +73,7 @@ export function NowPlayingSheet() {
   const displayProgress = isDragging ? dragProgress : progressSeconds;
   const progressPct = dur > 0 ? Math.min((displayProgress / dur) * 100, 100) : 0;
 
-  // Keep pause available while the requested source is still resolving.
-  const isLoading = track?.audioUrl === undefined && !playing;
+  const isLoading = track?.audioUrl === undefined && playing;
 
   // Sync volume to audio element
   useEffect(() => {
@@ -290,7 +289,7 @@ export function NowPlayingSheet() {
               aria-label={liked ? "Unlike" : "Like"}
             >
               <Heart
-                className={`size-6 transition-colors ${liked ? "fill-[#1db954] text-[#1db954]" : "text-white/40"}`}
+                className={`size-6 transition-colors ${liked ? "fill-primary text-primary" : "text-white/40"}`}
               />
             </button>
           )}
@@ -334,7 +333,7 @@ export function NowPlayingSheet() {
         <div className="flex items-center justify-between px-8 mb-4 shrink-0">
           <button
             onClick={toggleShuffle}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 ${shuffle ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
+            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 ${shuffle ? "text-primary" : "text-white/50 hover:text-white"}`}
             aria-label={`Shuffle ${shuffle ? "on" : "off"}`}
           >
             <Shuffle className="size-5" />
@@ -354,10 +353,10 @@ export function NowPlayingSheet() {
             className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50 cursor-pointer hover:scale-105"
             aria-label={playing ? "Pause" : "Play"}
           >
-            {playing ? (
-              <Pause className="size-7 text-black fill-black" />
-            ) : isLoading ? (
+            {isLoading ? (
               <Loader2 className="size-7 text-black animate-spin" />
+            ) : playing ? (
+              <Pause className="size-7 text-black fill-black" />
             ) : (
               <Play className="size-7 text-black fill-black ml-1" />
             )}
@@ -373,12 +372,12 @@ export function NowPlayingSheet() {
 
           <button
             onClick={cycleRepeat}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 relative ${repeat !== "off" ? "text-[#1db954]" : "text-white/50 hover:text-white"}`}
+            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 relative ${repeat !== "off" ? "text-primary" : "text-white/50 hover:text-white"}`}
             aria-label={repeatLabel}
           >
             <Repeat className="size-5" />
             {repeat === "one" && (
-              <span className="absolute bottom-0 right-0 text-[8px] font-bold text-[#1db954]">1</span>
+              <span className="absolute bottom-0 right-0 text-[8px] font-bold text-primary">1</span>
             )}
           </button>
         </div>
@@ -427,16 +426,16 @@ export function NowPlayingSheet() {
                       className="size-10 rounded overflow-hidden bg-[#2c2c2e] object-cover"
                     />
                     <div className="flex-1 min-w-0 text-left">
-                      <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-[#1db954]" : "text-white"}`}>
+                      <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : "text-white"}`}>
                         {queueTrack.title}
                       </p>
                       <p className="text-xs text-white/60 truncate">{queueTrack.artistName}</p>
                     </div>
                     {index === queueIndex && playing && (
                       <div className="flex items-center gap-0.5">
-                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse" />
-                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse delay-75" />
-                        <div className="w-0.5 h-3 bg-[#1db954] animate-pulse delay-150" />
+                        <div className="w-0.5 h-3 bg-primary animate-pulse" />
+                        <div className="w-0.5 h-3 bg-primary animate-pulse delay-75" />
+                        <div className="w-0.5 h-3 bg-primary animate-pulse delay-150" />
                       </div>
                     )}
                   </button>

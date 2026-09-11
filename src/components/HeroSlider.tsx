@@ -56,7 +56,6 @@ export function HeroSlider({ slides }: HeroSliderProps) {
       coverUrl: slide.imageUrl,
       audioUrl: slide.audioUrl,
     });
-    togglePlay();
   };
 
   if (slides.length === 0) return null;

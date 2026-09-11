@@ -1,9 +1,6 @@
 import { Play, Pause } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
-import { toast } from "sonner";
 
 interface AlbumCardProps {
   id: string;
@@ -17,55 +14,28 @@ interface AlbumCardProps {
 
 export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, price }: AlbumCardProps) {
   const setTrack = usePlayer((s) => s.setTrack);
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const formatPrice = useCurrency((s) => s.formatPrice);
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const isCurrentTrack = currentTrackId === id;
   const isPlayingThisTrack = playing && isCurrentTrack;
 
-  const handlePlay = async () => {
-    try {
-      const isPaid = price && Number(price) > 0;
-      
-      if (isCurrentTrack) {
-        // Just toggle play/pause if it's the same track
-        togglePlay();
-        return;
-      }
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: id } });
-        setTrack({
-          id,
-          title,
-          artistName: subtitle,
-          coverUrl: imageUrl,
-          audioUrl: url,
-          durationSeconds: duration,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: id } });
-        setTrack({
-          id,
-          title,
-          artistName: subtitle,
-          coverUrl: imageUrl,
-          audioUrl: url,
-          durationSeconds: duration,
-        });
-        setIsPreview(false);
-      }
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isCurrentTrack) {
       togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
     }
+    setTrack({
+      id,
+      title,
+      artistName: subtitle,
+      coverUrl: imageUrl,
+      audioUrl: audioUrl || undefined,
+      durationSeconds: duration,
+    });
   };
 
   return (

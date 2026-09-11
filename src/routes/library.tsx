@@ -10,8 +10,6 @@ import { usePlayer } from "@/stores/player";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl, getSignedAudioUrl } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -66,6 +64,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading } = useQuery({
@@ -82,6 +81,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.albums).filter(hasId);
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const { data: followedArtists, isLoading: followingLoading } = useQuery({
@@ -96,6 +96,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.artists).filter(hasId);
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   if (likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
@@ -226,24 +227,32 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
     mutationFn: () => toggleFollow({ data: { artist_id: artist.id } }),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: followQK });
+      await qc.cancelQueries({ queryKey: ["followed-artists", userId] });
       const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
+      const prevFollowed = qc.getQueryData<any[]>(["followed-artists", userId]) ?? [];
       if (prev) {
         qc.setQueryData(followQK, {
           following: !prev.following,
           count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
         });
       }
-      return { prev };
+      // Optimistically remove from followed artists list if unfollowing
+      if (prev?.following) {
+        qc.setQueryData(["followed-artists", userId], prevFollowed.filter((a) => a.id !== artist.id));
+      }
+      return { prev, prevFollowed };
     },
     onError: (e: Error, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      if (ctx?.prevFollowed) qc.setQueryData(["followed-artists", userId], ctx.prevFollowed);
       toast.error(e.message);
     },
     onSuccess: (res) => {
       toast.success(res.action === "followed" ? `❤️ Following ${artist.name}!` : `👋 Unfollowed ${artist.name}`);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["followed-artists"] });
+      qc.invalidateQueries({ queryKey: ["followed-artists", userId] });
+      qc.invalidateQueries({ queryKey: ["library", userId] });
     },
   });
 
@@ -296,48 +305,22 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const qc = useQueryClient();
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
   const player = usePlayer();
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const isPlaying = player.playing && player.track?.id === song.id;
-  const isPaid = song.price && Number(song.price) > 0;
 
-  const handlePlay = async () => {
-    try {
-      if (isPlaying) {
-        player.togglePlay();
-        return;
-      }
-
-      if (isPaid) {
-        // Use preview URL for paid songs
-        const { url } = await getPreviewFn({ data: { song_id: song.id } });
-        player.setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          audioUrl: url,
-        });
-        player.setIsPreview(true);
-        player.togglePlay();
-        toast.info(`🎵 Previewing "${song.title}" (15s)`);
-      } else {
-        // Full playback for free songs
-        const { url } = await getPublicFn({ data: { song_id: song.id } });
-        player.setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          audioUrl: url,
-        });
-        player.setIsPreview(false);
-        player.togglePlay();
-      }
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isPlaying) {
+      player.togglePlay();
+      return;
     }
+    player.setTrack({
+      id: song.id,
+      title: song.title,
+      artistName: song.artists?.name ?? "Unknown",
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration,
+    });
   };
 
   const removeMutation = useMutation({
@@ -350,13 +333,22 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
         .eq("song_id", song.id);
       if (error) throw error;
     },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["liked-songs", userId] });
+      const prev = qc.getQueryData<any[]>(["liked-songs", userId]) ?? [];
+      const next = prev.filter((s) => s.id !== song.id);
+      qc.setQueryData(["liked-songs", userId], next);
+      return { prev };
+    },
+    onError: (error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["liked-songs", userId], ctx.prev);
+      toast.error(`Failed to remove: ${(error as Error).message}`);
+    },
     onSuccess: () => {
       toast.success(`🗑️ Removed "${song.title}" from liked songs`);
       qc.invalidateQueries({ queryKey: ["liked-songs", userId] });
       qc.invalidateQueries({ queryKey: ["saved-track-ids", userId] });
-    },
-    onError: (error) => {
-      toast.error(`Failed to remove: ${(error as Error).message}`);
+      qc.invalidateQueries({ queryKey: ["library", userId] });
     },
   });
 
@@ -424,34 +416,22 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
 function PurchasedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
   const player = usePlayer();
-  const getSignedFn = useServerFn(getSignedAudioUrl);
 
   const isPlaying = player.playing && player.track?.id === song.id;
 
-  const handlePlay = async () => {
-    try {
-      if (isPlaying) {
-        player.togglePlay();
-        return;
-      }
-
-      // Purchased songs have full playback
-      const result = await getSignedFn({ data: { song_id: song.id } });
-      if (!result.url || ("requiresPurchase" in result && result.requiresPurchase)) {
-        throw new Error("This song requires a purchase");
-      }
-      player.setTrack({
-        id: song.id,
-        title: song.title,
-        artistName: song.artists?.name ?? "Unknown",
-        coverUrl: song.cover_url,
-        audioUrl: result.url,
-      });
-      player.setIsPreview(false);
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isPlaying) {
       player.togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
     }
+    player.setTrack({
+      id: song.id,
+      title: song.title,
+      artistName: song.artists?.name ?? "Unknown",
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration,
+    });
   };
 
   return (

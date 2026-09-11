@@ -164,6 +164,8 @@ function ArtistProfileEditPage() {
       toast.success("🎨 Artist profile updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["my-artist-profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["artist-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["artist", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["artists"] });
     },
     onError: (error) => {
       console.error("[Artist Profile] Save failed:", error);

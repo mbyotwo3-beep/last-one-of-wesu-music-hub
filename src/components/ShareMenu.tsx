@@ -104,6 +104,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     }
     toggle();
   };
+  const toggleLike = handleLike;
 
   const handleAddToPlaylistClick = () => {
     if (!user) {
@@ -298,7 +299,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleLike();
+                  toggleLike();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
               >

@@ -136,18 +136,30 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { data: song } = await context.supabase
       .from("songs")
-      .select("audio_url, price, album_id")
+      .select("audio_url, price, album_id, artist_id")
       .eq("id", data.song_id)
       .single();
     if (!song) throw new Error("Song not found");
 
-    // Superadmin bypass — full playback everywhere for testing
-    const isSuper = await isSuperadminUser(context.supabase, context.userId);
+    // Staff bypass (admin and superadmin) — full playback for QA and moderation
+    const isStaff = await isStaffUser(context.supabase, context.userId);
 
-    // Free if priced 0, purchased individually, purchased with its album, or
-    // accessed by a superadmin. Subscriptions are deliberately not an
-    // entitlement while subscription sales are paused.
-    if (!isSuper && (song as any).price && Number((song as any).price) > 0) {
+    // Check if the caller is the artist who uploaded this song
+    let isOwnerArtist = false;
+    if (!isStaff && (song as any).artist_id) {
+      const { data: artist } = await context.supabase
+        .from("artists")
+        .select("id")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (artist && (artist as any).id === (song as any).artist_id) {
+        isOwnerArtist = true;
+      }
+    }
+
+    // Free if priced 0, purchased individually, purchased with its album,
+    // accessed by staff, or accessed by the song's artist owner.
+    if (!isStaff && !isOwnerArtist && (song as any).price && Number((song as any).price) > 0) {
       const albumId = (song as any).album_id as string | null;
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
@@ -197,14 +209,26 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { data: song, error: songError } = await context.supabase
       .from("songs")
-      .select("id,title,audio_url,price,album_id,status")
+      .select("id,title,audio_url,price,album_id,status,artist_id")
       .eq("id", data.song_id)
       .maybeSingle();
     if (songError) throw new Error(songError.message);
     if (!song || song.status !== "approved") throw new Error("Song is not available for download");
 
-    const isSuper = await isSuperadminUser(context.supabase, context.userId);
-    if (!isSuper && Number(song.price ?? 0) > 0) {
+    const isStaff = await isStaffUser(context.supabase, context.userId);
+    let isOwnerArtist = false;
+    if (!isStaff && (song as any).artist_id) {
+      const { data: artist } = await context.supabase
+        .from("artists")
+        .select("id")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (artist && (artist as any).id === (song as any).artist_id) {
+        isOwnerArtist = true;
+      }
+    }
+
+    if (!isStaff && !isOwnerArtist && Number(song.price ?? 0) > 0) {
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
           .from("purchases")

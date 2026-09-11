@@ -19,11 +19,13 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PodcastRouteImport } from './routes/podcast'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as NowPlayingRouteImport } from './routes/now-playing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as NewMusicRouteImport } from './routes/new-music'
 import { Route as MustHaveRouteImport } from './routes/must-have'
+import { Route as LikedSongsRouteImport } from './routes/liked-songs'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LabelDashboardRouteImport } from './routes/label-dashboard'
 import { Route as HotTracksRouteImport } from './routes/hot-tracks'
@@ -104,6 +106,11 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PodcastRoute = PodcastRouteImport.update({
+  id: '/podcast',
+  path: '/podcast',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
   id: '/playlists',
   path: '/playlists',
@@ -127,6 +134,11 @@ const NewMusicRoute = NewMusicRouteImport.update({
 const MustHaveRoute = MustHaveRouteImport.update({
   id: '/must-have',
   path: '/must-have',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LikedSongsRoute = LikedSongsRouteImport.update({
+  id: '/liked-songs',
+  path: '/liked-songs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -294,11 +306,13 @@ export interface FileRoutesByFullPath {
   '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/liked-songs': typeof LikedSongsRoute
   '/must-have': typeof MustHaveRoute
   '/new-music': typeof NewMusicRoute
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -340,11 +354,13 @@ export interface FileRoutesByTo {
   '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/liked-songs': typeof LikedSongsRoute
   '/must-have': typeof MustHaveRoute
   '/new-music': typeof NewMusicRoute
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -387,11 +403,13 @@ export interface FileRoutesById {
   '/hot-tracks': typeof HotTracksRoute
   '/label-dashboard': typeof LabelDashboardRoute
   '/library': typeof LibraryRoute
+  '/liked-songs': typeof LikedSongsRoute
   '/must-have': typeof MustHaveRoute
   '/new-music': typeof NewMusicRoute
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/podcast': typeof PodcastRoute
   '/profile': typeof ProfileRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -435,11 +453,13 @@ export interface FileRouteTypes {
     | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/liked-songs'
     | '/must-have'
     | '/new-music'
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -481,11 +501,13 @@ export interface FileRouteTypes {
     | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/liked-songs'
     | '/must-have'
     | '/new-music'
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -527,11 +549,13 @@ export interface FileRouteTypes {
     | '/hot-tracks'
     | '/label-dashboard'
     | '/library'
+    | '/liked-songs'
     | '/must-have'
     | '/new-music'
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/podcast'
     | '/profile'
     | '/recently-added'
     | '/reset-password'
@@ -574,11 +598,13 @@ export interface RootRouteChildren {
   HotTracksRoute: typeof HotTracksRoute
   LabelDashboardRoute: typeof LabelDashboardRoute
   LibraryRoute: typeof LibraryRoute
+  LikedSongsRoute: typeof LikedSongsRoute
   MustHaveRoute: typeof MustHaveRoute
   NewMusicRoute: typeof NewMusicRoute
   NotificationsRoute: typeof NotificationsRoute
   NowPlayingRoute: typeof NowPlayingRoute
   PlaylistsRoute: typeof PlaylistsRouteWithChildren
+  PodcastRoute: typeof PodcastRoute
   ProfileRoute: typeof ProfileRoute
   RecentlyAddedRoute: typeof RecentlyAddedRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -669,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/podcast': {
+      id: '/podcast'
+      path: '/podcast'
+      fullPath: '/podcast'
+      preLoaderRoute: typeof PodcastRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/playlists': {
       id: '/playlists'
       path: '/playlists'
@@ -702,6 +735,13 @@ declare module '@tanstack/react-router' {
       path: '/must-have'
       fullPath: '/must-have'
       preLoaderRoute: typeof MustHaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/liked-songs': {
+      id: '/liked-songs'
+      path: '/liked-songs'
+      fullPath: '/liked-songs'
+      preLoaderRoute: typeof LikedSongsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -986,11 +1026,13 @@ const rootRouteChildren: RootRouteChildren = {
   HotTracksRoute: HotTracksRoute,
   LabelDashboardRoute: LabelDashboardRoute,
   LibraryRoute: LibraryRoute,
+  LikedSongsRoute: LikedSongsRoute,
   MustHaveRoute: MustHaveRoute,
   NewMusicRoute: NewMusicRoute,
   NotificationsRoute: NotificationsRoute,
   NowPlayingRoute: NowPlayingRoute,
   PlaylistsRoute: PlaylistsRouteWithChildren,
+  PodcastRoute: PodcastRoute,
   ProfileRoute: ProfileRoute,
   RecentlyAddedRoute: RecentlyAddedRoute,
   ResetPasswordRoute: ResetPasswordRoute,

@@ -14,6 +14,7 @@ export function AppleMusicSidebar() {
   const mainNav = [
     { to: "/", label: "Listen Now", icon: Play },
     { to: "/browse", label: "Browse", icon: Grid, highlight: true },
+    { to: "/podcast", label: "Podcasts", icon: Mic2 },
   ];
 
   const libraryNav = [

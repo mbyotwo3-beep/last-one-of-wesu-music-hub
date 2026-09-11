@@ -4,7 +4,7 @@ import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
-import { Play, ShoppingBag, Heart } from "lucide-react";
+import { Play, Pause, ShoppingBag, Heart } from "lucide-react";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
@@ -13,6 +13,7 @@ const albumQO = (id: string) =>
   queryOptions({
     queryKey: ["album", id],
     queryFn: () => getAlbumWithSongs({ data: { id } }),
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
 export const Route = createFileRoute("/albums/$id")({
@@ -35,20 +36,44 @@ export const Route = createFileRoute("/albums/$id")({
 function AlbumPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(albumQO(id));
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
+  const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
   const album = data.album!;
   const artist = (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null }).artist ?? null;
 
+  const albumTracks = data.songs.map((s) => ({
+    id: s.id,
+    title: s.title,
+    artistName: artist?.name ?? "Unknown",
+    coverUrl: album.cover_url,
+    durationSeconds: s.duration,
+  }));
+
+  const isAlbumPlaying = playing && data.songs.some((s) => s.id === currentTrackId);
+
   const playFirst = () => {
-    const first = data.songs[0];
-    if (!first) return;
-    setTrack({
-      id: first.id,
-      title: first.title,
-      artistName: artist?.name ?? "Unknown",
-      coverUrl: album.cover_url,
-      durationSeconds: first.duration,
-    });
+    if (data.songs.length === 0) return;
+    if (isAlbumPlaying) {
+      togglePlay();
+      return;
+    }
+    const currentIndexInAlbum = data.songs.findIndex((s) => s.id === currentTrackId);
+    if (currentIndexInAlbum !== -1) {
+      togglePlay();
+    } else {
+      setQueue(albumTracks, 0);
+    }
+  };
+
+  const handlePlaySong = (song: any, index: number) => {
+    const isCurrentTrack = currentTrackId === song.id;
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
+    }
+    setQueue(albumTracks, index);
   };
 
   return (
@@ -87,10 +112,14 @@ function AlbumPage() {
           <button
             onClick={playFirst}
             disabled={data.songs.length === 0}
-            className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40"
-            aria-label="Play album"
+            className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40 cursor-pointer"
+            aria-label={isAlbumPlaying ? "Pause album" : "Play album"}
           >
-            <Play className="size-6 fill-current ml-0.5" />
+            {isAlbumPlaying ? (
+              <Pause className="size-6 fill-current" />
+            ) : (
+              <Play className="size-6 fill-current ml-0.5" />
+            )}
           </button>
           {Number(album.price) > 0 && (
             <Link
@@ -118,22 +147,22 @@ function AlbumPage() {
           <div className="space-y-1">
             {data.songs.map((s, i) => {
               const { isSaved, toggle } = useSavedTrack(s.id);
+              const isCurrentTrack = currentTrackId === s.id;
+              const isPlayingThisTrack = playing && isCurrentTrack;
               return (
                 <div key={s.id} className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
                   <button
-                    onClick={() =>
-                      setTrack({
-                        id: s.id,
-                        title: s.title,
-                        artistName: artist?.name ?? "Unknown",
-                        coverUrl: album.cover_url,
-                        durationSeconds: s.duration,
-                      })
-                    }
+                    onClick={() => handlePlaySong(s, i)}
                     className="flex items-center gap-4 flex-1 text-left cursor-pointer"
                   >
-                    <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                    <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
+                    {isPlayingThisTrack ? (
+                      <Pause className="w-6 size-4 fill-current text-primary" />
+                    ) : (
+                      <>
+                        <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                        <Play className="w-6 size-4 fill-current hidden group-hover:block text-primary" />
+                      </>
+                    )}
                     <div className="flex-1">
                       <p className="font-semibold text-sm group-hover:text-primary transition-colors">{s.title}</p>
                     </div>

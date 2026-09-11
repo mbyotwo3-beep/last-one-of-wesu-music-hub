@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
 import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, UserPlus, UserCheck, UserMinus, ShoppingBag, Heart } from "lucide-react";
+import { CheckCircle2, Play, Pause, UserPlus, UserCheck, UserMinus, ShoppingBag, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,14 +13,13 @@ import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ShareMenu } from "@/components/ShareMenu";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 
 const artistQO = (id: string) =>
   queryOptions({
     queryKey: ["artist", id],
     queryFn: () => getArtistById({ data: { id } }),
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
 export const Route = createFileRoute("/artists/$id")({
@@ -46,15 +45,14 @@ export const Route = createFileRoute("/artists/$id")({
 function ArtistPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(artistQO(id));
-  const setTrack = usePlayer((s) => s.setTrack);
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
+  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
+  const playing = usePlayer((s) => s.playing);
+  const currentTrackId = usePlayer((s) => s.track?.id);
   const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const a = data.artist!;
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const [coverBg, setCoverBg] = useState<string | null>(null);
   useEffect(() => {
@@ -79,11 +77,13 @@ function ArtistPage() {
   const followQuery = useQuery({
     queryKey: followQK,
     queryFn: () => getFollowState({ data: { artist_id: id, user_id: user?.id ?? null } }),
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
   const similarQuery = useQuery({
     queryKey: ["similar-artists", id],
     queryFn: () => getSimilarArtists({ data: { artist_id: id } }),
     enabled: !!followQuery.data?.following,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const follow = useMutation({
@@ -130,41 +130,36 @@ function ArtistPage() {
     follow.mutate();
   };
 
-  const playAll = async () => {
-    const first = data.topSongs[0];
-    if (!first) return;
-    
-    try {
-      const isPaid = first.price && Number(first.price) > 0;
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: a.name,
-          coverUrl: first.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${first.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: a.name,
-          coverUrl: first.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(false);
-      }
+  const topSongTracks = data.topSongs.map((s) => ({
+    id: s.id,
+    title: s.title,
+    artistName: a.name,
+    coverUrl: s.cover_url,
+    durationSeconds: s.duration,
+  }));
+
+  const isArtistPlaying = playing && data.topSongs.some((s) => s.id === currentTrackId);
+
+  const playAll = () => {
+    if (data.topSongs.length === 0) return;
+    if (isArtistPlaying) {
       togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
     }
+    const currentIndex = data.topSongs.findIndex((s) => s.id === currentTrackId);
+    if (currentIndex !== -1) {
+      togglePlay();
+    } else {
+      setQueue(topSongTracks, 0);
+    }
+  };
+
+  const handlePlaySong = (song: any, index: number) => {
+    if (currentTrackId === song.id) {
+      togglePlay();
+      return;
+    }
+    setQueue(topSongTracks, index);
   };
 
   const following = !!followQuery.data?.following;
@@ -219,10 +214,14 @@ function ArtistPage() {
             <button
               onClick={playAll}
               disabled={data.topSongs.length === 0}
-              className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40 disabled:hover:scale-100"
-              aria-label="Play"
+              className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-40 disabled:hover:scale-100 cursor-pointer"
+              aria-label={isArtistPlaying ? "Pause" : "Play"}
             >
-              <Play className="size-6 fill-current ml-0.5" />
+              {isArtistPlaying ? (
+                <Pause className="size-6 fill-current" />
+              ) : (
+                <Play className="size-6 fill-current ml-0.5" />
+              )}
             </button>
             <ShareMenu
               artistId={a.id}
@@ -275,49 +274,25 @@ function ArtistPage() {
             <div className="space-y-1">
               {data.topSongs.map((s, i) => {
                 const { isSaved, toggle } = useSavedTrack(s.id);
+                const isCurrentTrack = currentTrackId === s.id;
+                const isPlayingThisTrack = playing && isCurrentTrack;
                 return (
                   <div
                     key={s.id}
                     className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                   >
                     <button
-                      onClick={async () => {
-                        try {
-                          const isPaid = s.price && Number(s.price) > 0;
-                          
-                          if (isPaid) {
-                            const { url } = await getPreviewFn({ data: { song_id: s.id } });
-                            setTrack({
-                              id: s.id,
-                              title: s.title,
-                              artistName: a.name,
-                              coverUrl: s.cover_url,
-                              audioUrl: url,
-                              durationSeconds: s.duration,
-                            });
-                            setIsPreview(true);
-                            toast.info(`🎵 Previewing "${s.title}" (15s)`);
-                          } else {
-                            const { url } = await getPublicFn({ data: { song_id: s.id } });
-                            setTrack({
-                              id: s.id,
-                              title: s.title,
-                              artistName: a.name,
-                              coverUrl: s.cover_url,
-                              audioUrl: url,
-                              durationSeconds: s.duration,
-                            });
-                            setIsPreview(false);
-                          }
-                          togglePlay();
-                        } catch (error) {
-                          toast.error(`Failed to play: ${(error as Error).message}`);
-                        }
-                      }}
+                      onClick={() => handlePlaySong(s, i)}
                       className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
                     >
-                      <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-                      <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current" />
+                      {isPlayingThisTrack ? (
+                        <Pause className="w-6 text-sm size-4 fill-current text-primary" />
+                      ) : (
+                        <>
+                          <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
+                          <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current text-primary" />
+                        </>
+                      )}
                       <StorageImage
                         bucket="album-art"
                         path={s.cover_url}
@@ -325,7 +300,7 @@ function ArtistPage() {
                         className="size-10 rounded-md overflow-hidden bg-card object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{s.title}</p>
+                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{s.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {(s.play_count ?? 0).toLocaleString()} plays
                         </p>

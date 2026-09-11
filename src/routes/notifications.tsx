@@ -34,15 +34,26 @@ function Page() {
       return data ?? [];
     },
     enabled: !!user,
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
       await supabase.from("notifications").update({ read_at: new Date().toISOString() } as any).eq("id", id);
     },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["notifications", user?.id] });
+      const prev = qc.getQueryData<any[]>(["notifications", user?.id]) ?? [];
+      const next = prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
+      qc.setQueryData(["notifications", user?.id], next);
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["notifications", user?.id], ctx.prev);
+      toast.error("Failed to mark as read");
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-      toast.success("Marked as read");
+      qc.invalidateQueries({ queryKey: ["notifications", user?.id] });
     },
   });
 
@@ -52,8 +63,19 @@ function Page() {
       if (unreadIds.length === 0) return;
       await supabase.from("notifications").update({ read_at: new Date().toISOString() } as any).in("id", unreadIds);
     },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications", user?.id] });
+      const prev = qc.getQueryData<any[]>(["notifications", user?.id]) ?? [];
+      const next = prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }));
+      qc.setQueryData(["notifications", user?.id], next);
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["notifications", user?.id], ctx.prev);
+      toast.error("Failed to mark all as read");
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["notifications", user?.id] });
       toast.success("All notifications marked as read");
     },
   });

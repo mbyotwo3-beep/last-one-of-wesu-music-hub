@@ -206,10 +206,23 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             previewMode = true;
           }
         } else {
-          const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
-          url = res.url;
-          previewMode = true;
-          setShowAd(true);
+          // Check if it's a free track first so anonymous listeners hear the full song with ads
+          let publicRes: { url: string } | null = null;
+          try {
+            publicRes = await getPublicFn({ data: { song_id: track!.id } });
+          } catch {
+            publicRes = null;
+          }
+          if (publicRes && publicRes.url) {
+            url = publicRes.url;
+            previewMode = false;
+            setShowAd(true);
+          } else {
+            const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
+            url = res.url;
+            previewMode = true;
+            setShowAd(true);
+          }
         }
 
         // A newer selection may have replaced this request while it was

@@ -30,7 +30,7 @@ export function MiniPlayer() {
   // A track is allowed to be paused while its URL is still resolving. The
   // player starts in `playing=true`, so loading must never lock the pause
   // control once playback has been requested.
-  const isLoading = track.audioUrl === undefined && !playing;
+  const isLoading = track.audioUrl === undefined && playing;
   const dur = track.durationSeconds ?? 0;
   const progress = dur > 0 ? Math.min((progressSeconds / dur) * 100, 100) : 0;
 

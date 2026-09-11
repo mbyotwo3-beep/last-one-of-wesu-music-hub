@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { Music2, Play, ShoppingBag, Heart } from "lucide-react";
+import { Music2, Play, Pause, ShoppingBag, Heart } from "lucide-react";
 import { getSongById } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -13,6 +13,7 @@ const songQO = (id: string) =>
   queryOptions({
     queryKey: ["song", id],
     queryFn: () => getSongById({ data: { id } }),
+    staleTime: 0, // Always refetch to ensure immediate updates
   });
 
 export const Route = createFileRoute("/songs/$id")({
@@ -39,11 +40,22 @@ function SongPage() {
   const { id } = Route.useParams();
   const { data: song } = useSuspenseQuery(songQO(id));
   const setTrack = usePlayer((state) => state.setTrack);
+  const togglePlay = usePlayer((state) => state.togglePlay);
+  const playing = usePlayer((state) => state.playing);
+  const currentTrackId = usePlayer((state) => state.track?.id);
   const artist = song!.artist as { id: string; name: string } | null;
   const isFree = Number(song!.price ?? 0) <= 0;
   const { isSaved, toggle } = useSavedTrack(id);
 
+  const isCurrentTrack = currentTrackId === song!.id;
+  const isPlayingThisTrack = playing && isCurrentTrack;
+
   const play = () => {
+    if (isCurrentTrack) {
+      togglePlay();
+      return;
+    }
+
     setTrack({
       id: song!.id,
       title: song!.title,
@@ -91,7 +103,12 @@ function SongPage() {
             onClick={play}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground transition-transform hover:scale-105"
           >
-            <Play className="size-5 fill-current" /> Play
+            {isPlayingThisTrack ? (
+              <Pause className="size-5 fill-current" />
+            ) : (
+              <Play className="size-5 fill-current" />
+            )}
+            {isPlayingThisTrack ? "Pause" : "Play"}
           </button>
           {isFree ? (
             <DownloadButton songId={song!.id} label="Download" />

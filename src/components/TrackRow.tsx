@@ -3,9 +3,6 @@ import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { DownloadButton } from "@/components/DownloadButton";
 import { useSavedTrack } from "@/hooks/use-saved-track";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
-import { toast } from "sonner";
 
 interface TrackRowProps {
   id: string;
@@ -21,55 +18,29 @@ interface TrackRowProps {
 
 export function TrackRow({ id, title, artist, album, duration, coverUrl, audioUrl, index, price }: TrackRowProps) {
   const setTrack = usePlayer((s) => s.setTrack);
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const { isSaved, toggle } = useSavedTrack(id);
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const isCurrentTrack = currentTrackId === id;
   const isPlayingThisTrack = playing && isCurrentTrack;
 
-  const handlePlay = async (e?: React.MouseEvent) => {
+  const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     
-    try {
-      const isPaid = price && Number(price) > 0;
-      
-      if (isCurrentTrack) {
-        // Just toggle play/pause if it's the same track
-        togglePlay();
-        return;
-      }
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: id } });
-        setTrack({
-          id,
-          title,
-          artistName: artist,
-          coverUrl,
-          audioUrl: url,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: id } });
-        setTrack({
-          id,
-          title,
-          artistName: artist,
-          coverUrl,
-          audioUrl: url,
-        });
-        setIsPreview(false);
-      }
+    if (isCurrentTrack) {
       togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
     }
+    
+    setTrack({
+      id,
+      title,
+      artistName: artist,
+      coverUrl,
+      audioUrl: audioUrl || undefined,
+    });
   };
 
   return (

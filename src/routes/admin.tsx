@@ -4,11 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Users, Music, Shield, BarChart3, Check, X, Building2,
   CheckCircle2, Clock, AlertTriangle, TrendingUp, CreditCard,
-  Trash2, Search, Filter,
+  Trash2, Search, Filter, Play, Pause,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
+import { usePlayer } from "@/stores/player";
 import {
   getPlatformStats,
   getRecentActivity,
@@ -326,6 +327,24 @@ function SongMod() {
   const [songToDelete, setSongToDelete] = useState<{ id: string; title: string; artistName?: string } | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
+  const player = usePlayer();
+  const currentTrackId = player.track?.id;
+  const isPlaying = player.playing;
+
+  const handleAudition = (song: any) => {
+    if (currentTrackId === song.id) {
+      player.togglePlay();
+      return;
+    }
+    player.setTrack({
+      id: song.id,
+      title: song.title,
+      artistName: song.artist?.name ?? "Unknown",
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration,
+    });
+  };
+
   const pendingQ = useQuery({
     queryKey: ["pending-songs"],
     queryFn: () => listPending(),
@@ -452,6 +471,18 @@ function SongMod() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
+                      onClick={() => handleAudition(s)}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer transition-colors font-semibold"
+                      title={currentTrackId === s.id && isPlaying ? "Pause" : "Audition"}
+                    >
+                      {currentTrackId === s.id && isPlaying ? (
+                        <Pause className="size-3 text-primary fill-primary" />
+                      ) : (
+                        <Play className="size-3 text-primary fill-primary ml-0.5" />
+                      )}
+                      {currentTrackId === s.id && isPlaying ? "Pause" : "Audition"}
+                    </button>
+                    <button
                       disabled={modMutation.isPending || deleteMutation.isPending}
                       onClick={() => modMutation.mutate({ data: { id: s.id, status: "approved" } })}
                       className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-semibold"
@@ -540,6 +571,18 @@ function SongMod() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleAudition(s)}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-secondary border border-border text-foreground hover:bg-accent cursor-pointer transition-colors font-medium"
+                        title={currentTrackId === s.id && isPlaying ? "Pause" : "Audition"}
+                      >
+                        {currentTrackId === s.id && isPlaying ? (
+                          <Pause className="size-3 text-primary fill-primary" />
+                        ) : (
+                          <Play className="size-3 text-primary fill-primary ml-0.5" />
+                        )}
+                        {currentTrackId === s.id && isPlaying ? "Pause" : "Audition"}
+                      </button>
                       {!isApproved && (
                         <button
                           disabled={modMutation.isPending || deleteMutation.isPending}

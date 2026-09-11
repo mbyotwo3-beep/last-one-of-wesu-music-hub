@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { UserCircle, Pencil, MapPin, Mail, Calendar, Mic2, LogOut, ArrowLeft, Camera } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ function Page() {
   const { user } = useAuth();
   const { isArtist, isSuperAdmin, isAdmin } = useUserRoles();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const update = useServerFn(updateProfile);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -65,6 +66,9 @@ function Page() {
     onSuccess: () => {
       toast.success("✅ Profile updated successfully!");
       setIsEditing(false);
+      // Invalidate profile-related queries so changes appear immediately
+      qc.invalidateQueries({ queryKey: ["profile", user?.id] });
+      qc.invalidateQueries({ queryKey: ["my-artist-profile", user?.id] });
     },
     onError: (error) => {
       toast.error(`Failed to update profile: ${(error as Error).message}`);

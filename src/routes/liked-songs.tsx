@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Heart, Play, Music2 } from "lucide-react";
+import { Heart, Play, Pause, Music2 } from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,8 +8,6 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { usePlayer } from "@/stores/player";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/liked-songs")({
   head: () => ({ meta: [{ title: "Liked Songs — Wesu+" }] }),
@@ -35,8 +33,6 @@ function hasId(value: unknown): value is { id: string } {
 function Page() {
   const { user } = useAuth();
   const player = usePlayer();
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const { data: likedSongs, isLoading } = useQuery({
     queryKey: ["liked-songs", user?.id],
@@ -55,48 +51,30 @@ function Page() {
 
   const safeLikedSongs = (likedSongs ?? []).filter(hasId);
 
-  const handlePlayAll = async () => {
+  const songTracks = safeLikedSongs.map((song: any) => ({
+    id: song.id,
+    title: song.title,
+    artistName: song.artists?.name ?? "Unknown",
+    coverUrl: song.cover_url,
+    durationSeconds: song.duration,
+  }));
+
+  const isLikedSongsPlaying = player.playing && safeLikedSongs.some((s) => s.id === player.track?.id);
+
+  const handlePlayAll = () => {
     if (safeLikedSongs.length === 0) {
       toast.error("No liked songs to play");
       return;
     }
-
-    try {
-      const firstSong = safeLikedSongs[0];
-      const isPaid = firstSong.price && Number(firstSong.price) > 0;
-      
-      let audioUrl: string;
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: firstSong.id } });
-        audioUrl = url;
-        player.setIsPreview(true);
-        toast.info(`🎵 Previewing "${firstSong.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: firstSong.id } });
-        audioUrl = url;
-        player.setIsPreview(false);
-      }
-
-      player.setQueue(
-        safeLikedSongs.map((song: any) => ({
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          audioUrl: "", // Will be loaded when played
-        }))
-      );
-
-      player.setTrack({
-        id: firstSong.id,
-        title: firstSong.title,
-        artistName: firstSong.artists?.name ?? "Unknown",
-        coverUrl: firstSong.cover_url,
-        audioUrl,
-      });
+    if (isLikedSongsPlaying) {
       player.togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
+    }
+    const currentIndex = safeLikedSongs.findIndex((s) => s.id === player.track?.id);
+    if (currentIndex !== -1) {
+      player.togglePlay();
+    } else {
+      player.setQueue(songTracks, 0);
     }
   };
 
@@ -128,9 +106,14 @@ function Page() {
             {safeLikedSongs.length > 0 && (
               <button
                 onClick={handlePlayAll}
-                className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl hover:scale-105 transform transition-transform"
+                className="size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl hover:scale-105 transform transition-transform cursor-pointer"
+                aria-label={isLikedSongsPlaying ? "Pause" : "Play"}
               >
-                <Play className="size-6 fill-current ml-1" />
+                {isLikedSongsPlaying ? (
+                  <Pause className="size-6 fill-current" />
+                ) : (
+                  <Play className="size-6 fill-current ml-1" />
+                )}
               </button>
             )}
           </div>
@@ -146,7 +129,7 @@ function Page() {
             </p>
             <Link
               to="/browse"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors cursor-pointer"
             >
               <Music2 className="size-4" />
               Browse Music
@@ -159,9 +142,7 @@ function Page() {
                 key={song.id}
                 song={song}
                 index={index}
-                userId={user?.id ?? null}
-                getPreviewFn={getPreviewFn}
-                getPublicFn={getPublicFn}
+                songTracks={songTracks}
               />
             ))}
           </div>
@@ -174,62 +155,31 @@ function Page() {
 function LikedSongRow({
   song,
   index,
-  userId,
-  getPreviewFn,
-  getPublicFn,
+  songTracks,
 }: {
   song: any;
   index: number;
-  userId: string | null;
-  getPreviewFn: any;
-  getPublicFn: any;
+  songTracks: any[];
 }) {
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
   const player = usePlayer();
 
   const isPlaying = player.playing && player.track?.id === song.id;
-  const isPaid = song.price && Number(song.price) > 0;
 
-  const handlePlay = async () => {
-    try {
-      if (isPlaying) {
-        player.togglePlay();
-        return;
-      }
-
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: song.id } });
-        player.setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          audioUrl: url,
-        });
-        player.setIsPreview(true);
-        toast.info(`🎵 Previewing "${song.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: song.id } });
-        player.setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          audioUrl: url,
-        });
-        player.setIsPreview(false);
-      }
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isPlaying) {
       player.togglePlay();
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+      return;
     }
+    player.setQueue(songTracks, index);
   };
 
   return (
     <div className="group flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors">
       <div className="w-8 text-center text-muted-foreground text-sm font-medium">
         {isPlaying ? (
-          <Music2 className="size-4 mx-auto text-primary animate-pulse" />
+          <Pause className="size-4 mx-auto text-primary" />
         ) : (
           index + 1
         )}
@@ -245,7 +195,7 @@ function LikedSongRow({
         <Link
           to="/artists/$id"
           params={{ id: song.artist_id }}
-          className="text-sm text-muted-foreground truncate hover:text-foreground hover:underline block"
+          className="text-sm text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
         >
           {song.artists?.name ?? "Unknown"}
         </Link>
@@ -256,7 +206,7 @@ function LikedSongRow({
           toggle();
         }}
         disabled={loading}
-        className="size-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
+        className="size-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
         title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
       >
         <Heart 
@@ -265,11 +215,11 @@ function LikedSongRow({
       </button>
       <button
         onClick={handlePlay}
-        className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl opacity-0 group-hover:opacity-100"
-        title={isPlaying ? "Pause" : (isPaid ? "Preview (15s)" : "Play")}
+        className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl opacity-0 group-hover:opacity-100 cursor-pointer"
+        title={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (
-          <Music2 className="size-4 fill-current" />
+          <Pause className="size-4 fill-current" />
         ) : (
           <Play className="size-4 fill-current ml-0.5" />
         )}

@@ -113,7 +113,7 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="lg:max-w-[calc(100vw-16rem)] lg:ml-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
         {/* Show full skeleton during initial load */}
         {isInitialLoading ? (
           <>
