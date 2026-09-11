@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { primeAudio } from "@/lib/audio";
 
 export interface PlayerTrack {
   id: string;
@@ -75,23 +76,27 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   isPreview: false,
 
   setIsPreview: (v) => set({ isPreview: v }),
-  setTrack: (t) =>
+  setTrack: (t) => {
+    if (t) primeAudio();
     set((state) => ({
       track: preserveResolvedAudioUrl(t, state.track),
       playing: !!t,
       progressSeconds: 0,
       liked: false,
       isPreview: false,
-    })),
+    }));
+  },
   setAudioUrl: (url) =>
     set((state) => (state.track ? { track: { ...state.track, audioUrl: url } } : state)),
 
   setQueue: (tracks, startIndex = 0) => {
+    if (tracks.length) primeAudio();
     const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
     set({ queue: tracks, queueIndex: startIndex, track, playing: !!track, progressSeconds: 0, liked: false });
   },
 
   skipNext: () => {
+    primeAudio();
     const { queue, queueIndex, shuffle, repeat } = get();
     if (!queue.length) return;
     let next: number;
@@ -114,6 +119,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   skipPrev: () => {
+    primeAudio();
     const { queue, queueIndex, progressSeconds } = get();
     if (progressSeconds > 3) {
       set({ progressSeconds: 0 });
@@ -135,6 +141,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   togglePlay: () => {
     const { isPreview, progressSeconds, playing } = get();
     const audio = (window as any).__wesuAudio as HTMLAudioElement | undefined;
+    if (!playing) primeAudio();
     // If a 15-second preview has reached the end and user clicks Play, replay from 0
     if (!playing && isPreview && progressSeconds >= 15) {
       if (audio) audio.currentTime = 0;

@@ -65,47 +65,54 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   };
 
   return (
-    <Link to="/songs/$id" params={{ id: song.id }} className="group text-left w-full relative cursor-pointer block">
-      <button
-        type="button"
+    <div className="group text-left w-full relative">
+      {/* Cover Image & Play Button Overlay */}
+      <div
         onClick={handlePlay}
-        className="relative block w-full cursor-pointer"
-        aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
+        className="relative block w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 cursor-pointer group-hover:scale-[1.02] transition-transform"
       >
         <StorageImage
           bucket="album-art"
           path={song.cover_url}
           alt={song.title}
-          className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
+          className="w-full h-full object-cover"
         />
-        <div className={`absolute inset-0 rounded-xl bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}>
-          <div className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors">
+        <div className={`absolute inset-0 bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}>
+          <button
+            type="button"
+            onClick={handlePlay}
+            aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
+            className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+          >
             {isPlayingThisTrack ? (
               <Pause className="size-4 fill-current" />
             ) : (
               <Play className="size-4 fill-current ml-0.5" />
             )}
-          </div>
+          </button>
         </div>
-      </button>
+      </div>
+
       {user && (
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSave();
-          }}
+          onClick={handleSave}
           aria-label={isSaved ? "Unsave track" : "Save track"}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
-          style={{ position: "absolute" }}
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer z-10"
         >
           <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
         </button>
       )}
+
       <div className="flex items-center justify-between gap-2 mt-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{song.title}</p>
+          <Link
+            to="/songs/$id"
+            params={{ id: song.id }}
+            className="text-sm font-semibold truncate hover:text-primary transition-colors block hover:underline"
+          >
+            {song.title}
+          </Link>
           {song.price != null && (
             <p className="text-xs font-medium text-primary">
               {useCurrency.getState().formatPrice(song.price)}
@@ -116,10 +123,6 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
               to="/artists/$id"
               params={{ id: song.artist.id }}
               className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
             >
               {artistName}
             </Link>
@@ -143,7 +146,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

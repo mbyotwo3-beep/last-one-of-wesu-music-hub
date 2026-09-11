@@ -44,27 +44,21 @@ import {
   isNativeAudioAvailable,
 } from "@/lib/native-audio";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getAudio,
+  primeAudio,
+  getCachedAudioUrl,
+  setCachedAudioUrl,
+} from "@/lib/audio";
 
-let _audio: HTMLAudioElement | null = null;
 let _nativeAvailable: boolean | null = null;
 
-function getAudio(): HTMLAudioElement {
-  if (!_audio) {
-    _audio = new Audio();
-    _audio.preload = "auto";
-    _audio.crossOrigin = "anonymous";
-    (window as any).__wesuAudio = _audio;
-  }
-  return _audio;
-}
-
 function cleanupAudio(): void {
-  if (_audio) {
-    _audio.pause();
-    _audio.src = "";
-    _audio.load();
-    _audio = null;
-    delete (window as any).__wesuAudio;
+  const audio = getAudio();
+  if (audio) {
+    audio.pause();
+    audio.src = "";
+    audio.load();
   }
 }
 
@@ -178,7 +172,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
     const audio = getAudio();
     audio.pause();
-    audio.src = "";
 
     let retries = 0;
     const isCurrentTrack = () => currentTrackId.current === track!.id;
@@ -187,41 +180,52 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         let url: string;
         let previewMode = false;
 
-        // Get current access token for entitlement-checked preview of paid tracks.
-        const { data: sess } = await supabase.auth.getSession();
-        const accessToken = sess.session?.access_token ?? null;
-
-        if (user) {
-          let signed: { url: string; requiresPurchase?: boolean } | null = null;
-          try {
-            signed = await getSignedFn({ data: { song_id: track!.id } });
-          } catch {
-            signed = null;
-          }
-          if (signed && signed.url && !signed.requiresPurchase) {
-            url = signed.url;
-          } else {
-            const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
-            url = res.url;
-            previewMode = true;
-          }
+        const cached = getCachedAudioUrl(track!.id);
+        if (cached) {
+          url = cached.url;
+          previewMode = cached.previewMode;
+          if (!user && !previewMode) setShowAd(true);
         } else {
-          // Check if it's a free track first so anonymous listeners hear the full song with ads
-          let publicRes: { url: string } | null = null;
-          try {
-            publicRes = await getPublicFn({ data: { song_id: track!.id } });
-          } catch {
-            publicRes = null;
-          }
-          if (publicRes && publicRes.url) {
-            url = publicRes.url;
-            previewMode = false;
-            setShowAd(true);
+          // Get current access token for entitlement-checked preview of paid tracks.
+          const { data: sess } = await supabase.auth.getSession();
+          const accessToken = sess.session?.access_token ?? null;
+
+          if (user) {
+            let signed: { url: string; requiresPurchase?: boolean } | null = null;
+            try {
+              signed = await getSignedFn({ data: { song_id: track!.id } });
+            } catch {
+              signed = null;
+            }
+            if (signed && signed.url && !signed.requiresPurchase) {
+              url = signed.url;
+            } else {
+              const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
+              url = res.url;
+              previewMode = true;
+            }
           } else {
-            const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
-            url = res.url;
-            previewMode = true;
-            setShowAd(true);
+            // Check if it's a free track first so anonymous listeners hear the full song with ads
+            let publicRes: { url: string } | null = null;
+            try {
+              publicRes = await getPublicFn({ data: { song_id: track!.id } });
+            } catch {
+              publicRes = null;
+            }
+            if (publicRes && publicRes.url) {
+              url = publicRes.url;
+              previewMode = false;
+              setShowAd(true);
+            } else {
+              const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
+              url = res.url;
+              previewMode = true;
+              setShowAd(true);
+            }
+          }
+
+          if (url && /^https?:\/\//i.test(url)) {
+            setCachedAudioUrl(track!.id, url, previewMode);
           }
         }
 
@@ -301,7 +305,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           }
         };
         const onCanPlay = () => {
-          if (isCurrentTrack()) setLoading(false);
+          if (isCurrentTrack()) {
+            setLoading(false);
+            if (usePlayer.getState().playing && audio.paused && audio.src && !audio.src.startsWith("data:")) {
+              audio.play().catch(() => {});
+            }
+          }
         };
         const onPlay = () => {
           if (isCurrentTrack()) setLoading(false);
@@ -337,16 +346,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         try {
           if (usePlayer.getState().playing) {
             await audio.play();
-          } else {
-            setLoading(false);
           }
+          setLoading(false);
         } catch (playErr) {
-          // A mobile browser may block the delayed autoplay after the signed
-          // URL request. Keep the source ready and let the user's next tap
-          // start it through the sync effect.
           setLoading(false);
           if ((playErr as DOMException)?.name === "NotAllowedError") {
-            if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+            // Keep playing: true! Do NOT kill playback state.
+            // When user taps anywhere on the document or canplay arrives, it will immediately play.
+            console.warn("Autoplay deferred by browser policy, awaiting user interaction");
           } else {
             throw playErr;
           }
@@ -443,6 +450,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   useEffect(() => {
     getAudio().volume = muted ? 0 : volume;
   }, [volume, muted]);
+
+  // Resume playback on user gesture if browser deferred autoplay
+  useEffect(() => {
+    const handleGestureResume = () => {
+      const st = usePlayer.getState();
+      const audio = getAudio();
+      if (st.playing && audio && audio.paused && audio.src && !audio.src.startsWith("data:")) {
+        audio.play().catch(() => {});
+      }
+    };
+    window.addEventListener("pointerdown", handleGestureResume, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", handleGestureResume);
+    };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
