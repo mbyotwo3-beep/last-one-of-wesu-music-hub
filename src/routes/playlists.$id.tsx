@@ -19,6 +19,75 @@ export const Route = createFileRoute("/playlists/$id")({
   notFoundComponent: () => <div className="p-12 text-center">Playlist not found</div>,
 });
 
+// Extracted into its own component so useSavedTrack is called at component level (not inside .map)
+interface SongRowProps {
+  song: any;
+  index: number;
+  isOwner: boolean;
+  playlistId: string;
+  onPlay: (index: number) => void;
+  onRemove: (songId: string) => void;
+}
+
+function SongRow({ song: s, index: i, isOwner, playlistId, onPlay, onRemove }: SongRowProps) {
+  const { isSaved, toggle } = useSavedTrack(s.id);
+
+  return (
+    <div
+      key={s.id}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
+      onClick={() => onPlay(i)}
+    >
+      <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
+      <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
+      <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
+        <Link
+          to="/artists/$id"
+          params={{ id: s.artist?.id ?? "" }}
+          className="text-xs text-muted-foreground truncate hover:underline cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {s.artist?.name ?? "Unknown"}
+        </Link>
+      </div>
+      {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <Heart
+          className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+        />
+      </button>
+      <ShareMenu
+        songId={s.id}
+        songTitle={s.title}
+        artistId={s.artist?.id}
+        artistName={s.artist?.name}
+        type="song"
+        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
+      />
+      {isOwner && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(s.id);
+          }}
+          className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
+          aria-label="Remove"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Page() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -106,7 +175,10 @@ function Page() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
-      <button onClick={() => navigate({ to: "/playlists" })} className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 cursor-pointer transition-colors group">
+      <button
+        onClick={() => navigate({ to: "/playlists" })}
+        className="text-sm text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 cursor-pointer transition-colors group"
+      >
         <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back
       </button>
       <div className="flex items-end gap-6 mb-8">
@@ -148,55 +220,17 @@ function Page() {
         <p className="text-muted-foreground py-12 text-center">No songs yet. Add from any song page.</p>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
-          {songs.map((s: any, i: number) => {
-            const { isSaved, toggle } = useSavedTrack(s.id);
-            return (
-              <div
-                key={s.id}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 cursor-pointer group"
-                onClick={() => playSong(i)}
-              >
-                <span className="text-sm text-muted-foreground w-6 text-right group-hover:hidden">{i + 1}</span>
-                <Play className="size-4 text-primary fill-current hidden group-hover:block w-6" />
-                <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-10 rounded object-cover" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{s.title}</div>
-                <Link to="/artists/$id" params={{ id: s.artist?.id ?? "" }} className="text-xs text-muted-foreground truncate hover:underline cursor-pointer" onClick={(e) => e.stopPropagation()}>
-                    {s.artist?.name ?? "Unknown"}
-                  </Link>
-                </div>
-                {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle();
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Heart
-                    className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  />
-                </button>
-                <ShareMenu
-                  songId={s.id}
-                  songTitle={s.title}
-                  artistId={s.artist?.id}
-                  artistName={s.artist?.name}
-                  type="song"
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground relative z-20"
-                />
-                {isOwner && (
-                  <button
-                  onClick={(e) => { e.stopPropagation(); remove.mutate({ data: { playlist_id: id, song_id: s.id } }); }}
-                  className="text-muted-foreground hover:text-destructive p-2 cursor-pointer transition-colors"
-                  aria-label="Remove"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-                )}
-              </div>
-            );
-          })}
+          {songs.map((s: any, i: number) => (
+            <SongRow
+              key={s.id}
+              song={s}
+              index={i}
+              isOwner={isOwner}
+              playlistId={id}
+              onPlay={playSong}
+              onRemove={(songId) => remove.mutate({ data: { playlist_id: id, song_id: songId } })}
+            />
+          ))}
         </div>
       )}
     </div>
