@@ -13,6 +13,7 @@ import {
   listStorageBuckets,
   type StorageFile,
 } from "@/lib/storage.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export function MediaGallery() {
   const qc = useQueryClient();
@@ -32,12 +33,13 @@ export function MediaGallery() {
 
   const { data: files, isLoading: filesLoading, refetch } = useQuery({
     queryKey: ["storage-files", selectedBucket],
-    queryFn: () => listFilesFn({ bucket: selectedBucket }),
+    queryFn: () => listFilesFn({ data: { bucket: selectedBucket } }),
     retry: 1,
   });
 
   const deleteM = useMutation({
-    mutationFn: deleteFileFn,
+    mutationFn: (vars: { bucket: string; path: string }) =>
+      deleteFileFn({ data: vars }),
     onSuccess: () => {
       toast.success("🗑️ File deleted successfully!");
       refetch();
@@ -80,7 +82,6 @@ export function MediaGallery() {
 
   const handleDownload = () => {
     if (!selectedFile) return;
-    const { supabase } = require("@/integrations/supabase/client");
     const { data } = supabase.storage
       .from(selectedBucket)
       .getPublicUrl(selectedFile.name);
@@ -121,7 +122,7 @@ export function MediaGallery() {
           >
             {bucketsLoading ? (
               <option>Loading buckets...</option>
-            ) : buckets?.map((bucket) => (
+            ) : buckets?.map((bucket: { id: string; name: string; public: boolean }) => (
               <option key={bucket.id} value={bucket.id}>
                 {bucket.name} {bucket.public ? '(Public)' : '(Private)'}
               </option>

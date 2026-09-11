@@ -24,7 +24,7 @@ export const Route = createFileRoute("/songs/$id")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: `${loaderData?.title ?? "Song"} — Wesu+"` },
+      { title: `${loaderData?.title ?? "Song"} — Wesu+` },
       {
         name: "description",
         content: `Listen to ${loaderData?.title ?? "music"} on Wesu+`,

@@ -88,7 +88,7 @@ const NavbarComponent = function Navbar() {
       {menuOpen && (
         <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             <p className="text-xs font-semibold text-primary mt-0.5">
               {isSuperAdmin
                 ? "Superadmin"

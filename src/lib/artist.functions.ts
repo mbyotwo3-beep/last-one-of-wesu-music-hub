@@ -177,7 +177,6 @@ export const uploadSong = createServerFn({ method: "POST" })
         status: "pending",
         release_date: data.release_date ?? null,
         label_id: data.has_label ? (artist as any).label_id : null,
-        track_number: data.track_number ?? null,
       } as any)
       .select("id")
       .single();
@@ -188,7 +187,6 @@ export const uploadSong = createServerFn({ method: "POST" })
       release_date: data.release_date,
       has_feature: data.has_feature,
       has_label: data.has_label,
-      track_number: data.track_number,
     });
     return { ok: true, id: song!.id, status: "pending" };
   });

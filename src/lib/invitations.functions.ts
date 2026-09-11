@@ -59,11 +59,10 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
 
     // Check if email already exists as a user
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existingUser } = await supabaseAdmin
-      .from("profiles")
-      .select("id, email")
-      .eq("email", data.email.toLowerCase())
-      .maybeSingle();
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
+    );
     
     if (existingUser) {
       // User already exists, check if they have an artist profile
@@ -189,11 +188,10 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
 
     // Check if email already exists as a user
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existingUser } = await supabaseAdmin
-      .from("profiles")
-      .select("id, email")
-      .eq("email", data.email.toLowerCase())
-      .maybeSingle();
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
+    );
     
     if (existingUser) {
       // User already exists, check if they have a label

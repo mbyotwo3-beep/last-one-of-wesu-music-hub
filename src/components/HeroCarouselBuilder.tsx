@@ -152,6 +152,7 @@ function HeroSlideCard({
   onUpdate: (d: any) => void;
   isPending: boolean;
 }) {
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({

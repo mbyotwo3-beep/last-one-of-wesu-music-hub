@@ -35,8 +35,8 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const isCurrentTrack = currentTrackId === song.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
 
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleSave = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!user) {
       const currentPath = window.location.pathname + window.location.search;
       navigate({
@@ -136,7 +136,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             songTitle={song.title}
             artistId={song.artist?.id}
             artistName={artistName}
-            albumId={song.album_id}
+            albumId={song.album_id ?? undefined}
             type="song"
             icon="more"
             className="relative z-20"
