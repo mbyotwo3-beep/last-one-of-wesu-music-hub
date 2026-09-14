@@ -20,8 +20,8 @@ export const Route = createFileRoute("/apply-label")({
 function Page() {
   const nav = useNavigate();
   const fn = useServerFn(applyForLabel);
-  const m = useMutation({ 
-    mutationFn: fn, 
+  const m = useMutation({
+    mutationFn: fn,
     onSuccess: () => {
       toast.success("Label application submitted successfully!");
       nav({ to: "/label-dashboard" });
@@ -53,6 +53,8 @@ function Page() {
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
         <input
+          type="email"
+          required
           placeholder="Contact email"
           className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
           value={form.contact_email}

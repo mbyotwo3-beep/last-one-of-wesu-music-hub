@@ -26,12 +26,17 @@ export async function resolveImageUrl(
   const pending = inflight.get(key);
   if (pending) return pending;
   const p = (async () => {
-    // 60-min signed URL — plenty for a page view; cached in-memory for the tab.
-    const { url } = await signImageUrl({ data: { bucket, path } });
-    if (!url) throw new Error("sign failed");
-    cache.set(key, url);
-    inflight.delete(key);
-    return url;
+    try {
+      // 60-min signed URL — plenty for a page view; cached in-memory for the tab.
+      const { url } = await signImageUrl({ data: { bucket, path } });
+      if (!url) throw new Error("sign failed");
+      cache.set(key, url);
+      return url;
+    } finally {
+      // Always release the inflight slot — otherwise a single rejection
+      // caches a rejected promise forever and the image never loads.
+      inflight.delete(key);
+    }
   })();
   inflight.set(key, p);
   return p;
@@ -51,4 +56,3 @@ export function invalidateImageUrl(bucket: ImageBucket, path: string | null | un
   cache.delete(key);
   inflight.delete(key);
 }
-

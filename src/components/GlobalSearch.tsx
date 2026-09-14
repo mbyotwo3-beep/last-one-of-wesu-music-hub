@@ -21,6 +21,9 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
   const [results, setResults] = useState<Results>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic request id — a slow earlier query must never overwrite results
+  // for a newer term (classic typeahead race).
+  const reqIdRef = useRef(0);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -39,14 +42,15 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
       return;
     }
     setLoading(true);
+    const reqId = ++reqIdRef.current;
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await searchFn({ data: { q: term, limit: 5 } });
-        setResults(res);
+        if (reqIdRef.current === reqId) setResults(res);
       } catch {
-        setResults({ songs: [], albums: [], artists: [] });
+        if (reqIdRef.current === reqId) setResults({ songs: [], albums: [], artists: [] });
       } finally {
-        setLoading(false);
+        if (reqIdRef.current === reqId) setLoading(false);
       }
     }, 250);
     return () => {
@@ -145,7 +149,8 @@ export function GlobalSearch({ variant = "desktop" }: { variant?: "desktop" | "m
                   {results.songs.map((s) => (
                     <Link
                       key={s.id}
-                      to="/browse"
+                      to="/songs/$id"
+                      params={{ id: s.id }}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
                     >

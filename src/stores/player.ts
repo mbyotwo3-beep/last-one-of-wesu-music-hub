@@ -118,6 +118,20 @@ export const usePlayer = create<PlayerState>()(
       removeFromQueue: (index) => {
         set((state) => {
           const newQueue = state.queue.filter((_, i) => i !== index);
+          if (index === state.queueIndex) {
+            // Removing the currently playing track — advance to the track
+            // now at this position (or stop if the queue is empty).
+            const nextTrack = newQueue[Math.min(index, newQueue.length - 1)] ?? null;
+            return {
+              queue: newQueue,
+              queueIndex: Math.min(index, Math.max(newQueue.length - 1, 0)),
+              track: nextTrack,
+              playing: !!nextTrack,
+              progressSeconds: 0,
+              liked: false,
+              isPreview: false,
+            };
+          }
           const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
           return { queue: newQueue, queueIndex: newQueueIndex };
         });
@@ -133,7 +147,11 @@ export const usePlayer = create<PlayerState>()(
         } else {
           next = queueIndex + 1;
           if (next >= queue.length) {
-            if (repeat === "off") return;
+            if (repeat === "off") {
+              // Dead end — stop instead of leaving playing:true on ended audio.
+              set({ playing: false });
+              return;
+            }
             next = 0;
           }
         }
@@ -143,6 +161,7 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           liked: false,
           playing: true,
+          isPreview: false,
         }));
       },
 
@@ -163,6 +182,7 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           liked: false,
           playing: true,
+          isPreview: false,
         }));
       },
 
@@ -200,7 +220,8 @@ export const usePlayer = create<PlayerState>()(
         const audio = getAudio();
         if (audio) {
           audio.pause();
-          audio.src = "";
+          audio.removeAttribute("src");
+          audio.load();
         }
         set({
           track: null,
@@ -208,6 +229,7 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           liked: false,
           nowPlayingOpen: false,
+          isPreview: false,
         });
       },
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: v === 0 }),
@@ -220,10 +242,11 @@ export const usePlayer = create<PlayerState>()(
       name: "wesu-player",
       // Persist queue + prefs across reloads like Spotify. Never auto-resume
       // audio (browser policy) — restore paused at saved position.
+      // Strip the signed audioUrl: it expires, so rehydrate must re-resolve.
       partialize: (s) =>
         ({
-          track: s.track,
-          queue: s.queue.slice(0, 200),
+          track: s.track ? { ...s.track, audioUrl: undefined } : null,
+          queue: s.queue.slice(0, 200).map((t) => ({ ...t, audioUrl: undefined })),
           queueIndex: s.queueIndex,
           volume: s.volume,
           muted: s.muted,

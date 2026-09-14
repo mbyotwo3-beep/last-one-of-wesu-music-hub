@@ -100,6 +100,21 @@ export const revokeRole = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
+    // Never allow removing your own superadmin or the last superadmin —
+    // both are instant lockouts with no recovery path.
+    if (data.role === "superadmin") {
+      if (data.user_id === context.userId) {
+        throw new Error("You cannot remove your own superadmin role");
+      }
+      const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+      const { data: remaining } = await admin
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "superadmin");
+      if ((remaining ?? []).length <= 1) {
+        throw new Error("Cannot remove the last superadmin");
+      }
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("user_roles")
@@ -124,6 +139,10 @@ export const upsertPlan = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
+    if (!data.name?.trim()) throw new Error("Plan name is required");
+    if (!Number.isFinite(data.price_zmw) || data.price_zmw < 0) {
+      throw new Error("Plan price must be a non-negative number");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row: any = {
       name: data.name,
@@ -175,7 +194,9 @@ export const updateSettings = createServerFn({ method: "POST" })
 export const listAudit = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    await assertSuperadmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("audit_log")
       .select("*")
       .order("created_at", { ascending: false })
@@ -202,6 +223,15 @@ export const decidePayout = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     if (!(await isStaffUser(context.supabase, context.userId))) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Pending-only guard: without it a completed payout can be re-decided,
+    // double-processing money movement downstream.
+    const { data: pending } = await supabaseAdmin
+      .from("payouts")
+      .select("id")
+      .eq("id", data.id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (!pending) throw new Error("Payout is no longer pending");
     const { error } = await supabaseAdmin
       .from("payouts")
       .update({
@@ -210,7 +240,8 @@ export const decidePayout = createServerFn({ method: "POST" })
         processed_at: new Date().toISOString(),
         processed_by: context.userId,
       })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("status", "pending");
     if (error) throw new Error(error.message);
     await audit(context.userId, `payout.${data.decision}`, "payout", data.id, {
       notes: data.notes,
@@ -242,22 +273,22 @@ export const getSettings = createServerFn({ method: "GET" })
 // now granted only by an existing superadmin via grantRole.
 
 /**
- * Manually mark a payment_transaction as paid. Useful for testing the split
- * pipeline before Lenco is wired. Triggers compute_revenue_splits().
+ * Manually settle a payment_transaction as successful (test/recovery hook).
+ * Routes through settleTransaction so the purchase + revenue splits are
+ * created — writing a raw "paid" status would leave the row in a state no
+ * pipeline reads (stuck and invisible).
  */
 export const markTransactionPaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { transaction_id: string }) => d)
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("payment_transactions")
-      .update({ status: "paid" })
-      .eq("id", data.transaction_id);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "tx.mark_paid", "transaction", data.transaction_id);
-    return { ok: true };
+    const { settleTransaction } = await import("@/lib/payments.server");
+    const result = await settleTransaction(data.transaction_id, "successful");
+    await audit(context.userId, "tx.mark_paid", "transaction", data.transaction_id, {
+      result,
+    });
+    return { ok: true, result };
   });
 
 export const setPlatformCommission = createServerFn({ method: "POST" })

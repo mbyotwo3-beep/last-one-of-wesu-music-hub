@@ -3,8 +3,13 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
 import { Disc } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
+import { useCurrency } from "@/stores/currency";
 
-const albumsQO = queryOptions({ queryKey: ["albums"], queryFn: () => listAlbums() });
+const albumsQO = queryOptions({
+  queryKey: ["albums"],
+  queryFn: () => listAlbums(),
+  staleTime: 5 * 60 * 1000,
+});
 
 export const Route = createFileRoute("/albums/")({
   head: () => ({
@@ -21,6 +26,7 @@ export const Route = createFileRoute("/albums/")({
 
 function AlbumsPage() {
   const { data: albums } = useSuspenseQuery(albumsQO);
+  const formatPrice = useCurrency((s) => s.formatPrice);
 
   return (
     <div className="min-h-screen pb-24">
@@ -47,9 +53,7 @@ function AlbumsPage() {
                 <p className="text-xs text-muted-foreground truncate">
                   {(a.artist as { name?: string } | null)?.name ?? "Unknown"}
                 </p>
-                <p className="text-xs text-primary font-bold mt-1">
-                  K{Number(a.price ?? 0).toFixed(2)}
-                </p>
+                <p className="text-xs text-primary font-bold mt-1">{formatPrice(a.price)}</p>
               </Link>
             ))}
           </div>

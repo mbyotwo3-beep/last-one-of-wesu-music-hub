@@ -90,12 +90,57 @@ export const getAllHomepageLayouts = createServerFn({ method: "GET" })
     return await readLayouts();
   });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SHELF_TYPES: ShelfType[] = [
+  "new_music",
+  "hot_tracks",
+  "featured_artists",
+  "must_have_albums",
+  "recently_played",
+  "by_genre",
+  "by_artist",
+  "by_playlist",
+  "custom",
+];
+const PAGES = ["home", "browse", "listen-now"];
+
 export const saveHomepageLayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { page: string; layout: HomepageLayout }) => d)
   .handler(async ({ data, context }) => {
     const isSuper = await isSuperadminUser(context.supabase, context.userId);
     if (!isSuper) throw new Error("Forbidden");
+    if (!PAGES.includes(data.page)) throw new Error("Invalid page");
+
+    // Sanitize shelves: unknown types, overlong titles, and malformed IDs
+    // would otherwise render dead homepage sections.
+    const shelves = (data.layout.shelves ?? []).slice(0, 20).map((s) => {
+      if (!SHELF_TYPES.includes(s.type)) throw new Error(`Invalid shelf type: ${s.type}`);
+      const q = s.query ?? {};
+      if (q.artistId && !UUID_RE.test(q.artistId)) throw new Error("Invalid artistId");
+      if (q.playlistId && !UUID_RE.test(q.playlistId)) throw new Error("Invalid playlistId");
+      if (Array.isArray(q.songIds)) {
+        for (const id of q.songIds.slice(0, 50)) {
+          if (!UUID_RE.test(id)) throw new Error("Invalid song id in shelf");
+        }
+      }
+      return {
+        id: String(s.id).slice(0, 64),
+        type: s.type,
+        title: String(s.title ?? "").slice(0, 120),
+        visible: s.visible !== false,
+        query: {
+          genre: q.genre ? String(q.genre).slice(0, 60) : undefined,
+          artistId: q.artistId,
+          playlistId: q.playlistId,
+          songIds: q.songIds?.slice(0, 50),
+        },
+      };
+    });
+    const layout: HomepageLayout = {
+      hero_slides: (data.layout.hero_slides ?? []).slice(0, 10),
+      shelves,
+    };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
@@ -103,8 +148,8 @@ export const saveHomepageLayout = createServerFn({ method: "POST" })
       .select("value")
       .eq("key", "homepage_layouts")
       .maybeSingle();
-    const current = ((existing?.value ?? {}) as unknown) as Record<string, HomepageLayout>;
-    const next = { ...current, [data.page]: data.layout };
+    const current = (existing?.value ?? {}) as unknown as Record<string, HomepageLayout>;
+    const next = { ...current, [data.page]: layout };
     const { error } = await supabaseAdmin
       .from("platform_settings")
       .upsert({ key: "homepage_layouts", value: next as any }, { onConflict: "key" });

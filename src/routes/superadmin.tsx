@@ -27,8 +27,8 @@ import {
   listPayouts,
   decidePayout,
   getSettings,
-  markTransactionPaid,
 } from "@/lib/superadmin.functions";
+import { moderateLabel } from "@/lib/labels.functions";
 import { initializePlatformSettings } from "@/lib/pricing.functions";
 import { getPlatformStats } from "@/lib/admin.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
@@ -128,24 +128,27 @@ function SuperadminPage() {
 }
 
 function LabelsTab() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useQuery({
+  const qc = useQueryClient();
+  const moderateFn = useServerFn(moderateLabel);
+  const { data: rows = [], error: queryError } = useQuery({
     queryKey: ["super-labels"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("labels")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        setRows(data ?? []);
-        return data ?? [];
-      } catch (err) {
-        setError((err as Error).message);
-        return [];
-      }
+      const { data, error } = await supabase
+        .from("labels")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
+  });
+  const error = queryError ? (queryError as Error).message : null;
+  const modM = useMutation({
+    mutationFn: moderateFn,
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["super-labels"] });
+      toast.success(`Label ${variables.data.decision}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <div className="space-y-4">
@@ -158,6 +161,7 @@ function LabelsTab() {
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Commission %</th>
               <th className="text-left p-3">Created</th>
+              <th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -171,11 +175,33 @@ function LabelsTab() {
                 <td className="p-3 text-xs text-muted-foreground">
                   {new Date(l.created_at).toLocaleDateString()}
                 </td>
+                <td className="p-3">
+                  {l.status === "pending" ? (
+                    <div className="flex gap-2">
+                      <button
+                        disabled={modM.isPending}
+                        onClick={() => modM.mutate({ data: { id: l.id, decision: "approved" } })}
+                        className="text-xs px-2 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        disabled={modM.isPending}
+                        onClick={() => modM.mutate({ data: { id: l.id, decision: "rejected" } })}
+                        className="text-xs px-2 py-1 rounded-md bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                <td colSpan={5} className="p-6 text-center text-muted-foreground">
                   No labels yet.
                 </td>
               </tr>
@@ -211,6 +237,7 @@ function FeaturedTab() {
     mutationFn: upsertFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["super-featured"] });
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
       toast.success("Featured slot added successfully");
     },
     onError: (error) => {
@@ -221,12 +248,15 @@ function FeaturedTab() {
     mutationFn: removeFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["super-featured"] });
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
       toast.success("Featured slot removed successfully");
     },
     onError: (error) => {
       toast.error(`Failed to remove featured slot: ${error.message}`);
     },
   });
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const targetIdValid = UUID_RE.test(form.target_id.trim());
   const [form, setForm] = useState({
     slot_type: "home_hero",
     target_type: "song",
@@ -272,11 +302,16 @@ function FeaturedTab() {
         </div>
         <input
           required
-          placeholder="Target ID (uuid)"
+          placeholder="Target ID — copy the UUID from the song/album/artist page URL"
           className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
           value={form.target_id}
           onChange={(e) => setForm({ ...form, target_id: e.target.value })}
         />
+        {form.target_id && !targetIdValid && (
+          <p className="text-sm text-yellow-500">
+            That doesn't look like a UUID — open the item and copy its full ID from the URL.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <input
             placeholder="Headline"
@@ -308,7 +343,7 @@ function FeaturedTab() {
           <p className="text-sm text-destructive">{(upsertM.error as Error).message}</p>
         )}
         <button
-          disabled={upsertM.isPending || !form.target_id}
+          disabled={upsertM.isPending || !targetIdValid}
           className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
           Add slot
@@ -336,7 +371,11 @@ function FeaturedTab() {
                 <td className="p-3">{s.active ? "Yes" : "No"}</td>
                 <td className="p-3">
                   <button
-                    onClick={() => removeM.mutate({ data: { id: s.id } })}
+                    onClick={() => {
+                      if (window.confirm("Remove this featured slot from the homepage?")) {
+                        removeM.mutate({ data: { id: s.id } });
+                      }
+                    }}
                     className="text-xs text-destructive cursor-pointer hover:underline"
                   >
                     Remove
@@ -413,6 +452,11 @@ function OverviewTab() {
 
   return (
     <div className="space-y-8">
+      {payoutsError && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-4 text-sm text-destructive">
+          Couldn't load payout overview: {(payoutsError as Error).message}
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="bg-card border border-border rounded-2xl p-6">
@@ -574,25 +618,22 @@ function UsersTab() {
 function PlansTab() {
   const qc = useQueryClient();
   const upsert = useServerFn(upsertPlan);
-  const [plans, setPlans] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const { isFetching } = useQuery({
+  const {
+    data: plans = [],
+    error: queryError,
+    isFetching,
+  } = useQuery({
     queryKey: ["super-plans"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("subscription_plans")
-          .select("*")
-          .order("price_zmw");
-        if (error) throw error;
-        setPlans(data ?? []);
-        return data ?? [];
-      } catch (err) {
-        setError((err as Error).message);
-        return [];
-      }
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .order("price_zmw");
+      if (error) throw error;
+      return data ?? [];
     },
   });
+  const error = queryError ? (queryError as Error).message : null;
   const upsertM = useMutation({
     mutationFn: upsert,
     onSuccess: () => {
@@ -669,25 +710,18 @@ function PlansTab() {
 function PaymentsTab() {
   const qc = useQueryClient();
   const toggle = useServerFn(togglePaymentMethod);
-  const [methods, setMethods] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useQuery({
+  const { data: methods = [], error: queryError } = useQuery({
     queryKey: ["super-methods"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("payment_methods")
-          .select("*")
-          .order("sort_order");
-        if (error) throw error;
-        setMethods(data ?? []);
-        return data ?? [];
-      } catch (err) {
-        setError((err as Error).message);
-        return [];
-      }
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data ?? [];
     },
   });
+  const error = queryError ? (queryError as Error).message : null;
   const m = useMutation({
     mutationFn: toggle,
     onSuccess: () => {
@@ -747,12 +781,25 @@ function PayoutsTab() {
     mutationFn: decide,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["super-payouts"] });
+      qc.invalidateQueries({ queryKey: ["super-payouts-overview"] });
+      qc.invalidateQueries({ queryKey: ["staff-payouts"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
       toast.success("Payout decision recorded successfully");
     },
     onError: (error) => {
       toast.error(`Failed to process payout: ${error.message}`);
     },
   });
+
+  const decideWithConfirm = (id: string, decision: "approved" | "rejected") => {
+    if (
+      decision === "approved" &&
+      !window.confirm("Approve this payout? This records approval for money movement.")
+    ) {
+      return;
+    }
+    m.mutate({ data: { id, decision } });
+  };
 
   if (isLoading) return <div className="text-muted-foreground">Loading payouts…</div>;
   if (error)
@@ -788,14 +835,14 @@ function PayoutsTab() {
                   <div className="flex gap-2">
                     <button
                       disabled={m.isPending}
-                      onClick={() => m.mutate({ data: { id: p.id, decision: "approved" } })}
+                      onClick={() => decideWithConfirm(p.id, "approved")}
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors"
                     >
                       <Check className="size-3" /> Approve
                     </button>
                     <button
                       disabled={m.isPending}
-                      onClick={() => m.mutate({ data: { id: p.id, decision: "rejected" } })}
+                      onClick={() => decideWithConfirm(p.id, "rejected")}
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors"
                     >
                       <X className="size-3" /> Reject
@@ -891,7 +938,15 @@ function SettingsTab() {
   return (
     <div className="space-y-4 max-w-2xl">
       <button
-        onClick={() => initM.mutate({})}
+        onClick={() => {
+          if (
+            window.confirm(
+              "Re-initialize platform settings with defaults? This overwrites site/pricing values.",
+            )
+          ) {
+            initM.mutate({});
+          }
+        }}
         disabled={initM.isPending}
         className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
       >

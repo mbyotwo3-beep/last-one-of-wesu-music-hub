@@ -56,7 +56,7 @@ const recentAlbumsQO = queryOptions({
 const playlistsQO = queryOptions({
   queryKey: ["browse-playlists"],
   queryFn: () => getPublicPlaylists(),
-  staleTime: 0, // Always refetch to ensure immediate updates
+  staleTime: 5 * 60 * 1000,
 });
 const genresQO = queryOptions({
   queryKey: ["browse-genres"],
@@ -120,7 +120,7 @@ function BrowsePage() {
   const { data: genres } = useSuspenseQuery(genresQO);
   const { data: topSongsByGenres } = useSuspenseQuery(topSongsByGenresQO);
   const { genre: activeGenre } = Route.useSearch();
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
   const { data: forYou } = useQuery({
@@ -200,7 +200,7 @@ function BrowsePage() {
             )}
 
             {user && forYou && forYou.forYou && forYou.forYou.length > 0 && (
-              <HorizontalShelf title="Songs You Might Like" showAllLink="/dashboard">
+              <HorizontalShelf title="Songs You Might Like" showAllLink="/library">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
                   {forYou.forYou.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
@@ -242,17 +242,23 @@ function BrowsePage() {
               </section>
             )}
 
-            {topSongsByGenres.map(({ genre, songs }) => (
-              songs.length > 0 && (
-                <HorizontalShelf key={genre} title={`Top 10 ${genre}`} showAllLink={`/browse?genre=${encodeURIComponent(genre)}`}>
-                  <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                    {songs.map((s) => (
-                      <TrackCard key={s.id} song={s} />
-                    ))}
-                  </div>
-                </HorizontalShelf>
-              )
-            ))}
+            {topSongsByGenres.map(
+              ({ genre, songs }) =>
+                songs.length > 0 && (
+                  <HorizontalShelf
+                    key={genre}
+                    title={`Top 10 ${genre}`}
+                    showAllLink="/browse"
+                    showAllSearch={{ genre }}
+                  >
+                    <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
+                      {songs.map((s) => (
+                        <TrackCard key={s.id} song={s} />
+                      ))}
+                    </div>
+                  </HorizontalShelf>
+                ),
+            )}
 
             {topArtists.length > 0 && (
               <HorizontalShelf title="Artists You Should Know" showAllLink="/artists">
@@ -282,13 +288,17 @@ function BrowsePage() {
                       index={i + 1}
                       song={s}
                       onPlay={() =>
-                        setTrack({
-                          id: s.id,
-                          title: s.title,
-                          artistName:
-                            (s.artist as { name?: string } | null)?.name ?? "Unknown",
-                          coverUrl: s.cover_url,
-                        })
+                        setQueue(
+                          trending.map((t: any) => ({
+                            id: t.id,
+                            title: t.title,
+                            artistName: (t.artist as { name?: string } | null)?.name ?? "Unknown",
+                            coverUrl: t.cover_url,
+                            durationSeconds: t.duration,
+                            price: (t as any).price,
+                          })),
+                          i,
+                        )
                       }
                     />
                   ))}
@@ -319,9 +329,7 @@ function BrowsePage() {
         )}
 
         {empty && !activeGenre && (
-          <p className="text-center text-muted-foreground py-12">
-            No music yet. Check back soon.
-          </p>
+          <p className="text-center text-muted-foreground py-12">No music yet. Check back soon.</p>
         )}
       </div>
     </div>
@@ -331,11 +339,7 @@ function BrowsePage() {
 function GenreView({ genre }: { genre: string }) {
   const { data: songs } = useSuspenseQuery(genreSongsQO(genre));
   if (songs.length === 0) {
-    return (
-      <p className="text-center text-muted-foreground py-12">
-        No {genre} songs yet.
-      </p>
-    );
+    return <p className="text-center text-muted-foreground py-12">No {genre} songs yet.</p>;
   }
   return (
     <section>
@@ -373,7 +377,11 @@ function TrackListRow({
   return (
     <div className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors group">
       <span className="w-6 text-sm text-muted-foreground tabular-nums">{index}</span>
-      <button onClick={onPlay} className="shrink-0 cursor-pointer" aria-label={`Play ${song.title}`}>
+      <button
+        onClick={onPlay}
+        className="shrink-0 cursor-pointer"
+        aria-label={`Play ${song.title}`}
+      >
         <StorageImage
           bucket="album-art"
           path={song.cover_url}

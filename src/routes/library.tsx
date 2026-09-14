@@ -1,6 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Music, Users, Disc, UserCheck, UserMinus, X, Play, Pause, ListMusic } from "lucide-react";
+import {
+  Heart,
+  Music,
+  Users,
+  Disc,
+  UserCheck,
+  UserMinus,
+  X,
+  Play,
+  Pause,
+  ListMusic,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
@@ -41,13 +52,15 @@ function Page() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select(
+          "*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))",
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return data ?? [];
     },
     enabled: !!user?.id,
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
   const { data: likedSongs, isLoading: likedLoading } = useQuery({
@@ -62,7 +75,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const { data: purchasedSongs, isLoading: purchasedLoading } = useQuery({
@@ -79,7 +92,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading } = useQuery({
@@ -96,7 +109,7 @@ function Page() {
       return (data ?? []).map((item: any) => item.albums).filter(hasId);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const { data: followedArtists, isLoading: followingLoading } = useQuery({
@@ -111,10 +124,16 @@ function Page() {
       return (data ?? []).map((item: any) => item.artists).filter(hasId);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
-  if (playlistsLoading || likedLoading || purchasedLoading || purchasedAlbumsLoading || followingLoading) {
+  if (
+    playlistsLoading ||
+    likedLoading ||
+    purchasedLoading ||
+    purchasedAlbumsLoading ||
+    followingLoading
+  ) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
 
@@ -136,7 +155,9 @@ function Page() {
           <h2 className="text-xl font-semibold">Followed Artists</h2>
         </div>
         {safeFollowedArtists.length === 0 ? (
-          <p className="text-muted-foreground">No followed artists yet. Follow artists to see them here.</p>
+          <p className="text-muted-foreground">
+            No followed artists yet. Follow artists to see them here.
+          </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {safeFollowedArtists.map((artist: any) => (
@@ -153,10 +174,7 @@ function Page() {
             <h2 className="text-xl font-semibold">Liked Songs</h2>
           </div>
           {safeLikedSongs.length > 0 && (
-            <Link
-              to="/liked-songs"
-              className="text-sm text-primary hover:underline"
-            >
+            <Link to="/liked-songs" className="text-sm text-primary hover:underline">
               View all
             </Link>
           )}
@@ -178,10 +196,7 @@ function Page() {
             <ListMusic className="size-5 text-primary" />
             <h2 className="text-xl font-semibold">Playlists</h2>
           </div>
-          <Link
-            to="/playlists"
-            className="text-sm text-primary hover:underline"
-          >
+          <Link to="/playlists" className="text-sm text-primary hover:underline">
             View all
           </Link>
         </div>
@@ -240,7 +255,9 @@ function Page() {
                   className="aspect-square w-full rounded-lg overflow-hidden bg-card ring-1 ring-white/5 mb-3 object-cover"
                 />
                 <p className="font-semibold text-sm truncate">{album.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{album.artists?.name ?? "Unknown"}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {album.artists?.name ?? "Unknown"}
+                </p>
                 <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full mt-2 inline-block font-medium">
                   Owned
                 </span>
@@ -283,7 +300,10 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
       }
       // Optimistically remove from followed artists list if unfollowing
       if (prev?.following) {
-        qc.setQueryData(["followed-artists", userId], prevFollowed.filter((a) => a.id !== artist.id));
+        qc.setQueryData(
+          ["followed-artists", userId],
+          prevFollowed.filter((a) => a.id !== artist.id),
+        );
       }
       return { prev, prevFollowed };
     },
@@ -293,7 +313,9 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
       toast.error(e.message);
     },
     onSuccess: (res) => {
-      toast.success(res.action === "followed" ? `❤️ Following ${artist.name}!` : `👋 Unfollowed ${artist.name}`);
+      toast.success(
+        res.action === "followed" ? `❤️ Following ${artist.name}!` : `👋 Unfollowed ${artist.name}`,
+      );
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["followed-artists", userId] });
@@ -415,8 +437,8 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
           className="absolute -top-1.5 -right-1.5 size-7 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-border"
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
         >
-          <Heart 
-            className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
+          <Heart
+            className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`}
           />
         </button>
       </div>
@@ -498,8 +520,8 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
             className="absolute -top-1.5 -right-1.5 size-7 bg-background rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-border"
             title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           >
-            <Heart 
-              className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`} 
+            <Heart
+              className={`size-4 ${isSaved ? "fill-red-500 text-red-500" : "text-foreground"}`}
             />
           </button>
         )}
@@ -603,7 +625,8 @@ function PlaylistCard({ playlist }: { playlist: any }) {
           )}
         </div>
         <p className="text-sm text-muted-foreground truncate">
-          {playlist.is_public ? "Public" : "Private"} • {songCount} {songCount === 1 ? "song" : "songs"}
+          {playlist.is_public ? "Public" : "Private"} • {songCount}{" "}
+          {songCount === 1 ? "song" : "songs"}
           {playlist.description ? ` • ${playlist.description}` : ""}
         </p>
       </Link>

@@ -106,6 +106,15 @@ export const updateArtistProfile = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
 
+    if (data.bio !== undefined && data.bio.length > 500) {
+      throw new Error("Bio must be at most 500 characters");
+    }
+    if (data.name !== undefined) {
+      const n = data.name.trim();
+      if (!n) throw new Error("Artist name is required");
+      if (n.length > 120) throw new Error("Artist name is too long");
+    }
+
     // Fetch existing artist photos to delete old ones when replaced
     const { data: existing } = await supabase
       .from("artists")
@@ -170,8 +179,17 @@ export const uploadSong = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("You must be an approved artist to upload");
-    if ((artist as any).status === "pending")
-      throw new Error("Your artist application is pending approval");
+    if ((artist as any).status !== "approved")
+      throw new Error("Your artist application must be approved before uploading");
+
+    // Validate title and price server-side (client checks are bypassable).
+    const title = (data.title ?? "").trim();
+    if (!title) throw new Error("Song title is required");
+    if (title.length > 200) throw new Error("Song title is too long");
+    const price = Number(data.price ?? 0);
+    if (!Number.isFinite(price) || price < 0 || price > 250) {
+      throw new Error("Song price must be between 0 and 250");
+    }
 
     // Security: storage paths must be scoped to the caller's own folder.
     // Prevents referencing another user's private object and later obtaining
@@ -194,12 +212,12 @@ export const uploadSong = createServerFn({ method: "POST" })
     const { data: song, error } = await supabase
       .from("songs")
       .insert({
-        title: data.title,
+        title,
         audio_url: data.audio_url,
         cover_url: data.cover_url ?? null,
         duration: data.duration ?? null,
         genre: data.genre ?? null,
-        price: data.price ?? 0,
+        price,
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
         status: songStatus,
@@ -345,15 +363,22 @@ export const createAlbum = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("Artist profile required");
+    const title = (data.title ?? "").trim();
+    if (!title) throw new Error("Album title is required");
+    if (title.length > 200) throw new Error("Album title is too long");
+    const price = Number(data.price ?? 0);
+    if (!Number.isFinite(price) || price < 0 || price > 500) {
+      throw new Error("Album price must be between 0 and 500");
+    }
     const { data: album, error } = await supabase
       .from("albums")
       .insert({
-        title: data.title,
+        title,
         cover_url: data.cover_url ?? null,
         release_date: data.release_date ?? null,
         genre: data.genre ?? null,
         description: data.description ?? null,
-        price: data.price ?? 0,
+        price,
         artist_id: (artist as any).id,
         status: data.status ?? "draft",
       } as any)
@@ -422,8 +447,8 @@ export const requestPayout = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     // Get dynamic withdrawal settings
-    const { getWithdrawalConfig } = await import("@/lib/pricing.functions");
-    const withdrawalConfig = await getWithdrawalConfig();
+    const { readWithdrawalConfig } = await import("@/lib/pricing.functions");
+    const withdrawalConfig = await readWithdrawalConfig();
     const minWithdrawal = withdrawalConfig.min_amount;
 
     // REQUIREMENT: Payout only allowed if money is over minimum
@@ -501,8 +526,8 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
     }
 
     // Get dynamic verification settings
-    const { getVerificationConfig } = await import("@/lib/pricing.functions");
-    const verificationConfig = await getVerificationConfig();
+    const { readVerificationConfig } = await import("@/lib/pricing.functions");
+    const verificationConfig = await readVerificationConfig();
     const minFollowers = verificationConfig.min_followers;
     const minEarnings = verificationConfig.min_earnings;
 
@@ -571,7 +596,13 @@ export const setCollabPrefs = createServerFn({ method: "POST" })
     const patch: any = {};
     if (data.accepts_collabs !== undefined) patch.accepts_collabs = data.accepts_collabs;
     if (data.allow_features !== undefined) patch.available_for_features = data.allow_features;
-    if (data.feature_rate !== undefined) patch.feature_rate = data.feature_rate;
+    if (data.feature_rate !== undefined) {
+      const r = Number(data.feature_rate);
+      if (!Number.isFinite(r) || r < 0 || r > 100000) {
+        throw new Error("Feature rate must be between 0 and 100000");
+      }
+      patch.feature_rate = r;
+    }
     const { error } = await context.supabase
       .from("artists")
       .update(patch)
@@ -764,14 +795,25 @@ export const updateAlbum = createServerFn({ method: "POST" })
       }
     }
 
-    // 4. Build update object
+    // 4. Build update object (validated — client checks are bypassable)
     const updateData: any = {};
-    if (data.title !== undefined) updateData.title = data.title;
+    if (data.title !== undefined) {
+      const t = data.title.trim();
+      if (!t) throw new Error("Album title is required");
+      if (t.length > 200) throw new Error("Album title is too long");
+      updateData.title = t;
+    }
     if (data.description !== undefined) updateData.description = data.description;
     if (data.genre !== undefined) updateData.genre = data.genre;
     if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
     if (data.release_date !== undefined) updateData.release_date = data.release_date;
-    if (data.price !== undefined) updateData.price = data.price;
+    if (data.price !== undefined) {
+      const p = Number(data.price);
+      if (!Number.isFinite(p) || p < 0 || p > 500) {
+        throw new Error("Album price must be between 0 and 500");
+      }
+      updateData.price = p;
+    }
     if (data.status !== undefined) updateData.status = data.status;
 
     // 5. Update the album
@@ -856,12 +898,23 @@ export const updateSong = createServerFn({ method: "POST" })
       }
     }
 
-    // 4. Build update object
+    // 4. Build update object (validated — client checks are bypassable)
     const updateData: any = {};
-    if (data.title !== undefined) updateData.title = data.title;
+    if (data.title !== undefined) {
+      const t = data.title.trim();
+      if (!t) throw new Error("Song title is required");
+      if (t.length > 200) throw new Error("Song title is too long");
+      updateData.title = t;
+    }
     if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
     if (data.genre !== undefined) updateData.genre = data.genre;
-    if (data.price !== undefined) updateData.price = data.price;
+    if (data.price !== undefined) {
+      const p = Number(data.price);
+      if (!Number.isFinite(p) || p < 0 || p > 250) {
+        throw new Error("Song price must be between 0 and 250");
+      }
+      updateData.price = p;
+    }
     if (data.track_number !== undefined) updateData.track_number = data.track_number;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.explicit !== undefined) updateData.explicit = data.explicit;

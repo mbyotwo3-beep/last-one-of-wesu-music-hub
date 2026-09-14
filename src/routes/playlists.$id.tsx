@@ -89,14 +89,20 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
         <p className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}>
           {s.title}
         </p>
-        <Link
-          to="/artists/$id"
-          params={{ id: s.artist?.id ?? "" }}
-          className="text-xs text-muted-foreground truncate hover:underline hover:text-foreground inline-block"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {s.artist?.name ?? "Unknown"}
-        </Link>
+        {s.artist?.id ? (
+          <Link
+            to="/artists/$id"
+            params={{ id: s.artist.id }}
+            className="text-xs text-muted-foreground truncate hover:underline hover:text-foreground inline-block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {s.artist?.name ?? "Unknown"}
+          </Link>
+        ) : (
+          <span className="text-xs text-muted-foreground truncate inline-block">
+            {s.artist?.name ?? "Unknown"}
+          </span>
+        )}
       </div>
 
       {/* Duration */}
@@ -208,7 +214,7 @@ function Page() {
         songs: extractedSongs,
       };
     },
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const remove = useMutation({

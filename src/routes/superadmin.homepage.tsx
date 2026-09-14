@@ -69,23 +69,24 @@ function Page() {
   const [activePage, setActivePage] = useState("home");
   const [layout, setLayout] = useState<HomepageLayout>(DEFAULT_LAYOUTS.home);
 
-  const { data: all, isLoading, error } = useQuery({
+  const {
+    data: all,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["homepage-layouts"],
     queryFn: () => loadFn(),
   });
-
-  if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading homepage layouts…</div>;
-  if (error) return <div className="p-12 text-center text-destructive">Error loading layouts: {(error as Error).message}</div>;
-
-  useEffect(() => {
-    if (all && all[activePage]) setLayout(all[activePage]);
-    else setLayout(DEFAULT_LAYOUTS[activePage] ?? { hero_slides: [], shelves: [] });
-  }, [all, activePage]);
 
   const save = useMutation({
     mutationFn: saveFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["homepage-layouts"] });
+      // The public home reads these keys — without this the builder save
+      // looks successful but the site never changes.
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
+      qc.invalidateQueries({ queryKey: ["active-carousels"] });
+      qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
       toast.success("Homepage saved");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -95,6 +96,21 @@ function Page() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  // All hooks above this line — early returns below must never precede hooks.
+  useEffect(() => {
+    if (all && all[activePage]) setLayout(all[activePage]);
+    else setLayout(DEFAULT_LAYOUTS[activePage] ?? { hero_slides: [], shelves: [] });
+  }, [all, activePage]);
+
+  if (isLoading)
+    return <div className="p-12 text-center text-muted-foreground">Loading homepage layouts…</div>;
+  if (error)
+    return (
+      <div className="p-12 text-center text-destructive">
+        Error loading layouts: {(error as Error).message}
+      </div>
+    );
 
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -108,7 +124,10 @@ function Page() {
   }
 
   function updateShelf(id: string, patch: Partial<HomepageShelf>) {
-    setLayout((p) => ({ ...p, shelves: p.shelves.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+    setLayout((p) => ({
+      ...p,
+      shelves: p.shelves.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    }));
   }
 
   function addShelf() {
@@ -132,7 +151,10 @@ function Page() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
-      <Link to="/superadmin" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 cursor-pointer">
+      <Link
+        to="/superadmin"
+        className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 cursor-pointer"
+      >
         <ArrowLeft className="size-4" /> Back to Superadmin
       </Link>
       <div className="flex items-center justify-between mb-6">
@@ -172,10 +194,15 @@ function Page() {
             <Plus className="size-3" /> Add shelf
           </button>
         </div>
-        <p className="text-xs text-muted-foreground mb-4">Drag to reorder. Toggle visibility, edit title, and choose data source.</p>
+        <p className="text-xs text-muted-foreground mb-4">
+          Drag to reorder. Toggle visibility, edit title, and choose data source.
+        </p>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={layout.shelves.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={layout.shelves.map((s) => s.id)}
+            strategy={verticalListSortingStrategy}
+          >
             <div className="space-y-2">
               {layout.shelves.map((shelf) => (
                 <SortableShelfRow
@@ -190,7 +217,9 @@ function Page() {
         </DndContext>
 
         {layout.shelves.length === 0 && (
-          <p className="text-sm text-muted-foreground py-8 text-center">No shelves. Add one to get started.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            No shelves. Add one to get started.
+          </p>
         )}
       </div>
 
@@ -224,7 +253,10 @@ function Page() {
         </p>
         <div className="space-y-3">
           {layout.hero_slides.map((slide, idx) => (
-            <div key={slide.id} className="p-4 bg-secondary/40 border border-border rounded-lg space-y-3">
+            <div
+              key={slide.id}
+              className="p-4 bg-secondary/40 border border-border rounded-lg space-y-3"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Slide {idx + 1}</span>
                 <button
@@ -246,7 +278,7 @@ function Page() {
                   setLayout((p) => ({
                     ...p,
                     hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, title: e.target.value } : s
+                      s.id === slide.id ? { ...s, title: e.target.value } : s,
                     ),
                   }));
                 }}
@@ -259,7 +291,7 @@ function Page() {
                   setLayout((p) => ({
                     ...p,
                     hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, subtitle: e.target.value } : s
+                      s.id === slide.id ? { ...s, subtitle: e.target.value } : s,
                     ),
                   }));
                 }}
@@ -272,7 +304,7 @@ function Page() {
                   setLayout((p) => ({
                     ...p,
                     hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, cover_url: e.target.value } : s
+                      s.id === slide.id ? { ...s, cover_url: e.target.value } : s,
                     ),
                   }));
                 }}
@@ -285,7 +317,7 @@ function Page() {
                   setLayout((p) => ({
                     ...p,
                     hero_slides: p.hero_slides.map((s) =>
-                      s.id === slide.id ? { ...s, link_url: e.target.value } : s
+                      s.id === slide.id ? { ...s, link_url: e.target.value } : s,
                     ),
                   }));
                 }}
@@ -295,7 +327,9 @@ function Page() {
             </div>
           ))}
           {layout.hero_slides.length === 0 && (
-            <p className="text-sm text-muted-foreground py-4 text-center">No slides. Add one to get started.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No slides. Add one to get started.
+            </p>
           )}
         </div>
       </div>
@@ -346,7 +380,9 @@ function SortableShelfRow({
         className="bg-background border border-border rounded px-2 py-1 text-xs"
       >
         {SHELF_TYPES.map((t) => (
-          <option key={t.value} value={t.value}>{t.label}</option>
+          <option key={t.value} value={t.value}>
+            {t.label}
+          </option>
         ))}
       </select>
       <input
@@ -354,7 +390,7 @@ function SortableShelfRow({
         onChange={(e) => onUpdate({ title: e.target.value })}
         className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm"
       />
-      {(shelf.type === "by_genre") && (
+      {shelf.type === "by_genre" && (
         <input
           placeholder="Genre"
           value={shelf.query?.genre ?? ""}
@@ -364,13 +400,19 @@ function SortableShelfRow({
       )}
       {(shelf.type === "by_artist" || shelf.type === "by_playlist") && (
         <input
-          placeholder="ID"
+          placeholder={
+            shelf.type === "by_artist" ? "Artist UUID from URL" : "Playlist UUID from URL"
+          }
+          title="Copy the UUID from the artist/playlist page URL — invalid IDs render an empty shelf"
           value={shelf.query?.artistId ?? shelf.query?.playlistId ?? ""}
-          onChange={(e) => onUpdate({
-            query: shelf.type === "by_artist"
-              ? { ...shelf.query, artistId: e.target.value }
-              : { ...shelf.query, playlistId: e.target.value }
-          })}
+          onChange={(e) =>
+            onUpdate({
+              query:
+                shelf.type === "by_artist"
+                  ? { ...shelf.query, artistId: e.target.value.trim() }
+                  : { ...shelf.query, playlistId: e.target.value.trim() },
+            })
+          }
           className="w-40 bg-background border border-border rounded px-2 py-1 text-xs font-mono"
         />
       )}

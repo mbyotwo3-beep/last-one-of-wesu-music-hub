@@ -1,9 +1,23 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, memo } from "react";
-import { Search, LogOut, UserCircle, Shield, Menu, X, FileText, Mic2 } from "lucide-react";
+import {
+  Search,
+  LogOut,
+  UserCircle,
+  Shield,
+  Menu,
+  X,
+  FileText,
+  Mic2,
+  Home,
+  LayoutGrid,
+  Library,
+} from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlayer } from "@/stores/player";
+import { useQueryClient } from "@tanstack/react-query";
 import { ThemeToggle } from "./ThemeToggle";
 import { CurrencyToggle } from "./CurrencyToggle";
 import { GlobalSearch } from "./GlobalSearch";
@@ -36,8 +50,29 @@ const NavbarComponent = function Navbar() {
 
   const isAuth = useRouterState({ select: (s) => s.location.pathname }) === "/auth";
   const isLoading = authLoading || rolesLoading;
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
-  const navLinks: { to: string; label: string; icon: any }[] = [];
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setMenuOpen(false);
+    setMobileMenuOpen(false);
+    // SPA sign-out: clear caches + stop playback without a full reload
+    // (which previously wiped player queue and upload drafts).
+    try {
+      usePlayer.getState().exitSong();
+    } catch {
+      /* ignore */
+    }
+    qc.clear();
+    navigate({ to: "/" });
+  };
+
+  const navLinks: { to: string; label: string; icon: any }[] = [
+    { to: "/", label: "Home", icon: Home },
+    { to: "/browse", label: "Browse", icon: LayoutGrid },
+    { to: "/library", label: "Library", icon: Library },
+  ];
 
   // During initial auth loading, show skeleton to prevent flicker
   if (isLoading) {
@@ -45,11 +80,7 @@ const NavbarComponent = function Navbar() {
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl h-16">
         <div className="h-full px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="flex items-center gap-2"
-              aria-label="Wesu+ home"
-            >
+            <Link to="/" className="flex items-center gap-2" aria-label="Wesu+ home">
               <img src="/images/wesu-logo.png" alt="Wesu+" className="h-11 w-auto" />
             </Link>
           </div>
@@ -90,17 +121,11 @@ const NavbarComponent = function Navbar() {
           <div className="px-4 py-3 border-b border-border">
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             <p className="text-xs font-semibold text-primary mt-0.5">
-              {isSuperAdmin
-                ? "Superadmin"
-                : isAdmin
-                  ? "Admin"
-                  : isArtist
-                    ? "Artist"
-                    : "Listener"}
+              {isSuperAdmin ? "Superadmin" : isAdmin ? "Admin" : isArtist ? "Artist" : "Listener"}
             </p>
           </div>
           <Link
-            to="/dashboard"
+            to="/library"
             className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
             onClick={() => setMenuOpen(false)}
           >
@@ -167,11 +192,7 @@ const NavbarComponent = function Navbar() {
             </span>
           </Link>
           <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              setMenuOpen(false);
-              window.location.href = "/";
-            }}
+            onClick={handleSignOut}
             className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-accent flex items-center gap-2 border-t border-border transition-colors"
           >
             <LogOut className="size-4" />
@@ -195,11 +216,7 @@ const NavbarComponent = function Navbar() {
               {mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
             </button>
           )}
-          <Link
-            to="/"
-            className="flex items-center gap-2"
-            aria-label="Wesu+ home"
-          >
+          <Link to="/" className="flex items-center gap-2" aria-label="Wesu+ home">
             <img src="/images/wesu-logo.png" alt="Wesu+" className="h-11 w-auto" />
           </Link>
           <div className="hidden lg:flex items-center gap-1 ml-4">
@@ -232,7 +249,9 @@ const NavbarComponent = function Navbar() {
           <CurrencyToggle />
           <ThemeToggle />
 
-          {user ? <UserMenu /> : !isAuth ? (
+          {user ? (
+            <UserMenu />
+          ) : !isAuth ? (
             <Link
               to="/auth"
               className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
@@ -262,7 +281,7 @@ const NavbarComponent = function Navbar() {
               <>
                 <div className="border-t border-border my-2" />
                 <Link
-                  to="/dashboard"
+                  to="/library"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
@@ -324,11 +343,7 @@ const NavbarComponent = function Navbar() {
                   Terms &amp; Conditions
                 </Link>
                 <button
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    setMobileMenuOpen(false);
-                    window.location.href = "/";
-                  }}
+                  onClick={handleSignOut}
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-destructive hover:bg-accent rounded-lg transition-colors"
                 >
                   <LogOut className="size-5" />

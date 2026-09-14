@@ -16,7 +16,7 @@ const albumQO = (id: string) =>
   queryOptions({
     queryKey: ["album", id],
     queryFn: () => getAlbumWithSongs({ data: { id } }),
-    staleTime: 0,
+    staleTime: 60_000,
   });
 
 export const Route = createFileRoute("/albums/$id/edit")({
@@ -103,6 +103,7 @@ function AlbumEditPage() {
     onSuccess: () => {
       toast.success("Track updated successfully!");
       qc.invalidateQueries({ queryKey: ["album", id] });
+      qc.invalidateQueries({ queryKey: ["my-songs"] });
     },
     onError: (error) => {
       toast.error(`Failed to update track: ${(error as Error).message}`);
@@ -116,6 +117,8 @@ function AlbumEditPage() {
       toast.success("Track deleted successfully!");
       qc.invalidateQueries({ queryKey: ["album", id] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
+      qc.invalidateQueries({ queryKey: ["my-albums"] });
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
     },
     onError: (error) => {
       toast.error(`Failed to delete track: ${(error as Error).message}`);
@@ -124,6 +127,14 @@ function AlbumEditPage() {
 
   const handleCoverUpload = async () => {
     if (!coverFile || !user) return;
+    if (!coverFile.type.startsWith("image/")) {
+      toast.error("Cover art must be an image file (JPG, PNG, or WEBP)");
+      return;
+    }
+    if (coverFile.size > 10 * 1024 * 1024) {
+      toast.error("Cover art must be smaller than 10MB");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -141,12 +152,20 @@ function AlbumEditPage() {
   };
 
   const handleSaveAlbum = async () => {
+    if (!title.trim()) {
+      toast.error("Album title is required");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0 || price > 500) {
+      toast.error("Album price must be between 0 and 500");
+      return;
+    }
     try {
       setIsSubmitting(true);
       await updateAlbumMutation.mutateAsync({
         data: {
           id,
-          title,
+          title: title.trim(),
           description,
           genre,
           release_date,

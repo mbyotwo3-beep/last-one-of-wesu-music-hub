@@ -47,11 +47,54 @@ async function assertLabelManager(client: unknown, userId: string, labelId: stri
   };
 }
 
+/** Staff-only label moderation (approve/reject pending applications). */
+export const moderateLabel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; decision: "approved" | "rejected" }) => d)
+  .handler(async ({ context, data }) => {
+    if (!(await isStaffUser(context.supabase, context.userId))) {
+      throw new Error("Forbidden");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: pending } = await supabaseAdmin
+      .from("labels")
+      .select("id, name, owner_user_id")
+      .eq("id", data.id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (!pending) throw new Error("Label is no longer pending");
+    const { error } = await supabaseAdmin
+      .from("labels")
+      .update({ status: data.decision } as any)
+      .eq("id", data.id)
+      .eq("status", "pending");
+    if (error) throw new Error(error.message);
+    // Grant the label role to the owner on approval so the dashboard unlocks.
+    if (data.decision === "approved") {
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert(
+          { user_id: (pending as any).owner_user_id, role: "label" },
+          { onConflict: "user_id,role" },
+        );
+    }
+    await audit(context.userId, `label.${data.decision}`, "label", data.id, {
+      name: (pending as any).name,
+    });
+    return { ok: true };
+  });
+
 export const applyForLabel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { name: string; bio?: string; contact_email?: string; logo_url?: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
+    const name = (data.name ?? "").trim();
+    if (!name) throw new Error("Label name is required");
+    if (name.length > 120) throw new Error("Label name is too long");
+    if (data.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_email)) {
+      throw new Error("Contact email is invalid");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("labels")
@@ -65,11 +108,11 @@ export const applyForLabel = createServerFn({ method: "POST" })
           : "You already have a label application.",
       );
     }
-    const slug = slugify(data.name) + "-" + Math.random().toString(36).slice(2, 6);
+    const slug = slugify(name) + "-" + Math.random().toString(36).slice(2, 6);
     const { data: row, error } = await supabase
       .from("labels")
       .insert({
-        name: data.name,
+        name,
         slug,
         owner_user_id: userId,
         bio: data.bio ?? null,
@@ -93,9 +136,20 @@ export const updateLabel = createServerFn({ method: "POST" })
     const { userId } = context;
     await assertLabelManager(context.supabase, userId, data.id);
     const patch: any = {};
-    for (const k of ["name", "bio", "contact_email", "logo_url"] as const) {
-      if (data[k] !== undefined) patch[k] = data[k];
+    if (data.name !== undefined) {
+      const n = data.name.trim();
+      if (!n) throw new Error("Label name is required");
+      if (n.length > 120) throw new Error("Label name is too long");
+      patch.name = n;
     }
+    if (data.bio !== undefined) patch.bio = data.bio;
+    if (data.contact_email !== undefined) {
+      if (data.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_email)) {
+        throw new Error("Contact email is invalid");
+      }
+      patch.contact_email = data.contact_email;
+    }
+    if (data.logo_url !== undefined) patch.logo_url = data.logo_url;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Clean up old logo from storage if replaced
@@ -197,7 +251,8 @@ export const inviteArtistToLabel = createServerFn({ method: "POST" })
         .maybeSingle(),
     ]);
     if (!artist || artist.status !== "approved") throw new Error("Artist is not approved");
-    if (existing) throw new Error(`Artist already has a ${existing.status} relationship with this label`);
+    if (existing)
+      throw new Error(`Artist already has a ${existing.status} relationship with this label`);
 
     const { error } = await supabaseAdmin.from("label_artists").insert({
       label_id: data.label_id,
@@ -352,18 +407,21 @@ async function getLabelAvailableBalance(supabase: any, labelId: string): Promise
     .select("amount")
     .eq("label_id", labelId)
     .eq("payee_role", "label");
-  
-  const totalEarned = (splits ?? []).reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0);
-  
+
+  const totalEarned = (splits ?? []).reduce(
+    (sum: number, s: any) => sum + Number(s.amount || 0),
+    0,
+  );
+
   // Get total already paid or pending
   const { data: payouts } = await supabase
     .from("payouts")
     .select("amount")
     .eq("label_id", labelId)
     .in("status", ["pending", "approved", "processing", "paid", "completed"]);
-  
+
   const totalPaid = (payouts ?? []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-  
+
   return Math.max(0, totalEarned - totalPaid);
 }
 
@@ -388,9 +446,15 @@ export const requestLabelPayout = createServerFn({ method: "POST" })
     if (!Number.isFinite(data.amount) || data.amount <= 0) {
       throw new Error("Payout amount must be a positive number");
     }
-    
+
     if (data.amount > 1000000) {
       throw new Error("Payout amount cannot exceed ZMW 1,000,000");
+    }
+    // Enforce the platform minimum withdrawal like artist payouts do.
+    const { readWithdrawalConfig } = await import("@/lib/pricing.functions");
+    const withdrawal = await readWithdrawalConfig();
+    if (data.amount < withdrawal.min_amount) {
+      throw new Error(`Minimum withdrawal is ZMW ${withdrawal.min_amount}`);
     }
     const label = await assertLabelManager(context.supabase, context.userId, data.label_id);
     if (label.owner_user_id !== context.userId) {
@@ -401,10 +465,10 @@ export const requestLabelPayout = createServerFn({ method: "POST" })
     const available = await getLabelAvailableBalance(supabaseAdmin, data.label_id);
     if (data.amount > available) {
       throw new Error(
-        `Insufficient balance. Available: ZMW ${available.toFixed(2)}, Requested: ZMW ${data.amount.toFixed(2)}`
+        `Insufficient balance. Available: ZMW ${available.toFixed(2)}, Requested: ZMW ${data.amount.toFixed(2)}`,
       );
     }
-    
+
     const { error } = await context.supabase.from("payouts").insert({
       label_id: data.label_id,
       artist_id: null,
@@ -416,7 +480,7 @@ export const requestLabelPayout = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(context.userId, "label.payout.request", "label", data.label_id, {
       amount: data.amount,
-      available_balance: available
+      available_balance: available,
     });
     return { ok: true };
   });

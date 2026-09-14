@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Music2 } from "lucide-react";
-import { resolveImageUrl, peekImageUrl, invalidateImageUrl, type ImageBucket } from "@/lib/storage-url";
+import {
+  resolveImageUrl,
+  peekImageUrl,
+  invalidateImageUrl,
+  type ImageBucket,
+} from "@/lib/storage-url";
 
 interface Props {
   bucket: ImageBucket;
@@ -65,7 +70,12 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
     setRetried(true);
     invalidateImageUrl(bucket, path);
     resolveImageUrl(bucket, path)
-      .then((u) => setUrl(u ? `${u}${u.includes("?") ? "&" : "?"}r=${Date.now()}` : null))
+      // Re-sign only — never append cache-busters, they invalidate the
+      // R2 signature and guarantee a second failure.
+      .then((u) => {
+        setUrl(u);
+        if (!u) setFailed(true);
+      })
       .catch(() => {
         setFailed(true);
         setIsLoading(false);
@@ -78,7 +88,10 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
 
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center bg-card animate-pulse ${className ?? ""}`} onClick={onClick}>
+      <div
+        className={`flex items-center justify-center bg-card animate-pulse ${className ?? ""}`}
+        onClick={onClick}
+      >
         <Music2 className="size-4 text-muted-foreground opacity-50" />
       </div>
     );
@@ -86,10 +99,23 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
 
   if (!url || failed) {
     return (
-      <div className={`flex items-center justify-center bg-card ${className ?? ""}`} onClick={onClick}>
+      <div
+        className={`flex items-center justify-center bg-card ${className ?? ""}`}
+        onClick={onClick}
+      >
         <Music2 className="size-4 text-muted-foreground" />
       </div>
     );
   }
-  return <img src={url} alt={alt} className={className} loading={loading} onClick={onClick} onError={handleError} onLoad={handleLoad} />;
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      loading={loading}
+      onClick={onClick}
+      onError={handleError}
+      onLoad={handleLoad}
+    />
+  );
 }

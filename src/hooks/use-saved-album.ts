@@ -16,7 +16,7 @@ export function useSavedAlbum(albumId: string | null | undefined) {
     queryKey: ["saved-album-ids", user?.id],
     queryFn: () => listFn(),
     enabled: !!user,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const isSaved = !!(albumId && idsQ.data?.includes(albumId));
@@ -24,13 +24,13 @@ export function useSavedAlbum(albumId: string | null | undefined) {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!albumId) return;
-      if (isSaved) {
-        const result = await unsaveFn({ data: { album_id: albumId } });
-        return result;
-      } else {
-        const result = await saveFn({ data: { album_id: albumId } });
-        return result;
+      // Read intent from the live cache, not the render closure — rapid
+      // double-taps would otherwise send the same action twice.
+      const current = qc.getQueryData<string[]>(["saved-album-ids", user?.id]) ?? idsQ.data ?? [];
+      if (current.includes(albumId)) {
+        return unsaveFn({ data: { album_id: albumId } });
       }
+      return saveFn({ data: { album_id: albumId } });
     },
     onMutate: async () => {
       if (!albumId) return;
@@ -58,5 +58,11 @@ export function useSavedAlbum(albumId: string | null | undefined) {
     },
   });
 
-  return { isSaved, toggle: () => mutation.mutate(), loading: mutation.isPending };
+  return {
+    isSaved,
+    toggle: () => {
+      if (!mutation.isPending) mutation.mutate();
+    },
+    loading: mutation.isPending,
+  };
 }

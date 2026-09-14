@@ -16,17 +16,24 @@ function loadScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") return reject(new Error("Not in browser"));
     if (window.LencoPay) return resolve();
+    const fail = (script: HTMLScriptElement | null, err: Error) => {
+      // Remove the dead tag so a later retry actually reloads the script.
+      script?.remove();
+      reject(err);
+    };
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SRC}"]`);
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load Lenco checkout")));
+      existing.addEventListener("error", () =>
+        fail(existing, new Error("Failed to load Lenco checkout")),
+      );
       return;
     }
     const s = document.createElement("script");
     s.src = SRC;
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Failed to load Lenco checkout"));
+    s.onerror = () => fail(s, new Error("Failed to load Lenco checkout"));
     document.body.appendChild(s);
   });
 }

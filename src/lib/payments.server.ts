@@ -94,7 +94,7 @@ export async function settleTransaction(
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null, metadata } as any)
       .eq("id", transactionId)
-      .eq("status", "pending");
+      .in("status", ["pending", "processing", "fulfillment_failed"]);
     return "failed";
   }
 
@@ -150,7 +150,7 @@ export async function settleTransaction(
       .update({
         status: "fulfillment_failed",
         metadata: {
-          ...((claimed.metadata && typeof claimed.metadata === "object") ? claimed.metadata : {}),
+          ...(claimed.metadata && typeof claimed.metadata === "object" ? claimed.metadata : {}),
           fulfillment_error: detail,
         },
       } as any)

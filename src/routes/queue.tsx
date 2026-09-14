@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
-import { Play, Pause, X, Shuffle, ListMusic, Clock, Trash2, Disc } from "lucide-react";
+import { Play, Pause, X, Shuffle, ListMusic, Repeat, Repeat1, Trash2, Disc } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getPublicAudioUrl, getPreviewAudioUrl } from "@/lib/listener.functions";
@@ -31,7 +31,6 @@ function QueuePage() {
   const shuffle = usePlayer((s) => s.shuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const repeat = usePlayer((s) => s.repeat);
-  const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const removeFromQueue = usePlayer((s) => s.removeFromQueue);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
@@ -101,29 +100,23 @@ function QueuePage() {
 
       if (isPaid) {
         const { url } = await getPreviewFn({ data: { song_id: queueTrack.id } });
-        setTrack({
-          id: queueTrack.id,
-          title: queueTrack.title,
-          artistName: queueTrack.artistName,
-          coverUrl: queueTrack.coverUrl,
-          audioUrl: url,
-          durationSeconds: queueTrack.durationSeconds,
-        });
+        // Single setQueue with the resolved URL — the old setTrack()+setQueue()
+        // pair published the URL then immediately overwrote it with undefined,
+        // forcing a refetch + preview flash.
+        setQueue(
+          queue.map((t, i) => (i === index ? { ...t, audioUrl: url, price: t.price } : t)),
+          index,
+        );
         setIsPreview(true);
         toast.info(`🎵 Previewing "${queueTrack.title}" (15s)`);
       } else {
         const { url } = await getPublicFn({ data: { song_id: queueTrack.id } });
-        setTrack({
-          id: queueTrack.id,
-          title: queueTrack.title,
-          artistName: queueTrack.artistName,
-          coverUrl: queueTrack.coverUrl,
-          audioUrl: url,
-          durationSeconds: queueTrack.durationSeconds,
-        });
+        setQueue(
+          queue.map((t, i) => (i === index ? { ...t, audioUrl: url } : t)),
+          index,
+        );
         setIsPreview(false);
       }
-      setQueue(queue, index);
     } catch (error) {
       toast.error(`Failed to play: ${(error as Error).message}`);
     }
@@ -186,9 +179,9 @@ function QueuePage() {
             className={`p-2 rounded-full ${repeat !== "off" ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent"} transition`}
             title={`Repeat: ${repeat}`}
           >
-            {repeat === "all" && <Clock className="size-5" />}
-            {repeat === "one" && <ListMusic className="size-5" />}
-            {repeat === "off" && <Clock className="size-5" />}
+            {repeat === "all" && <Repeat className="size-5" />}
+            {repeat === "one" && <Repeat1 className="size-5" />}
+            {repeat === "off" && <Repeat className="size-5 opacity-60" />}
           </button>
         </div>
       </div>
@@ -197,7 +190,7 @@ function QueuePage() {
       <div className="space-y-2">
         {queue.map((queueTrack, index) => (
           <div
-            key={queueTrack.id}
+            key={`${queueTrack.id}-${index}`}
             className={`flex items-center gap-4 p-4 rounded-xl transition-colors ${
               queueIndex === index
                 ? "bg-primary/10 border border-primary/20"

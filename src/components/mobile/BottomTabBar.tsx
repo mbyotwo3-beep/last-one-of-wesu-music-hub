@@ -1,10 +1,29 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { Home, Search, Library, User, Shield, Menu, X, LogOut, Play, Grid, Clock, Disc, ListMusic, Heart, Music, Mic2, Plus } from "lucide-react";
+import {
+  Home,
+  Search,
+  Library,
+  User,
+  Shield,
+  Menu,
+  X,
+  LogOut,
+  Play,
+  Grid,
+  Clock,
+  Disc,
+  ListMusic,
+  Heart,
+  Music,
+  Mic2,
+  Plus,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlayer } from "@/stores/player";
 
 interface Tab {
   to: string;
@@ -39,7 +58,7 @@ export function computeTabs(opts: {
       show: true,
     },
     {
-      to: "/dashboard",
+      to: "/library",
       label: "Library",
       icon: Library,
       ariaLabel: "My library",
@@ -67,7 +86,8 @@ export function computeTabs(opts: {
       icon: Shield,
       ariaLabel: "Admin panel",
       show: isAdmin || isSuperAdmin,
-    },  ].filter((t) => t.show);
+    },
+  ].filter((t) => t.show);
 }
 
 export function BottomTabBar() {
@@ -80,7 +100,10 @@ export function BottomTabBar() {
   const [userPlaylists, setUserPlaylists] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    if (!user) { setUserPlaylists([]); return; }
+    if (!user) {
+      setUserPlaylists([]);
+      return;
+    }
     supabase
       .from("playlists")
       .select("id, name")
@@ -99,15 +122,27 @@ export function BottomTabBar() {
 
   function handleTab(tab: Tab) {
     if (tab.requireAuth && !user) {
-      navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+      navigate({ to: "/auth", search: { redirect: pathname } });
     } else {
       navigate({ to: tab.to as any });
     }
   }
 
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    setMenuOpen(false);
+    // SPA sign-out — no full reload (a reload wipes player queue +
+    // in-memory upload drafts).
+    try {
+      usePlayer.getState().exitSong();
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/" });
+  }
+
   return (
     <>
-
       <nav
         className="fixed bottom-0 inset-x-0 bg-background/70 backdrop-blur-xl border-t border-border/50 z-50 pb-[env(safe-area-inset-bottom)]"
         aria-label="Main navigation"
@@ -164,7 +199,10 @@ export function BottomTabBar() {
               className="flex-1"
               onSubmit={(e) => {
                 e.preventDefault();
-                const q = (e.currentTarget.elements.namedItem("q") as HTMLInputElement).value;
+                const q = (
+                  e.currentTarget.elements.namedItem("q") as HTMLInputElement
+                ).value.trim();
+                if (!q) return;
                 setSearchOpen(false);
                 navigate({ to: "/search", search: { q, tab: "all" } });
               }}
@@ -256,7 +294,7 @@ export function BottomTabBar() {
             </button>
             <button
               onClick={() => {
-                navigate({ to: "/songs" });
+                navigate({ to: "/hot-tracks" });
                 setMenuOpen(false);
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
@@ -272,7 +310,10 @@ export function BottomTabBar() {
             {/* Favorites / Liked Songs — always shown when logged in */}
             {user && (
               <button
-                onClick={() => { navigate({ to: "/liked-songs" }); setMenuOpen(false); }}
+                onClick={() => {
+                  navigate({ to: "/liked-songs" });
+                  setMenuOpen(false);
+                }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
               >
                 <Heart className="size-5" />
@@ -284,7 +325,10 @@ export function BottomTabBar() {
               userPlaylists.map((pl) => (
                 <button
                   key={pl.id}
-                  onClick={() => { navigate({ to: "/playlists/$id", params: { id: pl.id } }); setMenuOpen(false); }}
+                  onClick={() => {
+                    navigate({ to: "/playlists/$id", params: { id: pl.id } });
+                    setMenuOpen(false);
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
                   <ListMusic className="size-5" />
@@ -293,7 +337,10 @@ export function BottomTabBar() {
               ))
             ) : user ? (
               <button
-                onClick={() => { navigate({ to: "/playlists" }); setMenuOpen(false); }}
+                onClick={() => {
+                  navigate({ to: "/playlists" });
+                  setMenuOpen(false);
+                }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
               >
                 <ListMusic className="size-5" />
@@ -319,7 +366,7 @@ export function BottomTabBar() {
                 </div>
                 <button
                   onClick={() => {
-                    navigate({ to: "/dashboard" });
+                    navigate({ to: "/library" });
                     setMenuOpen(false);
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
@@ -374,11 +421,7 @@ export function BottomTabBar() {
                   </button>
                 )}
                 <button
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    setMenuOpen(false);
-                    window.location.href = "/";
-                  }}
+                  onClick={handleSignOut}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-destructive hover:bg-accent rounded-lg transition-colors border-t border-border"
                 >
                   <LogOut className="size-5" />

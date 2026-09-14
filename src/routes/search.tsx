@@ -139,7 +139,11 @@ function SearchPage() {
                     key={s.id}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent border-b border-border last:border-b-0 transition-colors"
                   >
-                    <Link to="/browse" className="flex min-w-0 flex-1 items-center gap-3">
+                    <Link
+                      to="/songs/$id"
+                      params={{ id: s.id }}
+                      className="flex min-w-0 flex-1 items-center gap-3"
+                    >
                       <StorageImage
                         bucket="album-art"
                         path={s.cover_url}

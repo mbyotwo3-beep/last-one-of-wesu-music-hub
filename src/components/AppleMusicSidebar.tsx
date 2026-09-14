@@ -1,5 +1,16 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Search, Play, Pause, Grid, Clock, Disc, Music, ListMusic, Heart, Plus } from "lucide-react";
+import {
+  Search,
+  Play,
+  Pause,
+  Grid,
+  Clock,
+  Disc,
+  Music,
+  ListMusic,
+  Heart,
+  Plus,
+} from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,10 +31,10 @@ export function AppleMusicSidebar() {
   ];
 
   const libraryNav = [
-    { to: "/new-music", label: "Recently Added", icon: Clock },
+    { to: "/recently-added", label: "Recently Added", icon: Clock },
     { to: "/artists", label: "Artists", icon: Disc },
     { to: "/albums", label: "Albums", icon: Music },
-    { to: "/hot-tracks", label: "Songs", icon: ListMusic },
+    { to: "/hot-tracks", label: "Hot Tracks", icon: ListMusic },
     { to: "/liked-songs", label: "Liked Songs", icon: Heart },
   ];
 
@@ -34,13 +45,15 @@ export function AppleMusicSidebar() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("playlists")
-        .select("id, name, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select(
+          "id, name, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))",
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return data ?? [];
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   // Fetch Liked Songs for sidebar playback
@@ -56,11 +69,12 @@ export function AppleMusicSidebar() {
       return (data ?? []).map((item: any) => item.songs).filter(Boolean);
     },
     enabled: !!user?.id,
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
   const safeLikedSongs = likedSongs ?? [];
-  const isLikedSongsPlaying = player.playing && safeLikedSongs.some((s: any) => s.id === player.track?.id);
+  const isLikedSongsPlaying =
+    player.playing && safeLikedSongs.some((s: any) => s.id === player.track?.id);
 
   const handlePlayLikedSongs = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -106,7 +120,8 @@ export function AppleMusicSidebar() {
       return;
     }
 
-    const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+    const isThisPlaylistActive =
+      player.playing && songs.some((s: any) => s.id === player.track?.id);
     if (isThisPlaylistActive) {
       player.togglePlay();
       return;
@@ -202,14 +217,18 @@ export function AppleMusicSidebar() {
                   to={item.to}
                   className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
                 >
-                  <Icon className={`size-5 shrink-0 ${isLikedItem && isLikedSongsPlaying ? "text-primary fill-primary" : ""}`} />
+                  <Icon
+                    className={`size-5 shrink-0 ${isLikedItem && isLikedSongsPlaying ? "text-primary fill-primary" : ""}`}
+                  />
                   <span className="truncate">{item.label}</span>
                 </Link>
                 {isLikedItem && safeLikedSongs.length > 0 && (
                   <button
                     onClick={handlePlayLikedSongs}
                     className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
-                      isLikedSongsPlaying ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100"
+                      isLikedSongsPlaying
+                        ? "opacity-100 text-primary"
+                        : "opacity-0 group-hover:opacity-100"
                     }`}
                     title={isLikedSongsPlaying ? "Pause" : "Play Liked Songs"}
                     aria-label={isLikedSongsPlaying ? "Pause Liked Songs" : "Play Liked Songs"}
@@ -252,7 +271,8 @@ export function AppleMusicSidebar() {
                   return s;
                 })
                 .filter(Boolean);
-              const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+              const isThisPlaylistActive =
+                player.playing && songs.some((s: any) => s.id === player.track?.id);
 
               return (
                 <div
@@ -268,7 +288,9 @@ export function AppleMusicSidebar() {
                     params={{ id: pl.id }}
                     className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
                   >
-                    <ListMusic className={`size-5 shrink-0 ${isThisPlaylistActive ? "text-primary" : ""}`} />
+                    <ListMusic
+                      className={`size-5 shrink-0 ${isThisPlaylistActive ? "text-primary" : ""}`}
+                    />
                     <span className="truncate">{pl.name}</span>
                   </Link>
 
@@ -276,7 +298,9 @@ export function AppleMusicSidebar() {
                     <button
                       onClick={(e) => handlePlayPlaylist(pl, e)}
                       className={`shrink-0 p-1 rounded-full text-foreground hover:text-primary transition-all cursor-pointer ${
-                        isThisPlaylistActive ? "opacity-100 text-primary" : "opacity-0 group-hover/pl:opacity-100"
+                        isThisPlaylistActive
+                          ? "opacity-100 text-primary"
+                          : "opacity-0 group-hover/pl:opacity-100"
                       }`}
                       title={isThisPlaylistActive ? "Pause" : "Play playlist"}
                       aria-label={isThisPlaylistActive ? "Pause playlist" : "Play playlist"}
@@ -315,4 +339,3 @@ export function AppleMusicSidebar() {
     </aside>
   );
 }
-

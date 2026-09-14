@@ -4,10 +4,18 @@ import { Link } from "@tanstack/react-router";
 interface HorizontalShelfProps {
   title: string;
   children: ReactNode;
+  // Plain route path ("/hot-tracks"). For filtered destinations pass
+  // showAllSearch instead — TanStack Link cannot parse "?genre=" strings.
   showAllLink?: string;
+  showAllSearch?: Record<string, string>;
 }
 
-export function HorizontalShelf({ title, children, showAllLink }: HorizontalShelfProps) {
+export function HorizontalShelf({
+  title,
+  children,
+  showAllLink,
+  showAllSearch,
+}: HorizontalShelfProps) {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4 px-2">
@@ -15,15 +23,14 @@ export function HorizontalShelf({ title, children, showAllLink }: HorizontalShel
         {showAllLink && (
           <Link
             to={showAllLink as any}
+            {...(showAllSearch ? { search: showAllSearch as any } : {})}
             className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
           >
             See All
           </Link>
         )}
       </div>
-      <div className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide">
-        {children}
-      </div>
+      <div className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide">{children}</div>
     </div>
   );
 }

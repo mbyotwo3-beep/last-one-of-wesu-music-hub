@@ -351,11 +351,8 @@ export function NowPlayingSheet() {
           </button>
 
           <button
-            onClick={() => {
-              if (!isLoading) togglePlay();
-            }}
-            disabled={isLoading}
-            className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50 cursor-pointer hover:scale-105"
+            onClick={togglePlay}
+            className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform cursor-pointer hover:scale-105"
             aria-label={playing ? "Pause" : "Play"}
           >
             {isLoading ? (

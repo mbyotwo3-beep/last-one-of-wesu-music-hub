@@ -13,7 +13,7 @@ const songQO = (id: string) =>
   queryOptions({
     queryKey: ["song", id],
     queryFn: () => getSongById({ data: { id } }),
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 5 * 60 * 1000,
   });
 
 export const Route = createFileRoute("/songs/$id")({
@@ -39,10 +39,11 @@ export const Route = createFileRoute("/songs/$id")({
 function SongPage() {
   const { id } = Route.useParams();
   const { data: song } = useSuspenseQuery(songQO(id));
-  const setTrack = usePlayer((state) => state.setTrack);
+  const setQueue = usePlayer((state) => state.setQueue);
   const togglePlay = usePlayer((state) => state.togglePlay);
   const playing = usePlayer((state) => state.playing);
   const currentTrackId = usePlayer((state) => state.track?.id);
+  const formatPrice = useCurrency((state) => state.formatPrice);
   const artist = song!.artist as { id: string; name: string } | null;
   const isFree = Number(song!.price ?? 0) <= 0;
   const { isSaved, toggle } = useSavedTrack(id);
@@ -56,13 +57,19 @@ function SongPage() {
       return;
     }
 
-    setTrack({
-      id: song!.id,
-      title: song!.title,
-      artistName: artist?.name ?? "Unknown",
-      coverUrl: song!.cover_url,
-      durationSeconds: song!.duration,
-    });
+    setQueue(
+      [
+        {
+          id: song!.id,
+          title: song!.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: song!.cover_url,
+          durationSeconds: song!.duration,
+          price: song!.price,
+        },
+      ],
+      0,
+    );
   };
 
   return (
@@ -125,7 +132,7 @@ function SongPage() {
               search={{ item: "song", id: song!.id }}
               className="inline-flex items-center gap-2 rounded-full bg-secondary px-6 py-3 font-bold hover:bg-accent"
             >
-              <ShoppingBag className="size-5" /> Buy {useCurrency.getState().formatPrice(song!.price)}
+              <ShoppingBag className="size-5" /> Buy {formatPrice(song!.price)}
             </Link>
           )}
           <button

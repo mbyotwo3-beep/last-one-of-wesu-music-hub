@@ -4,10 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { CreditCard, Smartphone, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  getPaymentMethods,
-  getPurchasableItem,
-} from "@/lib/music.functions";
+import { getPaymentMethods, getPurchasableItem } from "@/lib/music.functions";
 import { initiatePayment } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -71,10 +68,10 @@ function MissingCheckout() {
           This checkout link is incomplete. Your payment has not been started.
         </p>
         <Link
-          to="/library"
+          to="/browse"
           className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
         >
-          Go to Library
+          Browse Music
         </Link>
       </div>
     </div>
@@ -89,8 +86,7 @@ function CheckoutPage() {
 
   const { data: purchasable } = useQuery({
     queryKey: ["purchasable", search.item, search.id],
-    queryFn: () =>
-      getPurchasableItem({ data: { item_type: search.item!, id: search.id! } }),
+    queryFn: () => getPurchasableItem({ data: { item_type: search.item!, id: search.id! } }),
     enabled: !!search.item && !!search.id,
   });
 
@@ -99,7 +95,11 @@ function CheckoutPage() {
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+    if (!loading && !user)
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
   }, [user, loading, navigate]);
 
   const payFn = useServerFn(initiatePayment);
@@ -118,6 +118,8 @@ function CheckoutPage() {
           .then(({ openLencoCardWidget }) =>
             openLencoCardWidget(res.widget, {
               onSuccess: () =>
+                navigate({ to: "/checkout/success", search: { ref: res.transactionId } }),
+              onPending: () =>
                 navigate({ to: "/checkout/success", search: { ref: res.transactionId } }),
               onClose: () => toast.info("Card payment cancelled."),
             }),

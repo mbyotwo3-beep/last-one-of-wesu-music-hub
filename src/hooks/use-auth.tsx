@@ -47,8 +47,19 @@ function subscribe(cb: () => void) {
   };
 }
 
+// Memoized snapshot object — useSyncExternalStore requires a stable
+// reference when data is unchanged, otherwise every render loop.
+let snapshot: { user: User | null; loading: boolean } = { user: null, loading: true };
+
+function syncSnapshot() {
+  if (snapshot.user !== cachedUser || snapshot.loading !== cachedLoading) {
+    snapshot = { user: cachedUser, loading: cachedLoading };
+  }
+}
+
 function getSnapshot(): { user: User | null; loading: boolean } {
-  return { user: cachedUser, loading: cachedLoading };
+  syncSnapshot();
+  return snapshot;
 }
 
 // Server snapshot — always logged out / loading to avoid hydration mismatch.

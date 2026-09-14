@@ -1,5 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isSuperadminUser } from "@/lib/roles";
 
 export interface PricingConfig {
   song_min: number;
@@ -57,53 +59,56 @@ export const DEFAULT_SITE: SiteConfig = {
  * Initialize platform_settings with default values if they don't exist.
  * This ensures the dynamic config system works from the start.
  */
-export const initializePlatformSettings = createServerFn({ method: "POST" }).handler(
-  async () => {
+export const initializePlatformSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    // Only superadmins may (re)initialize platform settings — this upserts
+    // defaults and must never be callable by arbitrary signed-in users.
+    if (!(await isSuperadminUser(context.supabase, context.userId))) {
+      throw new Error("Forbidden: superadmin only");
+    }
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      
+
       // Initialize pricing
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
           { key: "pricing", value: DEFAULT_PRICING as unknown as Json },
-          { onConflict: "key" }
+          { onConflict: "key" },
         );
-      
+
       // Initialize verification
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
           { key: "verification", value: DEFAULT_VERIFICATION as unknown as Json },
-          { onConflict: "key" }
+          { onConflict: "key" },
         );
-      
+
       // Initialize withdrawal
       await supabaseAdmin
         .from("platform_settings")
         .upsert(
           { key: "withdrawal", value: DEFAULT_WITHDRAWAL as unknown as Json },
-          { onConflict: "key" }
+          { onConflict: "key" },
         );
-      
+
       // Initialize site settings with defaults
-      await supabaseAdmin
-        .from("platform_settings")
-        .upsert(
-          { 
-            key: "site", 
-            value: DEFAULT_SITE as unknown as Json 
-          },
-          { onConflict: "key" }
-        );
-      
+      await supabaseAdmin.from("platform_settings").upsert(
+        {
+          key: "site",
+          value: DEFAULT_SITE as unknown as Json,
+        },
+        { onConflict: "key" },
+      );
+
       return { success: true };
     } catch (error) {
       console.error("Failed to initialize platform settings:", error);
       return { success: false, error: (error as Error).message };
     }
-  },
-);
+  });
 
 /**
  * Public read of the current pricing config. Read via service role
@@ -136,46 +141,50 @@ export const getPricingConfig = createServerFn({ method: "GET" }).handler(
 /**
  * Public read of the current verification config.
  */
+export async function readVerificationConfig(): Promise<VerificationConfig> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "verification")
+      .maybeSingle();
+    const v = (data?.value as Partial<VerificationConfig> | null) ?? {};
+    return {
+      min_followers: Number(v.min_followers ?? DEFAULT_VERIFICATION.min_followers),
+      min_earnings: Number(v.min_earnings ?? DEFAULT_VERIFICATION.min_earnings),
+    };
+  } catch {
+    return DEFAULT_VERIFICATION;
+  }
+}
+
 export const getVerificationConfig = createServerFn({ method: "GET" }).handler(
-  async (): Promise<VerificationConfig> => {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await supabaseAdmin
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "verification")
-        .maybeSingle();
-      const v = (data?.value as Partial<VerificationConfig> | null) ?? {};
-      return {
-        min_followers: Number(v.min_followers ?? DEFAULT_VERIFICATION.min_followers),
-        min_earnings: Number(v.min_earnings ?? DEFAULT_VERIFICATION.min_earnings),
-      };
-    } catch {
-      return DEFAULT_VERIFICATION;
-    }
-  },
+  async (): Promise<VerificationConfig> => readVerificationConfig(),
 );
 
 /**
  * Public read of the current withdrawal config.
  */
+export async function readWithdrawalConfig(): Promise<WithdrawalConfig> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "withdrawal")
+      .maybeSingle();
+    const v = (data?.value as Partial<WithdrawalConfig> | null) ?? {};
+    return {
+      min_amount: Number(v.min_amount ?? DEFAULT_WITHDRAWAL.min_amount),
+    };
+  } catch {
+    return DEFAULT_WITHDRAWAL;
+  }
+}
+
 export const getWithdrawalConfig = createServerFn({ method: "GET" }).handler(
-  async (): Promise<WithdrawalConfig> => {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await supabaseAdmin
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "withdrawal")
-        .maybeSingle();
-      const v = (data?.value as Partial<WithdrawalConfig> | null) ?? {};
-      return {
-        min_amount: Number(v.min_amount ?? DEFAULT_WITHDRAWAL.min_amount),
-      };
-    } catch {
-      return DEFAULT_WITHDRAWAL;
-    }
-  },
+  async (): Promise<WithdrawalConfig> => readWithdrawalConfig(),
 );
 
 /**

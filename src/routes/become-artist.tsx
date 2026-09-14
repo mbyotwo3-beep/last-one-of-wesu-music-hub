@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { applyAsArtist } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
+import { useAuth } from "@/hooks/use-auth";
 import { TermsConsent } from "@/components/TermsConsent";
 
 export const Route = createFileRoute("/become-artist")({
@@ -22,12 +23,14 @@ export const Route = createFileRoute("/become-artist")({
 
 function Page() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const apply = useServerFn(applyAsArtist);
   const fetchOverview = useServerFn(getMyArtistOverview);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-artist-overview"],
     queryFn: () => fetchOverview(),
+    enabled: !!user,
   });
 
   const m = useMutation({

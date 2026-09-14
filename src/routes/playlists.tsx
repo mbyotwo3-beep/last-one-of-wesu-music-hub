@@ -42,13 +42,15 @@ function Page() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select(
+          "*, playlist_songs(position, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))",
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return data ?? [];
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const createM = useMutation({
@@ -101,7 +103,8 @@ function Page() {
       return;
     }
 
-    const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+    const isThisPlaylistActive =
+      player.playing && songs.some((s: any) => s.id === player.track?.id);
     if (isThisPlaylistActive) {
       player.togglePlay();
       return;
@@ -168,7 +171,9 @@ function Page() {
                 <input
                   type="checkbox"
                   checked={newPlaylist.make_public}
-                  onChange={(e) => setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })}
+                  onChange={(e) =>
+                    setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })
+                  }
                 />
                 Publish as an editorial playlist
               </label>
@@ -202,7 +207,9 @@ function Page() {
         {!playlists || playlists.length === 0 ? (
           <div className="text-center py-10 bg-card/50 border border-dashed border-border rounded-xl">
             <ListMusic className="size-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No custom playlists yet. Click "Create Playlist" above to start!</p>
+            <p className="text-sm text-muted-foreground">
+              No custom playlists yet. Click "Create Playlist" above to start!
+            </p>
           </div>
         ) : (
           playlists.map((playlist: any) => {
@@ -217,17 +224,24 @@ function Page() {
               .filter(Boolean);
             const songCount = songs.length;
             const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
-            const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+            const isThisPlaylistActive =
+              player.playing && songs.some((s: any) => s.id === player.track?.id);
 
             return (
               <div
                 key={playlist.id}
                 className={`bg-card border rounded-xl p-4 flex items-center gap-4 group transition-all hover:bg-accent/20 ${
-                  isThisPlaylistActive ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/40"
+                  isThisPlaylistActive
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-border hover:border-primary/40"
                 }`}
               >
                 {/* Playlist Thumbnail */}
-                <Link to="/playlists/$id" params={{ id: playlist.id }} className="relative shrink-0">
+                <Link
+                  to="/playlists/$id"
+                  params={{ id: playlist.id }}
+                  className="relative shrink-0"
+                >
                   {firstCover ? (
                     <StorageImage
                       bucket="album-art"

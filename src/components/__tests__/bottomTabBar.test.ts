@@ -45,7 +45,7 @@ describe("Property 14: Role-based tab set is dynamically derived", () => {
     fc.assert(
       fc.property(boolState, (state) => {
         const tabs = computeTabs(state);
-        const libraryTab = tabs.find((t) => t.to === "/dashboard");
+        const libraryTab = tabs.find((t) => t.to === "/library");
         const profileTab = tabs.find((t) => t.to === "/profile");
         // These tabs are always rendered (they redirect to /auth when tapped if not authenticated)
         expect(libraryTab).toBeDefined();
@@ -189,7 +189,7 @@ describe("Property 15: Unauthenticated BottomTabBar tab rendering", () => {
       isAdmin: false,
       isSuperAdmin: false,
     });
-    const library = tabs.find((t) => t.to === "/dashboard");
+    const library = tabs.find((t) => t.to === "/library");
     const profile = tabs.find((t) => t.to === "/profile");
     expect(library?.requireAuth).toBe(true);
     expect(profile?.requireAuth).toBe(true);

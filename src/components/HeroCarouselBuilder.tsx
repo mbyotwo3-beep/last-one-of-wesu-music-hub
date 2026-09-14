@@ -2,8 +2,19 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Plus, Trash2, Eye, EyeOff, GripVertical, ChevronDown, ChevronUp,
-  Link as LinkIcon, Image as ImageIcon, Save, X, Upload, Video,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  GripVertical,
+  ChevronDown,
+  ChevronUp,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Save,
+  X,
+  Upload,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,7 +47,11 @@ export function HeroCarouselBuilder() {
     retry: 1,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["all-hero-slides"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["all-hero-slides"] });
+    qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
+    qc.invalidateQueries({ queryKey: ["home-discover"] });
+  };
 
   const createM = useMutation({
     mutationFn: createFn,
@@ -49,13 +64,19 @@ export function HeroCarouselBuilder() {
 
   const updateM = useMutation({
     mutationFn: updateFn,
-    onSuccess: () => { toast.success("✨ Hero slide updated successfully!"); invalidate(); },
+    onSuccess: () => {
+      toast.success("✨ Hero slide updated successfully!");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteM = useMutation({
     mutationFn: deleteFn,
-    onSuccess: () => { toast.success("🗑️ Hero slide deleted successfully!"); invalidate(); },
+    onSuccess: () => {
+      toast.success("🗑️ Hero slide deleted successfully!");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -69,7 +90,8 @@ export function HeroCarouselBuilder() {
         <div>
           <h2 className="text-xl font-bold">Hero Carousel</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Full-width hero section with auto-rotating slides. Each slide has an image/video, title, description, and call-to-action button.
+            Full-width hero section with auto-rotating slides. Each slide has an image/video, title,
+            description, and call-to-action button.
           </p>
         </div>
         <button
@@ -107,9 +129,7 @@ export function HeroCarouselBuilder() {
           slide={slide}
           idx={idx}
           totalCount={slides?.length ?? 0}
-          onToggleActive={() =>
-            updateM.mutate({ data: { id: slide.id, active: !slide.active } })
-          }
+          onToggleActive={() => updateM.mutate({ data: { id: slide.id, active: !slide.active } })}
           onMoveUp={() =>
             updateM.mutate({ data: { id: slide.id, position: Math.max(0, slide.position - 1) } })
           }
@@ -297,7 +317,9 @@ function HeroSlideCard({
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">CTA:</span>
-                    <p className="text-sm font-medium">{slide.cta_text} → {slide.cta_link}</p>
+                    <p className="text-sm font-medium">
+                      {slide.cta_text} → {slide.cta_link}
+                    </p>
                     {slide.cta_external && (
                       <p className="text-xs text-muted-foreground">Opens in new tab</p>
                     )}
@@ -357,12 +379,10 @@ function HeroSlideForm({
       cta_text: "",
       cta_link: "",
       cta_external: false,
-    }
+    },
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    initialData?.image_url || null
-  );
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.image_url || null);
 
   // Persist form data to sessionStorage to prevent data loss when navigating away
   useEffect(() => {
@@ -430,7 +450,12 @@ function HeroSlideForm({
   };
 
   const handleSubmit = () => {
-    if (!formData.title.trim() || !formData.image_url.trim() || !formData.cta_text.trim() || !formData.cta_link.trim()) {
+    if (
+      !formData.title.trim() ||
+      !formData.image_url.trim() ||
+      !formData.cta_text.trim() ||
+      !formData.cta_link.trim()
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -451,7 +476,7 @@ function HeroSlideForm({
       <h3 className="font-semibold text-sm text-primary uppercase tracking-wide">
         {initialData ? "Edit Slide" : "New Slide"}
       </h3>
-      
+
       {/* Image Upload */}
       <div>
         <label className="block text-xs text-muted-foreground mb-2">Background Image *</label>
@@ -480,9 +505,7 @@ function HeroSlideForm({
               <Upload className="size-4" />
               Upload Image
             </label>
-            <p className="text-xs text-muted-foreground mt-2">
-              Or paste URL below
-            </p>
+            <p className="text-xs text-muted-foreground mt-2">Or paste URL below</p>
           </div>
         </div>
         <input

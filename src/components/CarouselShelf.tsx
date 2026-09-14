@@ -1,6 +1,13 @@
 import { useRef } from "react";
+import { Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Carousel } from "@/lib/carousel.functions";
+
+// CMS links are free text: internal paths ("/albums/...") must use SPA Link
+// (a full <a> reload wipes player queue + upload state), external URLs use <a>.
+function isInternalLink(url: string) {
+  return url.startsWith("/");
+}
 
 interface Props {
   carousel: Carousel;
@@ -47,14 +54,24 @@ export function CarouselShelf({ carousel }: Props) {
           >
             <ChevronRight className="size-4" />
           </button>
-          {carousel.show_all_link && (
-            <a
-              href={carousel.show_all_link}
-              className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
-            >
-              See All
-            </a>
-          )}
+          {carousel.show_all_link &&
+            (isInternalLink(carousel.show_all_link) ? (
+              <Link
+                to={carousel.show_all_link as any}
+                className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                See All
+              </Link>
+            ) : (
+              <a
+                href={carousel.show_all_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                See All
+              </a>
+            ))}
         </div>
       </div>
 
@@ -64,49 +81,70 @@ export function CarouselShelf({ carousel }: Props) {
         className="flex gap-4 overflow-x-auto pb-3 px-2 scrollbar-hide snap-x snap-mandatory"
         style={{ scrollSnapType: "x mandatory" }}
       >
-        {carousel.items.map((item) => (
-          <a
-            key={item.id}
-            href={item.link_url}
-            className="group flex-none w-36 md:w-44 snap-start cursor-pointer"
-            aria-label={item.title}
-          >
-            {/* Card image */}
-            <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-2.5 shadow-md group-hover:ring-primary/40 transition-all group-hover:scale-[1.03] duration-200">
-              <img
-                src={item.image_url}
-                alt={item.title}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  // fallback gradient on broken image
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-              {/* Play overlay on hover */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5 text-primary-foreground ml-0.5"
-                  >
-                    <path d="M5 3l14 9-14 9V3z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Card text */}
-            <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-              {item.title}
-            </p>
-            {item.subtitle && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{item.subtitle}</p>
-            )}
-          </a>
-        ))}
+        {carousel.items.map((item) =>
+          isInternalLink(item.link_url) ? (
+            <Link
+              key={item.id}
+              to={item.link_url as any}
+              className="group flex-none w-36 md:w-44 snap-start cursor-pointer"
+              aria-label={item.title}
+            >
+              <CarouselCard item={item} />
+            </Link>
+          ) : (
+            <a
+              key={item.id}
+              href={item.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex-none w-36 md:w-44 snap-start cursor-pointer"
+              aria-label={item.title}
+            >
+              <CarouselCard item={item} />
+            </a>
+          ),
+        )}
       </div>
     </section>
+  );
+}
+
+function CarouselCard({ item }: { item: NonNullable<Carousel["items"]>[number] }) {
+  return (
+    <>
+      {/* Card image */}
+      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-2.5 shadow-md group-hover:ring-primary/40 transition-all group-hover:scale-[1.03] duration-200">
+        <img
+          src={item.image_url}
+          alt={item.title}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            // fallback gradient on broken image
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+        {/* Play overlay on hover */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-5 h-5 text-primary-foreground ml-0.5"
+            >
+              <path d="M5 3l14 9-14 9V3z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Card text */}
+      <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+        {item.title}
+      </p>
+      {item.subtitle && (
+        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.subtitle}</p>
+      )}
+    </>
   );
 }

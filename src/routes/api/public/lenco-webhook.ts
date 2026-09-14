@@ -71,7 +71,20 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         }
 
         if (!row) {
+          // Unknown reference: don't just log — persist a dead-letter row so
+          // lost money is visible instead of silently vanishing.
           console.warn("[Lenco webhook] Unknown reference:", reference);
+          try {
+            await supabaseAdmin.from("audit_log").insert({
+              actor_id: null,
+              action: "webhook.unknown_reference",
+              target_type: "payment_transaction",
+              target_id: String(reference ?? providerRef ?? "unknown"),
+              meta: { event, payload: tx },
+            } as any);
+          } catch {
+            /* audit must never break the webhook response */
+          }
           return new Response("OK", { status: 200 });
         }
 
@@ -82,9 +95,7 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         // Lenco returns "pay-offline" while waiting for the customer to approve
         // the USSD prompt on their phone — leave the row pending, do nothing else.
         const isPending =
-          tx.status === "pay-offline" ||
-          tx.status === "pending" ||
-          event.endsWith(".pending");
+          tx.status === "pay-offline" || tx.status === "pending" || event.endsWith(".pending");
         if (isPending && !isSuccess && !isFailure) {
           return new Response("OK", { status: 200 });
         }

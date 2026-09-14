@@ -2,9 +2,23 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Users, Music, Shield, BarChart3, Check, X, Building2,
-  CheckCircle2, Clock, AlertTriangle, TrendingUp, CreditCard,
-  Trash2, Search, Filter, Play, Pause,
+  Users,
+  Music,
+  Shield,
+  BarChart3,
+  Check,
+  X,
+  Building2,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  TrendingUp,
+  CreditCard,
+  Trash2,
+  Search,
+  Filter,
+  Play,
+  Pause,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -55,7 +69,18 @@ function AdminRoute() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "songs" | "artists" | "verifications" | "labels" | "payouts" | "payments" | "carousels" | "hero-carousel" | "media-gallery" | "diagnostics";
+type Tab =
+  | "overview"
+  | "songs"
+  | "artists"
+  | "verifications"
+  | "labels"
+  | "payouts"
+  | "payments"
+  | "carousels"
+  | "hero-carousel"
+  | "media-gallery"
+  | "diagnostics";
 
 function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -65,12 +90,29 @@ function AdminPage() {
   const listVerifsFn = useServerFn(listPendingVerifications);
   const listLabelsFn = useServerFn(listPendingLabels);
 
-  const pendingSongsQ = useQuery({ queryKey: ["pending-songs-count"], queryFn: () => listSongsFn(), retry: 1 });
-  const pendingArtistsQ = useQuery({ queryKey: ["pending-artists-count"], queryFn: () => listArtistsFn(), retry: 1 });
-  const pendingVerifsQ = useQuery({ queryKey: ["pending-verifications-count"], queryFn: () => listVerifsFn(), retry: 1 });
-  const pendingLabelsQ = useQuery({ queryKey: ["pending-labels-count"], queryFn: () => listLabelsFn(), retry: 1 });
+  const pendingSongsQ = useQuery({
+    queryKey: ["pending-songs-count"],
+    queryFn: () => listSongsFn(),
+    retry: 1,
+  });
+  const pendingArtistsQ = useQuery({
+    queryKey: ["pending-artists-count"],
+    queryFn: () => listArtistsFn(),
+    retry: 1,
+  });
+  const pendingVerifsQ = useQuery({
+    queryKey: ["pending-verifications-count"],
+    queryFn: () => listVerifsFn(),
+    retry: 1,
+  });
+  const pendingLabelsQ = useQuery({
+    queryKey: ["pending-labels-count"],
+    queryFn: () => listLabelsFn(),
+    retry: 1,
+  });
 
-  const tabsError = pendingSongsQ.error || pendingArtistsQ.error || pendingVerifsQ.error || pendingLabelsQ.error;
+  const tabsError =
+    pendingSongsQ.error || pendingArtistsQ.error || pendingVerifsQ.error || pendingLabelsQ.error;
   if (tabsError) {
     return (
       <div className="text-destructive p-6">
@@ -169,29 +211,76 @@ function Overview({
   const analyticsFn = useServerFn(getPlatformAnalytics);
 
   const statsQ = useQuery({ queryKey: ["admin-stats"], queryFn: () => statsFn(), retry: 1 });
-  const activityQ = useQuery({ queryKey: ["admin-activity"], queryFn: () => activityFn(), retry: 1 });
-  const analyticsQ = useQuery({ queryKey: ["admin-analytics"], queryFn: () => analyticsFn(), retry: 1, staleTime: 60_000 });
+  const activityQ = useQuery({
+    queryKey: ["admin-activity"],
+    queryFn: () => activityFn(),
+    retry: 1,
+  });
+  const analyticsQ = useQuery({
+    queryKey: ["admin-analytics"],
+    queryFn: () => analyticsFn(),
+    retry: 1,
+    staleTime: 60_000,
+  });
 
   if (statsQ.isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
-  if (statsQ.error) return <div className="text-destructive">Error loading stats: {(statsQ.error as Error).message}</div>;
-  if (activityQ.error) return <div className="text-destructive">Error loading activity: {(activityQ.error as Error).message}</div>;
+  if (statsQ.error)
+    return (
+      <div className="text-destructive">Error loading stats: {(statsQ.error as Error).message}</div>
+    );
+  if (activityQ.error)
+    return (
+      <div className="text-destructive">
+        Error loading activity: {(activityQ.error as Error).message}
+      </div>
+    );
 
   const d = statsQ.data;
 
   const metricCards = d
     ? [
-        { label: "Total Users", value: d.totalUsers.toLocaleString(), icon: Users, color: "text-blue-400" },
-        { label: "Total Artists", value: (d as any).totalArtists?.toLocaleString() ?? "0", icon: Music, color: "text-purple-400" },
-        { label: "Total Songs", value: d.totalSongs.toLocaleString(), icon: Music, color: "text-rose-400" },
-        { label: "Completed purchases (30d)", value: d.completedPurchases30d.toLocaleString(), icon: CreditCard, color: "text-yellow-400" },
-        { label: "Revenue (30 days)", value: `ZMW ${d.monthlyRevenueZmw.toFixed(2)}`, icon: TrendingUp, color: "text-primary" },
+        {
+          label: "Total Users",
+          value: d.totalUsers.toLocaleString(),
+          icon: Users,
+          color: "text-blue-400",
+        },
+        {
+          label: "Total Artists",
+          value: (d as any).totalArtists?.toLocaleString() ?? "0",
+          icon: Music,
+          color: "text-purple-400",
+        },
+        {
+          label: "Total Songs",
+          value: d.totalSongs.toLocaleString(),
+          icon: Music,
+          color: "text-rose-400",
+        },
+        {
+          label: "Completed purchases (30d)",
+          value: d.completedPurchases30d.toLocaleString(),
+          icon: CreditCard,
+          color: "text-yellow-400",
+        },
+        {
+          label: "Revenue (30 days)",
+          value: `ZMW ${d.monthlyRevenueZmw.toFixed(2)}`,
+          icon: TrendingUp,
+          color: "text-primary",
+        },
       ]
     : [];
 
   const pendingItems = [
     { label: "Songs awaiting approval", count: pendingSongs, tab: "songs" as Tab, icon: Music },
     { label: "Artist applications", count: pendingArtists, tab: "artists" as Tab, icon: Users },
-    { label: "Verification requests", count: pendingVerifs, tab: "verifications" as Tab, icon: CheckCircle2 },
+    {
+      label: "Verification requests",
+      count: pendingVerifs,
+      tab: "verifications" as Tab,
+      icon: CheckCircle2,
+    },
     { label: "Label applications", count: pendingLabels, tab: "labels" as Tab, icon: Building2 },
   ].filter((i) => i.count > 0);
 
@@ -212,7 +301,11 @@ function Overview({
         </div>
       )}
 
-      <AnalyticsSection data={analyticsQ.data} scope="platform" title="Platform listening analytics" />
+      <AnalyticsSection
+        data={analyticsQ.data}
+        scope="platform"
+        title="Platform listening analytics"
+      />
 
       {/* Pending action alerts */}
       {pendingItems.length > 0 && (
@@ -285,7 +378,10 @@ function Overview({
           ) : (
             <ul className="space-y-3">
               {activityQ.data.recentTransactions.map((t) => (
-                <li key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-accent/50">
+                <li
+                  key={t.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-accent/50"
+                >
                   <div>
                     <p className="text-sm font-medium">ZMW {Number(t.amount).toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{t.method_code}</p>
@@ -295,8 +391,8 @@ function Overview({
                       t.status === "completed"
                         ? "bg-primary/15 text-primary"
                         : t.status === "pending"
-                        ? "bg-yellow-500/15 text-yellow-500"
-                        : "bg-destructive/15 text-destructive"
+                          ? "bg-yellow-500/15 text-yellow-500"
+                          : "bg-destructive/15 text-destructive"
                     }`}
                   >
                     {t.status}
@@ -324,7 +420,11 @@ function SongMod() {
   const [subTab, setSubTab] = useState<"pending" | "all">("pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [songToDelete, setSongToDelete] = useState<{ id: string; title: string; artistName?: string } | null>(null);
+  const [songToDelete, setSongToDelete] = useState<{
+    id: string;
+    title: string;
+    artistName?: string;
+  } | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
   const player = usePlayer();
@@ -336,13 +436,19 @@ function SongMod() {
       player.togglePlay();
       return;
     }
-    player.setTrack({
-      id: song.id,
-      title: song.title,
-      artistName: song.artist?.name ?? "Unknown",
-      coverUrl: song.cover_url,
-      durationSeconds: song.duration,
-    });
+    player.setQueue(
+      [
+        {
+          id: song.id,
+          title: song.title,
+          artistName: song.artist?.name ?? "Unknown",
+          coverUrl: song.cover_url,
+          durationSeconds: song.duration,
+          price: song.price,
+        },
+      ],
+      0,
+    );
   };
 
   const pendingQ = useQuery({
@@ -358,6 +464,13 @@ function SongMod() {
     retry: false,
   });
 
+  const invalidateHomeCaches = () => {
+    qc.invalidateQueries({ queryKey: ["home-discover"] });
+    qc.invalidateQueries({ queryKey: ["recent-albums"] });
+    qc.invalidateQueries({ queryKey: ["active-carousels"] });
+    qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
+  };
+
   const modMutation = useMutation({
     mutationFn: mod,
     onSuccess: (_, variables) => {
@@ -365,6 +478,8 @@ function SongMod() {
       qc.invalidateQueries({ queryKey: ["pending-songs"] });
       qc.invalidateQueries({ queryKey: ["pending-songs-count"] });
       qc.invalidateQueries({ queryKey: ["all-platform-songs"] });
+      // Approvals/rejections change public shelves immediately.
+      invalidateHomeCaches();
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
@@ -379,6 +494,7 @@ function SongMod() {
       qc.invalidateQueries({ queryKey: ["pending-songs-count"] });
       qc.invalidateQueries({ queryKey: ["all-platform-songs"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      invalidateHomeCaches();
     },
     onError: (error) => toast.error(`Delete failed: ${(error as Error).message}`),
   });
@@ -440,8 +556,14 @@ function SongMod() {
       {/* View: Pending Songs */}
       {subTab === "pending" && (
         <div className="space-y-4">
-          {pendingQ.isLoading && <div className="text-muted-foreground text-sm">Loading pending songs…</div>}
-          {pendingQ.error && <div className="text-destructive text-sm">Error: {(pendingQ.error as Error).message}</div>}
+          {pendingQ.isLoading && (
+            <div className="text-muted-foreground text-sm">Loading pending songs…</div>
+          )}
+          {pendingQ.error && (
+            <div className="text-destructive text-sm">
+              Error: {(pendingQ.error as Error).message}
+            </div>
+          )}
 
           {!pendingQ.isLoading && (!pendingQ.data || pendingQ.data.length === 0) ? (
             <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
@@ -450,7 +572,9 @@ function SongMod() {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">{pendingQ.data?.length} song(s) waiting for approval</p>
+              <p className="text-xs text-muted-foreground">
+                {pendingQ.data?.length} song(s) waiting for approval
+              </p>
               {(pendingQ.data ?? []).map((s: any) => (
                 <div
                   key={s.id}
@@ -464,9 +588,14 @@ function SongMod() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Artist: <span className="font-medium text-foreground">{s.artist?.name ?? "Unknown"}</span>
+                      Artist:{" "}
+                      <span className="font-medium text-foreground">
+                        {s.artist?.name ?? "Unknown"}
+                      </span>
                       {s.genre ? ` • ${s.genre}` : ""}
-                      {s.created_at ? ` • Uploaded ${new Date(s.created_at).toLocaleDateString()}` : ""}
+                      {s.created_at
+                        ? ` • Uploaded ${new Date(s.created_at).toLocaleDateString()}`
+                        : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -498,7 +627,9 @@ function SongMod() {
                     </button>
                     <button
                       disabled={modMutation.isPending || deleteMutation.isPending}
-                      onClick={() => setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })}
+                      onClick={() =>
+                        setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })
+                      }
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                       title="Permanently Delete Song"
                     >
@@ -515,17 +646,27 @@ function SongMod() {
       {/* View: All Platform Songs */}
       {subTab === "all" && (
         <div className="space-y-4">
-          {allSongsQ.isLoading && <div className="text-muted-foreground text-sm">Loading songs across platform…</div>}
-          {allSongsQ.error && <div className="text-destructive text-sm">Error: {(allSongsQ.error as Error).message}</div>}
+          {allSongsQ.isLoading && (
+            <div className="text-muted-foreground text-sm">Loading songs across platform…</div>
+          )}
+          {allSongsQ.error && (
+            <div className="text-destructive text-sm">
+              Error: {(allSongsQ.error as Error).message}
+            </div>
+          )}
 
           {!allSongsQ.isLoading && (!allSongsQ.data || allSongsQ.data.length === 0) ? (
             <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
               <Music className="size-5 text-muted-foreground" />
-              <p className="text-muted-foreground text-sm">No songs match the current search or filters.</p>
+              <p className="text-muted-foreground text-sm">
+                No songs match the current search or filters.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Showing {allSongsQ.data?.length} song(s) on platform</p>
+              <p className="text-xs text-muted-foreground">
+                Showing {allSongsQ.data?.length} song(s) on platform
+              </p>
               {(allSongsQ.data ?? []).map((s: any) => {
                 const isPending = s.status === "pending";
                 const isApproved = s.status === "approved";
@@ -562,10 +703,15 @@ function SongMod() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Artist: <span className="font-medium text-foreground">{s.artist?.name ?? "Unknown"}</span>
+                        Artist:{" "}
+                        <span className="font-medium text-foreground">
+                          {s.artist?.name ?? "Unknown"}
+                        </span>
                         {s.genre ? ` • ${s.genre}` : ""}
                         {s.price !== undefined ? ` • K${Number(s.price).toFixed(2)}` : ""}
-                        {s.play_count !== undefined ? ` • ${s.play_count.toLocaleString()} plays` : ""}
+                        {s.play_count !== undefined
+                          ? ` • ${s.play_count.toLocaleString()} plays`
+                          : ""}
                         {s.created_at ? ` • ${new Date(s.created_at).toLocaleDateString()}` : ""}
                       </p>
                     </div>
@@ -586,7 +732,9 @@ function SongMod() {
                       {!isApproved && (
                         <button
                           disabled={modMutation.isPending || deleteMutation.isPending}
-                          onClick={() => modMutation.mutate({ data: { id: s.id, status: "approved" } })}
+                          onClick={() =>
+                            modMutation.mutate({ data: { id: s.id, status: "approved" } })
+                          }
                           className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-medium"
                         >
                           <Check className="size-3" /> Approve
@@ -595,7 +743,9 @@ function SongMod() {
                       {isApproved && (
                         <button
                           disabled={modMutation.isPending || deleteMutation.isPending}
-                          onClick={() => modMutation.mutate({ data: { id: s.id, status: "taken_down" } })}
+                          onClick={() =>
+                            modMutation.mutate({ data: { id: s.id, status: "taken_down" } })
+                          }
                           className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground cursor-pointer transition-colors font-medium"
                           title="Take down song from active catalog"
                         >
@@ -604,7 +754,9 @@ function SongMod() {
                       )}
                       <button
                         disabled={modMutation.isPending || deleteMutation.isPending}
-                        onClick={() => setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })}
+                        onClick={() =>
+                          setSongToDelete({ id: s.id, title: s.title, artistName: s.artist?.name })
+                        }
                         className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-destructive/15 text-destructive hover:bg-destructive/25 cursor-pointer transition-colors font-semibold"
                         title="Permanently Delete Song (Enforce Terms)"
                       >
@@ -646,7 +798,8 @@ function SongMod() {
             </p>
 
             <p className="text-xs text-muted-foreground bg-destructive/10 border border-destructive/20 rounded-xl p-3">
-              ⚠️ This will permanently remove the audio file, playlists references, and album associations to keep the webapp compliant with terms and conditions.
+              ⚠️ This will permanently remove the audio file, playlists references, and album
+              associations to keep the webapp compliant with terms and conditions.
             </p>
 
             <div>
@@ -677,7 +830,11 @@ function SongMod() {
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate({ data: { id: songToDelete.id, reason: deleteReason.trim() || undefined } })}
+                onClick={() =>
+                  deleteMutation.mutate({
+                    data: { id: songToDelete.id, reason: deleteReason.trim() || undefined },
+                  })
+                }
                 className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {deleteMutation.isPending ? "Deleting…" : "Permanently Delete"}
@@ -698,7 +855,11 @@ function ArtistMod() {
   const list = useServerFn(listPendingArtists);
   const mod = useServerFn(moderateArtist);
 
-  const { data: pendingArtists, isLoading, error } = useQuery({
+  const {
+    data: pendingArtists,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["pending-artists"],
     queryFn: () => list(),
     retry: false,
@@ -707,7 +868,9 @@ function ArtistMod() {
   const m = useMutation({
     mutationFn: mod,
     onSuccess: (_, variables) => {
-      toast.success(`Artist application ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`);
+      toast.success(
+        `Artist application ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`,
+      );
       qc.invalidateQueries({ queryKey: ["pending-artists"] });
       qc.invalidateQueries({ queryKey: ["pending-artists-count"] });
     },
@@ -715,7 +878,10 @@ function ArtistMod() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading artists…</div>;
-  if (error) return <div className="text-destructive">Error loading artists: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading artists: {(error as Error).message}</div>
+    );
 
   return (
     <div className="space-y-4">
@@ -727,7 +893,9 @@ function ArtistMod() {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{pendingArtists.length} application(s) pending</p>
+          <p className="text-sm text-muted-foreground">
+            {pendingArtists.length} application(s) pending
+          </p>
           {pendingArtists.map((a: any) => (
             <div key={a.id} className="bg-card border border-border rounded-xl p-4">
               <div className="flex justify-between items-start">
@@ -736,13 +904,16 @@ function ArtistMod() {
                   <p className="text-xs text-muted-foreground">{a.genre ?? "No genre"}</p>
                   {a.bio && <p className="text-sm mt-2 text-muted-foreground max-w-2xl">{a.bio}</p>}
                   <span className="inline-flex items-center gap-1 text-[11px] text-yellow-500 mt-2">
-                    <Clock className="size-3" /> Applied {new Date(a.created_at).toLocaleDateString()}
+                    <Clock className="size-3" /> Applied{" "}
+                    {new Date(a.created_at).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="flex gap-2 shrink-0 ml-4">
                   <button
                     disabled={m.isPending}
-                    onClick={() => m.mutate({ data: { id: a.id, status: "approved", verified: false } })}
+                    onClick={() =>
+                      m.mutate({ data: { id: a.id, status: "approved", verified: false } })
+                    }
                     className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 transition-colors font-semibold"
                   >
                     <Check className="size-3" /> Approve
@@ -773,7 +944,11 @@ function VerificationMod() {
   const modVerif = useServerFn(moderateArtistVerification);
   const verificationConfigFn = useServerFn(getVerificationConfig);
 
-  const { data: pendingVerifications, isLoading, error } = useQuery({
+  const {
+    data: pendingVerifications,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["pending-verifications"],
     queryFn: () => listVerifs(),
     retry: false,
@@ -788,7 +963,9 @@ function VerificationMod() {
   const mVerif = useMutation({
     mutationFn: modVerif,
     onSuccess: (_, variables) => {
-      toast.success(`Artist verification ${variables.data.decision === "approve" ? "approved" : "rejected"}`);
+      toast.success(
+        `Artist verification ${variables.data.decision === "approve" ? "approved" : "rejected"}`,
+      );
       qc.invalidateQueries({ queryKey: ["pending-verifications"] });
       qc.invalidateQueries({ queryKey: ["pending-verifications-count"] });
     },
@@ -796,15 +973,21 @@ function VerificationMod() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading verifications…</div>;
-  if (error) return <div className="text-destructive">Error loading verifications: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">
+        Error loading verifications: {(error as Error).message}
+      </div>
+    );
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold">Artist Verification Requests</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Artists must have ≥{verificationConfig?.min_followers ?? 100} followers and &gt;K{verificationConfig?.min_earnings ?? 500} in earnings to apply for verification.
-          Once approved, they receive the verified badge on their profile.
+          Artists must have ≥{verificationConfig?.min_followers ?? 100} followers and &gt;K
+          {verificationConfig?.min_earnings ?? 500} in earnings to apply for verification. Once
+          approved, they receive the verified badge on their profile.
         </p>
       </div>
 
@@ -815,7 +998,9 @@ function VerificationMod() {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{pendingVerifications.length} request(s) pending</p>
+          <p className="text-sm text-muted-foreground">
+            {pendingVerifications.length} request(s) pending
+          </p>
           {pendingVerifications.map((a: any) => (
             <div
               key={a.id}
@@ -825,7 +1010,8 @@ function VerificationMod() {
                 <p className="font-semibold text-sm">{a.name}</p>
                 <p className="text-xs text-muted-foreground">{a.genre ?? "—"}</p>
                 <span className="inline-flex items-center gap-1 text-[11px] text-yellow-500 mt-1">
-                  <Clock className="size-3" /> Requested {new Date(a.created_at).toLocaleDateString()}
+                  <Clock className="size-3" /> Requested{" "}
+                  {new Date(a.created_at).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex gap-2 shrink-0 ml-4">
@@ -867,7 +1053,9 @@ function LabelMod() {
   const m = useMutation({
     mutationFn: modFn,
     onSuccess: (_, variables) => {
-      toast.success(`Label ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`);
+      toast.success(
+        `Label ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`,
+      );
       qc.invalidateQueries({ queryKey: ["pending-labels"] });
       qc.invalidateQueries({ queryKey: ["pending-labels-count"] });
     },
@@ -875,7 +1063,8 @@ function LabelMod() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading labels…</div>;
-  if (error) return <div className="text-destructive">Error loading labels: {(error as Error).message}</div>;
+  if (error)
+    return <div className="text-destructive">Error loading labels: {(error as Error).message}</div>;
   if (!data || data.length === 0)
     return (
       <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
@@ -886,7 +1075,9 @@ function LabelMod() {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground mb-2">{data.length} label application(s) pending</p>
+      <p className="text-sm text-muted-foreground mb-2">
+        {data.length} label application(s) pending
+      </p>
       {data.map((l: any) => (
         <div
           key={l.id}
@@ -943,13 +1134,28 @@ function PayoutMod() {
     onSuccess: (_, variables) => {
       toast.success(`Payout ${variables.data.decision}.`);
       qc.invalidateQueries({ queryKey: ["staff-payouts"] });
+      qc.invalidateQueries({ queryKey: ["super-payouts"] });
+      qc.invalidateQueries({ queryKey: ["super-payouts-overview"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
     },
     onError: (err) => toast.error(`Payout review failed: ${(err as Error).message}`),
   });
 
+  const confirmReview = (id: string, decision: "approved" | "rejected") => {
+    if (
+      decision === "approved" &&
+      !window.confirm("Approve this payout review? This records approval for money movement.")
+    ) {
+      return;
+    }
+    review.mutate({ data: { id, decision, notes: notes[id] } });
+  };
+
   if (isLoading) return <div className="text-muted-foreground">Loading payout requests…</div>;
-  if (error) return <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>
+    );
 
   const payouts = data ?? [];
   const pending = payouts.filter((p: any) => p.status === "pending");
@@ -972,16 +1178,21 @@ function PayoutMod() {
       ) : (
         <div className="space-y-3">
           {pending.map((p: any) => {
-            const payee = p.label?.name ? `Label: ${p.label.name}` : `Artist: ${p.artist?.name ?? "Unknown"}`;
+            const payee = p.label?.name
+              ? `Label: ${p.label.name}`
+              : `Artist: ${p.artist?.name ?? "Unknown"}`;
             return (
               <div key={p.id} className="rounded-2xl border border-border bg-card p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-semibold">{payee}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ZMW {Number(p.amount).toFixed(2)} · {p.method_code} · requested {new Date(p.requested_at).toLocaleString()}
+                      ZMW {Number(p.amount).toFixed(2)} · {p.method_code} · requested{" "}
+                      {new Date(p.requested_at).toLocaleString()}
                     </p>
-                    <p className="mt-1 break-all text-xs text-muted-foreground">Destination: {p.destination}</p>
+                    <p className="mt-1 break-all text-xs text-muted-foreground">
+                      Destination: {p.destination}
+                    </p>
                   </div>
                   <span className="w-fit rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-semibold text-yellow-500">
                     Pending review
@@ -991,7 +1202,9 @@ function PayoutMod() {
                   Review note (optional)
                   <input
                     value={notes[p.id] ?? ""}
-                    onChange={(event) => setNotes((current) => ({ ...current, [p.id]: event.target.value }))}
+                    onChange={(event) =>
+                      setNotes((current) => ({ ...current, [p.id]: event.target.value }))
+                    }
                     maxLength={1000}
                     placeholder="Visible in the audit trail"
                     className="mt-1 w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground"
@@ -1000,14 +1213,14 @@ function PayoutMod() {
                 <div className="mt-3 flex gap-2">
                   <button
                     disabled={review.isPending}
-                    onClick={() => review.mutate({ data: { id: p.id, decision: "approved", notes: notes[p.id] } })}
+                    onClick={() => confirmReview(p.id, "approved")}
                     className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
                   >
                     <Check className="size-3" /> Approve review
                   </button>
                   <button
                     disabled={review.isPending}
-                    onClick={() => review.mutate({ data: { id: p.id, decision: "rejected", notes: notes[p.id] } })}
+                    onClick={() => confirmReview(p.id, "rejected")}
                     className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
                   >
                     <X className="size-3" /> Reject
@@ -1021,12 +1234,17 @@ function PayoutMod() {
 
       {payouts.filter((p: any) => p.status !== "pending").length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="border-b border-border px-5 py-3 text-sm font-semibold">Reviewed requests</div>
+          <div className="border-b border-border px-5 py-3 text-sm font-semibold">
+            Reviewed requests
+          </div>
           <div className="divide-y divide-border">
             {payouts
               .filter((p: any) => p.status !== "pending")
               .map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-4 px-5 py-3 text-sm"
+                >
                   <span>{p.label?.name ?? p.artist?.name ?? "Unknown payee"}</span>
                   <span className="text-muted-foreground">ZMW {Number(p.amount).toFixed(2)}</span>
                   <span className="capitalize text-muted-foreground">{p.status}</span>
@@ -1051,7 +1269,10 @@ function Diagnostics() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading diagnostics…</div>;
-  if (error) return <div className="text-destructive">Error loading diagnostics: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading diagnostics: {(error as Error).message}</div>
+    );
   if (!data) return <div className="text-muted-foreground">No diagnostic data available.</div>;
 
   const { info, report } = data;
@@ -1124,7 +1345,8 @@ function Diagnostics() {
             Data Integrity Issue
           </h3>
           <p className="text-sm text-muted-foreground mb-3">
-            {info.dataIntegrity.approvedArtistsWithoutRole.length} approved artist(s) are missing the &apos;artist&apos; role.
+            {info.dataIntegrity.approvedArtistsWithoutRole.length} approved artist(s) are missing
+            the &apos;artist&apos; role.
           </p>
           <div className="text-xs space-y-2">
             {info.dataIntegrity.approvedArtistsWithoutRole.map((artist) => (
@@ -1158,7 +1380,11 @@ function PaymentsMod() {
     retry: false,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["stuck-transactions"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["stuck-transactions"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    qc.invalidateQueries({ queryKey: ["admin-activity"] });
+  };
 
   const recheckM = useMutation({
     mutationFn: (id: string) => recheckFn({ data: { transactionId: id } }),
@@ -1196,7 +1422,10 @@ function PaymentsMod() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading payments…</div>;
-  if (error) return <div className="text-destructive">Error loading payments: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading payments: {(error as Error).message}</div>
+    );
 
   const rows = data ?? [];
 
@@ -1206,7 +1435,8 @@ function PaymentsMod() {
         <div>
           <h2 className="text-lg font-semibold">Unfinished payments</h2>
           <p className="text-sm text-muted-foreground">
-            Payments that never reached a final outcome. Re-check asks the payment provider what really happened.
+            Payments that never reached a final outcome. Re-check asks the payment provider what
+            really happened.
           </p>
         </div>
         <button
@@ -1254,7 +1484,15 @@ function PaymentsMod() {
                   Re-check
                 </button>
                 <button
-                  onClick={() => cancelM.mutate(t.id)}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Mark this payment as abandoned? The buyer will no longer be able to complete it.",
+                      )
+                    ) {
+                      cancelM.mutate(t.id);
+                    }
+                  }}
                   disabled={cancelM.isPending}
                   className="text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive hover:bg-destructive/25 disabled:opacity-50"
                 >

@@ -90,16 +90,16 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   // Resolve image URLs for all slides on mount
   useEffect(() => {
     let cancelled = false;
-    
+
     slides.forEach(async (slide) => {
       if (cancelled) return;
-      
+
       // If it's already an absolute URL, use it directly
       if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
         return;
       }
-      
+
       // If it starts with "uploads/", resolve through hero-images bucket (legacy support)
       if (slide.imageUrl.startsWith("uploads/")) {
         const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
@@ -121,14 +121,14 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         }
         return;
       }
-      
+
       // Otherwise, assume it's in hero-images bucket with user_id folder
       const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
       if (cached) {
         setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
         return;
       }
-      
+
       try {
         const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
         if (url && !cancelled) {
@@ -142,7 +142,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         }
       }
     });
-    
+
     return () => {
       cancelled = true;
     };
@@ -153,11 +153,15 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const currentSlide = slides[currentIndex];
   const signedUrl = signedUrls.get(currentSlide.id) || currentSlide.imageUrl;
 
-  // Use the ctaExternal field to determine if link should open in new tab
-  const isExternalLink = currentSlide.ctaExternal === true;
+  // Use the ctaExternal field to determine if link should open in new tab.
+  // CMS links are free text — anything that isn't a plain internal path
+  // ("/albums/...") falls back to <a> so a bad value can't crash the router.
+  const ctaLink = currentSlide.ctaLink || "/";
+  const isExternalLink =
+    currentSlide.ctaExternal === true || /^https?:\/\//i.test(ctaLink) || !ctaLink.startsWith("/");
 
   return (
-    <div 
+    <div
       className="relative w-full aspect-[16/9] md:aspect-[2.4/1] overflow-hidden rounded-2xl mb-8"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -172,7 +176,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
               title={currentSlide.title}
               allow="autoplay; encrypted-media"
               allowFullScreen
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: "none" }}
             />
             <div className="absolute inset-0 bg-black/60" />
           </div>
@@ -201,7 +205,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           </p>
           {isExternalLink ? (
             <a
-              href={currentSlide.ctaLink}
+              href={ctaLink}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
@@ -211,7 +215,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             </a>
           ) : (
             <Link
-              to={currentSlide.ctaLink}
+              to={ctaLink as any}
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
             >
               {currentSlide.ctaText}
@@ -252,7 +256,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       {/* Progress Bar */}
       {shouldAutoRotate && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-          <div 
+          <div
             className="h-full bg-primary transition-all duration-100 ease-linear"
             style={{ width: `${progress}%` }}
           />
@@ -266,9 +270,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             key={index}
             onClick={() => goToSlide(index)}
             className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              index === currentIndex 
-                ? "bg-white w-8" 
-                : "bg-white/40 hover:bg-white/60"
+              index === currentIndex ? "bg-white w-8" : "bg-white/40 hover:bg-white/60"
             }`}
             aria-label={`Go to slide ${index + 1}`}
             aria-current={index === currentIndex ? "true" : "false"}

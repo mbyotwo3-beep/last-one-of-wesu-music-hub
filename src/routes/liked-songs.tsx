@@ -58,13 +58,15 @@ function Page() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("saved_tracks")
-        .select("id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration,price,artists:artist_id(id,name))")
+        .select(
+          "id, created_at, song_id, songs:song_id(id,title,cover_url,artist_id,album_id,duration,price,artists:artist_id(id,name))",
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       return (data ?? []).map((item: any) => item.songs).filter(hasId);
     },
     enabled: !!user?.id,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const safeLikedSongs = (likedSongs ?? []).filter(hasId);
@@ -77,7 +79,8 @@ function Page() {
     durationSeconds: song.duration,
   }));
 
-  const isLikedSongsPlaying = player.playing && safeLikedSongs.some((s) => s.id === player.track?.id);
+  const isLikedSongsPlaying =
+    player.playing && safeLikedSongs.some((s) => s.id === player.track?.id);
   const totalDuration = safeLikedSongs.reduce((acc: number, s: any) => acc + (s.duration || 0), 0);
 
   const handlePlayAll = () => {
@@ -121,7 +124,8 @@ function Page() {
         onClick={() => navigate({ to: "/library" })}
         className="text-sm font-medium text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 cursor-pointer transition-colors group"
       >
-        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to Library
+        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to
+        Library
       </button>
 
       {/* Apple Music 2-Column Layout on Desktop */}
@@ -143,7 +147,9 @@ function Page() {
 
           {/* Metadata */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium mb-6">
-            <span>{safeLikedSongs.length} {safeLikedSongs.length === 1 ? "song" : "songs"}</span>
+            <span>
+              {safeLikedSongs.length} {safeLikedSongs.length === 1 ? "song" : "songs"}
+            </span>
             {totalDuration > 0 && <span>• {formatTotalRuntime(totalDuration)}</span>}
             <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               Personal
@@ -159,9 +165,13 @@ function Page() {
               className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-[0.98] transition-all shadow-md cursor-pointer disabled:opacity-40"
             >
               {isLikedSongsPlaying ? (
-                <><Pause className="size-4 fill-current" /> Pause</>
+                <>
+                  <Pause className="size-4 fill-current" /> Pause
+                </>
               ) : (
-                <><Play className="size-4 fill-current ml-0.5" /> Play</>
+                <>
+                  <Play className="size-4 fill-current ml-0.5" /> Play
+                </>
               )}
             </button>
 
@@ -210,12 +220,7 @@ function Page() {
           ) : (
             <div className="space-y-1">
               {safeLikedSongs.map((song: any, index: number) => (
-                <LikedSongRow
-                  key={song.id}
-                  song={song}
-                  index={index}
-                  songTracks={songTracks}
-                />
+                <LikedSongRow key={song.id} song={song} index={index} songTracks={songTracks} />
               ))}
             </div>
           )}
@@ -267,7 +272,9 @@ function LikedSongRow({
           <Play className="size-4 fill-current text-primary" />
         ) : (
           <>
-            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">{index + 1}</span>
+            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">
+              {index + 1}
+            </span>
             <Play className="size-4 fill-current hidden group-hover:block text-foreground" />
           </>
         )}
@@ -283,17 +290,25 @@ function LikedSongRow({
 
       {/* Title & Artist */}
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}>
+        <p
+          className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}
+        >
           {song.title}
         </p>
-        <Link
-          to="/artists/$id"
-          params={{ id: song.artist_id ?? "" }}
-          className="text-xs text-muted-foreground truncate hover:underline hover:text-foreground inline-block"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {song.artists?.name ?? "Unknown"}
-        </Link>
+        {song.artist_id ? (
+          <Link
+            to="/artists/$id"
+            params={{ id: song.artist_id }}
+            className="text-xs text-muted-foreground truncate hover:underline hover:text-foreground inline-block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {song.artists?.name ?? "Unknown"}
+          </Link>
+        ) : (
+          <span className="text-xs text-muted-foreground truncate inline-block">
+            {song.artists?.name ?? "Unknown"}
+          </span>
+        )}
       </div>
 
       {/* Duration */}
@@ -311,7 +326,9 @@ function LikedSongRow({
             toggle();
           }}
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-            isSaved ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+            isSaved
+              ? "text-red-500 hover:text-red-600"
+              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}

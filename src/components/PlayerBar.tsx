@@ -48,15 +48,6 @@ import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/li
 
 let _nativeAvailable: boolean | null = null;
 
-function cleanupAudio(): void {
-  const audio = getAudio();
-  if (audio) {
-    audio.pause();
-    audio.src = "";
-    audio.load();
-  }
-}
-
 function fmt(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -103,6 +94,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const currentTrackId = useRef<string | null>(null);
   const trackedHistoryTrackRef = useRef<string | null>(null);
+  const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const audioEventsCleanupRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -137,7 +129,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       return;
     }
-    if (currentTrackId.current === track.id) return;
+    if (currentTrackId.current === track.id) {
+      // Same track, but auth identity changed (login/logout/purchase) while
+      // in preview mode → re-resolve entitlement instead of staying stuck.
+      if (resolvedForUserRef.current !== (user?.id ?? null) && usePlayer.getState().isPreview) {
+        currentTrackId.current = null;
+      } else {
+        return;
+      }
+    }
 
     if (currentTrackId.current) {
       const previousId = currentTrackId.current;
@@ -155,6 +155,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }
 
     currentTrackId.current = track.id;
+    resolvedForUserRef.current = user?.id ?? null;
     trackedHistoryTrackRef.current = null;
     setError(null);
     setLoading(true);
@@ -272,7 +273,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   setError("Preview ended. Buy this track for full access.");
                 }, 15000);
               }
-              const cleanup = await onNativeComplete(() => {
+              const cleanup = await onNativeComplete(track!.id, () => {
                 if (usePlayer.getState().repeat === "one") {
                   playNative(track!.id).catch(() => {});
                   return;
@@ -375,6 +376,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         if (!isCurrentTrack()) return;
         if (retries < 2) {
           retries++;
+          // Clear stale event handlers before retrying or they duplicate.
+          audioEventsCleanupRef.current?.();
+          audioEventsCleanupRef.current = null;
           await new Promise((r) => setTimeout(r, 1000));
           return loadUrl();
         }
@@ -386,7 +390,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }
     loadUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id]);
+  }, [track?.id, user?.id]);
 
   // Sync playing state
   useEffect(() => {
@@ -517,12 +521,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
       }
-      // Only fully destroy the audio source when this is the real visible player
-      // bar (not the hidden audioOnly engine inside MobileShell). Clearing src on
-      // the shared singleton when swapping between mobile/desktop layouts would
-      // abruptly stop any music that is currently playing.
-      if (!audioOnly) {
-        cleanupAudio();
+      // Never destroy the shared singleton's src on unmount — the bar stays
+      // mounted across routes by design, and an error-boundary reset must not
+      // wipe playback position. Pause only; exitSong() is the explicit stop.
+      try {
+        getAudio()?.pause();
+      } catch {
+        /* ignore */
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

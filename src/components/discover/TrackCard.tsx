@@ -23,7 +23,7 @@ export interface TrackCardSong {
 
 /** Cover-first tile for New Music / Made For You style shelves. */
 export function TrackCard({ song }: { song: TrackCardSong }) {
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -41,7 +41,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       const currentPath = window.location.pathname + window.location.search;
       navigate({
         to: "/auth",
-        search: { redirect: currentPath, action: "save", itemId: song.id, itemType: "song" }
+        search: { redirect: currentPath, action: "save", itemId: song.id, itemType: "song" },
       });
       return;
     }
@@ -55,13 +55,21 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       togglePlay();
       return;
     }
-    setTrack({
-      id: song.id,
-      title: song.title,
-      artistName,
-      coverUrl: song.cover_url,
-      durationSeconds: song.duration ?? undefined,
-    });
+    // Seed a single-track queue (not bare setTrack) so skip/queue screens
+    // keep working after playing from a shelf.
+    setQueue(
+      [
+        {
+          id: song.id,
+          title: song.title,
+          artistName,
+          coverUrl: song.cover_url,
+          durationSeconds: song.duration ?? undefined,
+          price: song.price ?? undefined,
+        },
+      ],
+      0,
+    );
   };
 
   return (
@@ -77,7 +85,9 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           alt={song.title}
           className="w-full h-full object-cover"
         />
-        <div className={`absolute inset-0 bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}>
+        <div
+          className={`absolute inset-0 bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}
+        >
           <button
             type="button"
             onClick={handlePlay}
@@ -169,7 +179,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
       const currentPath = window.location.pathname + window.location.search;
       navigate({
         to: "/auth",
-        search: { redirect: currentPath, action: "save", itemId: album.id, itemType: "album" }
+        search: { redirect: currentPath, action: "save", itemId: album.id, itemType: "album" },
       });
       return;
     }
@@ -185,7 +195,9 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
           alt={album.title}
           className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{album.title}</p>
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
+          {album.title}
+        </p>
       </Link>
       <div className="absolute top-2 right-2 flex gap-1">
         {user && (
@@ -241,21 +253,17 @@ export interface ArtistTileData {
 export function ArtistTile({ artist }: { artist: ArtistTileData }) {
   return (
     <div className="group text-center w-full relative cursor-pointer">
-      <Link
-        to="/artists/$id"
-        params={{ id: artist.id }}
-        className="block cursor-pointer"
-      >
+      <Link to="/artists/$id" params={{ id: artist.id }} className="block cursor-pointer">
         <StorageImage
           bucket="artist-images"
           path={artist.avatar_url ?? null}
           alt={artist.name}
           className="aspect-square w-full rounded-full overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{artist.name}</p>
-        <p className="text-xs text-muted-foreground truncate">
-          {artist.genre ?? "Artist"}
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
+          {artist.name}
         </p>
+        <p className="text-xs text-muted-foreground truncate">{artist.genre ?? "Artist"}</p>
       </Link>
       <div className="absolute top-2 right-2">
         <ShareMenu
@@ -285,17 +293,14 @@ const PALETTE = [
 ];
 
 export function GenreTile({ genre, index }: { genre: string; index: number }) {
-  const gradient =
-    GENRE_GRADIENTS[genre.toLowerCase()] ?? PALETTE[index % PALETTE.length];
+  const gradient = GENRE_GRADIENTS[genre.toLowerCase()] ?? PALETTE[index % PALETTE.length];
   return (
     <Link
       to="/browse"
       search={{ genre } as never}
       className={`relative aspect-[16/10] rounded-xl overflow-hidden bg-gradient-to-br ${gradient} p-4 flex items-start cursor-pointer hover:scale-[1.02] transition-transform`}
     >
-      <span className="text-white text-lg font-bold tracking-tight drop-shadow">
-        {genre}
-      </span>
+      <span className="text-white text-lg font-bold tracking-tight drop-shadow">{genre}</span>
     </Link>
   );
 }
@@ -310,22 +315,18 @@ export interface PlaylistTileData {
 export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
   return (
     <div className="group text-left w-full relative cursor-pointer">
-      <Link
-        to="/playlists/$id"
-        params={{ id: playlist.id }}
-        className="block cursor-pointer"
-      >
+      <Link to="/playlists/$id" params={{ id: playlist.id }} className="block cursor-pointer">
         <StorageImage
           bucket="album-art"
           path={playlist.cover_url ?? null}
           alt={playlist.name}
           className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">{playlist.name}</p>
+        <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
+          {playlist.name}
+        </p>
         {playlist.description ? (
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {playlist.description}
-          </p>
+          <p className="text-xs text-muted-foreground line-clamp-2">{playlist.description}</p>
         ) : (
           <p className="text-xs text-muted-foreground">Playlist</p>
         )}

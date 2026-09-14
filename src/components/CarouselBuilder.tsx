@@ -2,8 +2,17 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Plus, Trash2, Eye, EyeOff, GripVertical, ChevronDown, ChevronUp,
-  Link as LinkIcon, Image as ImageIcon, Save, X,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  GripVertical,
+  ChevronDown,
+  ChevronUp,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Save,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,6 +31,13 @@ import {
  * CarouselBuilder — full CRUD UI for managing homepage carousels.
  * Used in the Superadmin Homepage Builder and Admin "Carousels" tab.
  */
+
+// CMS links are free text: accept internal app paths or full https URLs only.
+// Anything else renders a dead card on the homepage.
+export function isValidCarouselLink(url: string) {
+  const v = url.trim();
+  return v.startsWith("/") || /^https:\/\//i.test(v);
+}
 export function CarouselBuilder() {
   const qc = useQueryClient();
 
@@ -39,7 +55,13 @@ export function CarouselBuilder() {
     retry: 1,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["all-carousels"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["all-carousels"] });
+    // Public homepage reads these — without this the site looks unchanged
+    // after every admin save.
+    qc.invalidateQueries({ queryKey: ["active-carousels"] });
+    qc.invalidateQueries({ queryKey: ["home-discover"] });
+  };
 
   // ── Create carousel ──────────────────────────────────────
   const [newTitle, setNewTitle] = useState("");
@@ -51,7 +73,9 @@ export function CarouselBuilder() {
     mutationFn: createFn,
     onSuccess: () => {
       toast.success("Carousel created!");
-      setNewTitle(""); setNewSubtitle(""); setNewSeeAll("");
+      setNewTitle("");
+      setNewSubtitle("");
+      setNewSeeAll("");
       setShowNewForm(false);
       invalidate();
     },
@@ -60,31 +84,46 @@ export function CarouselBuilder() {
 
   const updateM = useMutation({
     mutationFn: updateFn,
-    onSuccess: () => { toast.success("Carousel updated"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Carousel updated");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteM = useMutation({
     mutationFn: deleteFn,
-    onSuccess: () => { toast.success("Carousel deleted"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Carousel deleted");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const addItemM = useMutation({
     mutationFn: addItemFn,
-    onSuccess: () => { toast.success("Card added!"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Card added!");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const updateItemM = useMutation({
     mutationFn: updateItemFn,
-    onSuccess: () => { toast.success("Card updated"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Card updated");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteItemM = useMutation({
     mutationFn: deleteItemFn,
-    onSuccess: () => { toast.success("Card removed"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Card removed");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -98,7 +137,8 @@ export function CarouselBuilder() {
         <div>
           <h2 className="text-xl font-bold">Homepage Carousels</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Horizontal swipeable rows shown on the homepage. Each row contains clickable cards with an image and a link.
+            Horizontal swipeable rows shown on the homepage. Each row contains clickable cards with
+            an image and a link.
           </p>
         </div>
         <button
@@ -112,7 +152,9 @@ export function CarouselBuilder() {
       {/* New carousel form */}
       {showNewForm && (
         <div className="bg-card border border-primary/30 rounded-2xl p-5 space-y-3">
-          <h3 className="font-semibold text-sm text-primary uppercase tracking-wide">New Carousel</h3>
+          <h3 className="font-semibold text-sm text-primary uppercase tracking-wide">
+            New Carousel
+          </h3>
           <div className="grid sm:grid-cols-3 gap-3">
             <input
               placeholder="Title (e.g. New Releases)"
@@ -177,7 +219,9 @@ export function CarouselBuilder() {
             updateM.mutate({ data: { id: carousel.id, active: !carousel.active } })
           }
           onMoveUp={() =>
-            updateM.mutate({ data: { id: carousel.id, position: Math.max(0, carousel.position - 1) } })
+            updateM.mutate({
+              data: { id: carousel.id, position: Math.max(0, carousel.position - 1) },
+            })
           }
           onMoveDown={() =>
             updateM.mutate({ data: { id: carousel.id, position: carousel.position + 1 } })
@@ -193,8 +237,11 @@ export function CarouselBuilder() {
           onUpdateItem={(d) => updateItemM.mutate({ data: d })}
           onDeleteItem={(id) => deleteItemM.mutate({ data: { id } })}
           isPending={
-            updateM.isPending || deleteM.isPending ||
-            addItemM.isPending || updateItemM.isPending || deleteItemM.isPending
+            updateM.isPending ||
+            deleteM.isPending ||
+            addItemM.isPending ||
+            updateItemM.isPending ||
+            deleteItemM.isPending
           }
         />
       ))}
@@ -228,7 +275,14 @@ function CarouselCard({
   onDelete: () => void;
   onSaveTitle: (title: string, subtitle: string | null, show_all_link: string | null) => void;
   onAddItem: (d: { title: string; subtitle?: string; image_url: string; link_url: string }) => void;
-  onUpdateItem: (d: { id: string; title?: string; subtitle?: string | null; image_url?: string; link_url?: string; position?: number }) => void;
+  onUpdateItem: (d: {
+    id: string;
+    title?: string;
+    subtitle?: string | null;
+    image_url?: string;
+    link_url?: string;
+    position?: number;
+  }) => void;
   onDeleteItem: (id: string) => void;
   isPending: boolean;
 }) {
@@ -323,7 +377,9 @@ function CarouselCard({
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-muted-foreground mb-1 block">Subtitle (optional)</span>
+                <span className="text-xs text-muted-foreground mb-1 block">
+                  Subtitle (optional)
+                </span>
                 <input
                   value={editSubtitle}
                   onChange={(e) => setEditSubtitle(e.target.value)}
@@ -373,7 +429,9 @@ function CarouselCard({
             {/* Add card form */}
             {showAddItem && (
               <div className="bg-secondary/40 border border-border rounded-xl p-4 mb-4 space-y-3">
-                <h5 className="text-xs font-semibold text-primary uppercase tracking-wide">New Card</h5>
+                <h5 className="text-xs font-semibold text-primary uppercase tracking-wide">
+                  New Card
+                </h5>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-xs text-muted-foreground mb-1 block">Card Title *</span>
@@ -385,7 +443,9 @@ function CarouselCard({
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground mb-1 block">Subtitle (optional)</span>
+                    <span className="text-xs text-muted-foreground mb-1 block">
+                      Subtitle (optional)
+                    </span>
                     <input
                       placeholder="e.g. Hip-Hop · 12 songs"
                       value={newItem.subtitle}
@@ -414,6 +474,11 @@ function CarouselCard({
                       onChange={(e) => setNewItem({ ...newItem, link_url: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm font-mono text-xs"
                     />
+                    {newItem.link_url.trim() && !isValidCarouselLink(newItem.link_url) && (
+                      <span className="text-xs text-yellow-500">
+                        Use an internal path (/albums/…) or full https:// URL.
+                      </span>
+                    )}
                   </label>
                 </div>
                 {/* Image preview */}
@@ -430,7 +495,12 @@ function CarouselCard({
                 )}
                 <div className="flex gap-2">
                   <button
-                    disabled={!newItem.title.trim() || !newItem.image_url.trim() || !newItem.link_url.trim() || isPending}
+                    disabled={
+                      !newItem.title.trim() ||
+                      !newItem.image_url.trim() ||
+                      !isValidCarouselLink(newItem.link_url) ||
+                      isPending
+                    }
                     onClick={() => {
                       onAddItem({
                         title: newItem.title.trim(),
@@ -490,7 +560,12 @@ function CarouselItemCard({
   isPending,
 }: {
   item: CarouselItem;
-  onUpdate: (d: { title?: string; subtitle?: string | null; image_url?: string; link_url?: string }) => void;
+  onUpdate: (d: {
+    title?: string;
+    subtitle?: string | null;
+    image_url?: string;
+    link_url?: string;
+  }) => void;
   onDelete: () => void;
   isPending: boolean;
 }) {
@@ -551,7 +626,8 @@ function CarouselItemCard({
             }}
             className="flex-1 py-1 rounded bg-primary text-primary-foreground font-semibold disabled:opacity-40"
           >
-            <Save className="size-3 inline mr-1" />Save
+            <Save className="size-3 inline mr-1" />
+            Save
           </button>
           <button onClick={() => setEditing(false)} className="py-1 px-2 rounded bg-secondary">
             <X className="size-3" />
@@ -575,7 +651,8 @@ function CarouselItemCard({
           <p className="text-[10px] text-muted-foreground truncate">{item.subtitle}</p>
         )}
         <p className="text-[10px] text-primary/70 truncate mt-0.5 flex items-center gap-0.5">
-          <LinkIcon className="size-2.5" />{item.link_url}
+          <LinkIcon className="size-2.5" />
+          {item.link_url}
         </p>
       </div>
       {/* Hover actions */}
@@ -587,7 +664,9 @@ function CarouselItemCard({
           Edit
         </button>
         <button
-          onClick={() => { if (confirm("Remove this card?")) onDelete(); }}
+          onClick={() => {
+            if (confirm("Remove this card?")) onDelete();
+          }}
           disabled={isPending}
           className="p-1.5 rounded bg-destructive/80 text-white"
         >

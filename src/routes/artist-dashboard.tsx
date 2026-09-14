@@ -16,7 +16,7 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
@@ -476,7 +476,7 @@ function ArtistDashboardPage() {
 
       {/* Delete Song Confirmation Modal */}
       {songToDelete && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <DeleteModalShell onClose={() => setSongToDelete(null)}>
           <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-destructive">
@@ -517,11 +517,11 @@ function ArtistDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DeleteModalShell>
       )}
       {/* Delete Album Confirmation Modal */}
       {albumToDelete && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <DeleteModalShell onClose={() => setAlbumToDelete(null)}>
           <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-destructive">
@@ -560,8 +560,31 @@ function ArtistDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </DeleteModalShell>
       )}
+    </div>
+  );
+}
+
+// Shared modal shell: overlay click + Escape dismiss (previously X/Cancel only,
+// so a stuck modal had no escape hatch).
+function DeleteModalShell({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {children}
     </div>
   );
 }

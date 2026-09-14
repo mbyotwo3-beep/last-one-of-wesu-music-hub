@@ -18,10 +18,7 @@ export interface HeroCarouselSlide {
 }
 
 async function assertStaff(supabase: any, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
   const roles = (data ?? []).map((r: { role: string }) => r.role);
   if (!roles.includes("admin") && !roles.includes("superadmin")) {
@@ -39,7 +36,6 @@ export const getActiveHeroSlides = createServerFn({ method: "GET" }).handler(asy
     .eq("active", true)
     .order("position", { ascending: true });
   if (error) throw new Error(error.message);
-  console.log("[getActiveHeroSlides] Active slides:", data);
   return (data ?? []) as HeroCarouselSlide[];
 });
 
@@ -123,12 +119,16 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const patch: any = { updated_at: new Date().toISOString() };
-    if (data.title !== undefined) patch.title = data.title;
-    if (data.description !== undefined) patch.description = data.description;
-    if (data.image_url !== undefined) patch.image_url = data.image_url;
-    if (data.video_url !== undefined) patch.video_url = data.video_url;
-    if (data.cta_text !== undefined) patch.cta_text = data.cta_text;
-    if (data.cta_link !== undefined) patch.cta_link = data.cta_link;
+    const nonEmpty = (v: string | undefined, field: string) => {
+      if (v === undefined) return;
+      if (!v.trim()) throw new Error(`${field} cannot be empty`);
+      patch[field] = v.trim();
+    };
+    nonEmpty(data.title, "title");
+    nonEmpty(data.description, "description");
+    nonEmpty(data.image_url, "image_url");
+    nonEmpty(data.cta_text, "cta_text");
+    nonEmpty(data.cta_link, "cta_link");
     if (data.cta_external !== undefined) patch.cta_external = data.cta_external;
     if (data.position !== undefined) patch.position = data.position;
     if (data.active !== undefined) patch.active = data.active;

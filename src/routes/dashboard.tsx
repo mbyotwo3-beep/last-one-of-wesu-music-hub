@@ -61,7 +61,11 @@ function DashboardPage() {
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+    if (!loading && !user)
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
   }, [user, loading, navigate]);
 
   const { data, isLoading } = useQuery({
@@ -81,9 +85,24 @@ function DashboardPage() {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
 
   const stats = [
-    { label: "Playlists", value: data.stats.playlists, icon: ListMusic, link: "/playlists" as const },
-    { label: "Purchases", value: data.stats.purchases, icon: ShoppingBag, link: "/library" as const },
-    { label: "Liked Songs", value: (data as any).stats?.saved ?? 0, icon: Heart, link: "/dashboard" as const },
+    {
+      label: "Playlists",
+      value: data.stats.playlists,
+      icon: ListMusic,
+      link: "/playlists" as const,
+    },
+    {
+      label: "Purchases",
+      value: data.stats.purchases,
+      icon: ShoppingBag,
+      link: "/library" as const,
+    },
+    {
+      label: "Liked Songs",
+      value: (data as any).stats?.saved ?? 0,
+      icon: Heart,
+      link: "/library" as const,
+    },
   ];
 
   const savedTracks: any[] = (data as any).savedTracks ?? [];
@@ -130,21 +149,34 @@ function DashboardPage() {
                   const artistId = song?.artists?.id ?? song?.artist_id;
                   const albumId = song?.album_id;
                   return (
-                    <div key={s.id} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-accent transition-colors">
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+                    >
                       <div className="min-w-0">
                         {albumId ? (
-                          <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium truncate hover:underline block">
+                          <Link
+                            to="/albums/$id"
+                            params={{ id: albumId }}
+                            className="text-sm font-medium truncate hover:underline block"
+                          >
                             {song.title ?? "Untitled"}
                           </Link>
                         ) : (
                           <p className="text-sm font-medium truncate">{song.title ?? "Untitled"}</p>
                         )}
                         {artistId ? (
-                          <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block">
+                          <Link
+                            to="/artists/$id"
+                            params={{ id: artistId }}
+                            className="text-xs text-muted-foreground truncate hover:text-foreground hover:underline block"
+                          >
                             {song?.artists?.name ?? "—"}
                           </Link>
                         ) : (
-                          <p className="text-xs text-muted-foreground truncate">{song?.artists?.name ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {song?.artists?.name ?? "—"}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -173,7 +205,9 @@ function DashboardPage() {
                       <ListMusic className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{p.name}</p>
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                        {p.name}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {p.is_public ? "Public" : "Private"}
                       </p>
@@ -205,10 +239,7 @@ function DashboardPage() {
                   "Item";
                 const when = new Date(p.created_at).toLocaleDateString();
                 return (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between py-3"
-                  >
+                  <div key={p.id} className="flex items-center justify-between py-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{title}</p>
                       <p className="text-xs text-muted-foreground">{when}</p>

@@ -116,16 +116,20 @@ function Page() {
 }
 
 function CollabsTab() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const songsFn = useServerFn(listMySongs);
   const inviteFn = useServerFn(inviteCollaborator);
   const { data: songs } = useQuery({
     queryKey: ["my-songs"],
     queryFn: () => songsFn(),
     retry: false,
+    enabled: !!user,
   });
   const m = useMutation({
     mutationFn: inviteFn,
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-collabs"] });
       toast.success("🎵 Collaborator invite sent successfully!");
     },
     onError: (error) => {
@@ -141,13 +145,23 @@ function CollabsTab() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<any[]>([]);
   async function find() {
-    const { data } = await supabase
-      .from("artists")
-      .select("id, name")
-      .ilike("name", `%${search}%`)
-      .eq("status", "approved")
-      .limit(8);
-    setResults(data ?? []);
+    if (!search.trim()) {
+      toast.error("Type an artist name to search");
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("id, name")
+        .ilike("name", `%${search.trim()}%`)
+        .eq("status", "approved")
+        .limit(8);
+      if (error) throw error;
+      setResults(data ?? []);
+      if ((data ?? []).length === 0) toast.info("No approved artists found");
+    } catch (err) {
+      toast.error(`Artist search failed: ${(err as Error).message}`);
+    }
   }
   return (
     <div className="space-y-4">
@@ -158,7 +172,8 @@ function CollabsTab() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          m.mutate({ data: form });
+          const pct = Math.max(0, Math.min(100, Number(form.split_pct) || 0));
+          m.mutate({ data: { ...form, split_pct: pct } });
         }}
         className="bg-card border border-border rounded-2xl p-6 space-y-3"
       >
@@ -247,15 +262,22 @@ function CollabsTab() {
 }
 
 function LabelTab() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const fn = useServerFn(listMyLabelInvites);
   const respondFn = useServerFn(respondToLabelInvite);
   const leaveFn = useServerFn(leaveLabel);
-  const { data } = useQuery({ queryKey: ["my-label-invites"], queryFn: () => fn(), retry: false });
+  const { data } = useQuery({
+    queryKey: ["my-label-invites"],
+    queryFn: () => fn(),
+    retry: false,
+    enabled: !!user,
+  });
   const respondM = useMutation({
     mutationFn: respondFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-label-invites"] });
+      qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
       toast.success("🤝 Label invite response recorded!");
     },
     onError: (error) => {
@@ -263,9 +285,10 @@ function LabelTab() {
     },
   });
   const leaveM = useMutation({
-    mutationFn: leaveFn,
+    mutationFn: () => (leaveFn as any)(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-label-invites"] });
+      qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
       toast.success("🚀 Successfully left label. You're now independent!");
     },
     onError: (error) => {
@@ -281,7 +304,11 @@ function LabelTab() {
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">You're signed to a label.</span>
             <button
-              onClick={() => leaveM.mutate(undefined as any)}
+              onClick={() => {
+                if (window.confirm("Leave your label? You'll become an independent artist.")) {
+                  leaveM.mutate();
+                }
+              }}
               className="text-xs text-destructive"
             >
               Leave label
@@ -328,10 +355,12 @@ function LabelTab() {
 }
 
 function FeaturesTab() {
+  const qc = useQueryClient();
   const fn = useServerFn(setCollabPrefs);
   const m = useMutation({
     mutationFn: fn,
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["artist-overview"] });
       toast.success("⚡ Feature settings saved successfully!");
     },
     onError: (error) => {
@@ -373,9 +402,15 @@ function FeaturesTab() {
         <input
           type="number"
           min={0}
+          max={100000}
           step="0.01"
           value={form.feature_rate}
-          onChange={(e) => setForm({ ...form, feature_rate: Number(e.target.value) })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              feature_rate: Math.max(0, Math.min(100000, Number(e.target.value) || 0)),
+            })
+          }
         />
       </label>
       {m.isSuccess && <p className="text-sm text-primary">Saved.</p>}
@@ -407,6 +442,7 @@ function UploadWizard() {
   const createAlbumFn = useServerFn(createAlbum);
   const updateAlbumFn = useServerFn(updateAlbum);
   const pricingFn = useServerFn(getPricingConfig);
+  const overviewFn = useServerFn(getMyArtistOverview);
   const inviteFeatureFn = useServerFn(inviteArtistForFeature);
   const inviteLabelFn = useServerFn(inviteLabelForRelease);
 
@@ -415,6 +451,16 @@ function UploadWizard() {
     queryFn: () => pricingFn(),
     staleTime: 5 * 60 * 1000,
   });
+
+  // Label signing state — the server rejects has_label uploads when the
+  // artist isn't signed, so resolve it BEFORE uploading any bytes.
+  const { data: overview } = useQuery({
+    queryKey: ["artist-overview", user?.id],
+    queryFn: () => overviewFn(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+  const signedLabelId = (overview as any)?.artist?.label_id ?? null;
 
   const [step, setStep] = useState<1 | 2 | 3>(() => {
     const saved = sessionStorage.getItem("upload-wizard-step");
@@ -591,15 +637,30 @@ function UploadWizard() {
   }
 
   function audioFilesToEntries(fileList: FileList | File[]): TrackEntry[] {
-    return Array.from(fileList)
-      .filter(
-        (f) => f.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(f.name),
-      )
+    const skipped: string[] = [];
+    const entries = Array.from(fileList)
+      .filter((f) => {
+        const ok =
+          f.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(f.name);
+        if (!ok) skipped.push(f.name);
+        return ok;
+      })
+      .filter((f) => {
+        if (f.size > 100 * 1024 * 1024) {
+          skipped.push(`${f.name} (over 100MB)`);
+          return false;
+        }
+        return true;
+      })
       .map((f) => ({
         id: `${f.name}-${f.lastModified}-${Math.random()}`,
         file: f,
         title: f.name.replace(/\.[^.]+$/, ""),
       }));
+    if (skipped.length > 0) {
+      toast.error(`Skipped ${skipped.length} file(s): ${skipped.slice(0, 3).join(", ")}`);
+    }
+    return entries;
   }
 
   function addAudioFiles(fileList: FileList | File[], replace = false) {
@@ -669,6 +730,27 @@ function UploadWizard() {
     if (perr) return setError(perr);
     if (!title.trim()) return setError("Title is required");
     if (tracks.length === 0) return setError("Please add at least one audio file");
+    // Client-side audio cap (covers already cap at 10MB) — fail fast.
+    const oversized = tracks.find((t) => t.file.size > 100 * 1024 * 1024);
+    if (oversized) return setError(`"${oversized.file.name}" exceeds the 100MB per-track limit`);
+
+    // Resolve invite intent up front from storage (not state set later).
+    const featureEmail = (sessionStorage.getItem("upload-wizard-featureEmail") ?? "").trim();
+    const featureName = sessionStorage.getItem("upload-wizard-featureName") ?? "";
+    const labelEmail = (sessionStorage.getItem("upload-wizard-labelEmail") ?? "").trim();
+    const labelName = sessionStorage.getItem("upload-wizard-labelName") ?? "";
+    const doFeatureInvite = hasFeature && !!featureEmail;
+    if (hasFeature && !featureEmail) {
+      toast.info("No feature email entered — uploading without a feature invite.");
+    }
+    // has_label uploads are rejected server-side unless signed to a label.
+    // Never burn an upload on a flag that can't succeed.
+    const doLabelInvite = hasLabel && !!labelEmail && !!signedLabelId;
+    if (hasLabel && !signedLabelId) {
+      toast.info("You're not signed to a label — uploading as an independent release.");
+    } else if (hasLabel && !labelEmail) {
+      toast.info("No label email entered — uploading without a label invite.");
+    }
 
     setError(null);
     setBusy(true);
@@ -779,8 +861,8 @@ function UploadWizard() {
             price: tier === "free" ? 0 : price,
             album_id: null,
             release_date: releaseDate || undefined,
-            has_feature: hasFeature,
-            has_label: hasLabel,
+            has_feature: doFeatureInvite,
+            has_label: doLabelInvite,
           },
         });
 
@@ -791,22 +873,23 @@ function UploadWizard() {
         setOverallProgress(100);
         setCurrentStageText("Upload complete! ✓");
 
-        // Handle feature artist invitation
-        const featureEmail = sessionStorage.getItem("upload-wizard-featureEmail");
-        const featureName = sessionStorage.getItem("upload-wizard-featureName");
-        if (hasFeature && featureEmail && featureEmail.trim()) {
+        // Handle feature artist invitation (locals — state setters are async).
+        let newFeatureLink: string | null = null;
+        let newLabelLink: string | null = null;
+        if (doFeatureInvite) {
           try {
             const inviteRes = await inviteFeatureFn({
               data: {
                 song_id: (res as any).id,
-                email: featureEmail.trim(),
+                email: featureEmail,
                 artist_name: featureName || undefined,
                 role: "featured",
                 split_pct: 0,
               },
             });
             if ((inviteRes as any).registration_link) {
-              setFeatureInviteLink((inviteRes as any).registration_link);
+              newFeatureLink = (inviteRes as any).registration_link;
+              setFeatureInviteLink(newFeatureLink);
             } else if ((inviteRes as any).existingUser) {
               toast.success(
                 `🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`,
@@ -819,19 +902,18 @@ function UploadWizard() {
         }
 
         // Handle label invitation
-        const labelEmail = sessionStorage.getItem("upload-wizard-labelEmail");
-        const labelName = sessionStorage.getItem("upload-wizard-labelName");
-        if (hasLabel && labelEmail && labelEmail.trim()) {
+        if (doLabelInvite) {
           try {
             const inviteRes = await inviteLabelFn({
               data: {
                 song_id: (res as any).id,
-                email: labelEmail.trim(),
+                email: labelEmail,
                 label_name: labelName || undefined,
               },
             });
             if ((inviteRes as any).registration_link) {
-              setLabelInviteLink((inviteRes as any).registration_link);
+              newLabelLink = (inviteRes as any).registration_link;
+              setLabelInviteLink(newLabelLink);
             } else if ((inviteRes as any).existingUser) {
               toast.success(
                 `Label already registered. Please use the label dashboard to complete the process.`,
@@ -844,7 +926,7 @@ function UploadWizard() {
         }
 
         // Show success message
-        if (!featureInviteLink && !labelInviteLink) {
+        if (!newFeatureLink && !newLabelLink) {
           const successMessage =
             tier === "free"
               ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
@@ -858,7 +940,7 @@ function UploadWizard() {
         qc.invalidateQueries({ queryKey: ["artist-overview"] });
 
         // If there are invitation links, show them in the success screen
-        if (featureInviteLink || labelInviteLink) {
+        if (newFeatureLink || newLabelLink) {
           setDone(`🎵 Song "${title}" uploaded successfully!`);
         } else {
           clearSessionStorage();
@@ -921,8 +1003,8 @@ function UploadWizard() {
             cover_url,
             price,
             album_id: album.id,
-            has_feature: hasFeature,
-            has_label: hasLabel,
+            has_feature: doFeatureInvite,
+            has_label: doLabelInvite,
             track_number: trackIdx + 1,
             status: "draft",
           },
@@ -938,20 +1020,20 @@ function UploadWizard() {
       setOverallProgress(100);
       setCurrentStageText("All tracks uploaded and processed successfully! ✓");
 
-      // Handle label invitation for album
-      const labelEmail = sessionStorage.getItem("upload-wizard-labelEmail");
-      const labelName = sessionStorage.getItem("upload-wizard-labelName");
-      if (hasLabel && labelEmail && labelEmail.trim()) {
+      // Handle label invitation for album (locals — state setters are async).
+      let albumLabelLink: string | null = null;
+      if (doLabelInvite) {
         try {
           const inviteRes = await inviteLabelFn({
             data: {
               album_id: album.id,
-              email: labelEmail.trim(),
+              email: labelEmail,
               label_name: labelName || undefined,
             },
           });
           if ((inviteRes as any).registration_link) {
-            setLabelInviteLink((inviteRes as any).registration_link);
+            albumLabelLink = (inviteRes as any).registration_link;
+            setLabelInviteLink(albumLabelLink);
           } else if ((inviteRes as any).existingUser) {
             toast.success(
               `💿 Album "${title}" uploaded! Label already registered. Please use the label dashboard to complete the process.`,
@@ -963,7 +1045,7 @@ function UploadWizard() {
         }
       }
 
-      if (!labelInviteLink) {
+      if (!albumLabelLink) {
         toast.success(
           `💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`,
         );
@@ -976,7 +1058,7 @@ function UploadWizard() {
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
 
       // If there are invitation links, show them in the success screen
-      if (labelInviteLink) {
+      if (albumLabelLink) {
         setDone(`💿 Album "${title}" uploaded successfully!`);
       } else {
         clearSessionStorage();
@@ -1082,6 +1164,11 @@ function UploadWizard() {
               setTier("paid");
               setPrice(SINGLE_MIN);
               setFeeAgreed(false);
+              setBusy(false);
+              setError(null);
+              setUploadStates([]);
+              setOverallProgress(0);
+              setCurrentStageText("");
               dragSrcIndex.current = null;
               sessionStorage.removeItem("upload-wizard-featureEmail");
               sessionStorage.removeItem("upload-wizard-featureName");
@@ -1340,7 +1427,7 @@ function UploadWizard() {
               id="upload-cover"
               ref={coverInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp"
               className="sr-only"
               onChange={(e) => setCoverFile(e.target.files?.[0])}
             />
@@ -1810,6 +1897,7 @@ function UploadWizard() {
 
 function PayoutTab() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const overviewFn = useServerFn(getMyArtistOverview);
   const requestFn = useServerFn(requestPayout);
   const listFn = useServerFn(listMyPayouts);
@@ -1818,11 +1906,13 @@ function PayoutTab() {
     queryKey: ["artist-overview"],
     queryFn: () => overviewFn(),
     retry: false,
+    enabled: !!user,
   });
   const { data: payouts } = useQuery({
     queryKey: ["my-payouts"],
     queryFn: () => listFn(),
     retry: false,
+    enabled: !!user,
   });
   const { data: withdrawalConfig } = useQuery({
     queryKey: ["withdrawal-config"],
@@ -1839,7 +1929,12 @@ function PayoutTab() {
       toast.error(`Failed to request payout: ${error.message}`);
     },
   });
-  const availableBalance = Number(overview?.totalRevenueZmw ?? 0);
+  // Available = lifetime gross minus everything already requested/paid.
+  // (The server enforces the same via getArtistAvailableBalance.)
+  const claimed = (payouts ?? [])
+    .filter((p: any) => p.status !== "rejected" && p.status !== "cancelled")
+    .reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
+  const availableBalance = Math.max(0, Number(overview?.totalRevenueZmw ?? 0) - claimed);
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
   const eligible = availableBalance > minWithdrawal;
   const [form, setForm] = useState({
@@ -1903,7 +1998,7 @@ function PayoutTab() {
         />
         {m.error ? <p className="text-sm text-destructive">{(m.error as Error).message}</p> : null}
         <button
-          disabled={m.isPending || !eligible || form.amount < 500}
+          disabled={m.isPending || !eligible || form.amount < minWithdrawal}
           className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 cursor-pointer"
         >
           {m.isPending ? "Submitting..." : "Request Withdrawal"}

@@ -25,7 +25,7 @@ function ForgotPasswordPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "/reset-password",
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
       setSent(true);
@@ -79,7 +79,14 @@ function ForgotPasswordPage() {
               disabled={loading}
               className="w-full py-3 bg-primary text-obsidian rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? "Sending..." : (<>Send reset link<ArrowRight className="size-4" /></>)}
+              {loading ? (
+                "Sending..."
+              ) : (
+                <>
+                  Send reset link
+                  <ArrowRight className="size-4" />
+                </>
+              )}
             </button>
           </form>
         )}

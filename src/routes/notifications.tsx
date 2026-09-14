@@ -35,7 +35,7 @@ function Page() {
       return data ?? [];
     },
     enabled: !!user,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const markRead = useMutation({
@@ -131,9 +131,10 @@ function Page() {
         {rows && rows.some((n: any) => !n.read_at) && (
           <button
             onClick={() => markAllRead.mutate()}
-            className="text-sm text-primary hover:underline"
+            disabled={markAllRead.isPending}
+            className="text-sm text-primary hover:underline disabled:opacity-50"
           >
-            Mark all as read
+            {markAllRead.isPending ? "Marking…" : "Mark all as read"}
           </button>
         )}
       </div>

@@ -8,15 +8,13 @@ import { Play, Pause, Shuffle, ShoppingBag, Heart, Clock, ArrowLeft } from "luci
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
-import { useServerFn } from "@tanstack/react-start";
-import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
 import { toast } from "sonner";
 
 const albumQO = (id: string) =>
   queryOptions({
     queryKey: ["album", id],
     queryFn: () => getAlbumWithSongs({ data: { id } }),
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 5 * 60 * 1000,
   });
 
 export const Route = createFileRoute("/albums/$id")({
@@ -149,7 +147,6 @@ function AlbumPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { data } = useSuspenseQuery(albumQO(id));
-  const setTrack = usePlayer((s) => s.setTrack);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
@@ -157,8 +154,6 @@ function AlbumPage() {
   const currentTrackId = usePlayer((s) => s.track?.id);
   const album = data.album!;
   const artist = (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null }).artist ?? null;
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const albumTracks = data.songs.map((s) => ({
     id: s.id,
@@ -166,6 +161,7 @@ function AlbumPage() {
     artistName: artist?.name ?? "Unknown",
     coverUrl: album.cover_url,
     durationSeconds: s.duration,
+    price: (s as any).price ?? 0,
   }));
 
   const isAlbumPlaying = playing && data.songs.some((s) => s.id === currentTrackId);
@@ -174,122 +170,41 @@ function AlbumPage() {
   const playFirst = async () => {
     const first = data.songs[0];
     if (!first) return;
-    
-    try {
-      const isPaid = first.price && Number(first.price) > 0;
-      const isCurrentTrack = currentTrackId === first.id;
-      
-      if (isCurrentTrack) {
-        togglePlay();
-        return;
-      }
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${first.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(false);
-      }
-      setQueue(albumTracks, 0);
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+
+    // Toggle when the album is already playing (button shows Pause).
+    if (isAlbumPlaying) {
+      togglePlay();
+      return;
     }
+    // Single setQueue — PlayerBar resolves preview vs full audio itself.
+    // (The old setTrack()+setQueue() pair raced and dropped price info.)
+    setQueue(albumTracks, 0);
+    const isPaid = (first as any).price && Number((first as any).price) > 0;
+    setIsPreview(!!isPaid);
+    if (isPaid) toast.info(`🎵 Previewing "${first.title}" (15s)`);
   };
 
   const playShuffle = async () => {
     if (data.songs.length === 0) return;
     const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
-    
-    try {
-      const first = shuffled[0];
-      const isPaid = first && first.price && Number(first.price) > 0;
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${first.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: first.id } });
-        setTrack({
-          id: first.id,
-          title: first.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: first.duration,
-        });
-        setIsPreview(false);
-      }
-      setQueue(shuffled, 0);
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
-    }
+
+    setQueue(shuffled, 0);
+    const first = shuffled[0];
+    const isPaid = first && (first as any).price && Number((first as any).price) > 0;
+    setIsPreview(!!isPaid);
+    if (isPaid) toast.info(`🎵 Previewing "${first.title}" (15s)`);
   };
 
-  const handlePlaySong = async (song: any, index: number) => {
-    try {
-      const isPaid = song.price && Number(song.price) > 0;
-      const isCurrentTrack = currentTrackId === song.id;
-      
-      if (isCurrentTrack) {
-        togglePlay();
-        return;
-      }
-      
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: song.id } });
-        setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: song.duration,
-        });
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${song.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: song.id } });
-        setTrack({
-          id: song.id,
-          title: song.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: album.cover_url,
-          audioUrl: url,
-          durationSeconds: song.duration,
-        });
-        setIsPreview(false);
-      }
-      setQueue(albumTracks, index);
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
+  const handlePlaySong = (song: any, index: number) => {
+    if (currentTrackId === song.id) {
+      togglePlay();
+      return;
     }
+    // Single setQueue — PlayerBar resolves preview vs full audio itself.
+    setQueue(albumTracks, index);
+    const isPaid = song.price && Number(song.price) > 0;
+    setIsPreview(!!isPaid);
+    if (isPaid) toast.info(`🎵 Previewing "${song.title}" (15s)`);
   };
 
   return (

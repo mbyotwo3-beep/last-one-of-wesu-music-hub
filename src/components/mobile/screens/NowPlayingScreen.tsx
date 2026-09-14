@@ -47,6 +47,13 @@ export function NowPlayingScreen() {
   // Keep pause available while the requested source is still resolving.
   const isLoading = audioUrl === undefined && !playing;
 
+  function dismiss() {
+    // Direct loads (deep link) have no in-app history — fall back home
+    // instead of getting stuck.
+    if (router.history.length > 1) router.history.back();
+    else router.navigate({ to: "/" });
+  }
+
   function handleLike() {
     if (!user || !track) return;
     toggleSaved();
@@ -66,13 +73,13 @@ export function NowPlayingScreen() {
       onTouchEnd={(e) => {
         const touch = e.changedTouches[0];
         if (touch && touch.clientY - touch.screenY > 100) {
-          router.history.back();
+          dismiss();
         }
       }}
     >
       {/* Dismiss button */}
       <button
-        onClick={() => router.history.back()}
+        onClick={dismiss}
         className="min-h-[44px] min-w-[44px] flex items-center justify-center self-start -ml-2 mb-4 text-muted-foreground"
         aria-label="Dismiss now playing"
       >

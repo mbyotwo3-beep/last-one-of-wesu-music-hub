@@ -11,12 +11,20 @@ export const Route = createFileRoute("/new-music")({
 });
 
 function Page() {
-  const { data, isLoading } = useQuery({ queryKey: ["new-releases"], queryFn: () => getNewReleases() });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["new-releases"],
+    queryFn: () => getNewReleases(),
+    staleTime: 60_000,
+  });
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       <h1 className="text-3xl font-bold mb-6">New Music</h1>
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
+      ) : error ? (
+        <p className="text-destructive">Failed to load new music.</p>
+      ) : (data ?? []).length === 0 ? (
+        <p className="text-muted-foreground">No new releases yet.</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {(data ?? []).map((s: any) => (

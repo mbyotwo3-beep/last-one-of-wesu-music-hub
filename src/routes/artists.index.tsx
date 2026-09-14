@@ -4,7 +4,11 @@ import { listArtists } from "@/lib/music.functions";
 import { CheckCircle2, User } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 
-const artistsQO = queryOptions({ queryKey: ["artists"], queryFn: () => listArtists() });
+const artistsQO = queryOptions({
+  queryKey: ["artists"],
+  queryFn: () => listArtists(),
+  staleTime: 5 * 60 * 1000,
+});
 
 export const Route = createFileRoute("/artists/")({
   head: () => ({

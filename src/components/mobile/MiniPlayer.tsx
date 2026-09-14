@@ -80,8 +80,12 @@ export function MiniPlayer() {
               className="size-10 rounded-lg overflow-hidden bg-[#2c2c2e] shrink-0 object-cover shadow-md"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate leading-tight">{track.title}</p>
-              <p className="text-xs text-white/60 truncate leading-tight mt-0.5">{track.artistName}</p>
+              <p className="text-sm font-semibold text-white truncate leading-tight">
+                {track.title}
+              </p>
+              <p className="text-xs text-white/60 truncate leading-tight mt-0.5">
+                {track.artistName}
+              </p>
             </div>
           </button>
 
@@ -99,8 +103,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={togglePlay}
-              disabled={isLoading}
-              className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all disabled:opacity-40 cursor-pointer rounded-full hover:bg-white/10"
+              className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label={playing ? "Pause" : "Play"}
             >
               {playing ? (
@@ -164,7 +167,9 @@ export function MiniPlayer() {
                 >
                   <span className="text-white/60 text-xs w-4">{index + 1}</span>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-white" : "text-white/70"}`}>
+                    <p
+                      className={`text-sm font-medium truncate ${index === queueIndex ? "text-white" : "text-white/70"}`}
+                    >
                       {queueTrack.title}
                     </p>
                     <p className="text-xs text-white/50 truncate">{queueTrack.artistName}</p>

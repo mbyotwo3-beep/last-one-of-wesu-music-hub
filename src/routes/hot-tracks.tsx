@@ -14,7 +14,11 @@ export const Route = createFileRoute("/hot-tracks")({
 });
 
 function Page() {
-  const { data, isLoading } = useQuery({ queryKey: ["trending"], queryFn: () => getTrendingSongs() });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["trending"],
+    queryFn: () => getTrendingSongs(),
+    staleTime: 60_000,
+  });
   const setQueue = usePlayer((s) => s.setQueue);
   const songs = (data ?? []) as any[];
 
@@ -23,6 +27,10 @@ function Page() {
       <h1 className="text-3xl font-bold mb-6">Hot Tracks</h1>
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
+      ) : error ? (
+        <p className="text-destructive">Failed to load hot tracks.</p>
+      ) : songs.length === 0 ? (
+        <p className="text-muted-foreground">No trending tracks yet.</p>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           {songs.map((s, i) => (
@@ -39,6 +47,8 @@ function Page() {
                       title: t.title,
                       artistName: t.artist?.name ?? "Unknown",
                       coverUrl: t.cover_url,
+                      durationSeconds: t.duration,
+                      price: t.price,
                     })),
                     i,
                   )
@@ -47,10 +57,17 @@ function Page() {
                 aria-label={`Play ${s.title}`}
               >
                 <span className="text-sm text-muted-foreground w-6 text-right">{i + 1}</span>
-                <StorageImage bucket="album-art" path={s.cover_url} alt="" className="size-12 rounded object-cover" />
+                <StorageImage
+                  bucket="album-art"
+                  path={s.cover_url}
+                  alt=""
+                  className="size-12 rounded object-cover"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{s.title}</div>
-                  <div className="text-xs text-muted-foreground truncate">{s.artist?.name ?? "Unknown"}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {s.artist?.name ?? "Unknown"}
+                  </div>
                 </div>
                 <Play className="size-4 text-muted-foreground" />
               </button>

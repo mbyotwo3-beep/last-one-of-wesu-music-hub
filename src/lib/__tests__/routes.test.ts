@@ -52,7 +52,10 @@ interface RouteAccess {
 }
 
 // Routes directly accessible from BottomTabBar tabs
-const TAB_ROUTES: Route[] = ["/", "/browse", "/dashboard", "/profile"];
+// NOTE: the Library tab points at /library (real library content for every
+// role). /dashboard is a role-router (listeners see "My Library" there,
+// staff/artists bounce to their portals) and stays reachable contextually.
+const TAB_ROUTES: Route[] = ["/", "/browse", "/library", "/profile"];
 // Routes accessible via role-based tabs
 const ROLE_TAB_ROUTES: Route[] = ["/artist-studio", "/admin", "/superadmin"];
 // Routes accessible contextually (links, buttons, navigation actions)
@@ -60,6 +63,7 @@ const CONTEXTUAL_ROUTES: Route[] = [
   "/artists",
   "/albums",
   "/subscriptions",
+  "/dashboard",
   "/artist-dashboard",
   "/collabs",
   "/label-dashboard",
@@ -101,7 +105,7 @@ describe("Property 23: All web routes reachable on native platform", () => {
     // Core always-visible tabs
     expect(tabRoutes).toContain("/");
     expect(tabRoutes).toContain("/browse");
-    expect(tabRoutes).toContain("/dashboard");
+    expect(tabRoutes).toContain("/library");
     expect(tabRoutes).toContain("/profile");
     // Role-specific tabs
     expect(tabRoutes).toContain("/artist-studio");

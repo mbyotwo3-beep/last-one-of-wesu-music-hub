@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Building2, Users, DollarSign, Wallet, Camera } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import {
   getMyLabel,
@@ -36,11 +37,17 @@ export const Route = createFileRoute("/label-dashboard")({
 type Tab = "overview" | "roster" | "revenue" | "payouts" | "settings";
 
 function Page() {
+  const { user } = useAuth();
   const getLabel = useServerFn(getMyLabel);
-  const { data: label, isLoading, error } = useQuery({
+  const {
+    data: label,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["my-label"],
     queryFn: () => getLabel(),
     retry: 1,
+    enabled: !!user,
   });
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -52,7 +59,8 @@ function Page() {
       </div>
     );
   }
-  if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading label data…</div>;
+  if (isLoading)
+    return <div className="p-12 text-center text-muted-foreground">Loading label data…</div>;
   if (!label) {
     return (
       <div className="max-w-xl mx-auto px-6 py-16 text-center">
@@ -192,6 +200,8 @@ function Roster({ labelId }: { labelId: string }) {
       toast.success("💰 Royalty percentage updated!");
     },
     onError: (error) => {
+      // Refetch to roll the input back to the server value.
+      qc.invalidateQueries({ queryKey: ["roster", labelId] });
       toast.error(`Failed to update royalty: ${error.message}`);
     },
   });
@@ -209,13 +219,23 @@ function Roster({ labelId }: { labelId: string }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<any[]>([]);
   async function find() {
-    const { data } = await supabase
-      .from("artists")
-      .select("id, name")
-      .ilike("name", `%${search}%`)
-      .eq("status", "approved")
-      .limit(8);
-    setResults(data ?? []);
+    if (!search.trim()) {
+      toast.error("Type an artist name to search");
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("id, name")
+        .ilike("name", `%${search.trim()}%`)
+        .eq("status", "approved")
+        .limit(8);
+      if (error) throw error;
+      setResults(data ?? []);
+      if ((data ?? []).length === 0) toast.info("No approved artists found");
+    } catch (err) {
+      toast.error(`Artist search failed: ${(err as Error).message}`);
+    }
   }
 
   return (
@@ -279,14 +299,16 @@ function Roster({ labelId }: { labelId: string }) {
                 <td className="p-3 text-xs">{r.status}</td>
                 <td className="p-3">
                   <input
+                    key={`${r.id}-${r.royalty_pct}`}
                     type="number"
                     defaultValue={r.royalty_pct}
                     min={0}
                     max={100}
                     onBlur={(e) => {
-                      const v = Number(e.target.value);
+                      const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
                       if (v !== r.royalty_pct)
                         royaltyM.mutate({ data: { id: r.id, royalty_pct: v } });
+                      else e.target.value = String(r.royalty_pct);
                     }}
                     className="w-20 px-2 py-1 rounded bg-secondary border border-border"
                   />
@@ -390,20 +412,21 @@ function Payouts({ labelId }: { labelId: string }) {
   const availableBalance = Number(balanceData?.available ?? 0);
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
   const eligible = availableBalance > minWithdrawal;
-  const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });
+  const [form, setForm] = useState({
+    amount: minWithdrawal,
+    method_code: "MTN_MOMO",
+    destination: "",
+  });
 
   return (
     <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
       <div className="bg-card border border-border rounded-2xl p-6">
         <p className="text-sm text-muted-foreground">Available earnings</p>
-        <p className="text-3xl font-bold mt-1">
-          ZMW {availableBalance.toFixed(2)}
-        </p>
+        <p className="text-3xl font-bold mt-1">ZMW {availableBalance.toFixed(2)}</p>
         <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
-          {eligible 
+          {eligible
             ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
-            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`
-          }
+            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`}
         </div>
       </div>
       <form
@@ -431,49 +454,50 @@ function Payouts({ labelId }: { labelId: string }) {
             onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
           />
         </label>
-      <select
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.method_code}
-        onChange={(e) => setForm({ ...form, method_code: e.target.value })}
-      >
-        <option value="MTN_MOMO">MTN Mobile Money</option>
-        <option value="AIRTEL_MONEY">Airtel Money</option>
-        <option value="ZAMTEL_KWACHA">Zamtel Kwacha</option>
-        <option value="BANK">Bank transfer</option>
-      </select>
-      <input
-        required
-        placeholder="Destination"
-        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-        value={form.destination}
-        onChange={(e) => setForm({ ...form, destination: e.target.value })}
-      />
-      {m.error && <p className="text-sm text-destructive">{(m.error as Error).message}</p>}
-      {m.isSuccess && (
-        <p className="text-sm text-primary">Submitted — pending superadmin approval.</p>
-      )}
-      <button
-        disabled={!eligible || m.isPending}
-        className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {m.isPending ? "Submitting..." : "Request Payout"}
-      </button>
-    </form>
+        <select
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={form.method_code}
+          onChange={(e) => setForm({ ...form, method_code: e.target.value })}
+        >
+          <option value="MTN_MOMO">MTN Mobile Money</option>
+          <option value="AIRTEL_MONEY">Airtel Money</option>
+          <option value="ZAMTEL_KWACHA">Zamtel Kwacha</option>
+          <option value="BANK">Bank transfer</option>
+        </select>
+        <input
+          required
+          placeholder="Destination"
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={form.destination}
+          onChange={(e) => setForm({ ...form, destination: e.target.value })}
+        />
+        {m.error && <p className="text-sm text-destructive">{(m.error as Error).message}</p>}
+        {m.isSuccess && (
+          <p className="text-sm text-primary">Submitted — pending superadmin approval.</p>
+        )}
+        <button
+          disabled={!eligible || m.isPending}
+          className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {m.isPending ? "Submitting..." : "Request Payout"}
+        </button>
+      </form>
     </div>
   );
 }
 
 function Settings({ label }: { label: any }) {
+  const qc = useQueryClient();
   const fn = useServerFn(updateLabel);
   const m = useMutation({
     mutationFn: async (data: any) => {
       let logoUrl = data.logo_url;
-      
+
       // Upload logo file if provided
       if (data.logo_file) {
         logoUrl = await uploadFileToBucket("label-images", label.id, data.logo_file);
       }
-      
+
       return fn({
         data: {
           id: label.id,
@@ -485,6 +509,7 @@ function Settings({ label }: { label: any }) {
       });
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-label"] });
       toast.success("🏷️ Label settings updated successfully!");
     },
     onError: (error) => {
@@ -499,7 +524,7 @@ function Settings({ label }: { label: any }) {
     logo_file: null as File | null,
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(label.logo_url ?? null);
-  
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -521,7 +546,7 @@ function Settings({ label }: { label: any }) {
     };
     reader.readAsDataURL(file);
   };
-  
+
   return (
     <form
       onSubmit={(e) => {
@@ -572,13 +597,15 @@ function Settings({ label }: { label: any }) {
             <input
               id="label-logo-upload"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleLogoChange}
               className="sr-only"
             />
             <p className="text-xs text-muted-foreground mt-1">Max 5MB</p>
             {form.logo_file && (
-              <p className="mt-1 max-w-48 truncate text-xs text-primary">Selected: {form.logo_file.name}</p>
+              <p className="mt-1 max-w-48 truncate text-xs text-primary">
+                Selected: {form.logo_file.name}
+              </p>
             )}
           </div>
         </div>

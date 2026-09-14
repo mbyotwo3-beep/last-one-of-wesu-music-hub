@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  listSavedTrackIds,
-  saveTrack,
-  unsaveTrack,
-} from "@/lib/saved-tracks.functions";
+import { listSavedTrackIds, saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
@@ -23,7 +19,7 @@ export function useSavedTrack(songId: string | null | undefined) {
     queryKey: ["saved-track-ids", user?.id],
     queryFn: () => listFn(),
     enabled: !!user,
-    staleTime: 0, // Always refetch to ensure immediate updates
+    staleTime: 30_000,
   });
 
   const isSaved = !!(songId && idsQ.data?.includes(songId));
@@ -31,13 +27,13 @@ export function useSavedTrack(songId: string | null | undefined) {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!songId) return;
-      if (isSaved) {
-        const result = await unsaveFn({ data: { song_id: songId } });
-        return result;
-      } else {
-        const result = await saveFn({ data: { song_id: songId } });
-        return result;
+      // Read intent from the live cache, not the render closure — rapid
+      // double-taps would otherwise send the same action twice.
+      const current = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? idsQ.data ?? [];
+      if (current.includes(songId)) {
+        return unsaveFn({ data: { song_id: songId } });
       }
+      return saveFn({ data: { song_id: songId } });
     },
     onMutate: async () => {
       if (!songId) return;
@@ -69,7 +65,9 @@ export function useSavedTrack(songId: string | null | undefined) {
 
   return {
     isSaved,
-    toggle: () => mutation.mutate(),
+    toggle: () => {
+      if (!mutation.isPending) mutation.mutate();
+    },
     loading: mutation.isPending,
   };
 }

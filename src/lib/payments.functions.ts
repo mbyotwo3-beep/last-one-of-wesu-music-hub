@@ -68,7 +68,11 @@ export const verifyPayment = createServerFn({ method: "POST" })
     // A completed mobile-money collection can occasionally lose the server
     // request between entitlement creation and the final ledger update. Let a
     // subsequent status poll safely resume that recovery path.
-    if (tx.status !== "pending" && tx.status !== "fulfillment_failed" && tx.status !== "processing") {
+    if (
+      tx.status !== "pending" &&
+      tx.status !== "fulfillment_failed" &&
+      tx.status !== "processing"
+    ) {
       return { status: tx.status as string, transaction: tx };
     }
 
@@ -164,8 +168,29 @@ export const initiatePayment = createServerFn({ method: "POST" })
       throw new Error("Phone number is required for mobile money");
     }
 
-    // -- Record the pending transaction --
+    // -- Idempotency: double-clicks/retries within 5 minutes reuse the open
+    // mobile-money transaction instead of creating duplicate pendings.
+    // (Card checkouts return a fresh hosted URL each time, so they always
+    // create a new transaction.)
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (isMobile) {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: open } = await supabaseAdmin
+        .from("payment_transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("item_type", data.item_type)
+        .eq("item_id", data.item_id)
+        .eq("method_code", data.method_code)
+        .in("status", ["pending", "processing", "fulfillment_failed"])
+        .gte("created_at", fiveMinAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (open) return { transactionId: (open as any).id, resumed: true };
+    }
+
+    // -- Record the pending transaction --
     const { data: tx, error: insertError } = await supabaseAdmin
       .from("payment_transactions")
       .insert({
@@ -183,14 +208,8 @@ export const initiatePayment = createServerFn({ method: "POST" })
       .single();
     if (insertError || !tx) throw new Error(insertError?.message ?? "Insert failed");
 
-    const {
-      initiateMobileMoney,
-      initiateCardCheckout,
-      normalizeLencoOperator,
-      normalizeZmPhone,
-    } = await import(
-      "@/lib/lenco.server"
-    );
+    const { initiateMobileMoney, initiateCardCheckout, normalizeLencoOperator, normalizeZmPhone } =
+      await import("@/lib/lenco.server");
 
     const { getSiteConfigServer } = await import("@/lib/pricing.functions");
     const siteConfig = await getSiteConfigServer();

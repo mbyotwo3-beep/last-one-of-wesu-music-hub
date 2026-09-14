@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
@@ -16,7 +16,15 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in or create an account on Wesu+ Music Streaming." },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { redirect?: string; action?: string; artistId?: string; itemId?: string; itemType?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    redirect?: string;
+    action?: string;
+    artistId?: string;
+    itemId?: string;
+    itemType?: string;
+  } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
     action: typeof search.action === "string" ? search.action : undefined,
     artistId: typeof search.artistId === "string" ? search.artistId : undefined,
@@ -39,6 +47,35 @@ function AuthPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { redirect, action, artistId, itemId, itemType } = search;
+
+  // Only same-origin paths are valid redirect targets — anything else
+  // (absolute URLs, protocol-relative) falls back to the dashboard.
+  const safeRedirect =
+    redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : undefined;
+
+  // After an OAuth round-trip the page reloads with a session but without the
+  // original ?redirect — recover it from sessionStorage (written below).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (cancelled || !data.session || redirect) return;
+        const stored = sessionStorage.getItem("post_auth_redirect");
+        if (stored) {
+          sessionStorage.removeItem("post_auth_redirect");
+          const safe = stored.startsWith("/") && !stored.startsWith("//") ? stored : "/dashboard";
+          navigate({ to: safe as any });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -70,7 +107,7 @@ function AuthPage() {
               terms_accepted_at: new Date().toISOString(),
               terms_version: "2025-08-01",
             },
-            emailRedirectTo: `${window.location.origin}${redirect || "/dashboard"}`,
+            emailRedirectTo: `${window.location.origin}${safeRedirect || "/dashboard"}`,
           },
         });
         if (error) throw error;
@@ -126,11 +163,11 @@ function AuthPage() {
     } else if (action === "addPlaylist" && itemId && itemType === "song") {
       // For add to playlist, we redirect back to the page and let the user add to playlist
       // since we need them to select which playlist
-      navigate({ to: redirect || "/dashboard" });
+      navigate({ to: (safeRedirect || "/dashboard") as any });
       return;
     }
     // Redirect to the original destination
-    navigate({ to: redirect || "/dashboard" });
+    navigate({ to: (safeRedirect || "/dashboard") as any });
   }
 
   return (
@@ -263,7 +300,7 @@ function AuthPage() {
             // Keep the intended destination out of the OAuth redirect URI:
             // it must be a public same-origin URL, so stash the path locally.
             try {
-              sessionStorage.setItem("post_auth_redirect", redirect || "/dashboard");
+              sessionStorage.setItem("post_auth_redirect", safeRedirect || "/dashboard");
             } catch {
               /* storage unavailable — the fallback below still navigates */
             }
@@ -276,7 +313,7 @@ function AuthPage() {
               );
             }
             if (!result.redirected && !result.error) {
-              navigate({ to: redirect || "/dashboard" });
+              navigate({ to: (safeRedirect || "/dashboard") as any });
             }
             setLoading(false);
           }}

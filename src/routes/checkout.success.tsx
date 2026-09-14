@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPayment } from "@/lib/payments.functions";
@@ -40,8 +41,10 @@ function CheckoutSuccessPage() {
       try {
         const res: any = await verifyFn({ data: { transactionId: ref } });
         if (res?.transaction) return res.transaction;
-      } catch {
-        // fall through to a plain read
+      } catch (err) {
+        // Surface verify failures instead of hanging on "Processing" forever.
+        const msg = err instanceof Error ? err.message : "Verification failed";
+        toast.error(msg);
       }
       const { data } = await supabase
         .from("payment_transactions")
@@ -68,14 +71,16 @@ function CheckoutSuccessPage() {
         const { data } = await supabase
           .from("songs")
           .select("id,title,price,artists:artist_id(id,name)")
-          .eq("id", t.item_id).maybeSingle();
+          .eq("id", t.item_id)
+          .maybeSingle();
         return data;
       }
       if (t.item_type === "album") {
         const { data } = await supabase
           .from("albums")
           .select("id,title,price,artists:artist_id(id,name)")
-          .eq("id", t.item_id).maybeSingle();
+          .eq("id", t.item_id)
+          .maybeSingle();
         return data;
       }
       return null;
@@ -105,7 +110,11 @@ function CheckoutSuccessPage() {
   }, [isAwaitingSettlement]);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+    if (!loading && !user)
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
   }, [user, loading, navigate]);
 
   if (loading || !user) return null;
@@ -123,16 +132,30 @@ function CheckoutSuccessPage() {
 
   const isSuccess = transaction?.status === "completed";
   const isFailed = transaction?.status === "failed";
-  const isPending =
-    transaction?.status === "pending" || transaction?.status === "processing";
+  const isPending = transaction?.status === "pending" || transaction?.status === "processing";
   const tx: any = transaction;
   const failureReason =
     typeof tx?.metadata?.failure_reason === "string" ? tx.metadata.failure_reason : null;
 
   const StatusBadge = () => {
-    if (isSuccess) return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25">Completed</span>;
-    if (isFailed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-500 border border-red-500/20">Failed</span>;
-    if (isPending) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">Processing</span>;
+    if (isSuccess)
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25">
+          Completed
+        </span>
+      );
+    if (isFailed)
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-500 border border-red-500/20">
+          Failed
+        </span>
+      );
+    if (isPending)
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">
+          Processing
+        </span>
+      );
     return null;
   };
 
@@ -169,7 +192,9 @@ function CheckoutSuccessPage() {
             {(receiptItem as any)?.title ?? tx.item_type ?? "Item"}
             {(receiptItem as any)?.artists?.name ? ` — ${(receiptItem as any).artists.name}` : ""}
           </span>
-          <span className="font-semibold">{tx.currency} {Number(tx.amount).toFixed(2)}</span>
+          <span className="font-semibold">
+            {tx.currency} {Number(tx.amount).toFixed(2)}
+          </span>
         </div>
         <div className="border-t border-border pt-3 grid grid-cols-2 gap-y-2 text-xs">
           <span className="text-muted-foreground">Payment method</span>
@@ -222,7 +247,8 @@ function CheckoutSuccessPage() {
               <Loader2 className="size-16 text-primary mx-auto mb-4 animate-spin" />
               <h1 className="text-3xl font-bold mb-2">Payment Processing</h1>
               <p className="text-muted-foreground mb-6">
-                Waiting for confirmation from Lenco… If you paid via mobile money, approve the prompt on your phone.
+                Waiting for confirmation from Lenco… If you paid via mobile money, approve the
+                prompt on your phone.
                 {pollElapsed > 0 && ` (${pollElapsed}s)`}
               </p>
               <Receipt />
@@ -238,7 +264,8 @@ function CheckoutSuccessPage() {
               <XCircle className="size-16 text-red-500 mx-auto mb-4" />
               <h1 className="text-3xl font-bold mb-2">Transaction Not Found</h1>
               <p className="text-muted-foreground mb-6">
-                We couldn't find the transaction details. Please contact support if you believe this is an error.
+                We couldn't find the transaction details. Please contact support if you believe this
+                is an error.
               </p>
               <button
                 onClick={() => navigate({ to: "/dashboard" })}
@@ -253,4 +280,3 @@ function CheckoutSuccessPage() {
     </div>
   );
 }
-

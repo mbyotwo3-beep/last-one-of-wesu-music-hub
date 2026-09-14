@@ -1,6 +1,8 @@
 import { Play, Pause } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
+import { StorageImage } from "@/components/StorageImage";
 
 interface AlbumCardProps {
   id: string;
@@ -12,7 +14,15 @@ interface AlbumCardProps {
   price?: number | null;
 }
 
-export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, price }: AlbumCardProps) {
+export function AlbumCard({
+  id,
+  title,
+  subtitle,
+  imageUrl,
+  audioUrl,
+  duration,
+  price,
+}: AlbumCardProps) {
   const setTrack = usePlayer((s) => s.setTrack);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
@@ -24,6 +34,7 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
+    e?.preventDefault();
     if (isCurrentTrack) {
       togglePlay();
       return;
@@ -39,28 +50,33 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
   };
 
   return (
-    <button
-      onClick={handlePlay}
-      className="group relative aspect-square rounded-xl overflow-hidden bg-secondary transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+    <Link
+      to="/albums/$id"
+      params={{ id }}
+      className="group relative block aspect-square rounded-xl overflow-hidden bg-secondary transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
     >
       {/* Album Art */}
-      <img
-        src={imageUrl}
+      <StorageImage
+        bucket="album-art"
+        path={imageUrl}
         alt={title}
         className="w-full h-full object-cover"
-        loading="lazy"
       />
 
       {/* Hover Overlay */}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
         {/* Play Button */}
-        <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors">
+        <button
+          onClick={handlePlay}
+          aria-label={isPlayingThisTrack ? `Pause ${title}` : `Play ${title}`}
+          className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors cursor-pointer"
+        >
           {isPlayingThisTrack ? (
             <Pause className="size-5 text-white" />
           ) : (
             <Play className="size-5 text-white fill-white ml-0.5" />
           )}
-        </div>
+        </button>
       </div>
 
       {/* Card Info (shown below card in grid layout) */}
@@ -68,12 +84,9 @@ export function AlbumCard({ id, title, subtitle, imageUrl, audioUrl, duration, p
         <p className="text-sm font-semibold text-white truncate">{title}</p>
         <p className="text-xs text-zinc-300 truncate">{subtitle}</p>
         {price !== null && price !== undefined && (
-          <p className="text-xs font-medium text-primary mt-1">
-            {formatPrice(price)}
-          </p>
+          <p className="text-xs font-medium text-primary mt-1">{formatPrice(price)}</p>
         )}
       </div>
-    </button>
+    </Link>
   );
 }
-

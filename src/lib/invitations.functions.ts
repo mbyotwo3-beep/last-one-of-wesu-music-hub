@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Server-safe app URL — window doesn't exist in server functions.
+function appUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://www.wesuplus.com";
+}
+
 async function audit(
   actorId: string,
   action: string,
@@ -63,7 +68,7 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
     const existingUser = usersData?.users?.find(
       (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
     );
-    
+
     if (existingUser) {
       // User already exists, check if they have an artist profile
       const { data: existingArtist } = await supabaseAdmin
@@ -71,27 +76,46 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
         .select("id, name, status")
         .eq("user_id", existingUser.id)
         .maybeSingle();
-      
+
       if (existingArtist && existingArtist.status === "approved") {
-        // Artist exists and is approved, use existing collaborator system
-        const { inviteCollaborator } = await import("./collabs.functions");
-        await inviteCollaborator({
-          data: {
-            song_id: data.song_id,
-            artist_id: existingArtist.id,
-            role: data.role || "featured",
-            split_pct: data.split_pct || 0,
-          },
-        });
-        return { 
-          ok: true, 
+        // Artist exists and is approved — insert the collaborator row
+        // directly (server functions can't be invoked as plain functions).
+        const { data: targetSong } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("id", data.song_id)
+          .eq("artist_id", (artist as any).id)
+          .maybeSingle();
+        if (!targetSong) throw new Error("Song not found or you don't have permission");
+        const { data: splits } = await supabaseAdmin
+          .from("song_collaborators")
+          .select("split_pct")
+          .eq("song_id", data.song_id);
+        const total = (splits ?? []).reduce((s: number, r: any) => s + Number(r.split_pct ?? 0), 0);
+        const pct = data.split_pct || 0;
+        if (total + pct > 100) {
+          throw new Error(`Total splits would exceed 100% (currently ${total}%)`);
+        }
+        const { error: collabError } = await supabaseAdmin.from("song_collaborators").insert({
+          song_id: data.song_id,
+          artist_id: existingArtist.id,
+          role: data.role || "featured",
+          split_pct: pct,
+          invited_by: userId,
+          accepted: false,
+        } as any);
+        if (collabError) throw new Error(collabError.message);
+        return {
+          ok: true,
           existingUser: true,
-          message: "Artist already registered. Collaborator invite sent directly." 
+          message: "Artist already registered. Collaborator invite sent directly.",
         };
       }
-      
+
       // User exists but no artist profile or not approved
-      throw new Error("User exists but doesn't have an approved artist profile. Please ask them to apply as an artist first.");
+      throw new Error(
+        "User exists but doesn't have an approved artist profile. Please ask them to apply as an artist first.",
+      );
     }
 
     // Create invitation in invitations table
@@ -118,19 +142,19 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     // Generate registration link with invitation context
-    const registrationLink = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/register?invite=${(invitation as any).id}&type=feature`;
+    const registrationLink = `${appUrl()}/register?invite=${(invitation as any).id}&type=feature`;
 
     await audit(userId, "feature_invite.create", "invitation", (invitation as any).id, {
       to_email: data.email,
       song_id: data.song_id,
     });
 
-    return { 
-      ok: true, 
+    return {
+      ok: true,
       existingUser: false,
       invitation_id: (invitation as any).id,
       registration_link: registrationLink,
-      message: "Invitation created. Share this registration link with the artist." 
+      message: "Invitation created. Share this registration link with the artist.",
     };
   });
 
@@ -140,14 +164,7 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
  */
 export const inviteLabelForRelease = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(
-    (d: {
-      song_id?: string;
-      album_id?: string;
-      email: string;
-      label_name?: string;
-    }) => d,
-  )
+  .validator((d: { song_id?: string; album_id?: string; email: string; label_name?: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
 
@@ -192,7 +209,7 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
     const existingUser = usersData?.users?.find(
       (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
     );
-    
+
     if (existingUser) {
       // User already exists, check if they have a label
       const { data: existingLabel } = await supabaseAdmin
@@ -200,14 +217,18 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
         .select("id, name, status, owner_user_id")
         .eq("owner_user_id", existingUser.id)
         .maybeSingle();
-      
+
       if (existingLabel && existingLabel.status === "approved") {
         // Label exists and is approved, user should use existing label invitation system
-        throw new Error("Label already registered. Please use the label dashboard to invite artists.");
+        throw new Error(
+          "Label already registered. Please use the label dashboard to invite artists.",
+        );
       }
-      
+
       // User exists but no label or not approved
-      throw new Error("User exists but doesn't have an approved label. Please ask them to apply as a label first.");
+      throw new Error(
+        "User exists but doesn't have an approved label. Please ask them to apply as a label first.",
+      );
     }
 
     // Create invitation in invitations table
@@ -232,7 +253,7 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     // Generate registration link with invitation context
-    const registrationLink = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/register?invite=${(invitation as any).id}&type=label`;
+    const registrationLink = `${appUrl()}/register?invite=${(invitation as any).id}&type=label`;
 
     await audit(userId, "label_invite.create", "invitation", (invitation as any).id, {
       to_email: data.email,
@@ -240,12 +261,12 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
       album_id: data.album_id,
     });
 
-    return { 
-      ok: true, 
+    return {
+      ok: true,
       existingUser: false,
       invitation_id: (invitation as any).id,
       registration_link: registrationLink,
-      message: "Invitation created. Share this registration link with the label." 
+      message: "Invitation created. Share this registration link with the label.",
     };
   });
 
@@ -256,11 +277,9 @@ export const getInvitationDetails = createServerFn({ method: "GET" })
   .validator((d: { invitation_id: string }) => d)
   .handler(async ({ data }) => {
     const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(
-      process.env.SUPABASE_URL!, 
-      process.env.SUPABASE_PUBLISHABLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    );
+    const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const { data: invitation } = await sb
       .from("invitations")
@@ -273,8 +292,8 @@ export const getInvitationDetails = createServerFn({ method: "GET" })
       return { exists: false };
     }
 
-    return { 
-      exists: true, 
+    return {
+      exists: true,
       kind: (invitation as any).kind,
       payload: (invitation as any).payload,
       from_user_id: (invitation as any).from_user_id,
@@ -291,16 +310,24 @@ export const acceptInvitation = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Match the invitation against the caller's real email — context carries
+    // no email claim, so the old filter never matched and every accept failed.
+    const { data: caller } = await supabase.auth.getUser();
+    const callerEmail = caller?.user?.email?.toLowerCase() ?? null;
+
     const { data: invitation } = await supabaseAdmin
       .from("invitations")
       .select("*")
       .eq("id", data.invitation_id)
-      .eq("to_email", (context as any).email)
       .eq("status", "pending")
       .maybeSingle();
 
     if (!invitation) {
       throw new Error("Invitation not found or already processed");
+    }
+    const invitedEmail = ((invitation as any).to_email as string | null)?.toLowerCase() ?? null;
+    if (!callerEmail || !invitedEmail || callerEmail !== invitedEmail) {
+      throw new Error("This invitation was sent to a different email address");
     }
 
     const kind = (invitation as any).kind;
@@ -319,16 +346,14 @@ export const acceptInvitation = createServerFn({ method: "POST" })
         throw new Error("You must have an approved artist profile to accept feature invitations");
       }
 
-      const { error } = await supabaseAdmin
-        .from("song_collaborators")
-        .insert({
-          song_id: payload.song_id,
-          artist_id: (artist as any).id,
-          role: payload.role || "featured",
-          split_pct: payload.split_pct || 0,
-          invited_by: (invitation as any).from_user_id,
-          accepted: true,
-        } as any);
+      const { error } = await supabaseAdmin.from("song_collaborators").insert({
+        song_id: payload.song_id,
+        artist_id: (artist as any).id,
+        role: payload.role || "featured",
+        split_pct: payload.split_pct || 0,
+        invited_by: (invitation as any).from_user_id,
+        accepted: true,
+      } as any);
 
       if (error) throw new Error(error.message);
     } else if (kind === "label_apply") {
@@ -351,7 +376,7 @@ export const acceptInvitation = createServerFn({ method: "POST" })
     // Update invitation status
     await supabaseAdmin
       .from("invitations")
-      .update({ 
+      .update({
         status: "accepted",
         responded_at: new Date().toISOString(),
         to_user_id: userId,

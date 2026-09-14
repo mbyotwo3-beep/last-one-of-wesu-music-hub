@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Users, Check, X } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
+import { useAuth } from "@/hooks/use-auth";
 import { listMyCollabInvites, respondToCollabInvite } from "@/lib/collabs.functions";
 import { toast } from "sonner";
 
@@ -19,9 +20,15 @@ export const Route = createFileRoute("/collabs")({
 
 function Page() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const listFn = useServerFn(listMyCollabInvites);
   const respondFn = useServerFn(respondToCollabInvite);
-  const { data } = useQuery({ queryKey: ["my-collabs"], queryFn: () => listFn(), retry: false });
+  const { data } = useQuery({
+    queryKey: ["my-collabs"],
+    queryFn: () => listFn(),
+    retry: false,
+    enabled: !!user,
+  });
   const m = useMutation({
     mutationFn: respondFn,
     onSuccess: () => {

@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface ShareMenuProps {
   songId?: string;
   songTitle?: string;
+  coverUrl?: string | null;
   albumId?: string;
   albumTitle?: string;
   artistId?: string;
@@ -39,6 +40,7 @@ interface ShareMenuProps {
 export function ShareMenu({
   songId,
   songTitle,
+  coverUrl,
   albumId,
   albumTitle,
   artistId,
@@ -164,7 +166,7 @@ export function ShareMenu({
         id: songId,
         title: songTitle,
         artistName: artistName || "Unknown",
-        coverUrl: undefined,
+        coverUrl: coverUrl ?? undefined,
       });
       toast.success("Added to queue");
       setIsOpen(false);
@@ -276,9 +278,8 @@ export function ShareMenu({
   };
 
   const handleFollow = () => {
-    // For artist type, add follow option
+    // Follow lives on artist pages / library — no dead menu item references this.
     setIsOpen(false);
-    // This would need to be implemented with actual follow logic
   };
 
   useEffect(() => {

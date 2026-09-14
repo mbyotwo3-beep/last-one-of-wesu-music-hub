@@ -1,7 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Check, CheckCircle2, Loader2, User, X, Instagram, Twitter, Facebook, Youtube, Music, Apple } from "lucide-react";
+import {
+  Camera,
+  Check,
+  CheckCircle2,
+  Loader2,
+  User,
+  X,
+  Instagram,
+  Twitter,
+  Facebook,
+  Youtube,
+  Music,
+  Apple,
+} from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { getMyArtistProfile } from "@/lib/user.functions";
@@ -27,7 +40,7 @@ function ArtistProfileEditPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+
   const fetchProfile = useServerFn(getMyArtistProfile);
   const updateProfile = useServerFn(updateArtistProfile);
 
@@ -57,7 +70,7 @@ function ArtistProfileEditPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,14 +111,14 @@ function ArtistProfileEditPage() {
             userId: user.id,
             fileName: avatarFile.name,
             fileSize: avatarFile.size,
-            fileType: avatarFile.type
+            fileType: avatarFile.type,
           });
           const uploadStart = Date.now();
           // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
           avatarUrl = await uploadFileToBucket("artist-images", user.id, avatarFile);
           console.log("[Artist Profile] Avatar uploaded successfully:", {
             path: avatarUrl,
-            duration: Date.now() - uploadStart
+            duration: Date.now() - uploadStart,
           });
         }
 
@@ -116,14 +129,14 @@ function ArtistProfileEditPage() {
             userId: user.id,
             fileName: coverFile.name,
             fileSize: coverFile.size,
-            fileType: coverFile.type
+            fileType: coverFile.type,
           });
           const uploadStart = Date.now();
           // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
           coverUrl = await uploadFileToBucket("artist-images", user.id, coverFile);
           console.log("[Artist Profile] Cover uploaded successfully:", {
             path: coverUrl,
-            duration: Date.now() - uploadStart
+            duration: Date.now() - uploadStart,
           });
         }
 
@@ -136,17 +149,17 @@ function ArtistProfileEditPage() {
           cover_url: coverUrl ?? undefined,
           social_links: formData.social_links,
         };
-        
+
         console.log("[Artist Profile] Updating profile with data:", profileData);
         const updateStart = Date.now();
-        
+
         const result = await updateProfile({ data: profileData });
-        
+
         console.log("[Artist Profile] Profile update completed:", {
           result,
-          duration: Date.now() - updateStart
+          duration: Date.now() - updateStart,
         });
-        
+
         return result;
       } catch (error) {
         console.error("[Artist Profile] Error in saveMutation:", {
@@ -155,7 +168,7 @@ function ArtistProfileEditPage() {
           errorStack: (error as Error).stack,
           userId: user.id,
           hasAvatarFile: !!avatarFile,
-          hasCoverFile: !!coverFile
+          hasCoverFile: !!coverFile,
         });
         throw error;
       }
@@ -172,7 +185,7 @@ function ArtistProfileEditPage() {
       const errorMsg = (error as Error).message;
       toast.error(`Failed to update profile: ${errorMsg}`, {
         description: "Check the browser console (F12) for detailed error information.",
-        duration: 5000
+        duration: 5000,
       });
     },
   });
@@ -232,9 +245,7 @@ function ArtistProfileEditPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Edit Profile</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Customize your artist profile
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Customize your artist profile</p>
           </div>
           <button
             onClick={() => navigate({ to: "/artist-dashboard" })}
@@ -260,11 +271,7 @@ function ArtistProfileEditPage() {
               onClick={() => coverInputRef.current?.click()}
             >
               {coverPreview ? (
-                <img
-                  src={coverPreview}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                />
+                <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
@@ -283,7 +290,7 @@ function ArtistProfileEditPage() {
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleCoverChange}
               className="hidden"
             />
@@ -298,9 +305,7 @@ function ArtistProfileEditPage() {
             {coverFile && (
               <p className="mt-2 truncate text-xs text-primary">Selected: {coverFile.name}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-2">
-              Recommended: 1500x500px, max 10MB
-            </p>
+            <p className="text-xs text-muted-foreground mt-2">Recommended: 1500x500px, max 10MB</p>
           </div>
 
           {/* Profile Picture */}
@@ -312,11 +317,7 @@ function ArtistProfileEditPage() {
                 onClick={() => avatarInputRef.current?.click()}
               >
                 {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <User className="size-12 text-muted-foreground" />
@@ -342,7 +343,7 @@ function ArtistProfileEditPage() {
             <input
               ref={avatarInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleAvatarChange}
               className="hidden"
             />
@@ -387,8 +388,9 @@ function ArtistProfileEditPage() {
             <textarea
               id="bio"
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value.slice(0, 500) })}
               rows={4}
+              maxLength={500}
               className="w-full px-4 py-3 rounded-lg bg-card border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors resize-none"
               placeholder="Tell your fans about yourself..."
             />
@@ -402,18 +404,50 @@ function ArtistProfileEditPage() {
             <h3 className="text-lg font-semibold mb-4">Social Links</h3>
             <div className="space-y-4">
               {[
-                { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourhandle", icon: Instagram },
-                { key: "twitter", label: "Twitter/X", placeholder: "twitter.com/yourhandle", icon: Twitter },
-                { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourpage", icon: Facebook },
-                { key: "youtube", label: "YouTube", placeholder: "youtube.com/@yourchannel", icon: Youtube },
-                { key: "spotify", label: "Spotify", placeholder: "open.spotify.com/artist/...", icon: Music },
-                { key: "apple_music", label: "Apple Music", placeholder: "music.apple.com/artist/...", icon: Apple },
+                {
+                  key: "instagram",
+                  label: "Instagram",
+                  placeholder: "instagram.com/yourhandle",
+                  icon: Instagram,
+                },
+                {
+                  key: "twitter",
+                  label: "Twitter/X",
+                  placeholder: "twitter.com/yourhandle",
+                  icon: Twitter,
+                },
+                {
+                  key: "facebook",
+                  label: "Facebook",
+                  placeholder: "facebook.com/yourpage",
+                  icon: Facebook,
+                },
+                {
+                  key: "youtube",
+                  label: "YouTube",
+                  placeholder: "youtube.com/@yourchannel",
+                  icon: Youtube,
+                },
+                {
+                  key: "spotify",
+                  label: "Spotify",
+                  placeholder: "open.spotify.com/artist/...",
+                  icon: Music,
+                },
+                {
+                  key: "apple_music",
+                  label: "Apple Music",
+                  placeholder: "music.apple.com/artist/...",
+                  icon: Apple,
+                },
               ].map((social) => {
                 const Icon = social.icon;
-                const linkValue = formData.social_links[social.key as keyof typeof formData.social_links];
+                const linkValue =
+                  formData.social_links[social.key as keyof typeof formData.social_links];
                 const isValid = linkValue && linkValue.trim().length > 0;
-                const fullLink = isValid && (linkValue.startsWith('http') ? linkValue : `https://${linkValue}`);
-                
+                const fullLink =
+                  isValid && (linkValue.startsWith("http") ? linkValue : `https://${linkValue}`);
+
                 return (
                   <div key={social.key}>
                     <label htmlFor={social.key} className="block text-sm font-medium mb-2">

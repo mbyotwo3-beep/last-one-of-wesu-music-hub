@@ -27,6 +27,17 @@ export const listFeaturedSlots = createServerFn({ method: "GET" }).handler(async
   return data ?? [];
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SLOT_TYPES = ["home_hero", "home_trending", "home_artist", "genre_top", "editorial"];
+const TARGET_TYPES = ["song", "album", "artist", "playlist", "label"];
+const TARGET_TABLE: Record<string, string> = {
+  song: "songs",
+  album: "albums",
+  artist: "artists",
+  playlist: "playlists",
+  label: "labels",
+};
+
 export const upsertFeaturedSlot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
@@ -46,10 +57,23 @@ export const upsertFeaturedSlot = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await ensureStaff(context.supabase, context.userId);
+    if (!SLOT_TYPES.includes(data.slot_type)) throw new Error("Invalid slot_type");
+    if (!TARGET_TYPES.includes(data.target_type)) throw new Error("Invalid target_type");
+    if (!UUID_RE.test(data.target_id ?? "")) throw new Error("target_id must be a valid UUID");
+    // Verify the target actually exists — bad UUIDs were silently dropped by
+    // getHomeFeatured, so typos created invisible dead slots.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const table = TARGET_TABLE[data.target_type];
+    const { data: target } = await supabaseAdmin
+      .from(table)
+      .select("id")
+      .eq("id", data.target_id)
+      .maybeSingle();
+    if (!target) throw new Error(`Target ${data.target_type} does not exist`);
     const row: any = { ...data, created_by: context.userId };
     const { error } = data.id
-      ? await context.supabase.from("featured_slots").update(row).eq("id", data.id)
-      : await context.supabase.from("featured_slots").insert(row);
+      ? await supabaseAdmin.from("featured_slots").update(row).eq("id", data.id)
+      : await supabaseAdmin.from("featured_slots").insert(row);
     if (error) throw new Error(error.message);
     await audit(context.userId, "feature.upsert", "featured_slot", data.id, data);
     return { ok: true };
@@ -60,7 +84,8 @@ export const removeFeaturedSlot = createServerFn({ method: "POST" })
   .validator((d: { id: string }) => d)
   .handler(async ({ context, data }) => {
     await ensureStaff(context.supabase, context.userId);
-    await context.supabase.from("featured_slots").delete().eq("id", data.id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("featured_slots").delete().eq("id", data.id);
     await audit(context.userId, "feature.remove", "featured_slot", data.id);
     return { ok: true };
   });
@@ -69,7 +94,9 @@ export const listAllFeaturedAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureStaff(context.supabase, context.userId);
-    const { data } = await context.supabase
+    // Admin client: staff reads must not depend on RLS (returned [] under RLS).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
       .from("featured_slots")
       .select("*")
       .order("slot_type")

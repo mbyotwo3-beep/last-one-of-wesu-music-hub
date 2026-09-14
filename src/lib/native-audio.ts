@@ -71,12 +71,19 @@ export async function stopNative(id: string): Promise<void> {
 
 /**
  * Register a listener for when native audio playback completes.
+ * Only fires for the given asset id — a stale listener from a skipped track
+ * must never advance the queue. If the plugin payload carries no asset id,
+ * the callback still fires (backward compatible).
  * Returns a cleanup function to remove the listener.
  */
-export async function onNativeComplete(callback: () => void): Promise<() => void> {
+export async function onNativeComplete(assetId: string, callback: () => void): Promise<() => void> {
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
-    const handle = await NativeAudio.addListener("complete", callback);
+    const handle = await NativeAudio.addListener("complete", (event: any) => {
+      if (!event || event.assetId === undefined || event.assetId === assetId) {
+        callback();
+      }
+    });
     return () => handle.remove();
   } catch {
     return () => {};

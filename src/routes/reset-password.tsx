@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lock, ArrowRight, Music } from "lucide-react";
 
@@ -21,6 +21,8 @@ function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Supabase parses the recovery token from the URL hash and fires PASSWORD_RECOVERY.
   useEffect(() => {
@@ -31,7 +33,25 @@ function ResetPasswordPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) setReady(true);
     });
-    return () => sub.subscription.unsubscribe();
+    // Expired/used links never fire — stop hanging on "Verifying…" forever.
+    const t = setTimeout(() => {
+      setReady((r) => {
+        if (!r) setExpired(true);
+        return r;
+      });
+    }, 15000);
+    timers.current.push(t);
+    return () => {
+      sub.subscription.unsubscribe();
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timers.current.forEach(clearTimeout);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,7 +64,7 @@ function ResetPasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setDone(true);
-      setTimeout(() => navigate({ to: "/dashboard" }), 1500);
+      timers.current.push(setTimeout(() => navigate({ to: "/dashboard" }), 1500));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -63,9 +83,16 @@ function ResetPasswordPage() {
         </div>
 
         {!ready ? (
-          <p className="text-center text-muted-foreground text-sm">
-            Verifying reset link…
-          </p>
+          expired ? (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-center space-y-3">
+              <p>This reset link is invalid or has expired.</p>
+              <Link to="/forgot-password" className="text-primary hover:underline font-semibold">
+                Request a new reset link
+              </Link>
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground text-sm">Verifying reset link…</p>
+          )
         ) : done ? (
           <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-sm text-center">
             Password updated. Redirecting…
@@ -112,7 +139,14 @@ function ResetPasswordPage() {
               disabled={loading}
               className="w-full py-3 bg-primary text-obsidian rounded-xl font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? "Saving..." : (<>Update password<ArrowRight className="size-4" /></>)}
+              {loading ? (
+                "Saving..."
+              ) : (
+                <>
+                  Update password
+                  <ArrowRight className="size-4" />
+                </>
+              )}
             </button>
           </form>
         )}
