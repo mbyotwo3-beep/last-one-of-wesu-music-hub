@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
-import { MoreVertical, Heart, ListMusic, Plus, User, Share2, Disc, Copy, Check, X } from "lucide-react";
+import {
+  MoreVertical,
+  Heart,
+  ListMusic,
+  Plus,
+  User,
+  Share2,
+  Disc,
+  Copy,
+  Check,
+  X,
+} from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,7 +36,19 @@ interface ShareMenuProps {
   icon?: "more" | "share";
 }
 
-export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, artistName, playlistId, playlistName, type, className, icon = "more" }: ShareMenuProps & { className?: string }) {
+export function ShareMenu({
+  songId,
+  songTitle,
+  albumId,
+  albumTitle,
+  artistId,
+  artistName,
+  playlistId,
+  playlistName,
+  type,
+  className,
+  icon = "more",
+}: ShareMenuProps & { className?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
@@ -40,7 +63,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const addToPlaylistFn = useServerFn(addToPlaylist);
   const createPlaylistFn = useServerFn(createPlaylist);
   const getSongArtistsFn = useServerFn(getSongArtists);
-  const addToQueue = usePlayer((s) => s.setQueue);
+  const appendToQueue = usePlayer((s) => s.addToQueue);
   const setTrack = usePlayer((s) => s.setTrack);
   const { isSaved, toggle } = useSavedTrack(songId);
 
@@ -97,7 +120,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       const currentPath = window.location.pathname + window.location.search;
       navigate({
         to: "/auth",
-        search: { redirect: currentPath, action: "like", itemId: songId, itemType: "song" }
+        search: { redirect: currentPath, action: "like", itemId: songId, itemType: "song" },
       });
       setIsOpen(false);
       return;
@@ -111,7 +134,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       const currentPath = window.location.pathname + window.location.search;
       navigate({
         to: "/auth",
-        search: { redirect: currentPath, action: "addPlaylist", itemId: songId, itemType: "song" }
+        search: { redirect: currentPath, action: "addPlaylist", itemId: songId, itemType: "song" },
       });
       setIsOpen(false);
       return;
@@ -129,21 +152,22 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
   const handleCreatePlaylist = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlaylistName.trim()) return;
-    createPlaylistMutation.mutate({ data: { name: newPlaylistName, description: "", make_public: false } });
+    createPlaylistMutation.mutate({
+      data: { name: newPlaylistName, description: "", make_public: false },
+    });
   };
 
   const handleAddToQueue = () => {
     if (songId && songTitle) {
-      const currentQueue = usePlayer.getState().queue;
-      const currentTrack = usePlayer.getState().track;
-      const newTrack = {
+      // Spotify behavior: append only — never interrupt current playback.
+      appendToQueue({
         id: songId,
         title: songTitle,
         artistName: artistName || "Unknown",
         coverUrl: undefined,
-      };
-      addToQueue([...currentQueue, newTrack], currentQueue.length);
+      });
       toast.success("Added to queue");
+      setIsOpen(false);
     }
   };
 
@@ -151,13 +175,13 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     e?.stopPropagation();
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      
+
       // Calculate position like Spotify - align to right of button, but ensure it doesn't go off-screen
       const menuWidth = 208; // w-52 = 13rem = 208px
       const menuHeight = 300; // Approximate menu height
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      
+
       let leftPosition;
       // Try to align to right of button
       if (rect.right + menuWidth <= viewportWidth) {
@@ -169,7 +193,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         // Not enough space on either side, align to right edge with padding
         leftPosition = viewportWidth - menuWidth - 8;
       }
-      
+
       let topPosition;
       // Try to position below button
       if (rect.bottom + menuHeight <= viewportHeight) {
@@ -181,7 +205,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         // Not enough space on either side, position at bottom with padding
         topPosition = viewportHeight - menuHeight - 8;
       }
-      
+
       setMenuPosition({
         top: topPosition,
         left: leftPosition,
@@ -200,7 +224,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
     const baseUrl = window.location.origin;
     let url = baseUrl;
     let title = "";
-    
+
     if (type === "song" && songId) {
       url += `/songs/${songId}`;
       title = songTitle || "Song";
@@ -214,19 +238,21 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       url += `/playlists/${playlistId}`;
       title = playlistName || "Playlist";
     }
-    
+
     // Use Web Share API if available (like Apple Music)
     if (navigator.share && title) {
-      navigator.share({
-        title: title,
-        url: url,
-      }).catch(() => {
-        // Fallback to clipboard if share fails or is cancelled
-        navigator.clipboard.writeText(url);
-        setCopied(true);
-        toast.success("Link copied to clipboard");
-        setTimeout(() => setCopied(false), 2000);
-      });
+      navigator
+        .share({
+          title: title,
+          url: url,
+        })
+        .catch(() => {
+          // Fallback to clipboard if share fails or is cancelled
+          navigator.clipboard.writeText(url);
+          setCopied(true);
+          toast.success("Link copied to clipboard");
+          setTimeout(() => setCopied(false), 2000);
+        });
     } else {
       // Fallback for browsers without Web Share API
       navigator.clipboard.writeText(url);
@@ -260,7 +286,7 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
       const target = event.target as Node;
       // Close if click is outside both the button and the menu
       if (
-        buttonRef.current && 
+        buttonRef.current &&
         !buttonRef.current.contains(target) &&
         menuRef.current &&
         !menuRef.current.contains(target)
@@ -288,226 +314,229 @@ export function ShareMenu({ songId, songTitle, albumId, albumTitle, artistId, ar
         {icon === "share" ? <Share2 className="size-5" /> : <MoreVertical className="size-5" />}
       </button>
 
-      {isOpen && isPositioned && createPortal(
-        <div 
-          ref={menuRef}
-          className="fixed w-52 bg-card rounded-lg shadow-2xl z-[99999] overflow-hidden border border-border"
-          style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-        >
-          {type === "song" && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleLike();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : ""}`} />
-                {isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
-              </button>
-              
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddToPlaylistClick();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <ListMusic className="size-4" />
-                Add to playlist
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddToQueue();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Plus className="size-4" />
-                Add to queue
-              </button>
-
-              <div className="border-t border-border" />
-
-              {songArtists && songArtists.length > 0 && (
-                <>
-                  {songArtists.map((a: any) => (
-                    <button
-                      key={a.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGoToArtist(a.id);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-                    >
-                      <User className="size-4" />
-                      Go to artist
-                    </button>
-                  ))}
-                  <div className="border-t border-border" />
-                </>
-              )}
-
-              {albumId && (
+      {isOpen &&
+        isPositioned &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed w-52 bg-card rounded-lg shadow-2xl z-[99999] overflow-hidden border border-border"
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+          >
+            {type === "song" && (
+              <>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleGoToAlbum();
+                    toggleLike();
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                 >
-                  <Disc className="size-4" />
-                  Go to album
+                  <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : ""}`} />
+                  {isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
                 </button>
-              )}
 
-              <div className="border-t border-border" />
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyLink();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Share2 className="size-4" />
-                Share song
-              </button>
-            </>
-          )}
-
-          {type === "artist" && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyLink();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Share2 className="size-4" />
-                Share artist
-              </button>
-            </>
-          )}
-
-          {type === "album" && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyLink();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Share2 className="size-4" />
-                Share album
-              </button>
-            </>
-          )}
-
-          {type === "playlist" && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyLink();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-              >
-                <Share2 className="size-4" />
-                Share playlist
-              </button>
-            </>
-          )}
-
-          <div className="border-t border-border" />
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              // Force copy to clipboard without using Web Share API
-              let url = window.location.origin;
-              if (type === "song" && songId) url += `/songs/${songId}`;
-              else if (type === "album" && albumId) url += `/albums/${albumId}`;
-              else if (type === "artist" && artistId) url += `/artists/${artistId}`;
-              else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
-              
-              navigator.clipboard.writeText(url);
-              setCopied(true);
-              toast.success("Link copied to clipboard");
-              setTimeout(() => setCopied(false), 2000);
-              setIsOpen(false);
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
-          >
-            {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? "Link copied" : "Copy link"}
-          </button>
-        </div>,
-        document.body
-      )}
-
-      {showPlaylistModal && createPortal(
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground text-lg">Add to playlist</h3>
-              <button
-                onClick={() => setShowPlaylistModal(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
-              {playlists?.map((p: any) => (
                 <button
-                  key={p.id}
-                  onClick={() => handleAddToPlaylist(p.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-accent transition-colors cursor-pointer text-left"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToPlaylistClick();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                 >
-                  <ListMusic className="size-4 text-muted-foreground" />
-                  <span className="text-foreground">{p.name}</span>
+                  <ListMusic className="size-4" />
+                  Add to playlist
                 </button>
-              ))}
-            </div>
 
-            <div className="border-t border-border pt-4">
-              <form onSubmit={handleCreatePlaylist} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="New playlist name"
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-md bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                  autoFocus
-                />
-                <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToQueue();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                >
+                  <Plus className="size-4" />
+                  Add to queue
+                </button>
+
+                <div className="border-t border-border" />
+
+                {songArtists && songArtists.length > 0 && (
+                  <>
+                    {songArtists.map((a: any) => (
+                      <button
+                        key={a.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGoToArtist(a.id);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                      >
+                        <User className="size-4" />
+                        Go to artist
+                      </button>
+                    ))}
+                    <div className="border-t border-border" />
+                  </>
+                )}
+
+                {albumId && (
                   <button
-                    type="submit"
-                    disabled={createPlaylistMutation.isPending || !newPlaylistName.trim()}
-                    className="flex-1 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGoToAlbum();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                   >
-                    {createPlaylistMutation.isPending ? "Creating..." : "Create"}
+                    <Disc className="size-4" />
+                    Go to album
                   </button>
+                )}
+
+                <div className="border-t border-border" />
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                >
+                  <Share2 className="size-4" />
+                  Share song
+                </button>
+              </>
+            )}
+
+            {type === "artist" && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                >
+                  <Share2 className="size-4" />
+                  Share artist
+                </button>
+              </>
+            )}
+
+            {type === "album" && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                >
+                  <Share2 className="size-4" />
+                  Share album
+                </button>
+              </>
+            )}
+
+            {type === "playlist" && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+                >
+                  <Share2 className="size-4" />
+                  Share playlist
+                </button>
+              </>
+            )}
+
+            <div className="border-t border-border" />
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Force copy to clipboard without using Web Share API
+                let url = window.location.origin;
+                if (type === "song" && songId) url += `/songs/${songId}`;
+                else if (type === "album" && albumId) url += `/albums/${albumId}`;
+                else if (type === "artist" && artistId) url += `/artists/${artistId}`;
+                else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
+
+                navigator.clipboard.writeText(url);
+                setCopied(true);
+                toast.success("Link copied to clipboard");
+                setTimeout(() => setCopied(false), 2000);
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
+            >
+              {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+              {copied ? "Link copied" : "Copy link"}
+            </button>
+          </div>,
+          document.body,
+        )}
+
+      {showPlaylistModal &&
+        createPortal(
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground text-lg">Add to playlist</h3>
+                <button
+                  onClick={() => setShowPlaylistModal(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
+                {playlists?.map((p: any) => (
                   <button
-                    type="button"
-                    onClick={() => setShowPlaylistModal(false)}
-                    className="px-6 py-3 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold hover:bg-accent transition-colors cursor-pointer"
+                    key={p.id}
+                    onClick={() => handleAddToPlaylist(p.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-accent transition-colors cursor-pointer text-left"
                   >
-                    Cancel
+                    <ListMusic className="size-4 text-muted-foreground" />
+                    <span className="text-foreground">{p.name}</span>
                   </button>
-                </div>
-              </form>
+                ))}
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <form onSubmit={handleCreatePlaylist} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="New playlist name"
+                    value={newPlaylistName}
+                    onChange={(e) => setNewPlaylistName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-md bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={createPlaylistMutation.isPending || !newPlaylistName.trim()}
+                      className="flex-1 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform cursor-pointer"
+                    >
+                      {createPlaylistMutation.isPending ? "Creating..." : "Create"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlaylistModal(false)}
+                      className="px-6 py-3 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold hover:bg-accent transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
