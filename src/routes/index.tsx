@@ -8,21 +8,12 @@ import { usePlayer } from "@/stores/player";
 import { getHomeDiscover, getForYou } from "@/lib/music.functions";
 import { getRecentlyPlayed } from "@/lib/play-history.functions";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  TrackCard,
-  AlbumTile,
-  ArtistTile,
-  PlaylistTile,
-} from "@/components/discover/TrackCard";
+import { TrackCard, AlbumTile, ArtistTile, PlaylistTile } from "@/components/discover/TrackCard";
 import { CarouselShelf } from "@/components/CarouselShelf";
 import { getActiveCarousels } from "@/lib/carousel.functions";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
-import {
-  SkeletonHeroCarousel,
-  SkeletonShelf,
-  SkeletonTrackRow,
-} from "@/components/Skeleton";
+import { SkeletonHeroCarousel, SkeletonShelf, SkeletonTrackRow } from "@/components/Skeleton";
 
 const discoverQO = queryOptions({
   queryKey: ["home-discover"],
@@ -59,7 +50,7 @@ function IndexRoute() {
 
 function HomePage() {
   const { data } = useSuspenseQuery(discoverQO);
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
   const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
@@ -90,15 +81,8 @@ function HomePage() {
     enabled: !!user,
     staleTime: 60 * 1000,
   });
-  const {
-    featured,
-    newReleases,
-    trending,
-    topArtists,
-    recentAlbums,
-    editorialPlaylists,
-    moods,
-  } = data;
+  const { featured, newReleases, trending, topArtists, recentAlbums, editorialPlaylists, moods } =
+    data;
 
   const heroPick = featured[0] ?? recentAlbums[0];
   const empty =
@@ -128,7 +112,7 @@ function HomePage() {
             {/* Hero Carousel - Netlify-style with auto-rotation */}
             {heroSlides && heroSlides.length > 0 ? (
               <HeroCarousel
-                slides={heroSlides.map(slide => ({
+                slides={heroSlides.map((slide) => ({
                   id: slide.id,
                   title: slide.title,
                   description: slide.description,
@@ -139,49 +123,50 @@ function HomePage() {
                   ctaExternal: slide.cta_external,
                 }))}
               />
-            ) : heroPick && (
-              <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
-                <StorageImage
-                  bucket="album-art"
-                  path={heroPick.cover_url}
-                  alt={heroPick.title}
-                  className="absolute inset-0 w-full h-full object-cover opacity-70"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-                <div className="relative h-full flex flex-col justify-end p-6 md:p-10 max-w-2xl">
-                  <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
-                    Featured
-                  </p>
-                  <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tight mb-2">
-                    {heroPick.title}
-                  </h1>
-                  <p className="text-sm md:text-lg text-zinc-300 mb-5">
-                    {(heroPick.artist as { name?: string } | null)?.name ?? "Various Artists"}
-                  </p>
-                  <div className="flex gap-3">
-                    <Link
-                      to="/albums/$id"
-                      params={{ id: heroPick.id }}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm cursor-pointer hover:scale-105 transition-transform"
-                    >
-                      <Play className="size-4 fill-current" />
-                      Open Album
-                    </Link>
-                    <Link
-                      to="/browse"
-                      className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur cursor-pointer hover:scale-105 transition-transform"
-                    >
-                      Browse All
-                    </Link>
+            ) : (
+              heroPick && (
+                <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
+                  <StorageImage
+                    bucket="album-art"
+                    path={heroPick.cover_url}
+                    alt={heroPick.title}
+                    className="absolute inset-0 w-full h-full object-cover opacity-70"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+                  <div className="relative h-full flex flex-col justify-end p-6 md:p-10 max-w-2xl">
+                    <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
+                      Featured
+                    </p>
+                    <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tight mb-2">
+                      {heroPick.title}
+                    </h1>
+                    <p className="text-sm md:text-lg text-zinc-300 mb-5">
+                      {(heroPick.artist as { name?: string } | null)?.name ?? "Various Artists"}
+                    </p>
+                    <div className="flex gap-3">
+                      <Link
+                        to="/albums/$id"
+                        params={{ id: heroPick.id }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm cursor-pointer hover:scale-105 transition-transform"
+                      >
+                        <Play className="size-4 fill-current" />
+                        Open Album
+                      </Link>
+                      <Link
+                        to="/browse"
+                        className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur cursor-pointer hover:scale-105 transition-transform"
+                      >
+                        Browse All
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )
             )}
 
             {/* Custom Carousels configured by Admin / Superadmin */}
-            {carousels && carousels.map((carousel) => (
-              <CarouselShelf key={carousel.id} carousel={carousel} />
-            ))}
+            {carousels &&
+              carousels.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)}
 
             {user && recentlyPlayed && recentlyPlayed.length > 0 && (
               <HorizontalShelf title="Recently Played" showAllLink="/library">
@@ -194,7 +179,7 @@ function HomePage() {
             )}
 
             {user && forYouData && forYouData.forYou.length > 0 && (
-              <HorizontalShelf title="Made For You" >
+              <HorizontalShelf title="Made For You">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
                   {forYouData.forYou.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
@@ -259,13 +244,16 @@ function HomePage() {
                     <button
                       key={s.id}
                       onClick={() =>
-                        setTrack({
-                          id: s.id,
-                          title: s.title,
-                          artistName: (s.artist as { name?: string } | null)?.name ?? "Unknown",
-                          coverUrl: s.cover_url,
-                          durationSeconds: (s as { duration?: number }).duration,
-                        })
+                        setQueue(
+                          trending.map((t: any) => ({
+                            id: t.id,
+                            title: t.title,
+                            artistName: (t.artist as { name?: string } | null)?.name ?? "Unknown",
+                            coverUrl: t.cover_url,
+                            durationSeconds: (t as { duration?: number }).duration,
+                          })),
+                          i,
+                        )
                       }
                       className="w-full flex items-center gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors text-left group cursor-pointer"
                     >
@@ -304,7 +292,7 @@ function HomePage() {
             )}
 
             {editorialPlaylists.length > 0 && (
-              <HorizontalShelf title="Made For You" showAllLink="/playlists">
+              <HorizontalShelf title="Editorial Playlists" showAllLink="/playlists">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
                   {editorialPlaylists.map((p) => (
                     <PlaylistTile key={p.id} playlist={p} />

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Bell, Check, Heart, User, Music } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
@@ -20,6 +20,7 @@ export const Route = createFileRoute("/notifications")({
 
 function Page() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: rows, isLoading } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -39,7 +40,10 @@ function Page() {
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("notifications").update({ read_at: new Date().toISOString() } as any).eq("id", id);
+      await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() } as any)
+        .eq("id", id);
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["notifications", user?.id] });
@@ -61,7 +65,10 @@ function Page() {
     mutationFn: async () => {
       const unreadIds = rows?.filter((n: any) => !n.read_at).map((n: any) => n.id) || [];
       if (unreadIds.length === 0) return;
-      await supabase.from("notifications").update({ read_at: new Date().toISOString() } as any).in("id", unreadIds);
+      await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() } as any)
+        .in("id", unreadIds);
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications", user?.id] });
@@ -98,7 +105,19 @@ function Page() {
       markRead.mutate(n.id);
     }
     if (n.link) {
-      window.location.href = n.link;
+      // SPA navigation for internal links — avoids full document reload
+      // which wipes player queue / upload state.
+      try {
+        if (n.link.startsWith("http")) {
+          window.open(n.link, "_blank", "noopener,noreferrer");
+        } else if (n.link.startsWith("/")) {
+          navigate({ to: n.link as any });
+        } else {
+          window.location.href = n.link;
+        }
+      } catch {
+        window.location.href = n.link;
+      }
     }
   };
 
@@ -136,9 +155,7 @@ function Page() {
               }`}
             >
               <div className="flex items-start gap-4">
-                <div className="shrink-0 mt-1">
-                  {getNotificationIcon(n.type)}
-                </div>
+                <div className="shrink-0 mt-1">{getNotificationIcon(n.type)}</div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-foreground">{n.title}</div>
                   {n.body && <p className="text-sm text-muted-foreground mt-1">{n.body}</p>}

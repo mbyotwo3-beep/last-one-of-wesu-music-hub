@@ -305,10 +305,7 @@ export const deleteSong = createServerFn({ method: "POST" })
     }
 
     // 5. Delete the song row (cascades to likes, playlist_songs, saved_tracks, play_history, song_collaborators)
-    const { error: delError } = await supabaseAdmin
-      .from("songs")
-      .delete()
-      .eq("id", song.id);
+    const { error: delError } = await supabaseAdmin.from("songs").delete().eq("id", song.id);
 
     if (delError) {
       throw new Error(delError.message);
@@ -363,7 +360,11 @@ export const createAlbum = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "album.create", "album", album!.id, { title: data.title, release_date: data.release_date, status: data.status ?? "draft" });
+    await audit(supabase, userId, "album.create", "album", album!.id, {
+      title: data.title,
+      release_date: data.release_date,
+      status: data.status ?? "draft",
+    });
     return { ok: true, id: album!.id };
   });
 
@@ -389,25 +390,28 @@ export const listMyAlbums = createServerFn({ method: "GET" })
 /**
  * Calculate available balance for artist payout
  */
-async function getArtistAvailableBalance(supabase: SupabaseClient, artistId: string): Promise<number> {
+async function getArtistAvailableBalance(
+  supabase: SupabaseClient,
+  artistId: string,
+): Promise<number> {
   // Get total earned from revenue splits
   const { data: splits } = await supabase
     .from("revenue_splits")
     .select("amount")
     .eq("artist_id", artistId)
     .eq("payee_role", "artist");
-  
+
   const totalEarned = (splits ?? []).reduce((sum, s: any) => sum + Number(s.amount || 0), 0);
-  
+
   // Get total already paid or pending
   const { data: payouts } = await supabase
     .from("payouts")
     .select("amount")
     .eq("artist_id", artistId)
     .in("status", ["completed", "pending"]);
-  
+
   const totalPaid = (payouts ?? []).reduce((sum, p: any) => sum + Number(p.amount || 0), 0);
-  
+
   return Math.max(0, totalEarned - totalPaid);
 }
 
@@ -416,35 +420,37 @@ export const requestPayout = createServerFn({ method: "POST" })
   .validator((d: { amount: number; method_code: string; destination: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    
+
     // Get dynamic withdrawal settings
     const { getWithdrawalConfig } = await import("@/lib/pricing.functions");
     const withdrawalConfig = await getWithdrawalConfig();
     const minWithdrawal = withdrawalConfig.min_amount;
-    
+
     // REQUIREMENT: Payout only allowed if money is over minimum
     if (data.amount < minWithdrawal) {
       throw new Error(`Minimum withdrawal amount is K${minWithdrawal} (ZMW ${minWithdrawal})`);
     }
-    
+
     const { data: artist } = await supabase
       .from("artists")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("Artist profile required");
-    
+
     // SECURITY: Check available balance
     const available = await getArtistAvailableBalance(supabase, (artist as any).id);
     if (available <= minWithdrawal) {
-      throw new Error(`You can only apply for withdrawal if your available balance is over K${minWithdrawal} (Current: K${available.toFixed(2)})`);
+      throw new Error(
+        `You can only apply for withdrawal if your available balance is over K${minWithdrawal} (Current: K${available.toFixed(2)})`,
+      );
     }
     if (data.amount > available) {
       throw new Error(
-        `Insufficient balance. Available: K${available.toFixed(2)}, Requested: K${data.amount.toFixed(2)}`
+        `Insufficient balance. Available: K${available.toFixed(2)}, Requested: K${data.amount.toFixed(2)}`,
       );
     }
-    
+
     const { error } = await supabase.from("payouts").insert({
       artist_id: (artist as any).id,
       amount: data.amount,
@@ -452,9 +458,9 @@ export const requestPayout = createServerFn({ method: "POST" })
       destination: data.destination,
     } as any);
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "payout.request", "artist", (artist as any).id, { 
+    await audit(supabase, userId, "payout.request", "artist", (artist as any).id, {
       amount: data.amount,
-      available_balance: available
+      available_balance: available,
     });
     return { ok: true };
   });
@@ -508,13 +514,19 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
 
     if ((followersCount ?? 0) < minFollowers) {
       throw new Error(
-        `Verification requires at least ${minFollowers} followers (Currently: ${followersCount ?? 0})`
+        `Verification requires at least ${minFollowers} followers (Currently: ${followersCount ?? 0})`,
       );
     }
 
     // Check total earnings
-    const { data: songs } = await supabase.from("songs").select("id").eq("artist_id", (artist as any).id);
-    const { data: albums } = await supabase.from("albums").select("id").eq("artist_id", (artist as any).id);
+    const { data: songs } = await supabase
+      .from("songs")
+      .select("id")
+      .eq("artist_id", (artist as any).id);
+    const { data: albums } = await supabase
+      .from("albums")
+      .select("id")
+      .eq("artist_id", (artist as any).id);
     const songIds = (songs ?? []).map((s) => s.id);
     const albumIds = (albums ?? []).map((a) => a.id);
 
@@ -534,7 +546,7 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
 
     if (totalRevenue <= minEarnings) {
       throw new Error(
-        `Verification requires total earnings over K${minEarnings} (Currently: K${totalRevenue.toFixed(2)})`
+        `Verification requires total earnings over K${minEarnings} (Currently: K${totalRevenue.toFixed(2)})`,
       );
     }
 
@@ -586,69 +598,108 @@ export const deleteAlbum = createServerFn({ method: "POST" })
       throw new Error("Album not found");
     }
 
-    // 2. Permission check: verify the user owns this album
-    if ((album as any).artists.user_id !== userId) {
+    // 2. Permission check: owner OR staff (admin/superadmin) — previously
+    // staff was blocked, so admins couldn't clean up ghost albums.
+    const isStaff = await isStaffUser(supabase, userId);
+    if (!isStaff && (album as any).artists.user_id !== userId) {
       throw new Error("Forbidden: You do not have permission to delete this album");
     }
 
-    // 3. Handle orphaned songs by setting album_id to NULL
-    // This is required because the schema doesn't have ON DELETE SET NULL
-    await supabaseAdmin
+    // 3. Fetch songs on this album so we delete them TOGETHER with the album.
+    // Previously songs were orphaned via SET NULL, leaving ghost covers on
+    // home shelves (album row with 0 songs still in recentAlbums) and forcing
+    // song-by-song deletes.
+    const { data: albumSongs } = await supabaseAdmin
       .from("songs")
-      .update({ album_id: null } as any)
+      .select("id, audio_url, cover_url")
       .eq("album_id", data.id);
+    const songIds = (albumSongs ?? []).map((s: any) => s.id as string);
 
-    // 4. Delete saved_albums entries (no CASCADE in schema)
-    await supabaseAdmin
-      .from("saved_albums")
-      .delete()
-      .eq("album_id", data.id);
-
-    // 5. Clean up cover art from storage if it's not shared
-    if (album.cover_url) {
-      try {
-        // Check if any other song or album is using this cover
-        const { data: sharedSong } = await supabaseAdmin
-          .from("songs")
-          .select("id")
-          .eq("cover_url", album.cover_url)
-          .limit(1)
-          .maybeSingle();
-
-        const { data: sharedAlbum } = await supabaseAdmin
-          .from("albums")
-          .select("id")
-          .eq("cover_url", album.cover_url)
-          .neq("id", data.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (!sharedSong && !sharedAlbum) {
-          const { deleteStoredMedia } = await import("./media.server");
-          await deleteStoredMedia("album-art", album.cover_url);
-        }
-      } catch (err) {
-        console.warn("[Album Delete] Could not delete cover art:", err);
+    // 4. Remove featured slots pointing at the album OR its songs (target_id
+    // has no FK, so orphans otherwise keep rendering ghost covers).
+    try {
+      await supabaseAdmin
+        .from("featured_slots")
+        .delete()
+        .eq("target_type", "album")
+        .eq("target_id", data.id);
+      if (songIds.length > 0) {
+        await supabaseAdmin
+          .from("featured_slots")
+          .delete()
+          .eq("target_type", "song")
+          .in("target_id", songIds);
       }
+    } catch {
+      /* ignore */
     }
 
-    // 6. Delete the album row
-    const { error: delError } = await supabaseAdmin
-      .from("albums")
-      .delete()
-      .eq("id", data.id);
+    // 5. Delete saved_albums entries
+    await supabaseAdmin.from("saved_albums").delete().eq("album_id", data.id);
+
+    // 6. Collect distinct storage paths before row deletes (for shared checks)
+    const audioPaths = Array.from(
+      new Set((albumSongs ?? []).map((s: any) => s.audio_url).filter(Boolean)),
+    ) as string[];
+    const coverPaths = Array.from(
+      new Set(
+        [album.cover_url, ...(albumSongs ?? []).map((s: any) => s.cover_url)].filter(Boolean),
+      ),
+    ) as string[];
+
+    // 7. Delete songs first (lets FK CASCADE clean playlist_songs,
+    // saved_tracks, likes, play_history, collaborators). Purchases use
+    // SET NULL so receipts survive.
+    if (songIds.length > 0) {
+      const { error: songsDelErr } = await supabaseAdmin.from("songs").delete().in("id", songIds);
+      if (songsDelErr) throw new Error(songsDelErr.message);
+    }
+
+    // 8. Delete the album row
+    const { error: delError } = await supabaseAdmin.from("albums").delete().eq("id", data.id);
 
     if (delError) {
       throw new Error(delError.message);
     }
 
-    // 7. Audit log
+    // 9. Best-effort storage cleanup AFTER commit, only when no other
+    // song/album still references the path.
+    try {
+      const { r2Delete, isR2Configured } = await import("./r2.server");
+      const { deleteStoredMedia } = await import("./media.server");
+      const useR2 = isR2Configured();
+      for (const p of audioPaths) {
+        try {
+          if (useR2) await r2Delete("song-audio", p);
+          await supabaseAdmin.storage.from("song-audio").remove([p]);
+        } catch {
+          /* ignore per-file */
+        }
+      }
+      for (const p of coverPaths) {
+        try {
+          const [{ data: s1 }, { data: s2 }] = await Promise.all([
+            supabaseAdmin.from("songs").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+            supabaseAdmin.from("albums").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+          ]);
+          if (!s1 && !s2) await deleteStoredMedia("album-art", p);
+        } catch {
+          /* ignore per-file */
+        }
+      }
+    } catch (err) {
+      console.warn("[Album Delete] storage cleanup failed:", err);
+    }
+
+    // 10. Audit log
     await audit(supabaseAdmin, userId, "album.delete", "album", data.id, {
       title: album.title,
       artist_id: album.artist_id,
+      song_count: songIds.length,
+      deleted_by_role: isStaff ? "staff" : "artist",
     });
 
-    return { ok: true, id: data.id, title: album.title };
+    return { ok: true, id: data.id, title: album.title, deletedSongs: songIds.length };
   });
 
 export const updateAlbum = createServerFn({ method: "POST" })

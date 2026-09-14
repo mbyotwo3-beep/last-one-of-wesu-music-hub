@@ -196,7 +196,9 @@ export const getSongById = createServerFn({ method: "GET" })
     const supabase = getPublicSupabase();
     const { data: song, error } = await supabase
       .from("songs")
-      .select("id,title,duration,price,cover_url,genre,explicit,play_count,created_at,album_id,artist:artists(id,name)")
+      .select(
+        "id,title,duration,price,cover_url,genre,explicit,play_count,created_at,album_id,artist:artists(id,name)",
+      )
       .eq("id", data.id)
       .eq("status", "approved")
       .maybeSingle();
@@ -335,29 +337,29 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
  */
 export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
-  
+
   // Get all genres and their counts
   const { data: genreRows, error: genreError } = await supabase
     .from("songs")
     .select("genre")
     .not("genre", "is", null)
     .limit(500);
-  
+
   if (genreError) throw new Error(genreError.message);
-  
+
   const counts = new Map<string, number>();
   for (const row of genreRows ?? []) {
     const g = (row as { genre: string | null }).genre;
     if (!g) continue;
     counts.set(g, (counts.get(g) ?? 0) + 1);
   }
-  
+
   // Get top 8 genres by count
   const topGenres = Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([genre]) => genre);
-  
+
   // Get top 10 songs for each genre
   const genreSongs = await Promise.all(
     topGenres.map(async (genre) => {
@@ -367,12 +369,12 @@ export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(asy
         .eq("genre", genre)
         .order("play_count", { ascending: false })
         .limit(10);
-      
+
       if (error) throw new Error(error.message);
       return { genre, songs: data ?? [] };
-    })
+    }),
   );
-  
+
   return genreSongs;
 });
 
@@ -382,43 +384,46 @@ export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(asy
  */
 export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
-  const [featured, newest, trending, artists, albums, playlists, genreRows] =
-    await Promise.all([
-      supabase
-        .from("albums")
-        .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
-        .eq("featured", true)
-        .order("release_date", { ascending: false })
-        .limit(6),
-      supabase
-        .from("songs")
-        .select("id,title,duration,price,cover_url,artist:artists(id,name)")
-        .order("created_at", { ascending: false })
-        .limit(12),
-      supabase
-        .from("songs")
-        .select("id,title,play_count,price,cover_url,duration,artist:artists(id,name)")
-        .order("play_count", { ascending: false })
-        .limit(10),
-      supabase
-        .from("artists")
-        .select("id,name,genre,avatar_url,verified,monthly_listeners")
-        .eq("status", "approved")
-        .order("monthly_listeners", { ascending: false })
-        .limit(10),
-      supabase
-        .from("albums")
-        .select("id,title,cover_url,release_date,artist:artists(id,name)")
-        .order("release_date", { ascending: false })
-        .limit(12),
-      supabase
-        .from("playlists")
-        .select("id,name,description,cover_url")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false })
-        .limit(10),
-      supabase.from("songs").select("genre").not("genre", "is", null).limit(300),
-    ]);
+  const [featured, newest, trending, artists, albums, playlists, genreRows] = await Promise.all([
+    supabase
+      .from("albums")
+      .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
+      .eq("featured", true)
+      .eq("status", "approved")
+      .order("release_date", { ascending: false })
+      .limit(6),
+    supabase
+      .from("songs")
+      .select("id,title,duration,price,cover_url,artist:artists(id,name)")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .from("songs")
+      .select("id,title,play_count,price,cover_url,duration,artist:artists(id,name)")
+      .eq("status", "approved")
+      .order("play_count", { ascending: false })
+      .limit(10),
+    supabase
+      .from("artists")
+      .select("id,name,genre,avatar_url,verified,monthly_listeners")
+      .eq("status", "approved")
+      .order("monthly_listeners", { ascending: false })
+      .limit(10),
+    supabase
+      .from("albums")
+      .select("id,title,cover_url,release_date,artist:artists(id,name)")
+      .eq("status", "approved")
+      .order("release_date", { ascending: false })
+      .limit(12),
+    supabase
+      .from("playlists")
+      .select("id,name,description,cover_url")
+      .eq("is_public", true)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase.from("songs").select("genre").not("genre", "is", null).limit(300),
+  ]);
 
   const counts = new Map<string, number>();
   for (const row of genreRows.data ?? []) {
@@ -436,6 +441,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
         .from("songs")
         .select("id,title,cover_url,duration,price,album_id,artist:artists(id,name)")
         .eq("genre", genre)
+        .eq("status", "approved")
         .order("play_count", { ascending: false })
         .limit(8);
       return { genre, songs: data ?? [] };
@@ -467,12 +473,14 @@ export const getForYou = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const savedRes = await supabase.from("saved_tracks").select("song_id").eq("user_id", userId).limit(200);
+    const savedRes = await supabase
+      .from("saved_tracks")
+      .select("song_id")
+      .eq("user_id", userId)
+      .limit(200);
 
     const songIds = Array.from(
-      new Set([
-        ...(savedRes.data ?? []).map((r: any) => r.song_id as string),
-      ]),
+      new Set([...(savedRes.data ?? []).map((r: any) => r.song_id as string)]),
     );
 
     if (songIds.length === 0) {

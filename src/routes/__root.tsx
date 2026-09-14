@@ -17,8 +17,11 @@ import { PlayerBar } from "../components/PlayerBar";
 import { AppleMusicSidebar } from "../components/AppleMusicSidebar";
 import { ThemeProvider, themeInitScript } from "../hooks/use-theme";
 import { usePlatform } from "../hooks/use-platform";
-import { MobileShell } from "../components/mobile/MobileShell";
-import { useBelowLg } from "../hooks/use-below-lg";
+import { BottomTabBar } from "../components/mobile/BottomTabBar";
+import { MiniPlayer } from "../components/mobile/MiniPlayer";
+import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
+import { StatusBarInit } from "../components/mobile/StatusBarInit";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { registerDeepLinkHandler } from "../integrations/supabase/auth-deep-link";
 
 function NotFoundComponent() {
@@ -69,12 +72,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
+          <Link
+            to="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -106,9 +109,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@wesuplus" },
       { name: "twitter:title", content: "Wesu+ — Music Streaming" },
-      { name: "twitter:description", content: "Wesu+ Music is a free and premium music streaming platform with song/album purchases and artist tools." },
+      {
+        name: "twitter:description",
+        content:
+          "Wesu+ Music is a free and premium music streaming platform with song/album purchases and artist tools.",
+      },
       { name: "twitter:image", content: "/images/wesu-logo-full.png" },
-
     ],
     links: [
       { rel: "icon", href: "/favicon.png", type: "image/png" },
@@ -147,8 +153,6 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const platform = usePlatform();
-  const isSmallScreen = useBelowLg();
-  const useMobileLayout = platform === "native" || isSmallScreen;
 
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {
@@ -157,25 +161,46 @@ function RootComponent() {
     }
   }, [platform]);
 
+  // STABILITY: single stable tree — Outlet + audio engine never unmount on
+  // resize/rotate. Responsive switching is CSS-only (hidden lg:*) so upload
+  // File objects, form state, and playback survive breakpoint changes.
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {useMobileLayout ? (
-          <MobileShell>
-            <Outlet />
-          </MobileShell>
-        ) : (
-          <div className="flex min-h-screen">
+        <StatusBarInit />
+        <div className="flex min-h-screen">
+          <div className="hidden lg:block shrink-0">
             <AppleMusicSidebar />
-            <div className="flex-1 flex flex-col">
+          </div>
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="hidden lg:block">
               <Navbar />
-              <main className="flex-1">
-                <Outlet />
-              </main>
+            </div>
+            {/* Mobile top bar — CSS-only, never unmounts Outlet */}
+            <header className="lg:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 pt-[env(safe-area-inset-top)] pb-2 bg-background/95 backdrop-blur border-b border-border">
+              <Link to="/" aria-label="Wesu+ home" className="flex items-center gap-2">
+                <img src="/images/wesu-logo.png" alt="Wesu+" className="h-10 w-auto" />
+              </Link>
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 pt-[calc(env(safe-area-inset-top)+3.25rem)] lg:pt-0 pb-[calc(env(safe-area-inset-bottom)+8rem)] lg:pb-0">
+              <Outlet />
+            </main>
+            {/* Single audio engine + desktop UI. Stays mounted at all
+                breakpoints (CSS-hidden on mobile) so playback + queue survive
+                resize/rotate. Mobile MiniPlayer/Sheet are UI-only and share
+                the same window.__wesuAudio singleton. */}
+            <div className="hidden lg:block">
               <PlayerBar />
             </div>
+            {/* Mobile UI — CSS-only, never unmounts Outlet */}
+            <div className="lg:hidden">
+              <MiniPlayer />
+              <NowPlayingSheet />
+              <BottomTabBar />
+            </div>
           </div>
-        )}
+        </div>
         <Toaster position="top-right" />
       </ThemeProvider>
     </QueryClientProvider>

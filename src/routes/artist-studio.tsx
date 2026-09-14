@@ -47,7 +47,6 @@ import { inviteArtistForFeature, inviteLabelForRelease } from "@/lib/invitations
 import { supabase } from "@/integrations/supabase/client";
 import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
 
-
 export const Route = createFileRoute("/artist-studio")({
   head: () => ({ meta: [{ title: "Artist Studio — Wesu+" }] }),
   component: () => (
@@ -64,6 +63,21 @@ function ArtistStudioRoute() {
 }
 
 type Tab = "upload" | "collabs" | "label" | "features" | "payouts";
+
+// ─── In-memory upload draft (module singleton) ─────────────────
+// File objects cannot go in sessionStorage, and previously any Outlet
+// remount / navigation wiped staged cover + tracks. Keeping the File
+// handles here survives in-app navigation (same tab) so going to the
+// dashboard and back restores the draft instead of losing everything.
+interface DraftTrack {
+  id: string;
+  file: File;
+  title: string;
+}
+const uploadDraft: { cover: File | null; tracks: DraftTrack[] } = {
+  cover: null,
+  tracks: [],
+};
 
 function Page() {
   const [tab, setTab] = useState<Tab>("upload");
@@ -100,7 +114,6 @@ function Page() {
     </div>
   );
 }
-
 
 function CollabsTab() {
   const songsFn = useServerFn(listMySongs);
@@ -361,7 +374,7 @@ function FeaturesTab() {
           type="number"
           min={0}
           step="0.01"
-            value={form.feature_rate}
+          value={form.feature_rate}
           onChange={(e) => setForm({ ...form, feature_rate: Number(e.target.value) })}
         />
       </label>
@@ -412,11 +425,19 @@ function UploadWizard() {
     return (saved as UploadMode) || "single";
   });
   const [title, setTitle] = useState(() => sessionStorage.getItem("upload-wizard-title") || "");
-  const [description, setDescription] = useState(() => sessionStorage.getItem("upload-wizard-description") || "");
+  const [description, setDescription] = useState(
+    () => sessionStorage.getItem("upload-wizard-description") || "",
+  );
   const [genre, setGenre] = useState(() => sessionStorage.getItem("upload-wizard-genre") || "");
-  const [releaseDate, setReleaseDate] = useState(() => sessionStorage.getItem("upload-wizard-releaseDate") || "");
-  const [hasFeature, setHasFeature] = useState(() => sessionStorage.getItem("upload-wizard-hasFeature") === "true");
-  const [hasLabel, setHasLabel] = useState(() => sessionStorage.getItem("upload-wizard-hasLabel") === "true");
+  const [releaseDate, setReleaseDate] = useState(
+    () => sessionStorage.getItem("upload-wizard-releaseDate") || "",
+  );
+  const [hasFeature, setHasFeature] = useState(
+    () => sessionStorage.getItem("upload-wizard-hasFeature") === "true",
+  );
+  const [hasLabel, setHasLabel] = useState(
+    () => sessionStorage.getItem("upload-wizard-hasLabel") === "true",
+  );
   const [tier, setTier] = useState<"free" | "paid">(() => {
     const saved = sessionStorage.getItem("upload-wizard-tier");
     return (saved as "free" | "paid") || "paid";
@@ -425,14 +446,28 @@ function UploadWizard() {
     const saved = sessionStorage.getItem("upload-wizard-price");
     return saved ? parseFloat(saved) : pricing.song_min;
   });
-  const [feeAgreed, setFeeAgreed] = useState(() => sessionStorage.getItem("upload-wizard-feeAgreed") === "true");
+  const [feeAgreed, setFeeAgreed] = useState(
+    () => sessionStorage.getItem("upload-wizard-feeAgreed") === "true",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
   const [labelInviteLink, setLabelInviteLink] = useState<string | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [tracks, setTracks] = useState<TrackEntry[]>([]);
+  const [cover, setCover] = useState<File | null>(() => uploadDraft.cover);
+  const [tracks, setTracksState] = useState<TrackEntry[]>(() => uploadDraft.tracks);
+  // Sync every staged change to the module draft so back-navigation restores files.
+  const setTracks: typeof setTracksState = (v) => {
+    setTracksState((prev) => {
+      const next = typeof v === "function" ? (v as (p: TrackEntry[]) => TrackEntry[])(prev) : v;
+      uploadDraft.tracks = next;
+      return next;
+    });
+  };
+  const setCoverSync = (f: File | null) => {
+    uploadDraft.cover = f;
+    setCover(f);
+  };
   const coverInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const singleAudioInputRef = useRef<HTMLInputElement>(null);
@@ -456,7 +491,8 @@ function UploadWizard() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (busy || tracks.length > 0 || cover) {
         e.preventDefault();
-        e.returnValue = "You have unsaved upload progress. Leaving this page will cancel your upload.";
+        e.returnValue =
+          "You have unsaved upload progress. Leaving this page will cancel your upload.";
         return e.returnValue;
       }
     };
@@ -479,17 +515,31 @@ function UploadWizard() {
       price: price.toString(),
       feeAgreed: feeAgreed.toString(),
     };
-    
+
     // Only write if data exists to avoid unnecessary writes
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         sessionStorage.setItem(`upload-wizard-${key}`, value);
       }
     });
-  }, [step, mode, title, description, genre, releaseDate, hasFeature, hasLabel, tier, price, feeAgreed]);
+  }, [
+    step,
+    mode,
+    title,
+    description,
+    genre,
+    releaseDate,
+    hasFeature,
+    hasLabel,
+    tier,
+    price,
+    feeAgreed,
+  ]);
 
   // Clear sessionStorage on successful upload
   const clearSessionStorage = () => {
+    uploadDraft.cover = null;
+    uploadDraft.tracks = [];
     sessionStorage.removeItem("upload-wizard-step");
     sessionStorage.removeItem("upload-wizard-mode");
     sessionStorage.removeItem("upload-wizard-title");
@@ -514,6 +564,12 @@ function UploadWizard() {
   const FREE_SONG_FEE = pricing.free_song_fee;
 
   function switchMode(next: UploadMode) {
+    if (next !== mode && tracks.length > 0) {
+      const ok = window.confirm(
+        "Switching upload type will clear your currently staged audio files. Continue?",
+      );
+      if (!ok) return;
+    }
     setMode(next);
     setTier("paid");
     setPrice(next === "album" ? ALBUM_MIN : SINGLE_MIN);
@@ -531,12 +587,14 @@ function UploadWizard() {
       return;
     }
     setError(null);
-    setCover(file);
+    setCoverSync(file);
   }
 
   function audioFilesToEntries(fileList: FileList | File[]): TrackEntry[] {
     return Array.from(fileList)
-      .filter((f) => f.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(f.name))
+      .filter(
+        (f) => f.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(f.name),
+      )
       .map((f) => ({
         id: `${f.name}-${f.lastModified}-${Math.random()}`,
         file: f,
@@ -665,7 +723,9 @@ function UploadWizard() {
       if (cover) {
         setCurrentStageText(`Uploading cover art (${cover.name})…`);
         setUploadStates((prev) =>
-          prev.map((it) => (it.id === "cover-art" ? { ...it, stage: "uploading", percent: 0 } : it)),
+          prev.map((it) =>
+            it.id === "cover-art" ? { ...it, stage: "uploading", percent: 0 } : it,
+          ),
         );
         cover_url = await uploadFileToBucket("album-art", user.id, cover, (pct) => {
           setUploadStates((prev) =>
@@ -682,20 +742,31 @@ function UploadWizard() {
 
       if (mode === "single") {
         const trackEntry = tracks[0];
-        setCurrentStageText(`Uploading audio file: "${trackEntry.title.trim() || trackEntry.file.name}"…`);
+        setCurrentStageText(
+          `Uploading audio file: "${trackEntry.title.trim() || trackEntry.file.name}"…`,
+        );
         setUploadStates((prev) =>
-          prev.map((it) => (it.id === trackEntry.id ? { ...it, stage: "uploading", percent: 0 } : it)),
+          prev.map((it) =>
+            it.id === trackEntry.id ? { ...it, stage: "uploading", percent: 0 } : it,
+          ),
         );
 
-        const audio_url = await uploadFileToBucket("song-audio", user.id, trackEntry.file, (pct) => {
-          setUploadStates((prev) =>
-            prev.map((it) => (it.id === trackEntry.id ? { ...it, percent: pct } : it)),
-          );
-          calcOverall(pct);
-        });
+        const audio_url = await uploadFileToBucket(
+          "song-audio",
+          user.id,
+          trackEntry.file,
+          (pct) => {
+            setUploadStates((prev) =>
+              prev.map((it) => (it.id === trackEntry.id ? { ...it, percent: pct } : it)),
+            );
+            calcOverall(pct);
+          },
+        );
 
         setUploadStates((prev) =>
-          prev.map((it) => (it.id === trackEntry.id ? { ...it, stage: "saving", percent: 100 } : it)),
+          prev.map((it) =>
+            it.id === trackEntry.id ? { ...it, stage: "saving", percent: 100 } : it,
+          ),
         );
         setCurrentStageText("Registering song with platform…");
 
@@ -737,7 +808,9 @@ function UploadWizard() {
             if ((inviteRes as any).registration_link) {
               setFeatureInviteLink((inviteRes as any).registration_link);
             } else if ((inviteRes as any).existingUser) {
-              toast.success(`🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`);
+              toast.success(
+                `🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`,
+              );
             }
           } catch (inviteError) {
             console.error("Failed to send feature invitation:", inviteError);
@@ -760,7 +833,9 @@ function UploadWizard() {
             if ((inviteRes as any).registration_link) {
               setLabelInviteLink((inviteRes as any).registration_link);
             } else if ((inviteRes as any).existingUser) {
-              toast.success(`Label already registered. Please use the label dashboard to complete the process.`);
+              toast.success(
+                `Label already registered. Please use the label dashboard to complete the process.`,
+              );
             }
           } catch (inviteError) {
             console.error("Failed to send label invitation:", inviteError);
@@ -770,9 +845,10 @@ function UploadWizard() {
 
         // Show success message
         if (!featureInviteLink && !labelInviteLink) {
-          const successMessage = tier === "free"
-            ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
-            : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
+          const successMessage =
+            tier === "free"
+              ? `🎵 Song "${title}" submitted! Waiting for admin approval. (A K${FREE_SONG_FEE} fee applies)`
+              : `🎵 Song "${title}" uploaded successfully! Waiting for admin approval.`;
           toast.success(successMessage);
         } else {
           toast.success(`🎵 Song "${title}" uploaded successfully!`);
@@ -780,7 +856,7 @@ function UploadWizard() {
 
         qc.invalidateQueries({ queryKey: ["my-songs"] });
         qc.invalidateQueries({ queryKey: ["artist-overview"] });
-        
+
         // If there are invitation links, show them in the success screen
         if (featureInviteLink || labelInviteLink) {
           setDone(`🎵 Song "${title}" uploaded successfully!`);
@@ -819,7 +895,9 @@ function UploadWizard() {
       for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
         const entry = tracks[trackIdx];
         const trackTitle = entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, "");
-        setCurrentStageText(`Uploading track ${trackIdx + 1} of ${tracks.length}: "${trackTitle}"…`);
+        setCurrentStageText(
+          `Uploading track ${trackIdx + 1} of ${tracks.length}: "${trackTitle}"…`,
+        );
         setUploadStates((prev) =>
           prev.map((it) => (it.id === entry.id ? { ...it, stage: "uploading", percent: 0 } : it)),
         );
@@ -875,7 +953,9 @@ function UploadWizard() {
           if ((inviteRes as any).registration_link) {
             setLabelInviteLink((inviteRes as any).registration_link);
           } else if ((inviteRes as any).existingUser) {
-            toast.success(`💿 Album "${title}" uploaded! Label already registered. Please use the label dashboard to complete the process.`);
+            toast.success(
+              `💿 Album "${title}" uploaded! Label already registered. Please use the label dashboard to complete the process.`,
+            );
           }
         } catch (inviteError) {
           console.error("Failed to send label invitation:", inviteError);
@@ -884,7 +964,9 @@ function UploadWizard() {
       }
 
       if (!labelInviteLink) {
-        toast.success(`💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`);
+        toast.success(
+          `💿 Album "${title}" with ${tracks.length} tracks uploaded! Waiting for admin approval.`,
+        );
       } else {
         toast.success(`💿 Album "${title}" uploaded successfully!`);
       }
@@ -921,12 +1003,13 @@ function UploadWizard() {
     return (
       <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-6">
         <p className="text-lg font-semibold">✓ {done || "Upload Complete!"}</p>
-        
+
         {featureInviteLink && (
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
             <p className="text-sm font-medium">🎤 Featured Artist Invitation</p>
             <p className="text-xs text-muted-foreground">
-              Copy this registration link and send it to the featured artist via email or messaging app.
+              Copy this registration link and send it to the featured artist via email or messaging
+              app.
             </p>
             <div className="flex gap-2">
               <input
@@ -994,7 +1077,7 @@ function UploadWizard() {
               setReleaseDate("");
               setHasFeature(false);
               setHasLabel(false);
-              setCover(null);
+              setCoverSync(null);
               setTracks([]);
               setTier("paid");
               setPrice(SINGLE_MIN);
@@ -1067,7 +1150,9 @@ function UploadWizard() {
               key={m}
               onClick={() => switchMode(m)}
               className={`text-left p-6 rounded-2xl border-2 transition-colors ${
-                mode === m ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50"
+                mode === m
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-card hover:border-primary/50"
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
@@ -1120,7 +1205,7 @@ function UploadWizard() {
               Release Date <span className="font-normal text-muted-foreground">(optional)</span>
               <input
                 type="date"
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split("T")[0]}
                 className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
                 value={releaseDate}
                 onChange={(e) => setReleaseDate(e.target.value)}
@@ -1165,7 +1250,8 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Feature Artist Details</p>
               <p className="text-xs text-muted-foreground">
-                If the featured artist is not yet registered on Wesu, enter their email to send them a registration link.
+                If the featured artist is not yet registered on Wesu, enter their email to send them
+                a registration link.
               </p>
               <input
                 type="email"
@@ -1194,7 +1280,8 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Label Details</p>
               <p className="text-xs text-muted-foreground">
-                If the label is not yet registered on Wesu, enter their email to send them a registration link.
+                If the label is not yet registered on Wesu, enter their email to send them a
+                registration link.
               </p>
               <input
                 type="email"
@@ -1222,7 +1309,9 @@ function UploadWizard() {
           <div className="rounded-xl border border-border bg-secondary/30 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold">Cover art <span className="font-normal text-muted-foreground">(optional)</span></p>
+                <p className="text-sm font-semibold">
+                  Cover art <span className="font-normal text-muted-foreground">(optional)</span>
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">JPG, PNG, or WEBP · max 10MB</p>
               </div>
               <div className="flex items-center gap-2">
@@ -1237,7 +1326,7 @@ function UploadWizard() {
                   <button
                     type="button"
                     onClick={() => {
-                      setCover(null);
+                      setCoverSync(null);
                       if (coverInputRef.current) coverInputRef.current.value = "";
                     }}
                     className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-accent transition"
@@ -1263,12 +1352,19 @@ function UploadWizard() {
             /* Single-song: plain drop zone */
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files, true); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                addAudioFiles(e.dataTransfer.files, true);
+              }}
               className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 hover:border-primary/60 hover:bg-primary/5 transition"
             >
               <FileAudio className="size-8 mx-auto mb-2 text-primary" />
-              <p className="text-sm font-semibold">{tracks.length > 0 ? tracks[0].file.name : "Choose audio file"}</p>
-              <p className="text-xs text-muted-foreground mt-1">Drop an audio file here, or use the button below</p>
+              <p className="text-sm font-semibold">
+                {tracks.length > 0 ? tracks[0].file.name : "Choose audio file"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Drop an audio file here, or use the button below
+              </p>
               <button
                 type="button"
                 onClick={() => audioInputRef.current?.click()}
@@ -1294,7 +1390,10 @@ function UploadWizard() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold flex items-center gap-1.5">
                     <ListOrdered className="size-4 text-primary" />
-                    Tracklist Order{tracks.length > 0 ? ` (${tracks.length} song${tracks.length > 1 ? "s" : ""})` : ""}
+                    Tracklist Order
+                    {tracks.length > 0
+                      ? ` (${tracks.length} song${tracks.length > 1 ? "s" : ""})`
+                      : ""}
                   </p>
                 </div>
                 {/* Single add */}
@@ -1319,7 +1418,10 @@ function UploadWizard() {
                   type="file"
                   accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
                   className="sr-only"
-                  onChange={(e) => { addAudioFiles(e.target.files ?? []); e.target.value = ""; }}
+                  onChange={(e) => {
+                    addAudioFiles(e.target.files ?? []);
+                    e.target.value = "";
+                  }}
                 />
                 <input
                   id="upload-audio"
@@ -1328,7 +1430,10 @@ function UploadWizard() {
                   accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
                   multiple
                   className="sr-only"
-                  onChange={(e) => { addAudioFiles(e.target.files ?? []); e.target.value = ""; }}
+                  onChange={(e) => {
+                    addAudioFiles(e.target.files ?? []);
+                    e.target.value = "";
+                  }}
                 />
               </div>
 
@@ -1336,7 +1441,9 @@ function UploadWizard() {
                 <div className="text-xs text-muted-foreground bg-secondary/40 border border-border/60 rounded-xl px-3.5 py-2.5 flex items-center gap-2">
                   <span className="text-primary font-bold">ℹ</span>
                   <span>
-                    Tracks will appear on your album in this exact sequence. Use the <strong>↑</strong> and <strong>↓</strong> arrow buttons or drag to arrange your track order.
+                    Tracks will appear on your album in this exact sequence. Use the{" "}
+                    <strong>↑</strong> and <strong>↓</strong> arrow buttons or drag to arrange your
+                    track order.
                   </span>
                 </div>
               )}
@@ -1345,11 +1452,16 @@ function UploadWizard() {
                 /* Drop zone shown when empty */
                 <div
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    addAudioFiles(e.dataTransfer.files);
+                  }}
                   className="border-2 border-dashed border-border rounded-xl p-8 text-center bg-secondary/30 hover:border-primary/60 hover:bg-primary/5 transition"
                 >
                   <FileAudio className="size-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Drop audio files here, or use the buttons above</p>
+                  <p className="text-sm text-muted-foreground">
+                    Drop audio files here, or use the buttons above
+                  </p>
                 </div>
               ) : (
                 /* Drag-to-reorder tracklist with Up/Down buttons */
@@ -1442,7 +1554,10 @@ function UploadWizard() {
               {tracks.length > 0 && (
                 <div
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); addAudioFiles(e.dataTransfer.files); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    addAudioFiles(e.dataTransfer.files);
+                  }}
                   className="rounded-lg border-2 border-dashed border-border py-3 text-center text-xs text-muted-foreground hover:border-primary/50 transition"
                 >
                   Drop more files here to append
@@ -1575,8 +1690,12 @@ function UploadWizard() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className="text-xl font-bold font-mono text-primary">{overallProgress}%</span>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Progress</p>
+                  <span className="text-xl font-bold font-mono text-primary">
+                    {overallProgress}%
+                  </span>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                    Total Progress
+                  </p>
                 </div>
               </div>
 
@@ -1597,10 +1716,10 @@ function UploadWizard() {
                       item.stage === "uploading"
                         ? "border-primary/50 bg-primary/5"
                         : item.stage === "done"
-                        ? "border-border/60 bg-card/60 text-muted-foreground"
-                        : item.stage === "error"
-                        ? "border-destructive/50 bg-destructive/5 text-destructive"
-                        : "border-border/40 bg-secondary/20 text-muted-foreground"
+                          ? "border-border/60 bg-card/60 text-muted-foreground"
+                          : item.stage === "error"
+                            ? "border-destructive/50 bg-destructive/5 text-destructive"
+                            : "border-border/40 bg-secondary/20 text-muted-foreground"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
@@ -1618,7 +1737,9 @@ function UploadWizard() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className={`truncate font-medium ${item.stage === "uploading" ? "text-foreground font-semibold" : ""}`}>
+                        <p
+                          className={`truncate font-medium ${item.stage === "uploading" ? "text-foreground font-semibold" : ""}`}
+                        >
                           {item.name}
                         </p>
                         {item.stage === "uploading" && (
@@ -1647,19 +1768,13 @@ function UploadWizard() {
                         </span>
                       )}
                       {item.stage === "saving" && (
-                        <span className="text-xs text-muted-foreground animate-pulse">
-                          Saving…
-                        </span>
+                        <span className="text-xs text-muted-foreground animate-pulse">Saving…</span>
                       )}
                       {item.stage === "waiting" && (
-                        <span className="text-xs text-muted-foreground">
-                          In queue
-                        </span>
+                        <span className="text-xs text-muted-foreground">In queue</span>
                       )}
                       {item.stage === "error" && (
-                        <span className="text-xs font-semibold text-destructive">
-                          Failed
-                        </span>
+                        <span className="text-xs font-semibold text-destructive">Failed</span>
                       )}
                     </div>
                   </div>
@@ -1692,7 +1807,6 @@ function UploadWizard() {
     </form>
   );
 }
-
 
 function PayoutTab() {
   const qc = useQueryClient();
@@ -1728,20 +1842,21 @@ function PayoutTab() {
   const availableBalance = Number(overview?.totalRevenueZmw ?? 0);
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
   const eligible = availableBalance > minWithdrawal;
-  const [form, setForm] = useState({ amount: minWithdrawal, method_code: "MTN_MOMO", destination: "" });
+  const [form, setForm] = useState({
+    amount: minWithdrawal,
+    method_code: "MTN_MOMO",
+    destination: "",
+  });
 
   return (
     <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
       <div className="bg-card border border-border rounded-2xl p-6">
         <p className="text-sm text-muted-foreground">Available earnings</p>
-        <p className="text-3xl font-bold mt-1">
-          ZMW {availableBalance.toFixed(2)}
-        </p>
+        <p className="text-3xl font-bold mt-1">ZMW {availableBalance.toFixed(2)}</p>
         <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
-          {eligible 
+          {eligible
             ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
-            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`
-          }
+            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`}
         </div>
       </div>
       <form

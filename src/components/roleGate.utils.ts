@@ -24,8 +24,9 @@ export function checkRoleAccess(opts: {
   isArtist: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isLabel?: boolean;
 }): AccessResult {
-  const { require, isUser, isArtist, isAdmin, isSuperAdmin } = opts;
+  const { require, isUser, isArtist, isAdmin, isSuperAdmin, isLabel } = opts;
 
   if (!isUser) return "redirect-auth";
 
@@ -38,7 +39,9 @@ export function checkRoleAccess(opts: {
           ? isAdmin || isSuperAdmin
           : require === "superadmin"
             ? isSuperAdmin
-            : false;
+            : require === "label"
+              ? Boolean(isLabel) || isAdmin || isSuperAdmin
+              : false;
 
   return ok ? "allowed" : "redirect-home";
 }

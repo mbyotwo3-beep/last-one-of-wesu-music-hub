@@ -61,7 +61,8 @@ export function NowPlayingSheet() {
   const queueIndex = usePlayer((s) => s.queueIndex);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
-  const [volume, setVolume] = useState(1);
+  const volume = usePlayer((s) => s.volume);
+  const setVolume = usePlayer((s) => s.setVolume);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
@@ -140,7 +141,8 @@ export function NowPlayingSheet() {
 
   if (!track) return null;
 
-  const repeatLabel = repeat === "off" ? "Repeat off" : repeat === "one" ? "Repeat one" : "Repeat all";
+  const repeatLabel =
+    repeat === "off" ? "Repeat off" : repeat === "one" ? "Repeat one" : "Repeat all";
 
   return (
     <>
@@ -349,7 +351,9 @@ export function NowPlayingSheet() {
           </button>
 
           <button
-            onClick={() => { if (!isLoading) togglePlay(); }}
+            onClick={() => {
+              if (!isLoading) togglePlay();
+            }}
             disabled={isLoading}
             className="w-16 h-16 flex items-center justify-center bg-white rounded-full shadow-lg active:scale-90 transition-transform disabled:opacity-50 cursor-pointer hover:scale-105"
             aria-label={playing ? "Pause" : "Play"}
@@ -427,7 +431,9 @@ export function NowPlayingSheet() {
                       className="size-10 rounded overflow-hidden bg-[#2c2c2e] object-cover"
                     />
                     <div className="flex-1 min-w-0 text-left">
-                      <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : "text-white"}`}>
+                      <p
+                        className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : "text-white"}`}
+                      >
                         {queueTrack.title}
                       </p>
                       <p className="text-xs text-white/60 truncate">{queueTrack.artistName}</p>

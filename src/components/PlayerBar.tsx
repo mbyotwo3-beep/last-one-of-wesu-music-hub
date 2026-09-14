@@ -44,12 +44,7 @@ import {
   isNativeAudioAvailable,
 } from "@/lib/native-audio";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  getAudio,
-  primeAudio,
-  getCachedAudioUrl,
-  setCachedAudioUrl,
-} from "@/lib/audio";
+import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/lib/audio";
 
 let _nativeAvailable: boolean | null = null;
 
@@ -117,14 +112,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const trackPrice: number = Number(meta?.price ?? 0);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
-
   // Load audio when track changes
   useEffect(() => {
     if (!track) {
       const previousId = currentTrackId.current;
       const previousProgress = usePlayer.getState().progressSeconds;
       if (user && previousId && !isPreview && previousProgress > 0) {
-        updatePlayProgressFn({ data: { song_id: previousId, progress_seconds: previousProgress } }).catch(() => {});
+        updatePlayProgressFn({
+          data: { song_id: previousId, progress_seconds: previousProgress },
+        }).catch(() => {});
       }
       if (currentTrackId.current) stopNative(currentTrackId.current).catch(() => {});
       audioEventsCleanupRef.current?.();
@@ -147,7 +143,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       const previousId = currentTrackId.current;
       const previousProgress = usePlayer.getState().progressSeconds;
       if (user && !isPreview && previousProgress > 0) {
-        updatePlayProgressFn({ data: { song_id: previousId, progress_seconds: previousProgress } }).catch(() => {});
+        updatePlayProgressFn({
+          data: { song_id: previousId, progress_seconds: previousProgress },
+        }).catch(() => {});
       }
       stopNative(currentTrackId.current).catch(() => {});
       nativeCleanupRef.current?.();
@@ -200,7 +198,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             if (signed && signed.url && !signed.requiresPurchase) {
               url = signed.url;
             } else {
-              const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
+              const res = await getPreviewFn({
+                data: { song_id: track!.id, access_token: accessToken },
+              });
               url = res.url;
               previewMode = true;
             }
@@ -217,7 +217,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               previewMode = false;
               setShowAd(true);
             } else {
-              const res = await getPreviewFn({ data: { song_id: track!.id, access_token: accessToken } });
+              const res = await getPreviewFn({
+                data: { song_id: track!.id, access_token: accessToken },
+              });
               url = res.url;
               previewMode = true;
               setShowAd(true);
@@ -268,7 +270,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   stopNative(track!.id).catch(() => {});
                   if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
                   setError("Preview ended. Buy this track for full access.");
-
                 }, 15000);
               }
               const cleanup = await onNativeComplete(() => {
@@ -278,7 +279,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 }
                 usePlayer.getState().skipNext();
                 if (track && user && !previewMode) {
-                  updatePlayProgressFn({ data: { song_id: track!.id, progress_seconds: Math.floor(track.durationSeconds ?? 0) } }).catch(() => {});
+                  updatePlayProgressFn({
+                    data: {
+                      song_id: track!.id,
+                      progress_seconds: Math.floor(track.durationSeconds ?? 0),
+                    },
+                  }).catch(() => {});
                   incrementFn({ data: { song_id: track!.id } }).catch(() => {});
                 }
               });
@@ -307,7 +313,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const onCanPlay = () => {
           if (isCurrentTrack()) {
             setLoading(false);
-            if (usePlayer.getState().playing && audio.paused && audio.src && !audio.src.startsWith("data:")) {
+            if (
+              usePlayer.getState().playing &&
+              audio.paused &&
+              audio.src &&
+              !audio.src.startsWith("data:")
+            ) {
               audio.play().catch(() => {});
             }
           }
@@ -423,7 +434,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     const onEnded = () => {
       const st = usePlayer.getState();
       if (track && user && !isPreview) {
-        updatePlayProgressFn({ data: { song_id: track.id, progress_seconds: Math.floor(audio.currentTime || audio.duration || 0) } }).catch(() => {});
+        updatePlayProgressFn({
+          data: {
+            song_id: track.id,
+            progress_seconds: Math.floor(audio.currentTime || audio.duration || 0),
+          },
+        }).catch(() => {});
         incrementFn({ data: { song_id: track.id } }).catch(() => {});
       }
       if (st.repeat === "one") {
@@ -450,6 +466,30 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   useEffect(() => {
     getAudio().volume = muted ? 0 : volume;
   }, [volume, muted]);
+
+  // MediaSession — lock-screen / notification controls (Spotify feel)
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+      if (!track) return;
+      navigator.mediaSession.metadata = new (window as any).MediaMetadata({
+        title: track.title,
+        artist: track.artistName,
+        artwork: track.coverUrl ? [{ src: track.coverUrl, sizes: "512x512" }] : [],
+      });
+      const st = () => usePlayer.getState();
+      navigator.mediaSession.setActionHandler("play", () => {
+        if (!st().playing) st().togglePlay();
+      });
+      navigator.mediaSession.setActionHandler("pause", () => {
+        if (st().playing) st().togglePlay();
+      });
+      navigator.mediaSession.setActionHandler("previoustrack", () => st().skipPrev());
+      navigator.mediaSession.setActionHandler("nexttrack", () => st().skipNext());
+    } catch {
+      /* ignore — unsupported browsers */
+    }
+  }, [track?.id, track?.title, track?.artistName, track?.coverUrl]);
 
   // Resume playback on user gesture if browser deferred autoplay
   useEffect(() => {
@@ -491,7 +531,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   if (audioOnly) return null;
   if (!track) return null;
 
-  const dur = isPreview ? 15 : (audioDuration || track.durationSeconds || 0);
+  const dur = isPreview ? 15 : audioDuration || track.durationSeconds || 0;
   const progressPct = dur > 0 ? Math.min((progressSeconds / dur) * 100, 100) : 0;
 
   function seek(e: React.MouseEvent<HTMLDivElement>) {
@@ -520,7 +560,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             >
               <Minimize2 className="size-5" />
             </button>
-            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Now Playing</p>
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Now Playing
+            </p>
             <button
               onClick={() => {
                 usePlayer.getState().exitSong();
@@ -548,18 +590,33 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   {albumId ? (
-                    <Link to="/albums/$id" params={{ id: albumId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                    <Link
+                      to="/albums/$id"
+                      params={{ id: albumId }}
+                      onClick={() => setIsExpanded(false)}
+                      className="block hover:underline"
+                    >
                       <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                     </Link>
                   ) : artistId ? (
-                    <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block hover:underline">
+                    <Link
+                      to="/artists/$id"
+                      params={{ id: artistId }}
+                      onClick={() => setIsExpanded(false)}
+                      className="block hover:underline"
+                    >
                       <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                     </Link>
                   ) : (
                     <h2 className="text-2xl font-bold truncate">{track.title}</h2>
                   )}
                   {artistId ? (
-                    <Link to="/artists/$id" params={{ id: artistId }} onClick={() => setIsExpanded(false)} className="block text-lg text-muted-foreground truncate hover:text-foreground hover:underline">
+                    <Link
+                      to="/artists/$id"
+                      params={{ id: artistId }}
+                      onClick={() => setIsExpanded(false)}
+                      className="block text-lg text-muted-foreground truncate hover:text-foreground hover:underline"
+                    >
                       {track.artistName}
                     </Link>
                   ) : (
@@ -567,8 +624,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   )}
                 </div>
                 {user && (
-                  <button onClick={toggleLike} className="shrink-0 ml-4" aria-label={liked ? "Unlike" : "Like"}>
-                    <Heart className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                  <button
+                    onClick={toggleLike}
+                    className="shrink-0 ml-4"
+                    aria-label={liked ? "Unlike" : "Like"}
+                  >
+                    <Heart
+                      className={`size-6 ${liked ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                    />
                   </button>
                 )}
               </div>
@@ -610,7 +673,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 >
                   <Shuffle className="size-5" />
                 </button>
-                <button onClick={skipPrev} className="text-muted-foreground hover:text-foreground" aria-label="Previous">
+                <button
+                  onClick={skipPrev}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Previous"
+                >
                   <SkipBack className="size-6" />
                 </button>
                 <button
@@ -627,7 +694,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                     <Play className="size-6 ml-0.5" />
                   )}
                 </button>
-                <button onClick={skipNext} className="text-muted-foreground hover:text-foreground" aria-label="Next">
+                <button
+                  onClick={skipNext}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Next"
+                >
                   <SkipForward className="size-6" />
                 </button>
                 <button
@@ -635,7 +706,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
                   aria-label="Repeat"
                 >
-                  {repeat === "one" ? <Repeat1 className="size-5" /> : <Repeat className="size-5" />}
+                  {repeat === "one" ? (
+                    <Repeat1 className="size-5" />
+                  ) : (
+                    <Repeat className="size-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -644,7 +719,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             <div className="w-20 border-l border-border bg-muted/20 flex flex-col">
               {/* Vertical volume slider */}
               <div className="flex-1 flex flex-col items-center justify-center py-8">
-                <button onClick={toggleMute} className="mb-4 text-muted-foreground hover:text-foreground" aria-label="Mute">
+                <button
+                  onClick={toggleMute}
+                  className="mb-4 text-muted-foreground hover:text-foreground"
+                  aria-label="Mute"
+                >
                   <VolIcon className="size-5" />
                 </button>
                 <div className="h-48 w-1 bg-muted rounded-full relative">
@@ -699,10 +778,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                         className="size-10 rounded overflow-hidden bg-card object-cover"
                       />
                       <div className="flex-1 min-w-0 text-left">
-                        <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : ""}`}>
+                        <p
+                          className={`text-sm font-medium truncate ${index === queueIndex ? "text-primary" : ""}`}
+                        >
                           {queueTrack.title}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{queueTrack.artistName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {queueTrack.artistName}
+                        </p>
                       </div>
                       {index === queueIndex && playing && (
                         <div className="flex items-center gap-0.5">
@@ -717,7 +800,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               )}
             </div>
           </div>
-          {error && <div className="p-4 text-sm text-destructive text-center border-t border-border">{error}</div>}
+          {error && (
+            <div className="p-4 text-sm text-destructive text-center border-t border-border">
+              {error}
+            </div>
+          )}
         </div>
       )}
 
@@ -752,7 +839,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           </div>
         )}
 
-
         <div className="h-20 px-4 grid grid-cols-3 items-center gap-4">
           {/* Left: Track info */}
           <div className="flex items-center gap-3 min-w-0">
@@ -765,21 +851,36 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             />
             <div className="min-w-0 overflow-hidden">
               {albumId ? (
-                <Link to="/albums/$id" params={{ id: albumId }} className="text-sm font-medium text-white truncate hover:underline block">
+                <Link
+                  to="/albums/$id"
+                  params={{ id: albumId }}
+                  className="text-sm font-medium text-white truncate hover:underline block"
+                >
                   {track.title}
                 </Link>
               ) : artistId ? (
-                <Link to="/artists/$id" params={{ id: artistId }} className="text-sm font-medium text-white truncate hover:underline block">
+                <Link
+                  to="/artists/$id"
+                  params={{ id: artistId }}
+                  className="text-sm font-medium text-white truncate hover:underline block"
+                >
                   {track.title}
                 </Link>
               ) : (
-                <p className="text-sm font-medium text-white truncate hover:underline cursor-pointer" onClick={() => setIsExpanded(true)}>
+                <p
+                  className="text-sm font-medium text-white truncate hover:underline cursor-pointer"
+                  onClick={() => setIsExpanded(true)}
+                >
                   {track.title}
                 </p>
               )}
 
               {artistId ? (
-                <Link to="/artists/$id" params={{ id: artistId }} className="text-xs text-gray-300 truncate hover:text-white hover:underline block">
+                <Link
+                  to="/artists/$id"
+                  params={{ id: artistId }}
+                  className="text-xs text-gray-300 truncate hover:text-white hover:underline block"
+                >
                   {track.artistName}
                 </Link>
               ) : (
@@ -793,7 +894,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
                   aria-label={liked ? "Unlike" : "Like"}
                 >
-                  <Heart className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`} />
+                  <Heart
+                    className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`}
+                  />
                 </button>
               )}
               <ShareMenu
@@ -896,7 +999,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               <ListMusic className="size-4" />
             </Link>
             <div className="flex items-center gap-2">
-              <button onClick={toggleMute} className="text-gray-300 hover:text-white" aria-label="Mute">
+              <button
+                onClick={toggleMute}
+                className="text-gray-300 hover:text-white"
+                aria-label="Mute"
+              >
                 <VolIcon className="size-4" />
               </button>
               <input

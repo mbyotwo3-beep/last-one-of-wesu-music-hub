@@ -5,23 +5,33 @@ import { checkRoleAccess } from "@/components/roleGate.utils";
 import { toast } from "sonner";
 
 interface Props {
-  require: "user" | "artist" | "admin" | "superadmin";
+  require: "user" | "artist" | "admin" | "superadmin" | "label";
   children: ReactNode;
 }
 
 export function RoleGate({ require, children }: Props) {
-  const { isUser, isArtist, isAdmin, isSuperAdmin, loading } = useUserRoles();
+  const { isUser, isArtist, isAdmin, isSuperAdmin, isLabel, loading } = useUserRoles() as any;
   const navigate = useNavigate();
 
   const access = loading
     ? null
-    : checkRoleAccess({ require, isUser, isArtist, isAdmin, isSuperAdmin });
+    : checkRoleAccess({
+        require: require as any,
+        isUser,
+        isArtist,
+        isAdmin,
+        isSuperAdmin,
+        isLabel,
+      });
   const ok = access === "allowed";
 
   useEffect(() => {
     if (loading) return;
     if (access === "redirect-auth") {
-      navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
       return;
     }
     if (access === "redirect-home") {

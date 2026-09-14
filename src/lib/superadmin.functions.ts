@@ -43,7 +43,9 @@ export const listUsers = createServerFn({ method: "GET" })
 
 export const grantRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { user_id: string; role: "user" | "artist" | "admin" | "superadmin" }) => d)
+  .validator(
+    (d: { user_id: string; role: "user" | "artist" | "admin" | "superadmin" | "label" }) => d,
+  )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -93,7 +95,9 @@ export const grantRole = createServerFn({ method: "POST" })
 
 export const revokeRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { user_id: string; role: "user" | "artist" | "admin" | "superadmin" }) => d)
+  .validator(
+    (d: { user_id: string; role: "user" | "artist" | "admin" | "superadmin" | "label" }) => d,
+  )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

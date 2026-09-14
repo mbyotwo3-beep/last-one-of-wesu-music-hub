@@ -199,9 +199,14 @@ function FeaturedTab() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading featured slots…</div>;
-  if (error) return <div className="text-destructive">Error loading featured slots: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">
+        Error loading featured slots: {(error as Error).message}
+      </div>
+    );
   if (!data) return <div className="text-muted-foreground">No featured slots found</div>;
-  
+
   const upsertM = useMutation({
     mutationFn: upsertFn,
     onSuccess: () => {
@@ -357,7 +362,11 @@ function OverviewTab() {
   const fn = useServerFn(getPlatformStats);
   const analyticsFn = useServerFn(getPlatformAnalytics);
   const listPayoutsFn = useServerFn(listPayouts);
-  const { data, isLoading, error } = useQuery({ queryKey: ["super-stats"], queryFn: () => fn(), retry: 1 });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["super-stats"],
+    queryFn: () => fn(),
+    retry: 1,
+  });
   const { data: payouts, error: payoutsError } = useQuery({
     queryKey: ["super-payouts-overview"],
     queryFn: () => listPayoutsFn(),
@@ -371,16 +380,25 @@ function OverviewTab() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading metrics…</div>;
-  if (error) return <div className="text-destructive">Error loading stats: {(error as Error).message}</div>;
+  if (error)
+    return <div className="text-destructive">Error loading stats: {(error as Error).message}</div>;
   if (!data) return <div className="text-muted-foreground">No data available</div>;
 
   const pendingPayouts = payouts?.filter((p: any) => p.status === "pending") ?? [];
 
   const cards = [
     { label: "Total Users", value: data.totalUsers.toLocaleString(), color: "text-blue-400" },
-    { label: "Total Artists", value: ((data as any).totalArtists ?? 0).toLocaleString(), color: "text-purple-400" },
+    {
+      label: "Total Artists",
+      value: ((data as any).totalArtists ?? 0).toLocaleString(),
+      color: "text-purple-400",
+    },
     { label: "Total Songs", value: data.totalSongs.toLocaleString(), color: "text-rose-400" },
-    { label: "Completed purchases (30d)", value: data.completedPurchases30d.toLocaleString(), color: "text-yellow-400" },
+    {
+      label: "Completed purchases (30d)",
+      value: data.completedPurchases30d.toLocaleString(),
+      color: "text-yellow-400",
+    },
     {
       label: "Revenue (30 days)",
       value: `ZMW ${data.monthlyRevenueZmw.toFixed(2)}`,
@@ -414,7 +432,8 @@ function OverviewTab() {
             {pendingPayouts.length} Payout Request{pendingPayouts.length > 1 ? "s" : ""} Pending
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Artists are waiting to receive their earnings. Go to the Payouts tab to review and approve.
+            Artists are waiting to receive their earnings. Go to the Payouts tab to review and
+            approve.
           </p>
           <div className="space-y-2">
             {pendingPayouts.slice(0, 3).map((p: any) => (
@@ -423,7 +442,9 @@ function OverviewTab() {
                 className="flex items-center justify-between bg-card/60 rounded-lg px-4 py-2"
               >
                 <span className="text-sm font-medium">{p.artist?.name ?? "—"}</span>
-                <span className="text-sm font-bold text-primary">ZMW {Number(p.amount).toFixed(2)}</span>
+                <span className="text-sm font-bold text-primary">
+                  ZMW {Number(p.amount).toFixed(2)}
+                </span>
               </div>
             ))}
             {pendingPayouts.length > 3 && (
@@ -443,7 +464,11 @@ function UsersTab() {
   const list = useServerFn(listUsers);
   const grant = useServerFn(grantRole);
   const revoke = useServerFn(revokeRole);
-  const { data: users, isLoading, error } = useQuery({
+  const {
+    data: users,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["super-users"],
     queryFn: () => list(),
     retry: 1,
@@ -471,10 +496,12 @@ function UsersTab() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading users…</div>;
-  if (error) return <div className="text-destructive">Error loading users: {(error as Error).message}</div>;
+  if (error)
+    return <div className="text-destructive">Error loading users: {(error as Error).message}</div>;
   if (!users) return <div className="text-muted-foreground">No users found</div>;
-  const roles: Array<"user" | "artist" | "admin" | "superadmin"> = [
+  const roles: Array<"user" | "artist" | "admin" | "superadmin" | "label"> = [
     "artist",
+    "label",
     "admin",
     "superadmin",
   ];
@@ -553,7 +580,10 @@ function PlansTab() {
     queryKey: ["super-plans"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.from("subscription_plans").select("*").order("price_zmw");
+        const { data, error } = await supabase
+          .from("subscription_plans")
+          .select("*")
+          .order("price_zmw");
         if (error) throw error;
         setPlans(data ?? []);
         return data ?? [];
@@ -645,7 +675,10 @@ function PaymentsTab() {
     queryKey: ["super-methods"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.from("payment_methods").select("*").order("sort_order");
+        const { data, error } = await supabase
+          .from("payment_methods")
+          .select("*")
+          .order("sort_order");
         if (error) throw error;
         setMethods(data ?? []);
         return data ?? [];
@@ -670,32 +703,32 @@ function PaymentsTab() {
     <div className="space-y-4">
       {error && <div className="text-destructive text-sm">Error: {error}</div>}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-secondary text-muted-foreground">
-          <tr>
-            <th className="text-left p-3">Method</th>
-            <th className="text-left p-3">Category</th>
-            <th className="text-left p-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {methods.map((p) => (
-            <tr key={p.code} className="border-t border-border">
-              <td className="p-3 font-medium">{p.label}</td>
-              <td className="p-3 text-muted-foreground">{p.category}</td>
-              <td className="p-3">
-                <button
-                  disabled={m.isPending}
-                  onClick={() => m.mutate({ data: { code: p.code, is_enabled: !p.is_enabled } })}
-                  className={`text-xs px-3 py-1 rounded-full cursor-pointer transition-colors ${p.is_enabled ? "bg-primary/15 text-primary hover:bg-primary/25" : "bg-muted text-muted-foreground hover:bg-accent"}`}
-                >
-                  {p.is_enabled ? "Enabled" : "Disabled"}
-                </button>
-              </td>
+        <table className="w-full text-sm">
+          <thead className="bg-secondary text-muted-foreground">
+            <tr>
+              <th className="text-left p-3">Method</th>
+              <th className="text-left p-3">Category</th>
+              <th className="text-left p-3">Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {methods.map((p) => (
+              <tr key={p.code} className="border-t border-border">
+                <td className="p-3 font-medium">{p.label}</td>
+                <td className="p-3 text-muted-foreground">{p.category}</td>
+                <td className="p-3">
+                  <button
+                    disabled={m.isPending}
+                    onClick={() => m.mutate({ data: { code: p.code, is_enabled: !p.is_enabled } })}
+                    className={`text-xs px-3 py-1 rounded-full cursor-pointer transition-colors ${p.is_enabled ? "bg-primary/15 text-primary hover:bg-primary/25" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+                  >
+                    {p.is_enabled ? "Enabled" : "Disabled"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -705,7 +738,11 @@ function PayoutsTab() {
   const qc = useQueryClient();
   const list = useServerFn(listPayouts);
   const decide = useServerFn(decidePayout);
-  const { data, isLoading, error } = useQuery({ queryKey: ["super-payouts"], queryFn: () => list(), retry: 1 });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["super-payouts"],
+    queryFn: () => list(),
+    retry: 1,
+  });
   const m = useMutation({
     mutationFn: decide,
     onSuccess: () => {
@@ -718,7 +755,10 @@ function PayoutsTab() {
   });
 
   if (isLoading) return <div className="text-muted-foreground">Loading payouts…</div>;
-  if (error) return <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading payouts: {(error as Error).message}</div>
+    );
   if (!data) return <div className="text-muted-foreground">No payouts found</div>;
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -842,8 +882,12 @@ function SettingsTab() {
   }, [data, site]);
 
   if (isLoading) return <div className="text-muted-foreground">Loading settings…</div>;
-  if (error) return <div className="text-destructive">Error loading settings: {(error as Error).message}</div>;
-  if (!data || site === null) return <div className="text-muted-foreground">No settings available</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading settings: {(error as Error).message}</div>
+    );
+  if (!data || site === null)
+    return <div className="text-muted-foreground">No settings available</div>;
   return (
     <div className="space-y-4 max-w-2xl">
       <button
@@ -986,7 +1030,9 @@ function SettingsTab() {
               min={0}
               className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
               value={verification.min_followers ?? 100}
-              onChange={(e) => setVerification({ ...verification, min_followers: Number(e.target.value) })}
+              onChange={(e) =>
+                setVerification({ ...verification, min_followers: Number(e.target.value) })
+              }
             />
           </label>
           <label className="block text-sm">
@@ -996,7 +1042,9 @@ function SettingsTab() {
               min={0}
               className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
               value={verification.min_earnings ?? 500}
-              onChange={(e) => setVerification({ ...verification, min_earnings: Number(e.target.value) })}
+              onChange={(e) =>
+                setVerification({ ...verification, min_earnings: Number(e.target.value) })
+              }
             />
           </label>
         </div>
@@ -1033,12 +1081,18 @@ function SettingsTab() {
   );
 }
 
-
 function AuditTab() {
   const fn = useServerFn(listAudit);
-  const { data, isLoading, error } = useQuery({ queryKey: ["super-audit"], queryFn: () => fn(), retry: 1 });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["super-audit"],
+    queryFn: () => fn(),
+    retry: 1,
+  });
   if (isLoading) return <div className="text-muted-foreground">Loading audit log…</div>;
-  if (error) return <div className="text-destructive">Error loading audit log: {(error as Error).message}</div>;
+  if (error)
+    return (
+      <div className="text-destructive">Error loading audit log: {(error as Error).message}</div>
+    );
   if (!data) return <div className="text-muted-foreground">No audit entries found</div>;
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">

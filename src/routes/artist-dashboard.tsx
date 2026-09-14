@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -22,7 +22,12 @@ import { useUserRoles } from "@/hooks/use-roles";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { getMyArtistAnalytics } from "@/lib/analytics.functions";
-import { requestArtistVerification, deleteSong } from "@/lib/artist.functions";
+import {
+  requestArtistVerification,
+  deleteSong,
+  deleteAlbum,
+  listMyAlbums,
+} from "@/lib/artist.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
@@ -51,12 +56,19 @@ function ArtistDashboardPage() {
   const requestVerificationFn = useServerFn(requestArtistVerification);
   const verificationConfigFn = useServerFn(getVerificationConfig);
   const deleteSongFn = useServerFn(deleteSong);
+  const deleteAlbumFn = useServerFn(deleteAlbum);
+  const listAlbumsFn = useServerFn(listMyAlbums);
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   const [songToDelete, setSongToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [albumToDelete, setAlbumToDelete] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth", search: { redirect: window.location.pathname + window.location.search } });
+    if (!loading && !user)
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
   }, [user, loading, navigate]);
 
   const { data, isLoading, error } = useQuery({
@@ -81,7 +93,9 @@ function ArtistDashboardPage() {
   const verificationMutation = useMutation({
     mutationFn: requestVerificationFn,
     onSuccess: () => {
-      toast.success("🎉 Verification application submitted! You're one step closer to the verified badge!");
+      toast.success(
+        "🎉 Verification application submitted! You're one step closer to the verified badge!",
+      );
       qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
     },
     onError: (err: Error) => {
@@ -96,9 +110,40 @@ function ArtistDashboardPage() {
       setSongToDelete(null);
       qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
+      qc.invalidateQueries({ queryKey: ["my-albums"] });
+      // Clear home shelves immediately so deleted covers vanish, no ghost.
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
+      qc.invalidateQueries({ queryKey: ["recent-albums"] });
+      qc.invalidateQueries({ queryKey: ["active-carousels"] });
+      qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
     },
     onError: (err: Error) => {
       toast.error(`Failed to delete track: ${err.message}`);
+    },
+  });
+
+  const { data: myAlbums } = useQuery({
+    queryKey: ["my-albums", user?.id],
+    queryFn: () => listAlbumsFn(),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const deleteAlbumMutation = useMutation({
+    mutationFn: deleteAlbumFn,
+    onSuccess: (res: any) => {
+      toast.success(`🗑️ Album "${res.title}" + ${res.deletedSongs ?? 0} song(s) deleted.`);
+      setAlbumToDelete(null);
+      qc.invalidateQueries({ queryKey: ["artist-overview", user?.id] });
+      qc.invalidateQueries({ queryKey: ["my-songs"] });
+      qc.invalidateQueries({ queryKey: ["my-albums"] });
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
+      qc.invalidateQueries({ queryKey: ["recent-albums"] });
+      qc.invalidateQueries({ queryKey: ["active-carousels"] });
+      qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to delete album: ${err.message}`);
     },
   });
 
@@ -122,14 +167,15 @@ function ArtistDashboardPage() {
         <Music className="size-12 mx-auto mb-4 text-muted-foreground" />
         <h1 className="text-2xl font-bold mb-2">You're not an artist yet</h1>
         <p className="text-muted-foreground mb-6">
-          You have the artist role but no artist profile. Apply for an artist account to start uploading music.
+          You have the artist role but no artist profile. Apply for an artist account to start
+          uploading music.
         </p>
-        <a
-          href="/become-artist"
+        <Link
+          to="/become-artist"
           className="inline-block px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:scale-105 transition-transform"
         >
           Apply now
-        </a>
+        </Link>
       </div>
     );
   }
@@ -203,18 +249,18 @@ function ArtistDashboardPage() {
             <p className="text-muted-foreground">Artist Dashboard</p>
           </div>
           <div className="flex gap-2">
-            <a
-              href="/artist-profile-edit"
+            <Link
+              to="/artist-profile-edit"
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent hover:bg-accent/80 transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
               <Settings className="size-4" /> Edit Profile
-            </a>
-            <a
-              href="/artist-studio"
+            </Link>
+            <Link
+              to="/artist-studio"
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground inline-flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
             >
               <Upload className="size-4" /> Open Studio
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -238,15 +284,17 @@ function ArtistDashboardPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className={`size-5 ${isVerified ? "text-primary" : "text-muted-foreground"}`} />
+                <CheckCircle2
+                  className={`size-5 ${isVerified ? "text-primary" : "text-muted-foreground"}`}
+                />
                 <h2 className="text-lg font-semibold">Artist Verification</h2>
               </div>
               <p className="text-sm text-muted-foreground">
                 {isVerified
                   ? "Your artist profile is officially verified by Wesu+ staff."
                   : verificationStatus === "pending"
-                  ? "Your verification application is currently under review by Admin / Superadmin."
-                  : `Get the verified badge on your profile. Verification requires at least ${verificationConfig?.min_followers ?? 100} followers and over K${verificationConfig?.min_earnings ?? 500} in total earnings.`}
+                    ? "Your verification application is currently under review by Admin / Superadmin."
+                    : `Get the verified badge on your profile. Verification requires at least ${verificationConfig?.min_followers ?? 100} followers and over K${verificationConfig?.min_earnings ?? 500} in total earnings.`}
               </p>
             </div>
 
@@ -255,14 +303,19 @@ function ArtistDashboardPage() {
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <span>Followers:</span>
-                    <span className={`font-semibold ${followerCount >= (verificationConfig?.min_followers ?? 100) ? "text-primary" : "text-foreground"}`}>
+                    <span
+                      className={`font-semibold ${followerCount >= (verificationConfig?.min_followers ?? 100) ? "text-primary" : "text-foreground"}`}
+                    >
                       {followerCount} / {verificationConfig?.min_followers ?? 100}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>Earnings:</span>
-                    <span className={`font-semibold ${data.totalRevenueZmw > (verificationConfig?.min_earnings ?? 500) ? "text-primary" : "text-foreground"}`}>
-                      K{data.totalRevenueZmw.toFixed(2)} / K{verificationConfig?.min_earnings ?? 500}
+                    <span
+                      className={`font-semibold ${data.totalRevenueZmw > (verificationConfig?.min_earnings ?? 500) ? "text-primary" : "text-foreground"}`}
+                    >
+                      K{data.totalRevenueZmw.toFixed(2)} / K
+                      {verificationConfig?.min_earnings ?? 500}
                     </span>
                   </div>
                 </div>
@@ -292,12 +345,12 @@ function ArtistDashboardPage() {
               <BarChart3 className="size-5 text-primary" />
               Uploaded Tracks ({allTracks.length})
             </h2>
-            <a
-              href="/artist-studio"
+            <Link
+              to="/artist-studio"
               className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-medium"
             >
               <Upload className="size-3.5" /> Upload New Track
-            </a>
+            </Link>
           </div>
 
           {allTracks.length === 0 ? (
@@ -347,12 +400,12 @@ function ArtistDashboardPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {(track.play_count ?? 0).toLocaleString()} listens
                         {track.genre ? ` • ${track.genre}` : ""}
-                        {track.created_at ? ` • Uploaded ${new Date(track.created_at).toLocaleDateString()}` : ""}
+                        {track.created_at
+                          ? ` • Uploaded ${new Date(track.created_at).toLocaleDateString()}`
+                          : ""}
                       </p>
                     </div>
-                    <span className="text-sm font-medium">
-                      {formatPrice(track.price)}
-                    </span>
+                    <span className="text-sm font-medium">{formatPrice(track.price)}</span>
                     <button
                       onClick={() => setSongToDelete({ id: track.id, title: track.title })}
                       className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
@@ -366,6 +419,58 @@ function ArtistDashboardPage() {
               })}
             </div>
           )}
+          {/* Albums — previously invisible, which is why deleted albums felt
+            "never even in the dashboard". Deleting here removes the album +
+            all its songs + featured slots + storage, so no ghost cover. */}
+          <div className="bg-card border border-border rounded-2xl p-6 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Albums ({myAlbums?.length ?? 0})</h2>
+              <Link
+                to="/artist-studio"
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Create album in Studio
+              </Link>
+            </div>
+            {!myAlbums || myAlbums.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No albums yet. Albums you create in Studio will appear here with delete controls.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(myAlbums as any[]).map((al) => (
+                  <div
+                    key={al.id}
+                    className="flex items-center gap-4 p-3 rounded-xl border border-border/40 hover:bg-accent/60 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{al.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {al.release_date
+                          ? `Released ${new Date(al.release_date).toLocaleDateString()}`
+                          : "No release date"}
+                      </p>
+                    </div>
+                    <Link
+                      to="/albums/$id"
+                      params={{ id: al.id }}
+                      className="text-xs text-primary hover:underline shrink-0"
+                    >
+                      Open
+                    </Link>
+                    <button
+                      onClick={() => setAlbumToDelete({ id: al.id, title: al.title })}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      title="Delete album + its songs"
+                      aria-label={`Delete album ${al.title}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -388,8 +493,9 @@ function ArtistDashboardPage() {
 
             <p className="text-sm text-muted-foreground">
               Are you sure you want to permanently delete{" "}
-              <strong className="text-foreground">"{songToDelete.title}"</strong>?
-              This action cannot be undone. All playlists, likes, and streaming records for this song will be removed.
+              <strong className="text-foreground">"{songToDelete.title}"</strong>? This action
+              cannot be undone. All playlists, likes, and streaming records for this song will be
+              removed.
             </p>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -408,6 +514,49 @@ function ArtistDashboardPage() {
                 className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {deleteMutation.isPending ? "Deleting…" : "Delete Song"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Album Confirmation Modal */}
+      {albumToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-5" />
+                <h3 className="font-semibold text-lg text-foreground">Delete Album</h3>
+              </div>
+              <button
+                onClick={() => setAlbumToDelete(null)}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Delete <strong className="text-foreground">"{albumToDelete.title}"</strong> and{" "}
+              <strong className="text-foreground">all songs inside it</strong>? Covers, featured
+              slots, and audio files are removed too. Purchases are kept as receipts. This cannot be
+              undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setAlbumToDelete(null)}
+                disabled={deleteAlbumMutation.isPending}
+                className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-medium hover:bg-accent cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteAlbumMutation.isPending}
+                onClick={() => deleteAlbumMutation.mutate({ data: { id: albumToDelete.id } })}
+                className="px-4 py-2 rounded-full bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {deleteAlbumMutation.isPending ? "Deleting…" : "Delete Album + Songs"}
               </button>
             </div>
           </div>

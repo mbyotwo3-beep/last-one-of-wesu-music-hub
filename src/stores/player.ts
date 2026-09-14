@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { primeAudio, getAudio } from "@/lib/audio";
 
 export interface PlayerTrack {
@@ -8,6 +9,7 @@ export interface PlayerTrack {
   coverUrl?: string | null;
   audioUrl?: string | null;
   durationSeconds?: number | null;
+  price?: number | null;
 }
 
 export type RepeatMode = "off" | "all" | "one";
@@ -63,145 +65,179 @@ interface PlayerState {
   cycleRepeat: () => void;
 }
 
-export const usePlayer = create<PlayerState>((set, get) => ({
-  track: null,
-  queue: [],
-  queueIndex: 0,
-  playing: false,
-  liked: false,
-  progressSeconds: 0,
-  nowPlayingOpen: false,
-  volume: 1,
-  muted: false,
-  shuffle: false,
-  repeat: "off",
-  isPreview: false,
-
-  setIsPreview: (v) => set({ isPreview: v }),
-  setTrack: (t) => {
-    if (t) primeAudio();
-    set((state) => ({
-      track: preserveResolvedAudioUrl(t, state.track),
-      playing: !!t,
-      progressSeconds: 0,
-      liked: false,
-      isPreview: false,
-    }));
-  },
-  setAudioUrl: (url) =>
-    set((state) => (state.track ? { track: { ...state.track, audioUrl: url } } : state)),
-
-  setQueue: (tracks, startIndex = 0) => {
-    if (tracks.length) primeAudio();
-    const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
-    set({ queue: tracks, queueIndex: startIndex, track, playing: !!track, progressSeconds: 0, liked: false });
-  },
-
-  addToQueue: (track) => {
-    if (track) primeAudio();
-    set((state) => ({
-      queue: [...state.queue, track],
-    }));
-  },
-
-  removeFromQueue: (index) => {
-    set((state) => {
-      const newQueue = state.queue.filter((_, i) => i !== index);
-      const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
-      return { queue: newQueue, queueIndex: newQueueIndex };
-    });
-  },
-
-  skipNext: () => {
-    primeAudio();
-    const { queue, queueIndex, shuffle, repeat } = get();
-    if (!queue.length) return;
-    let next: number;
-    if (shuffle) {
-      next = Math.floor(Math.random() * queue.length);
-    } else {
-      next = queueIndex + 1;
-      if (next >= queue.length) {
-        if (repeat === "off") return;
-        next = 0;
-      }
-    }
-    set((state) => ({
-      queueIndex: next,
-      track: preserveResolvedAudioUrl(queue[next], state.track),
-      progressSeconds: 0,
-      liked: false,
-      playing: true,
-    }));
-  },
-
-  skipPrev: () => {
-    primeAudio();
-    const { queue, queueIndex, progressSeconds } = get();
-    if (progressSeconds > 3) {
-      set({ progressSeconds: 0 });
-      const audio = getAudio();
-      if (audio) audio.currentTime = 0;
-      return;
-    }
-    if (!queue.length) return;
-    const prev = (queueIndex - 1 + queue.length) % queue.length;
-    set((state) => ({
-      queueIndex: prev,
-      track: preserveResolvedAudioUrl(queue[prev], state.track),
-      progressSeconds: 0,
-      liked: false,
-      playing: true,
-    }));
-  },
-
-  togglePlay: () => {
-    const { isPreview, progressSeconds, playing } = get();
-    const audio = getAudio();
-    if (!playing) primeAudio();
-    // If a 15-second preview has reached the end and user clicks Play, replay from 0
-    if (!playing && isPreview && progressSeconds >= 15) {
-      if (audio) audio.currentTime = 0;
-      set({ progressSeconds: 0, playing: true });
-      return;
-    }
-    set((s) => ({ playing: !s.playing }));
-  },
-
-  setProgress: (s) => set({ progressSeconds: s }),
-
-  seekTo: (seconds: number) => {
-    const { isPreview, track } = get();
-    const dur = track?.durationSeconds ?? 0;
-    const maxTime = isPreview ? 15 : dur > 0 ? dur : 100000;
-    const target = Math.max(0, Math.min(seconds, maxTime));
-    const audio = getAudio();
-    if (audio) {
-      audio.currentTime = target;
-    }
-    set({ progressSeconds: Math.floor(target) });
-  },
-
-  toggleLike: () => set((s) => ({ liked: !s.liked })),
-  openNowPlaying: () => set({ nowPlayingOpen: true }),
-  closeNowPlaying: () => set({ nowPlayingOpen: false }),
-  exitSong: () => {
-    const audio = getAudio();
-    if (audio) {
-      audio.pause();
-      audio.src = "";
-    }
-    set({
+export const usePlayer = create<PlayerState>()(
+  persist(
+    (set, get) => ({
       track: null,
+      queue: [],
+      queueIndex: 0,
       playing: false,
-      progressSeconds: 0,
       liked: false,
+      progressSeconds: 0,
       nowPlayingOpen: false,
-    });
-  },
-  setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: v === 0 }),
-  toggleMute: () => set((s) => ({ muted: !s.muted })),
-  toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
-  cycleRepeat: () =>
-    set((s) => ({ repeat: s.repeat === "off" ? "all" : s.repeat === "all" ? "one" : "off" })),
-}));
+      volume: 1,
+      muted: false,
+      shuffle: false,
+      repeat: "off",
+      isPreview: false,
+
+      setIsPreview: (v) => set({ isPreview: v }),
+      setTrack: (t) => {
+        if (t) primeAudio();
+        set((state) => ({
+          track: preserveResolvedAudioUrl(t, state.track),
+          playing: !!t,
+          progressSeconds: 0,
+          liked: false,
+          isPreview: false,
+        }));
+      },
+      setAudioUrl: (url) =>
+        set((state) => (state.track ? { track: { ...state.track, audioUrl: url } } : state)),
+
+      setQueue: (tracks, startIndex = 0) => {
+        if (tracks.length) primeAudio();
+        const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
+        set({
+          queue: tracks,
+          queueIndex: startIndex,
+          track,
+          playing: !!track,
+          progressSeconds: 0,
+          liked: false,
+        });
+      },
+
+      addToQueue: (track) => {
+        if (track) primeAudio();
+        set((state) => ({
+          queue: [...state.queue, track],
+        }));
+      },
+
+      removeFromQueue: (index) => {
+        set((state) => {
+          const newQueue = state.queue.filter((_, i) => i !== index);
+          const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
+          return { queue: newQueue, queueIndex: newQueueIndex };
+        });
+      },
+
+      skipNext: () => {
+        primeAudio();
+        const { queue, queueIndex, shuffle, repeat } = get();
+        if (!queue.length) return;
+        let next: number;
+        if (shuffle) {
+          next = Math.floor(Math.random() * queue.length);
+        } else {
+          next = queueIndex + 1;
+          if (next >= queue.length) {
+            if (repeat === "off") return;
+            next = 0;
+          }
+        }
+        set((state) => ({
+          queueIndex: next,
+          track: preserveResolvedAudioUrl(queue[next], state.track),
+          progressSeconds: 0,
+          liked: false,
+          playing: true,
+        }));
+      },
+
+      skipPrev: () => {
+        primeAudio();
+        const { queue, queueIndex, progressSeconds } = get();
+        if (progressSeconds > 3) {
+          set({ progressSeconds: 0 });
+          const audio = getAudio();
+          if (audio) audio.currentTime = 0;
+          return;
+        }
+        if (!queue.length) return;
+        const prev = (queueIndex - 1 + queue.length) % queue.length;
+        set((state) => ({
+          queueIndex: prev,
+          track: preserveResolvedAudioUrl(queue[prev], state.track),
+          progressSeconds: 0,
+          liked: false,
+          playing: true,
+        }));
+      },
+
+      togglePlay: () => {
+        const { isPreview, progressSeconds, playing } = get();
+        const audio = getAudio();
+        if (!playing) primeAudio();
+        // If a 15-second preview has reached the end and user clicks Play, replay from 0
+        if (!playing && isPreview && progressSeconds >= 15) {
+          if (audio) audio.currentTime = 0;
+          set({ progressSeconds: 0, playing: true });
+          return;
+        }
+        set((s) => ({ playing: !s.playing }));
+      },
+
+      setProgress: (s) => set({ progressSeconds: s }),
+
+      seekTo: (seconds: number) => {
+        const { isPreview, track } = get();
+        const dur = track?.durationSeconds ?? 0;
+        const maxTime = isPreview ? 15 : dur > 0 ? dur : 100000;
+        const target = Math.max(0, Math.min(seconds, maxTime));
+        const audio = getAudio();
+        if (audio) {
+          audio.currentTime = target;
+        }
+        set({ progressSeconds: Math.floor(target) });
+      },
+
+      toggleLike: () => set((s) => ({ liked: !s.liked })),
+      openNowPlaying: () => set({ nowPlayingOpen: true }),
+      closeNowPlaying: () => set({ nowPlayingOpen: false }),
+      exitSong: () => {
+        const audio = getAudio();
+        if (audio) {
+          audio.pause();
+          audio.src = "";
+        }
+        set({
+          track: null,
+          playing: false,
+          progressSeconds: 0,
+          liked: false,
+          nowPlayingOpen: false,
+        });
+      },
+      setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: v === 0 }),
+      toggleMute: () => set((s) => ({ muted: !s.muted })),
+      toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
+      cycleRepeat: () =>
+        set((s) => ({ repeat: s.repeat === "off" ? "all" : s.repeat === "all" ? "one" : "off" })),
+    }),
+    {
+      name: "wesu-player",
+      // Persist queue + prefs across reloads like Spotify. Never auto-resume
+      // audio (browser policy) — restore paused at saved position.
+      partialize: (s) =>
+        ({
+          track: s.track,
+          queue: s.queue.slice(0, 200),
+          queueIndex: s.queueIndex,
+          volume: s.volume,
+          muted: s.muted,
+          shuffle: s.shuffle,
+          repeat: s.repeat,
+          progressSeconds: s.progressSeconds,
+        }) as PlayerState,
+      merge: (persisted: any, current) => ({
+        ...current,
+        ...persisted,
+        playing: false,
+        nowPlayingOpen: false,
+        liked: false,
+      }),
+    },
+  ),
+);
