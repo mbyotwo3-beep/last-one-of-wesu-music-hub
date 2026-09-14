@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Search, Play, Pause, Grid, Clock, Disc, Music, ListMusic, Heart, Mic2, Plus } from "lucide-react";
+import { Search, Play, Pause, Grid, Clock, Disc, Music, ListMusic, Heart, Plus } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,7 +17,6 @@ export function AppleMusicSidebar() {
   const mainNav = [
     { to: "/", label: "Listen Now", icon: Play },
     { to: "/browse", label: "Browse", icon: Grid, highlight: true },
-    { to: "/podcast", label: "Podcasts", icon: Mic2 },
   ];
 
   const libraryNav = [
@@ -308,7 +307,7 @@ export function AppleMusicSidebar() {
             to="/become-artist"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
           >
-            <Mic2 className="size-5" />
+            <Plus className="size-5" />
             Become an Artist
           </Link>
         </div>

@@ -1,5 +1,5 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { Home, Search, Library, User, Mic2, Shield, Menu, X, LogOut, Play, Grid, Clock, Disc, ListMusic, Heart, Music } from "lucide-react";
+import { Home, Search, Library, User, Shield, Menu, X, LogOut, Play, Grid, Clock, Disc, ListMusic, Heart, Music, Mic2, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
@@ -57,7 +57,7 @@ export function computeTabs(opts: {
     {
       to: "/artist-studio",
       label: "Studio",
-      icon: Mic2,
+      icon: Music,
       ariaLabel: "Artist studio",
       show: isArtist || isAdmin || isSuperAdmin,
     },
@@ -219,16 +219,6 @@ export function BottomTabBar() {
               <Grid className="size-5" />
               <span className="text-sm font-medium">Browse</span>
             </button>
-            <button
-              onClick={() => {
-                navigate({ to: "/podcast" });
-                setMenuOpen(false);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              <Mic2 className="size-5" />
-              <span className="text-sm font-medium">Podcasts</span>
-            </button>
 
             {/* Library Section */}
             <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -355,7 +345,7 @@ export function BottomTabBar() {
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                   >
-                    <Mic2 className="size-5" />
+                    <Music className="size-5" />
                     <span className="text-sm font-medium">Artist Portal</span>
                   </button>
                 )}
@@ -407,7 +397,7 @@ export function BottomTabBar() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
               >
-                <Mic2 className="size-5" />
+                <Plus className="size-5" />
                 <span className="text-sm font-medium">Become an Artist</span>
               </button>
             </div>
