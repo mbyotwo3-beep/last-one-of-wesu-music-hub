@@ -888,10 +888,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           {/* Right: Queue, volume, expand */}
           <div className="flex items-center justify-end gap-3">
             <Link
-              to="/library"
+              to="/queue"
               className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
               aria-label="Queue"
-              title="Your library"
+              title="Queue"
             >
               <ListMusic className="size-4" />
             </Link>

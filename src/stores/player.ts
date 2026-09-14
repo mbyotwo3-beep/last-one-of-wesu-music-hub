@@ -47,6 +47,7 @@ interface PlayerState {
   setAudioUrl: (url: string | null | undefined) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
   addToQueue: (track: PlayerTrack) => void;
+  removeFromQueue: (index: number) => void;
   skipNext: () => void;
   skipPrev: () => void;
   togglePlay: () => void;
@@ -101,6 +102,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set((state) => ({
       queue: [...state.queue, track],
     }));
+  },
+
+  removeFromQueue: (index) => {
+    set((state) => {
+      const newQueue = state.queue.filter((_, i) => i !== index);
+      const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
+      return { queue: newQueue, queueIndex: newQueueIndex };
+    });
   },
 
   skipNext: () => {

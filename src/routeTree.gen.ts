@@ -18,6 +18,7 @@ import { Route as SongsRouteImport } from './routes/songs'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
+import { Route as QueueRouteImport } from './routes/queue'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as NowPlayingRouteImport } from './routes/now-playing'
@@ -100,6 +101,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RecentlyAddedRoute = RecentlyAddedRouteImport.update({
   id: '/recently-added',
   path: '/recently-added',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QueueRoute = QueueRouteImport.update({
+  id: '/queue',
+  path: '/queue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -319,6 +325,7 @@ export interface FileRoutesByFullPath {
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
@@ -367,6 +374,7 @@ export interface FileRoutesByTo {
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
@@ -417,6 +425,7 @@ export interface FileRoutesById {
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
   '/profile': typeof ProfileRoute
+  '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
@@ -468,6 +477,7 @@ export interface FileRouteTypes {
     | '/now-playing'
     | '/playlists'
     | '/profile'
+    | '/queue'
     | '/recently-added'
     | '/reset-password'
     | '/search'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/now-playing'
     | '/playlists'
     | '/profile'
+    | '/queue'
     | '/recently-added'
     | '/reset-password'
     | '/search'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/now-playing'
     | '/playlists'
     | '/profile'
+    | '/queue'
     | '/recently-added'
     | '/reset-password'
     | '/search'
@@ -615,6 +627,7 @@ export interface RootRouteChildren {
   NowPlayingRoute: typeof NowPlayingRoute
   PlaylistsRoute: typeof PlaylistsRouteWithChildren
   ProfileRoute: typeof ProfileRoute
+  QueueRoute: typeof QueueRoute
   RecentlyAddedRoute: typeof RecentlyAddedRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SearchRoute: typeof SearchRoute
@@ -695,6 +708,13 @@ declare module '@tanstack/react-router' {
       path: '/recently-added'
       fullPath: '/recently-added'
       preLoaderRoute: typeof RecentlyAddedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/queue': {
+      id: '/queue'
+      path: '/queue'
+      fullPath: '/queue'
+      preLoaderRoute: typeof QueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -1063,6 +1083,7 @@ const rootRouteChildren: RootRouteChildren = {
   NowPlayingRoute: NowPlayingRoute,
   PlaylistsRoute: PlaylistsRouteWithChildren,
   ProfileRoute: ProfileRoute,
+  QueueRoute: QueueRoute,
   RecentlyAddedRoute: RecentlyAddedRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SearchRoute: SearchRoute,

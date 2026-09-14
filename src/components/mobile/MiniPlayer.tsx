@@ -1,8 +1,9 @@
-import { Loader2, Pause, Play, SkipForward, SkipBack, Radio } from "lucide-react";
+import { Loader2, Pause, Play, SkipForward, SkipBack, Radio, ListMusic } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
+import { useState } from "react";
 
 /**
  * Spotify-style persistent mini player rendered above BottomTabBar.
@@ -22,6 +23,9 @@ export function MiniPlayer() {
   const skipPrev = usePlayer((s) => s.skipPrev);
   const openNowPlaying = usePlayer((s) => s.openNowPlaying);
   const isPreview = usePlayer((s) => s.isPreview);
+  const queue = usePlayer((s) => s.queue);
+  const queueIndex = usePlayer((s) => s.queueIndex);
+  const [showQueue, setShowQueue] = useState(false);
   const { data: meta } = useTrackMeta(track?.id);
   const trackPrice: number = Number(meta?.price ?? 0);
 
@@ -116,6 +120,15 @@ export function MiniPlayer() {
             >
               <SkipForward className="size-4 fill-white/80" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowQueue(!showQueue)}
+              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
+              aria-label="Queue"
+            >
+              <ListMusic className="size-4 fill-white/80" />
+            </button>
           </div>
         </div>
 
@@ -127,6 +140,48 @@ export function MiniPlayer() {
           />
         </div>
       </div>
+
+      {/* Queue overlay */}
+      {showQueue && (
+        <div className="mx-2 mt-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl max-h-80">
+          <div className="p-4 border-b border-white/10">
+            <h3 className="text-lg font-semibold text-white">Queue</h3>
+          </div>
+          {queue.length === 0 ? (
+            <div className="p-8 text-center text-white/60">
+              <p className="text-sm">Queue is empty</p>
+            </div>
+          ) : (
+            <div className="p-2 space-y-1 overflow-y-auto max-h-60">
+              {queue.map((queueTrack, index) => (
+                <button
+                  key={queueTrack.id}
+                  onClick={() => {
+                    usePlayer.getState().setQueue(queue, index);
+                    setShowQueue(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left"
+                >
+                  <span className="text-white/60 text-xs w-4">{index + 1}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className={`text-sm font-medium truncate ${index === queueIndex ? "text-white" : "text-white/70"}`}>
+                      {queueTrack.title}
+                    </p>
+                    <p className="text-xs text-white/50 truncate">{queueTrack.artistName}</p>
+                  </div>
+                  {index === queueIndex && playing && (
+                    <div className="flex items-center gap-0.5">
+                      <div className="w-0.5 h-3 bg-white animate-pulse" />
+                      <div className="w-0.5 h-3 bg-white animate-pulse delay-75" />
+                      <div className="w-0.5 h-3 bg-white animate-pulse delay-150" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
