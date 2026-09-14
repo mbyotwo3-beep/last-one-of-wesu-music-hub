@@ -56,6 +56,7 @@ import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AlbumsIdRouteImport } from './routes/albums.$id'
 import { Route as ApiPublicSitemapRouteImport } from './routes/api/public/sitemap'
 import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
+import { Route as AlbumsIdEditRouteImport } from './routes/albums.$id.edit'
 
 const TermsListenerRoute = TermsListenerRouteImport.update({
   id: '/terms-listener',
@@ -292,6 +293,11 @@ const ApiPublicLencoWebhookRoute = ApiPublicLencoWebhookRouteImport.update({
   path: '/api/public/lenco-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlbumsIdEditRoute = AlbumsIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => AlbumsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -329,7 +335,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
   '/terms-listener': typeof TermsListenerRoute
-  '/albums/$id': typeof AlbumsIdRoute
+  '/albums/$id': typeof AlbumsIdRouteWithChildren
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
+  '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
@@ -377,7 +384,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
   '/terms-listener': typeof TermsListenerRoute
-  '/albums/$id': typeof AlbumsIdRoute
+  '/albums/$id': typeof AlbumsIdRouteWithChildren
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -387,6 +394,7 @@ export interface FileRoutesByTo {
   '/albums': typeof AlbumsIndexRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
+  '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
@@ -427,7 +435,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
   '/terms-listener': typeof TermsListenerRoute
-  '/albums/$id': typeof AlbumsIdRoute
+  '/albums/$id': typeof AlbumsIdRouteWithChildren
   '/artists/$id': typeof ArtistsIdRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/labels/$slug': typeof LabelsSlugRoute
@@ -437,6 +445,7 @@ export interface FileRoutesById {
   '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
+  '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
 }
@@ -488,6 +497,7 @@ export interface FileRouteTypes {
     | '/albums/'
     | '/artists/'
     | '/labels/'
+    | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
   fileRoutesByTo: FileRoutesByTo
@@ -536,6 +546,7 @@ export interface FileRouteTypes {
     | '/albums'
     | '/artists'
     | '/labels'
+    | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
   id:
@@ -585,6 +596,7 @@ export interface FileRouteTypes {
     | '/albums/'
     | '/artists/'
     | '/labels/'
+    | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
   fileRoutesById: FileRoutesById
@@ -964,16 +976,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicLencoWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/albums/$id/edit': {
+      id: '/albums/$id/edit'
+      path: '/edit'
+      fullPath: '/albums/$id/edit'
+      preLoaderRoute: typeof AlbumsIdEditRouteImport
+      parentRoute: typeof AlbumsIdRoute
+    }
   }
 }
 
+interface AlbumsIdRouteChildren {
+  AlbumsIdEditRoute: typeof AlbumsIdEditRoute
+}
+
+const AlbumsIdRouteChildren: AlbumsIdRouteChildren = {
+  AlbumsIdEditRoute: AlbumsIdEditRoute,
+}
+
+const AlbumsIdRouteWithChildren = AlbumsIdRoute._addFileChildren(
+  AlbumsIdRouteChildren,
+)
+
 interface AlbumsRouteChildren {
-  AlbumsIdRoute: typeof AlbumsIdRoute
+  AlbumsIdRoute: typeof AlbumsIdRouteWithChildren
   AlbumsIndexRoute: typeof AlbumsIndexRoute
 }
 
 const AlbumsRouteChildren: AlbumsRouteChildren = {
-  AlbumsIdRoute: AlbumsIdRoute,
+  AlbumsIdRoute: AlbumsIdRouteWithChildren,
   AlbumsIndexRoute: AlbumsIndexRoute,
 }
 

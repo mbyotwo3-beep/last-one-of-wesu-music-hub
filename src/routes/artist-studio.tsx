@@ -38,6 +38,7 @@ import {
   leaveLabel,
   listMyLabelInvites,
   listMySongs,
+  updateAlbum,
 } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
@@ -391,6 +392,7 @@ function UploadWizard() {
   const navigate = useNavigate();
   const uploadFn = useServerFn(uploadSong);
   const createAlbumFn = useServerFn(createAlbum);
+  const updateAlbumFn = useServerFn(updateAlbum);
   const pricingFn = useServerFn(getPricingConfig);
   const inviteFeatureFn = useServerFn(inviteArtistForFeature);
   const inviteLabelFn = useServerFn(inviteLabelForRelease);
@@ -803,6 +805,7 @@ function UploadWizard() {
           price,
           cover_url,
           release_date: releaseDate || undefined,
+          status: "draft",
         },
       });
 
@@ -843,6 +846,7 @@ function UploadWizard() {
             has_feature: hasFeature,
             has_label: hasLabel,
             track_number: trackIdx + 1,
+            status: "draft",
           },
         });
 
@@ -888,13 +892,14 @@ function UploadWizard() {
       qc.invalidateQueries({ queryKey: ["my-albums"] });
       qc.invalidateQueries({ queryKey: ["my-songs"] });
       qc.invalidateQueries({ queryKey: ["artist-overview"] });
-      
+
       // If there are invitation links, show them in the success screen
       if (labelInviteLink) {
         setDone(`💿 Album "${title}" uploaded successfully!`);
       } else {
         clearSessionStorage();
-        navigate({ to: "/artist-dashboard" });
+        // Redirect to album edit page to review and submit for approval
+        navigate({ to: "/albums/$id/edit", params: { id: album.id } });
       }
     } catch (err) {
       const msg = (err as Error).message;

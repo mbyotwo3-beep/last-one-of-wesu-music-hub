@@ -8,6 +8,9 @@ import { Play, Pause, Shuffle, ShoppingBag, Heart, Clock, ArrowLeft } from "luci
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { useServerFn } from "@tanstack/react-start";
+import { getPreviewAudioUrl, getPublicAudioUrl } from "@/lib/listener.functions";
+import { toast } from "sonner";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -146,12 +149,16 @@ function AlbumPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { data } = useSuspenseQuery(albumQO(id));
+  const setTrack = usePlayer((s) => s.setTrack);
+  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const album = data.album!;
   const artist = (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null }).artist ?? null;
+  const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const getPublicFn = useServerFn(getPublicAudioUrl);
 
   const albumTracks = data.songs.map((s) => ({
     id: s.id,
@@ -164,33 +171,125 @@ function AlbumPage() {
   const isAlbumPlaying = playing && data.songs.some((s) => s.id === currentTrackId);
   const totalDuration = data.songs.reduce((acc, s) => acc + (s.duration || 0), 0);
 
-  const playFirst = () => {
-    if (data.songs.length === 0) return;
-    if (isAlbumPlaying) {
-      togglePlay();
-      return;
-    }
-    const currentIndexInAlbum = data.songs.findIndex((s) => s.id === currentTrackId);
-    if (currentIndexInAlbum !== -1) {
-      togglePlay();
-    } else {
+  const playFirst = async () => {
+    const first = data.songs[0];
+    if (!first) return;
+    
+    try {
+      const isPaid = first.price && Number(first.price) > 0;
+      const isCurrentTrack = currentTrackId === first.id;
+      
+      if (isCurrentTrack) {
+        togglePlay();
+        return;
+      }
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${first.title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(false);
+      }
       setQueue(albumTracks, 0);
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
     }
   };
 
-  const playShuffle = () => {
+  const playShuffle = async () => {
     if (data.songs.length === 0) return;
     const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
-    setQueue(shuffled, 0);
+    
+    try {
+      const first = shuffled[0];
+      const isPaid = first && first.price && Number(first.price) > 0;
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${first.title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: first.id } });
+        setTrack({
+          id: first.id,
+          title: first.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: first.duration,
+        });
+        setIsPreview(false);
+      }
+      setQueue(shuffled, 0);
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
+    }
   };
 
-  const handlePlaySong = (song: any, index: number) => {
-    const isCurrentTrack = currentTrackId === song.id;
-    if (isCurrentTrack) {
-      togglePlay();
-      return;
+  const handlePlaySong = async (song: any, index: number) => {
+    try {
+      const isPaid = song.price && Number(song.price) > 0;
+      const isCurrentTrack = currentTrackId === song.id;
+      
+      if (isCurrentTrack) {
+        togglePlay();
+        return;
+      }
+      
+      if (isPaid) {
+        const { url } = await getPreviewFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: song.duration,
+        });
+        setIsPreview(true);
+        toast.info(`🎵 Previewing "${song.title}" (15s)`);
+      } else {
+        const { url } = await getPublicFn({ data: { song_id: song.id } });
+        setTrack({
+          id: song.id,
+          title: song.title,
+          artistName: artist?.name ?? "Unknown",
+          coverUrl: album.cover_url,
+          audioUrl: url,
+          durationSeconds: song.duration,
+        });
+        setIsPreview(false);
+      }
+      setQueue(albumTracks, index);
+    } catch (error) {
+      toast.error(`Failed to play: ${(error as Error).message}`);
     }
-    setQueue(albumTracks, index);
   };
 
   return (
@@ -268,6 +367,30 @@ function AlbumPage() {
                 aria-label="Shuffle album"
               >
                 <Shuffle className="size-4" />
+              </button>
+
+              {/* Add to Queue button */}
+              <button
+                onClick={async () => {
+                  if (data.songs.length === 0) return;
+                  const tracks = data.songs.map((s) => ({
+                    id: s.id,
+                    title: s.title,
+                    artistName: artist?.name ?? "Unknown",
+                    coverUrl: album.cover_url,
+                    durationSeconds: s.duration,
+                  }));
+                  tracks.forEach((track) => {
+                    usePlayer.getState().addToQueue(track);
+                  });
+                  toast.success(`Added ${data.songs.length} songs to queue`);
+                }}
+                disabled={data.songs.length === 0}
+                className="inline-flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-secondary hover:bg-accent text-foreground font-medium border border-border transition-colors cursor-pointer disabled:opacity-40"
+                title="Add to queue"
+                aria-label="Add to queue"
+              >
+                <Clock className="size-4" />
               </button>
 
               {/* Share */}

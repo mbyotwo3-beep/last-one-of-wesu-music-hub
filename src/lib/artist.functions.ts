@@ -6,7 +6,7 @@ import { isStaffUser } from "./roles";
 // Best-effort audit; RLS may block insert for regular users — never fail the
 // user's action because of this. SUPABASE_SERVICE_ROLE_KEY is not available on
 // Lovable Cloud, so we can't fall back to an admin client here.
-async function audit(
+export async function audit(
   client: SupabaseClient,
   actorId: string,
   action: string,
@@ -159,6 +159,7 @@ export const uploadSong = createServerFn({ method: "POST" })
       has_feature?: boolean;
       has_label?: boolean;
       track_number?: number | null; // artist-chosen position within album
+      status?: "draft" | "pending" | "approved" | "rejected";
     }) => d,
   )
   .handler(async ({ context, data }) => {
@@ -189,6 +190,7 @@ export const uploadSong = createServerFn({ method: "POST" })
     }
 
     // Songs require admin approval before showing on the platform.
+    const songStatus = data.status ?? (data.album_id ? "draft" : "pending");
     const { data: song, error } = await supabase
       .from("songs")
       .insert({
@@ -200,21 +202,22 @@ export const uploadSong = createServerFn({ method: "POST" })
         price: data.price ?? 0,
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
-        status: "pending",
+        status: songStatus,
         release_date: data.release_date ?? null,
         label_id: data.has_label ? (artist as any).label_id : null,
+        track_number: data.track_number ?? null,
       } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
     await audit(supabase, userId, "song.upload", "song", song!.id, {
       title: data.title,
-      status: "pending",
+      status: songStatus,
       release_date: data.release_date,
       has_feature: data.has_feature,
       has_label: data.has_label,
     });
-    return { ok: true, id: song!.id, status: "pending" };
+    return { ok: true, id: song!.id, status: songStatus };
   });
 
 export const deleteSong = createServerFn({ method: "POST" })
@@ -334,6 +337,7 @@ export const createAlbum = createServerFn({ method: "POST" })
       genre?: string;
       description?: string;
       price?: number;
+      status?: "draft" | "pending" | "approved" | "rejected";
     }) => d,
   )
   .handler(async ({ context, data }) => {
@@ -354,11 +358,12 @@ export const createAlbum = createServerFn({ method: "POST" })
         description: data.description ?? null,
         price: data.price ?? 0,
         artist_id: (artist as any).id,
+        status: data.status ?? "draft",
       } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(supabase, userId, "album.create", "album", album!.id, { title: data.title, release_date: data.release_date });
+    await audit(supabase, userId, "album.create", "album", album!.id, { title: data.title, release_date: data.release_date, status: data.status ?? "draft" });
     return { ok: true, id: album!.id };
   });
 
@@ -563,6 +568,273 @@ export const setCollabPrefs = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const deleteAlbum = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Fetch the album with artist to verify ownership
+    const { data: album, error: albumErr } = await supabaseAdmin
+      .from("albums")
+      .select("id, title, cover_url, artist_id, artists!inner(user_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (albumErr || !album) {
+      throw new Error("Album not found");
+    }
+
+    // 2. Permission check: verify the user owns this album
+    if ((album as any).artists.user_id !== userId) {
+      throw new Error("Forbidden: You do not have permission to delete this album");
+    }
+
+    // 3. Handle orphaned songs by setting album_id to NULL
+    // This is required because the schema doesn't have ON DELETE SET NULL
+    await supabaseAdmin
+      .from("songs")
+      .update({ album_id: null } as any)
+      .eq("album_id", data.id);
+
+    // 4. Delete saved_albums entries (no CASCADE in schema)
+    await supabaseAdmin
+      .from("saved_albums")
+      .delete()
+      .eq("album_id", data.id);
+
+    // 5. Clean up cover art from storage if it's not shared
+    if (album.cover_url) {
+      try {
+        // Check if any other song or album is using this cover
+        const { data: sharedSong } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("cover_url", album.cover_url)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: sharedAlbum } = await supabaseAdmin
+          .from("albums")
+          .select("id")
+          .eq("cover_url", album.cover_url)
+          .neq("id", data.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (!sharedSong && !sharedAlbum) {
+          const { deleteStoredMedia } = await import("./media.server");
+          await deleteStoredMedia("album-art", album.cover_url);
+        }
+      } catch (err) {
+        console.warn("[Album Delete] Could not delete cover art:", err);
+      }
+    }
+
+    // 6. Delete the album row
+    const { error: delError } = await supabaseAdmin
+      .from("albums")
+      .delete()
+      .eq("id", data.id);
+
+    if (delError) {
+      throw new Error(delError.message);
+    }
+
+    // 7. Audit log
+    await audit(supabaseAdmin, userId, "album.delete", "album", data.id, {
+      title: album.title,
+      artist_id: album.artist_id,
+    });
+
+    return { ok: true, id: data.id, title: album.title };
+  });
+
+export const updateAlbum = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (d: {
+      id: string;
+      title?: string;
+      description?: string;
+      genre?: string;
+      cover_url?: string;
+      release_date?: string;
+      price?: number;
+      status?: "draft" | "pending" | "approved" | "rejected";
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Fetch the album with artist to verify ownership
+    const { data: album, error: albumErr } = await supabaseAdmin
+      .from("albums")
+      .select("id, title, cover_url, artist_id, artists!inner(user_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (albumErr || !album) {
+      throw new Error("Album not found");
+    }
+
+    // 2. Permission check: verify the user owns this album
+    if ((album as any).artists.user_id !== userId) {
+      throw new Error("Forbidden: You do not have permission to edit this album");
+    }
+
+    // 3. Handle cover art update (delete old if changed)
+    if (data.cover_url && data.cover_url !== album.cover_url && album.cover_url) {
+      try {
+        // Check if any other song or album is using the old cover
+        const { data: sharedSong } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("cover_url", album.cover_url)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: sharedAlbum } = await supabaseAdmin
+          .from("albums")
+          .select("id")
+          .eq("cover_url", album.cover_url)
+          .neq("id", data.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (!sharedSong && !sharedAlbum) {
+          const { deleteStoredMedia } = await import("./media.server");
+          await deleteStoredMedia("album-art", album.cover_url);
+        }
+      } catch (err) {
+        console.warn("[Album Update] Could not delete old cover art:", err);
+      }
+    }
+
+    // 4. Build update object
+    const updateData: any = {};
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.genre !== undefined) updateData.genre = data.genre;
+    if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
+    if (data.release_date !== undefined) updateData.release_date = data.release_date;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.status !== undefined) updateData.status = data.status;
+
+    // 5. Update the album
+    const { error: updateError } = await supabaseAdmin
+      .from("albums")
+      .update(updateData)
+      .eq("id", data.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    // 6. Audit log
+    await audit(supabaseAdmin, userId, "album.update", "album", data.id, {
+      title: album.title,
+      changes: updateData,
+    });
+
+    return { ok: true, id: data.id };
+  });
+
+export const updateSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (d: {
+      id: string;
+      title?: string;
+      cover_url?: string;
+      genre?: string;
+      price?: number;
+      track_number?: number;
+      status?: "draft" | "pending" | "approved" | "rejected";
+      explicit?: boolean;
+      album_id?: string | null;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Fetch the song with artist to verify ownership
+    const { data: song, error: songErr } = await supabaseAdmin
+      .from("songs")
+      .select("id, title, cover_url, artist_id, artists!inner(user_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (songErr || !song) {
+      throw new Error("Song not found");
+    }
+
+    // 2. Permission check: verify the user owns this song
+    if ((song as any).artists.user_id !== userId) {
+      throw new Error("Forbidden: You do not have permission to edit this song");
+    }
+
+    // 3. Handle cover art update (delete old if changed)
+    if (data.cover_url && data.cover_url !== song.cover_url && song.cover_url) {
+      try {
+        // Check if any other song or album is using the old cover
+        const { data: sharedSong } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("cover_url", song.cover_url)
+          .neq("id", data.id)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: sharedAlbum } = await supabaseAdmin
+          .from("albums")
+          .select("id")
+          .eq("cover_url", song.cover_url)
+          .limit(1)
+          .maybeSingle();
+
+        if (!sharedSong && !sharedAlbum) {
+          const { deleteStoredMedia } = await import("./media.server");
+          await deleteStoredMedia("album-art", song.cover_url);
+        }
+      } catch (err) {
+        console.warn("[Song Update] Could not delete old cover art:", err);
+      }
+    }
+
+    // 4. Build update object
+    const updateData: any = {};
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
+    if (data.genre !== undefined) updateData.genre = data.genre;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.track_number !== undefined) updateData.track_number = data.track_number;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.explicit !== undefined) updateData.explicit = data.explicit;
+    if (data.album_id !== undefined) updateData.album_id = data.album_id;
+
+    // 5. Update the song
+    const { error: updateError } = await supabaseAdmin
+      .from("songs")
+      .update(updateData)
+      .eq("id", data.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    // 6. Audit log
+    await audit(supabaseAdmin, userId, "song.update", "song", data.id, {
+      title: song.title,
+      changes: updateData,
+    });
+
+    return { ok: true, id: data.id };
+  });
+
 export const leaveLabel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -575,7 +847,7 @@ export const leaveLabel = createServerFn({ method: "POST" })
     await context.supabase
       .from("artists")
       .update({ label_id: null } as any)
-      .eq("id", (artist as any).id);
+      .eq("user_id", context.userId);
     await context.supabase
       .from("label_artists")
       .update({ status: "left" } as any)
@@ -636,85 +908,3 @@ export const signUpload = createServerFn({ method: "POST" })
   });
 
 // ---------- Edit an existing track ----------
-
-/**
- * Let an artist manage a track they already uploaded: title, genre, price,
- * explicit flag, album and cover art. Audio is intentionally immutable —
- * swapping the file under an approved track would bypass moderation.
- *
- * Editing content of an already-approved track sends it back to review only
- * when the cover changes, since that is the part shown publicly.
- */
-export const updateSong = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator(
-    (d: {
-      id: string;
-      title?: string;
-      genre?: string | null;
-      price?: number;
-      explicit?: boolean;
-      album_id?: string | null;
-      cover_url?: string | null;
-    }) => {
-      if (!d?.id) throw new Error("Song id is required");
-      return d;
-    },
-  )
-  .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
-
-    const { data: artist } = await supabase
-      .from("artists")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!artist) throw new Error("You must be an artist to edit tracks");
-
-    const { data: song } = await supabase
-      .from("songs")
-      .select("id, artist_id, status")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (!song || (song as any).artist_id !== (artist as any).id) {
-      throw new Error("Track not found");
-    }
-
-    // Storage paths must stay inside the caller's own folder.
-    if (data.cover_url && !data.cover_url.startsWith(`${userId}/`)) {
-      throw new Error("Invalid cover_url: must be under your own storage folder");
-    }
-
-    const patch: Record<string, unknown> = {};
-    if (data.title !== undefined) {
-      const t = data.title.trim();
-      if (!t) throw new Error("Title cannot be empty");
-      patch.title = t;
-    }
-    if (data.genre !== undefined) patch.genre = data.genre || null;
-    if (data.price !== undefined) {
-      if (Number.isNaN(data.price) || data.price < 0) throw new Error("Price cannot be negative");
-      patch.price = data.price;
-    }
-    if (data.explicit !== undefined) patch.explicit = data.explicit;
-    if (data.album_id !== undefined) patch.album_id = data.album_id || null;
-    if (data.cover_url !== undefined && data.cover_url) patch.cover_url = data.cover_url;
-
-    if (Object.keys(patch).length === 0) return { ok: true, id: data.id, status: (song as any).status };
-
-    const { error } = await supabase
-      .from("songs")
-      .update(patch as {
-        title?: string;
-        genre?: string | null;
-        price?: number;
-        explicit?: boolean;
-        album_id?: string | null;
-        cover_url?: string;
-      })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-
-    await audit(supabase, userId, "song.update", "song", data.id, patch);
-    return { ok: true, id: data.id, status: (song as any).status };
-  });

@@ -46,6 +46,7 @@ interface PlayerState {
    */
   setAudioUrl: (url: string | null | undefined) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
+  addToQueue: (track: PlayerTrack) => void;
   skipNext: () => void;
   skipPrev: () => void;
   togglePlay: () => void;
@@ -93,6 +94,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (tracks.length) primeAudio();
     const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
     set({ queue: tracks, queueIndex: startIndex, track, playing: !!track, progressSeconds: 0, liked: false });
+  },
+
+  addToQueue: (track) => {
+    if (track) primeAudio();
+    set((state) => ({
+      queue: [...state.queue, track],
+    }));
   },
 
   skipNext: () => {

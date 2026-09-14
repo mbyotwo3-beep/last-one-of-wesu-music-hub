@@ -211,7 +211,91 @@ ON public.albums (artist_id, status);
 CREATE INDEX IF NOT EXISTS idx_artists_status 
 ON public.artists (status);
 
--- 20. Verify all storage buckets have proper RLS policies
+-- 20. Add draft status support for albums and songs
+-- Note: These changes handle both text and enum status columns safely
+
+-- Update albums status constraint to include 'draft'
+DO $$
+BEGIN
+  -- Check if constraint exists and update it
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'albums_status_check' 
+    AND conrelid = 'public.albums'::regclass
+  ) THEN
+    ALTER TABLE public.albums DROP CONSTRAINT albums_status_check;
+  END IF;
+
+  -- Add new constraint with draft status
+  ALTER TABLE public.albums 
+  ADD CONSTRAINT albums_status_check 
+  CHECK (status IN ('draft', 'pending', 'approved', 'rejected'));
+EXCEPTION
+  WHEN others THEN
+    -- If constraint doesn't exist, just add it
+    ALTER TABLE public.albums 
+    ADD CONSTRAINT albums_status_check 
+    CHECK (status IN ('draft', 'pending', 'approved', 'rejected'));
+END $$;
+
+-- Update songs status constraint to include 'draft'
+DO $$
+BEGIN
+  -- Check if constraint exists and update it
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'songs_status_check' 
+    AND conrelid = 'public.songs'::regclass
+  ) THEN
+    ALTER TABLE public.songs DROP CONSTRAINT songs_status_check;
+  END IF;
+
+  -- Add new constraint with draft status
+  ALTER TABLE public.songs 
+  ADD CONSTRAINT songs_status_check 
+  CHECK (status IN ('draft', 'pending', 'approved', 'rejected'));
+EXCEPTION
+  WHEN others THEN
+    -- If constraint doesn't exist, just add it
+    ALTER TABLE public.songs 
+    ADD CONSTRAINT songs_status_check 
+    CHECK (status IN ('draft', 'pending', 'approved', 'rejected'));
+END $$;
+
+-- Add track_number column to songs if it doesn't exist
+ALTER TABLE public.songs ADD COLUMN IF NOT EXISTS track_number integer;
+
+-- Update foreign key constraints for proper album deletion
+DO $$
+BEGIN
+  -- Update songs foreign key to SET NULL on album delete
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'songs_album_id_fkey' 
+    AND conrelid = 'public.songs'::regclass
+  ) THEN
+    ALTER TABLE public.songs DROP CONSTRAINT songs_album_id_fkey;
+    ALTER TABLE public.songs 
+    ADD CONSTRAINT songs_album_id_fkey
+    FOREIGN KEY (album_id) REFERENCES public.albums(id)
+    ON DELETE SET NULL;
+  END IF;
+
+  -- Update saved_albums foreign key to CASCADE on album delete
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'saved_albums_album_id_fkey' 
+    AND conrelid = 'public.saved_albums'::regclass
+  ) THEN
+    ALTER TABLE public.saved_albums DROP CONSTRAINT saved_albums_album_id_fkey;
+    ALTER TABLE public.saved_albums 
+    ADD CONSTRAINT saved_albums_album_id_fkey
+    FOREIGN KEY (album_id) REFERENCES public.albums(id)
+    ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Verify all storage buckets have proper RLS policies
 -- (These should be configured in Supabase Dashboard > Storage)
 -- For album-art, artist-images, user-avatars, hero-images, label-images: Make PUBLIC
 -- For song-audio: Keep PRIVATE with RLS policies
