@@ -132,6 +132,7 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
         <ShareMenu
           songId={s.id}
           songTitle={s.title}
+          coverUrl={album.cover_url}
           albumId={albumId}
           artistId={artist?.id}
           artistName={artist?.name}

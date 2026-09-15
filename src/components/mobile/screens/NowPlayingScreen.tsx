@@ -133,6 +133,7 @@ export function NowPlayingScreen() {
           <ShareMenu
             songId={track.id}
             songTitle={track.title}
+            coverUrl={track.coverUrl}
             artistName={track.artistName}
             type="song"
             className="relative z-20"

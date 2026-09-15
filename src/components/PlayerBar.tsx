@@ -490,6 +490,31 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       });
       navigator.mediaSession.setActionHandler("previoustrack", () => st().skipPrev());
       navigator.mediaSession.setActionHandler("nexttrack", () => st().skipNext());
+      navigator.mediaSession.setActionHandler("seekto", (details) => {
+        const audio = getAudio();
+        if (audio && details.seekTime != null) {
+          audio.currentTime = details.seekTime;
+          st().setProgress(Math.floor(details.seekTime));
+        }
+      });
+      // Update positionState periodically for lock-screen progress
+      const updatePosition = () => {
+        const audio = getAudio();
+        if (audio && audio.duration && Number.isFinite(audio.duration)) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: audio.duration,
+              playbackRate: audio.playbackRate,
+              position: Math.min(audio.currentTime, audio.duration),
+            });
+          } catch { /* ignore */ }
+        }
+      };
+      const audio = getAudio();
+      audio?.addEventListener("timeupdate", updatePosition);
+      return () => {
+        audio?.removeEventListener("timeupdate", updatePosition);
+      };
     } catch {
       /* ignore — unsupported browsers */
     }
@@ -813,8 +838,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         </div>
       )}
 
-      {/* Desktop Spotify-style bar */}
-      <div className="fixed bottom-0 inset-x-0 bg-obsidian/95 backdrop-blur-xl border-t border-white/10 z-50">
+      {/* Desktop Spotify-style floating glass bar */}
+      <div className="fixed bottom-3 inset-x-3 z-50">
+      <div className="bg-obsidian/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_-2px_24px_rgba(0,0,0,0.5)] overflow-hidden">
         {showAd && !user && (
           <div className="flex items-center justify-between px-6 py-1.5 bg-primary/10 border-b border-primary/20 text-xs">
             <span className="flex items-center gap-1.5 text-gray-300">
@@ -907,6 +933,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               <ShareMenu
                 songId={track.id}
                 songTitle={track.title}
+                coverUrl={track.coverUrl}
                 artistId={artistId}
                 artistName={track.artistName}
                 albumId={albumId}
@@ -1040,6 +1067,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </>
   );

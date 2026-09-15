@@ -147,6 +147,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           <ShareMenu
             songId={song.id}
             songTitle={song.title}
+            coverUrl={song.cover_url}
             artistId={song.artist?.id}
             artistName={artistName}
             albumId={song.album_id ?? undefined}

@@ -27,6 +27,8 @@ interface ShareMenuProps {
   songId?: string;
   songTitle?: string;
   coverUrl?: string | null;
+  durationSeconds?: number | null;
+  price?: number | null;
   albumId?: string;
   albumTitle?: string;
   artistId?: string;
@@ -41,6 +43,8 @@ export function ShareMenu({
   songId,
   songTitle,
   coverUrl,
+  durationSeconds,
+  price,
   albumId,
   albumTitle,
   artistId,
@@ -159,18 +163,44 @@ export function ShareMenu({
     });
   };
 
-  const handleAddToQueue = () => {
-    if (songId && songTitle) {
-      // Spotify behavior: append only — never interrupt current playback.
-      appendToQueue({
-        id: songId,
-        title: songTitle,
-        artistName: artistName || "Unknown",
-        coverUrl: coverUrl ?? undefined,
-      });
-      toast.success("Added to queue");
-      setIsOpen(false);
+  const handleAddToQueue = async () => {
+    if (!songId || !songTitle) return;
+    // Spotify behavior: append only — never interrupt current playback.
+    // Ensure every queued instance carries its cover (so duplicates all show art)
+    // even when the caller didn't pass coverUrl. Fall back to the existing queue
+    // entry with the same id, then try a lightweight DB fetch.
+    let resolvedCover = coverUrl ?? undefined;
+    let resolvedDuration: number | undefined = undefined;
+    let resolvedPrice: number | undefined = undefined;
+    // Try reuse from already-queued copy (fast, no network)
+    if (resolvedCover === undefined) {
+      const existing = usePlayer.getState().queue.find((t) => t.id === songId);
+      if (existing?.coverUrl) resolvedCover = existing.coverUrl;
     }
+    if (resolvedCover === undefined) {
+      try {
+        const { data } = await supabase
+          .from("songs")
+          .select("cover_url,duration,price")
+          .eq("id", songId)
+          .maybeSingle();
+        if ((data as any)?.cover_url) resolvedCover = (data as any).cover_url;
+        if ((data as any)?.duration != null) resolvedDuration = Number((data as any).duration);
+        if ((data as any)?.price != null) resolvedPrice = Number((data as any).price);
+      } catch {
+        /* ignore — queue still works without cover */
+      }
+    }
+    appendToQueue({
+      id: songId,
+      title: songTitle,
+      artistName: artistName || "Unknown",
+      coverUrl: resolvedCover,
+      durationSeconds: resolvedDuration,
+      price: resolvedPrice,
+    });
+    toast.success("Added to queue");
+    setIsOpen(false);
   };
 
   const handleToggle = (e?: React.MouseEvent) => {

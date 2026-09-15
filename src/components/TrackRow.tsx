@@ -105,7 +105,7 @@ export function TrackRow({
       )}
 
       {Number(price ?? 0) <= 0 && <DownloadButton songId={id} />}
-      <ShareMenu songId={id} songTitle={title} artistName={artist} type="song" />
+      <ShareMenu songId={id} songTitle={title} coverUrl={coverUrl} artistName={artist} type="song" />
 
       {/* Like Button */}
       <button
