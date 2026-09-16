@@ -234,3 +234,47 @@ describe("Property 20: Signed URL retry logic", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Prime decision (audio.ts :: primeAudio)
+// Priming unlocks the pipeline with SILENCE only. It must never start real
+// media: on app open the engine pre-attaches the restored track's URL while
+// paused, and the first tap anywhere reaches primeAudio — playing there is
+// what started songs "on their own".
+// ---------------------------------------------------------------------------
+
+const SILENT = "data:audio/wav;base64,SILENCE";
+
+/**
+ * Pure model of the primeAudio decision.
+ * Returns "unlock" (play the silent placeholder) or "leave" (do not touch).
+ */
+function decidePrime(src: string, _paused: boolean): "unlock" | "leave" {
+  if (src && src !== SILENT) return "leave";
+  return "unlock";
+}
+
+describe("Prime never starts real media", () => {
+  it("empty element → unlock with silence", () => {
+    expect(decidePrime("", true)).toBe("unlock");
+    expect(decidePrime("", false)).toBe("unlock");
+  });
+
+  it("real song attached (paused or playing) → leave it alone", () => {
+    fc.assert(
+      fc.property(
+        fc.webUrl(),
+        fc.boolean(),
+        (url, paused) => {
+          expect(decidePrime(url, paused)).toBe("leave");
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("silent placeholder attached → unlock", () => {
+    expect(decidePrime(SILENT, true)).toBe("unlock");
+    expect(decidePrime(SILENT, false)).toBe("unlock");
+  });
+});

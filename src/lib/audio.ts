@@ -33,8 +33,14 @@ export function primeAudio(): HTMLAudioElement | null {
   try {
     const audio = getAudio();
     if (!audio) return null;
-    // If already playing real media, don't interrupt
-    if (audio.src && audio.src !== SILENT_AUDIO && !audio.paused) {
+    // Real media belongs to the engine (playing state in the store).
+    // Priming must NEVER start it: on app open the engine pre-attaches the
+    // restored track's URL while paused, and the first tap anywhere
+    // (scroll, menu, …) reaches here via the global pointerdown listener —
+    // playing the element here is what started songs "on their own".
+    // Only the silent placeholder may be played, purely to unlock the
+    // pipeline for a later engine-driven play() call.
+    if (audio.src && audio.src !== SILENT_AUDIO) {
       return audio;
     }
     if (!audio.src || audio.src === "") {
