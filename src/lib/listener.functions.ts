@@ -3,6 +3,167 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { isStaffUser, isSuperadminUser } from "./roles";
 
+export interface PlaylistMissingSong {
+  song_id: string;
+  title: string;
+  price: number;
+  cover_url: string | null;
+  artist_name: string;
+}
+
+export interface PlaylistAccess {
+  playlist_id: string;
+  isOwner: boolean;
+  isPublic: boolean;
+  /** Staff bypass moderation/QA listening like owners. */
+  isStaff: boolean;
+  /** True when every playable paid song is owned (or there is nothing to buy). */
+  unlocked: boolean;
+  missing: PlaylistMissingSong[];
+  total: number;
+}
+
+/**
+ * Shared core: which paid songs in a playlist does this user NOT yet own?
+ * Ownership = free (price 0) OR a completed single purchase OR a completed
+ * purchase of the album the song belongs to. Only approved songs count —
+ * pending/taken-down tracks are never sold.
+ */
+export async function computePlaylistMissing(
+  admin: any,
+  userId: string,
+  playlistId: string,
+): Promise<{
+  playlist: any;
+  songs: any[];
+  isOwner: boolean;
+  missing: PlaylistMissingSong[];
+  total: number;
+}> {
+  const { data: playlist } = await admin
+    .from("playlists")
+    .select("id,user_id,name,description,cover_url,is_public,created_at")
+    .eq("id", playlistId)
+    .maybeSingle();
+  if (!playlist) throw new Error("Playlist not found");
+
+  const isOwner = (playlist as any).user_id === userId;
+
+  const { data: psRows } = await admin
+    .from("playlist_songs")
+    .select("song_id, position")
+    .eq("playlist_id", playlistId)
+    .order("position", { ascending: true });
+  const songIds = ((psRows ?? []) as any[]).map((r) => r.song_id).filter(Boolean);
+
+  let songs: any[] = [];
+  if (songIds.length > 0) {
+    const { data: songRows } = await admin
+      .from("songs")
+      .select("id,title,price,cover_url,album_id,status,artist_id")
+      .in("id", songIds);
+    const artistIds = [...new Set(((songRows ?? []) as any[]).map((s) => s.artist_id).filter(Boolean))];
+    const { data: artists } = artistIds.length > 0
+      ? await admin.from("artists").select("id,name").in("id", artistIds)
+      : { data: [] };
+    const artistMap = new Map(((artists ?? []) as any[]).map((a: any) => [a.id, a.name]));
+    const byId = new Map(((songRows ?? []) as any[]).map((s: any) => [s.id, s]));
+    songs = songIds.map((id: string) => byId.get(id)).filter(Boolean);
+    for (const s of songs) s.artist_name = artistMap.get(s.artist_id) ?? "Unknown";
+  }
+
+  // Owners (and staff) never go through the paywall for viewing purposes —
+  // playback of individual paid tracks still follows normal entitlement.
+  const missing: PlaylistMissingSong[] = [];
+  if (!isOwner) {
+    const paidIds = songs
+      .filter((s) => s.status === "approved" && Number(s.price ?? 0) > 0)
+      .map((s) => s.id as string);
+    const albumIds = [
+      ...new Set(
+        songs
+          .filter((s) => paidIds.includes(s.id) && s.album_id)
+          .map((s) => s.album_id as string),
+      ),
+    ];
+    let ownedSongIds = new Set<string>();
+    let ownedAlbumIds = new Set<string>();
+    if (paidIds.length > 0) {
+      const [{ data: sp }, { data: ap }] = await Promise.all([
+        admin
+          .from("purchases")
+          .select("song_id")
+          .eq("user_id", userId)
+          .eq("status", "completed")
+          .in("song_id", paidIds),
+        albumIds.length > 0
+          ? admin
+              .from("purchases")
+              .select("album_id")
+              .eq("user_id", userId)
+              .eq("status", "completed")
+              .in("album_id", albumIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      ownedSongIds = new Set(((sp ?? []) as any[]).map((r) => r.song_id));
+      ownedAlbumIds = new Set(((ap ?? []) as any[]).map((r) => r.album_id));
+    }
+    for (const s of songs) {
+      if (s.status !== "approved" || Number(s.price ?? 0) <= 0) continue;
+      if (ownedSongIds.has(s.id)) continue;
+      if (s.album_id && ownedAlbumIds.has(s.album_id)) continue;
+      missing.push({
+        song_id: s.id,
+        title: s.title,
+        price: Number(s.price),
+        cover_url: s.cover_url ?? null,
+        artist_name: s.artist_name ?? "Unknown",
+      });
+    }
+  }
+
+  const total = missing.reduce((sum, m) => sum + m.price, 0);
+  return { playlist, songs, isOwner, missing, total };
+}
+
+/**
+ * Authenticated playlist access check for shared (non-editorial) playlists.
+ * The share link (unguessable UUID) grants viewing; full playback of paid
+ * tracks requires owning them — `missing` + `total` drive the unlock panel.
+ */
+export const getPlaylistAccess = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ context, data }): Promise<PlaylistAccess> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const staff = await isStaffUser(context.supabase, context.userId);
+    const { playlist, isOwner, missing, total } = await computePlaylistMissing(
+      supabaseAdmin,
+      context.userId,
+      data.playlist_id,
+    );
+    if (isOwner || staff) {
+      return {
+        playlist_id: playlist.id,
+        isOwner,
+        isPublic: playlist.is_public === true,
+        isStaff: staff,
+        unlocked: true,
+        missing: [],
+        total: 0,
+      };
+    }
+    return {
+      playlist_id: playlist.id,
+      isOwner: false,
+      isPublic: playlist.is_public === true,
+      isStaff: false,
+      unlocked: missing.length === 0,
+      missing,
+      total,
+    };
+  });
+
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { full_name?: string; bio?: string; avatar_url?: string; location?: string }) => d)

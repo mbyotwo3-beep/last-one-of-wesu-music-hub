@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock } from "lucide-react";
+import { useEffect } from "react";
+import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock, LockKeyhole } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getPlaylistWithSongs, removeFromPlaylist } from "@/lib/listener.functions";
+import { getPlaylistWithSongs, removeFromPlaylist, getPlaylistAccess } from "@/lib/listener.functions";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
@@ -165,6 +166,7 @@ function Page() {
   const currentTrackId = usePlayer((s) => s.track?.id);
   const getPlaylistFn = useServerFn(getPlaylistWithSongs);
   const removeFn = useServerFn(removeFromPlaylist);
+  const getAccessFn = useServerFn(getPlaylistAccess);
   const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
@@ -243,12 +245,37 @@ function Page() {
     },
   });
 
+  const songs = (((data as any)?.songs) ?? []) as any[];
+  const isOwner = (data as any)?.user_id === user?.id;
+  const isPublic = (data as any)?.is_public === true;
+
+  // Private (non-editorial) playlists require sign-in — anonymous visitors
+  // are sent to /auth and return here afterwards.
+  useEffect(() => {
+    if (!isLoading && data && !user && !isPublic) {
+      navigate({
+        to: "/auth",
+        search: { redirect: window.location.pathname + window.location.search },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, data, user, isPublic]);
+
+  // Ownership / unlock state for signed-in viewers of shared playlists.
+  const { data: access } = useQuery({
+    queryKey: ["playlist-access", id, user?.id],
+    queryFn: () => getAccessFn({ data: { playlist_id: id } }),
+    enabled: !!user && !!data,
+    staleTime: 30_000,
+  });
+  const showUnlockPanel =
+    !!user && !!access && !access.isOwner && !access.unlocked && access.missing.length > 0;
+
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   if (!data) return <div className="p-12 text-center">Playlist not found</div>;
-
-  const songs = ((data as any).songs ?? []) as any[];
-  const isOwner = (data as any).user_id === user?.id;
-  const isPublic = (data as any).is_public === true;
+  if (!user && !isPublic) {
+    return <div className="p-12 text-center text-muted-foreground">Redirecting to sign in…</div>;
+  }
 
   // Build the queue tracks array (shared between playAll and playSong)
   const queueTracks = songs.map((s: any) => ({
@@ -394,6 +421,54 @@ function Page() {
 
         {/* Right Column: Tracklist */}
         <div className="flex-1 w-full min-w-0">
+          {/* Shared-playlist unlock: one payment for every song the viewer
+              doesn't own yet. Owners and fully-unlocked viewers never see this. */}
+          {showUnlockPanel && (
+            <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <LockKeyhole className="size-4 text-primary" />
+                <h2 className="font-bold">Unlock this shared playlist</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                {access!.missing.length} song{access!.missing.length === 1 ? "" : "s"} in this
+                playlist {access!.missing.length === 1 ? "isn't" : "aren't"} in your library yet.
+                Pay once below — free songs and tracks you already own are never charged —
+                then play everything in full.
+              </p>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1 mb-4">
+                {access!.missing.map((m: any) => (
+                  <div key={m.song_id} className="flex items-center gap-3">
+                    <StorageImage
+                      bucket="album-art"
+                      path={m.cover_url}
+                      alt={m.title}
+                      className="size-9 rounded-lg object-cover bg-muted shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{m.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{m.artist_name}</p>
+                    </div>
+                    <span className="text-sm font-semibold shrink-0">
+                      ZMW {Number(m.price).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  to="/checkout"
+                  search={{ item: "playlist", id }}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:brightness-110 transition-all"
+                >
+                  Continue to checkout — ZMW {Number(access!.total).toFixed(2)}
+                </Link>
+                <span className="text-xs text-muted-foreground">
+                  You can still preview every track before paying.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Table Header */}
           <div className="flex items-center gap-3 sm:gap-4 px-3 pb-3 mb-2 border-b border-border/60 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <span className="w-8 text-center shrink-0">#</span>

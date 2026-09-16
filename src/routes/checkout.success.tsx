@@ -83,6 +83,14 @@ function CheckoutSuccessPage() {
           .maybeSingle();
         return data;
       }
+      if (t.item_type === "playlist") {
+        const { data } = await supabase
+          .from("playlists")
+          .select("id,name")
+          .eq("id", t.item_id)
+          .maybeSingle();
+        return data;
+      }
       return null;
     },
   });
@@ -174,8 +182,11 @@ function CheckoutSuccessPage() {
   const handleSuccessRedirect = () => {
     // Albums have a detail route. Songs currently live in Library, so never
     // navigate to the legacy /songs path (which redirects to Browse).
+    // Playlist bundles return to the now-unlocked shared playlist.
     if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/albums/$id", params: { id: tx.item_id } });
+    } else if (tx?.item_type === "playlist" && tx?.item_id) {
+      navigate({ to: "/playlists/$id", params: { id: tx.item_id } });
     } else {
       navigate({ to: "/library" });
     }
@@ -201,7 +212,7 @@ function CheckoutSuccessPage() {
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">
-            {(receiptItem as any)?.title ?? tx.item_type ?? "Item"}
+            {(receiptItem as any)?.title ?? (receiptItem as any)?.name ?? tx.item_type ?? "Item"}
             {(receiptItem as any)?.artists?.name ? ` — ${(receiptItem as any).artists.name}` : ""}
           </span>
           <span className="font-semibold">
@@ -235,7 +246,7 @@ function CheckoutSuccessPage() {
                 onClick={handleSuccessRedirect}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
-                Go to {tx?.item_type === "album" ? "Album" : "Song"}
+                Go to {tx?.item_type === "album" ? "Album" : tx?.item_type === "playlist" ? "Playlist" : "Song"}
               </button>
             </>
           ) : isFailed ? (

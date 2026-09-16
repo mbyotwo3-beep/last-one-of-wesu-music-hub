@@ -7,23 +7,112 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 interface PaymentTransaction {
   id: string;
   user_id: string;
-  item_type: "song" | "album";
+  item_type: "song" | "album" | "playlist";
   item_id: string | null;
   amount: number;
   currency: string;
   method_code: string;
+  provider?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
  * Fulfill a completed payment transaction.
  *
  * - song | album → insert a completed purchase and its revenue split.
+ * - playlist → fan out into one completed purchase + one completed child
+ *   song transaction per bundled song. Each child fires the revenue-split
+ *   trigger for its own song, so every artist/label/collaborator is paid
+ *   exactly as if the buyer had purchased that song directly. The parent
+ *   bundle row is only the receipt (the trigger ignores item_type
+ *   'playlist' by design).
  */
 export async function fulfillTransaction(tx: PaymentTransaction): Promise<void> {
+  if (tx.item_type === "playlist") {
+    await fulfillPlaylistBundle(tx);
+    return;
+  }
   if (tx.item_type !== "song" && tx.item_type !== "album") {
     throw new Error("Unsupported payment item type");
   }
   await fulfillPurchase(tx);
+}
+
+async function fulfillPlaylistBundle(tx: PaymentTransaction): Promise<void> {
+  const meta = (tx.metadata ?? {}) as Record<string, unknown>;
+  const songs = Array.isArray(meta.songs) ? (meta.songs as any[]) : [];
+  // Fall back to recomputing (defensive: old rows without a snapshot).
+  let bundle: { song_id: string; amount: number }[] = songs
+    .filter((s) => s && typeof s.song_id === "string")
+    .map((s) => ({ song_id: s.song_id as string, amount: Number(s.amount) || 0 }));
+
+  for (const { song_id, amount } of bundle) {
+    const ref = `${tx.id}:${song_id}`;
+
+    // 1. Purchase row (idempotent on the unique transaction reference).
+    const { data: existingPurchase } = await supabaseAdmin
+      .from("purchases")
+      .select("id")
+      .eq("transaction_ref", ref)
+      .maybeSingle();
+    if (!existingPurchase) {
+      // Skip songs that vanished after payment (deleted/taken down) rather
+      // than granting entitlements for ghosts.
+      const { data: song } = await supabaseAdmin
+        .from("songs")
+        .select("id")
+        .eq("id", song_id)
+        .maybeSingle();
+      if (!song) continue;
+      const { error: purchaseError } = await supabaseAdmin
+        .from("purchases")
+        .insert({
+          user_id: tx.user_id,
+          song_id,
+          album_id: null,
+          status: "completed",
+          amount,
+          payment_method: tx.method_code,
+          transaction_ref: ref,
+        } as any);
+      // Lost race with a concurrent fulfilment — the other worker owns it.
+      if (purchaseError && purchaseError.code !== "23505") {
+        throw new Error(`fulfillPlaylistBundle purchase failed: ${purchaseError.message}`);
+      }
+    }
+
+    // 2. Child song transaction (idempotent). Inserting it completed fires
+    // the revenue-split trigger for exactly this song. Ordered AFTER the
+    // purchase so a crash between the two still converges on retry: the
+    // purchase check above passes, and this check creates the missing child.
+    const { data: existingChild } = await supabaseAdmin
+      .from("payment_transactions")
+      .select("id")
+      .eq("item_type", "song")
+      .eq("item_id", song_id)
+      .eq("user_id", tx.user_id)
+      .eq("status", "completed")
+      .filter("metadata->>bundle_parent", "eq", tx.id)
+      .maybeSingle();
+    if (!existingChild) {
+      const { error: childError } = await supabaseAdmin
+        .from("payment_transactions")
+        .insert({
+          user_id: tx.user_id,
+          amount,
+          currency: tx.currency,
+          method_code: tx.method_code,
+          provider: tx.provider ?? "lenco",
+          provider_ref: null,
+          provider_token: null,
+          status: "completed",
+          item_type: "song",
+          item_id: song_id,
+          metadata: { bundle_parent: tx.id, phone: (meta.phone as string | null) ?? null },
+        } as any);
+      if (childError) throw new Error(`fulfillPlaylistBundle child tx failed: ${childError.message}`);
+    }
+  }
 }
 
 async function fulfillPurchase(tx: PaymentTransaction): Promise<void> {
@@ -106,7 +195,7 @@ export async function settleTransaction(
     .eq("id", transactionId)
     .maybeSingle();
   if (!current) return "pending";
-  if (current.item_type !== "song" && current.item_type !== "album") {
+  if (current.item_type !== "song" && current.item_type !== "album" && current.item_type !== "playlist") {
     await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null } as any)
