@@ -92,7 +92,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const isPreview = usePlayer((s) => s.isPreview);
   const setIsPreview = usePlayer((s) => s.setIsPreview);
   const [audioDuration, setAudioDuration] = useState<number>(0);
-  const currentTrackId = useRef<string | null>(null);
+  const selectionId = usePlayer((s) => s.selectionId);
+  // Manual retry counter: pressing play on a failed track re-runs resolution
+  // instead of sitting on a dead source.
+  const [retryNonce, setRetryNonce] = useState(0);
+  const appliedRetryRef = useRef(0);
+  // The selection the engine has loaded (or is loading). Keyed off the
+  // store's selectionId — NOT the track id — so re-selecting the same song
+  // (queue duplicates, retry after failure) always reloads.
+  const currentSelectionRef = useRef<number | null>(null);
+  const currentTrackIdRef = useRef<string | null>(null);
   const trackedHistoryTrackRef = useRef<string | null>(null);
   const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
@@ -104,21 +113,23 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const trackPrice: number = Number(meta?.price ?? 0);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
-  // Load audio when track changes
+  // Load audio when the selection changes (or auth identity changes, or
+  // the user manually retries a failed load).
   useEffect(() => {
     if (!track) {
-      const previousId = currentTrackId.current;
+      const previousId = currentTrackIdRef.current;
       const previousProgress = usePlayer.getState().progressSeconds;
       if (user && previousId && !isPreview && previousProgress > 0) {
         updatePlayProgressFn({
           data: { song_id: previousId, progress_seconds: previousProgress },
         }).catch(() => {});
       }
-      if (currentTrackId.current) stopNative(currentTrackId.current).catch(() => {});
+      if (currentTrackIdRef.current) stopNative(currentTrackIdRef.current).catch(() => {});
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
       getAudio().pause();
-      currentTrackId.current = null;
+      currentTrackIdRef.current = null;
+      currentSelectionRef.current = null;
       setLoading(false);
       setIsPreview(false);
       setAudioDuration(0);
@@ -129,32 +140,37 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       return;
     }
-    if (currentTrackId.current === track.id) {
-      // Same track, but auth identity changed (login/logout/purchase) while
-      // in preview mode → re-resolve entitlement instead of staying stuck.
+    const isSameSelection =
+      currentSelectionRef.current === selectionId && appliedRetryRef.current === retryNonce;
+    if (isSameSelection) {
+      // Same selection, but auth identity changed (login/logout/purchase)
+      // while in preview mode → re-resolve entitlement instead of staying
+      // stuck. Otherwise there is nothing new to load.
       if (resolvedForUserRef.current !== (user?.id ?? null) && usePlayer.getState().isPreview) {
-        currentTrackId.current = null;
+        // fall through to re-resolve
       } else {
         return;
       }
     }
 
-    if (currentTrackId.current) {
-      const previousId = currentTrackId.current;
+    if (currentTrackIdRef.current) {
+      const previousId = currentTrackIdRef.current;
       const previousProgress = usePlayer.getState().progressSeconds;
       if (user && !isPreview && previousProgress > 0) {
         updatePlayProgressFn({
           data: { song_id: previousId, progress_seconds: previousProgress },
         }).catch(() => {});
       }
-      stopNative(currentTrackId.current).catch(() => {});
+      stopNative(previousId).catch(() => {});
       nativeCleanupRef.current?.();
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
     }
 
-    currentTrackId.current = track.id;
+    currentSelectionRef.current = selectionId;
+    appliedRetryRef.current = retryNonce;
+    currentTrackIdRef.current = track.id;
     resolvedForUserRef.current = user?.id ?? null;
     trackedHistoryTrackRef.current = null;
     setError(null);
@@ -170,10 +186,22 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }
 
     const audio = getAudio();
+    // Kill the previous song IMMEDIATELY: pause() alone leaves the old src
+    // attached, and the play-state sync effect would resume the OLD song
+    // while the new URL resolves ("plays previous song first" bug). It also
+    // drops any primed silent placeholder so a failed load can never leave
+    // the element "playing" silence.
     audio.pause();
+    try {
+      audio.removeAttribute("src");
+      audio.load();
+    } catch {
+      /* ignore — element already empty */
+    }
 
     let retries = 0;
-    const isCurrentTrack = () => currentTrackId.current === track!.id;
+    const isCurrentTrack = () =>
+      currentSelectionRef.current === selectionId && appliedRetryRef.current === retryNonce;
     async function loadUrl() {
       try {
         let url: string;
@@ -389,8 +417,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
     }
     loadUrl();
+    // selectionId (not the track id) drives reloads so same-song
+    // re-selections can't be swallowed by the "same id" early-return.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id, user?.id]);
+  }, [track?.id, selectionId, retryNonce, user?.id]);
 
   // Sync playing state
   useEffect(() => {
@@ -398,6 +428,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     if (!track) return;
     async function syncPlayState() {
       if (!track) return;
+      // While the new URL is still resolving, never touch the element: the
+      // src is either empty or belonged to the previous song. Touching it
+      // here is what resumed the OLD song on every track change.
+      if (track.audioUrl === undefined) return;
+      // Pressing play on a failed track retries resolution instead of
+      // sitting silent on a dead source. The load effect clears `error` when
+      // the retry starts, and the error path below drops `playing` on
+      // failure, so this can't loop by itself.
+      if (playing && track.audioUrl === null && error) {
+        setRetryNonce((n) => n + 1);
+        return;
+      }
       if (isNative && _nativeAvailable && nativeCleanupRef.current) {
         if (playing) await playNative(track.id).catch(() => {});
         else await pauseNative(track.id).catch(() => {});
@@ -418,7 +460,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
     }
     syncPlayState();
-  }, [playing, track, isNative]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, track, isNative, error]);
 
   // Progress + duration + ended
   useEffect(() => {
@@ -538,8 +581,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (currentTrackId.current) {
-        stopNative(currentTrackId.current).catch(() => {});
+      if (currentTrackIdRef.current) {
+        stopNative(currentTrackIdRef.current).catch(() => {});
       }
       audioEventsCleanupRef.current?.();
       nativeCleanupRef.current?.();

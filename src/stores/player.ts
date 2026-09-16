@@ -28,6 +28,15 @@ interface PlayerState {
   track: PlayerTrack | null;
   queue: PlayerTrack[];
   queueIndex: number;
+  /**
+   * Monotonic token bumped on every explicit track selection (setTrack,
+   * setQueue, skipNext/Prev, removing the current track). The audio engine
+   * keys resolution off this — not the track id — so re-selecting the SAME
+   * song (queue duplicates, retry after a failed load) always reloads
+   * instead of hitting the "same id, do nothing" early-return. Never
+   * persisted: it only orders selections within a live session.
+   */
+  selectionId: number;
   playing: boolean;
   liked: boolean;
   progressSeconds: number;
@@ -71,6 +80,7 @@ export const usePlayer = create<PlayerState>()(
       track: null,
       queue: [],
       queueIndex: 0,
+      selectionId: 0,
       playing: false,
       liked: false,
       progressSeconds: 0,
@@ -86,6 +96,7 @@ export const usePlayer = create<PlayerState>()(
         if (t) primeAudio();
         set((state) => ({
           track: preserveResolvedAudioUrl(t, state.track),
+          selectionId: t ? state.selectionId + 1 : state.selectionId,
           playing: !!t,
           progressSeconds: 0,
           liked: false,
@@ -98,14 +109,15 @@ export const usePlayer = create<PlayerState>()(
       setQueue: (tracks, startIndex = 0) => {
         if (tracks.length) primeAudio();
         const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
-        set({
+        set((state) => ({
           queue: tracks,
           queueIndex: startIndex,
           track,
+          selectionId: track ? state.selectionId + 1 : state.selectionId,
           playing: !!track,
           progressSeconds: 0,
           liked: false,
-        });
+        }));
       },
 
       addToQueue: (track) => {
@@ -126,6 +138,7 @@ export const usePlayer = create<PlayerState>()(
               queue: newQueue,
               queueIndex: Math.min(index, Math.max(newQueue.length - 1, 0)),
               track: nextTrack,
+              selectionId: nextTrack ? state.selectionId + 1 : state.selectionId,
               playing: !!nextTrack,
               progressSeconds: 0,
               liked: false,
@@ -158,6 +171,7 @@ export const usePlayer = create<PlayerState>()(
         set((state) => ({
           queueIndex: next,
           track: preserveResolvedAudioUrl(queue[next], state.track),
+          selectionId: state.selectionId + 1,
           progressSeconds: 0,
           liked: false,
           playing: true,
@@ -179,6 +193,7 @@ export const usePlayer = create<PlayerState>()(
         set((state) => ({
           queueIndex: prev,
           track: preserveResolvedAudioUrl(queue[prev], state.track),
+          selectionId: state.selectionId + 1,
           progressSeconds: 0,
           liked: false,
           playing: true,
