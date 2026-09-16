@@ -23,6 +23,43 @@ export async function audit(
   }
 }
 
+/**
+ * Artists may only move their own content between draft <-> pending.
+ * approved/rejected are staff-only (moderation) — accepting them from an
+ * artist request would let anyone self-approve via devtools.
+ */
+function clampArtistStatus(
+  requested: "draft" | "pending" | "approved" | "rejected" | undefined,
+  fallback: "draft" | "pending",
+  isStaff: boolean,
+): "draft" | "pending" | "approved" | "rejected" {
+  const next = requested ?? fallback;
+  if ((next === "approved" || next === "rejected") && !isStaff) {
+    throw new Error("Only staff can approve or reject content");
+  }
+  if (next !== "draft" && next !== "pending" && next !== "approved" && next !== "rejected") {
+    throw new Error("Invalid status");
+  }
+  return next;
+}
+
+/**
+ * Storage rows must reference the caller's own folder (staff exempt).
+ * Without this, an artist can point their row at another user's private
+ * object and obtain signed URLs for it via the image/audio helpers.
+ */
+function assertOwnStoragePath(
+  kind: "audio" | "cover",
+  path: string | null | undefined,
+  userId: string,
+  isStaff: boolean,
+) {
+  if (!path || isStaff) return;
+  if (!path.startsWith(`${userId}/`)) {
+    throw new Error(`Invalid ${kind}_url: must be under your own storage folder`);
+  }
+}
+
 // ---------- Artist application & profile ----------
 
 export const applyAsArtist = createServerFn({ method: "POST" })
@@ -168,6 +205,7 @@ export const uploadSong = createServerFn({ method: "POST" })
       has_feature?: boolean;
       has_label?: boolean;
       track_number?: number | null; // artist-chosen position within album
+      fee_acknowledged?: boolean; // required for free (price 0) releases
       status?: "draft" | "pending" | "approved" | "rejected";
     }) => d,
   )
@@ -182,25 +220,34 @@ export const uploadSong = createServerFn({ method: "POST" })
     if ((artist as any).status !== "approved")
       throw new Error("Your artist application must be approved before uploading");
 
-    // Validate title and price server-side (client checks are bypassable).
+    const staff = await isStaffUser(supabase, userId);
+
+    // Validate title and price server-side against the live pricing config
+    // (client checks are bypassable).
     const title = (data.title ?? "").trim();
     if (!title) throw new Error("Song title is required");
     if (title.length > 200) throw new Error("Song title is too long");
+    const { getPricingConfig } = await import("@/lib/pricing.functions");
+    const pricing = await getPricingConfig();
     const price = Number(data.price ?? 0);
-    if (!Number.isFinite(price) || price < 0 || price > 250) {
-      throw new Error("Song price must be between 0 and 250");
+    if (!Number.isFinite(price) || price < 0 || price > pricing.song_max) {
+      throw new Error(`Song price must be between 0 and ${pricing.song_max}`);
+    }
+    if (price > 0 && price < pricing.song_min) {
+      throw new Error(`Paid songs must cost at least K${pricing.song_min}`);
+    }
+    // Free releases require acknowledging the maintenance fee (the client
+    // checkbox alone is bypassable).
+    if (price === 0 && !(data as any).fee_acknowledged && !staff) {
+      throw new Error("Free releases require acknowledging the maintenance fee");
     }
 
     // Security: storage paths must be scoped to the caller's own folder.
     // Prevents referencing another user's private object and later obtaining
     // a signed download URL for it via admin-signed URL helpers.
-    const ownerPrefix = `${userId}/`;
-    if (!data.audio_url || !data.audio_url.startsWith(ownerPrefix)) {
-      throw new Error("Invalid audio_url: must be under your own storage folder");
-    }
-    if (data.cover_url && !data.cover_url.startsWith(ownerPrefix)) {
-      throw new Error("Invalid cover_url: must be under your own storage folder");
-    }
+    if (!data.audio_url) throw new Error("Audio file is required");
+    assertOwnStoragePath("audio", data.audio_url, userId, staff);
+    assertOwnStoragePath("cover", data.cover_url, userId, staff);
 
     // If has_label is true, ensure artist is signed to a label
     if (data.has_label && !(artist as any).label_id) {
@@ -208,7 +255,7 @@ export const uploadSong = createServerFn({ method: "POST" })
     }
 
     // Songs require admin approval before showing on the platform.
-    const songStatus = data.status ?? (data.album_id ? "draft" : "pending");
+    const songStatus = clampArtistStatus(data.status, data.album_id ? "draft" : "pending", staff);
     const { data: song, error } = await supabase
       .from("songs")
       .insert({
@@ -363,13 +410,20 @@ export const createAlbum = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!artist) throw new Error("Artist profile required");
+    const staff = await isStaffUser(supabase, userId);
     const title = (data.title ?? "").trim();
     if (!title) throw new Error("Album title is required");
     if (title.length > 200) throw new Error("Album title is too long");
+    const { getPricingConfig } = await import("@/lib/pricing.functions");
+    const pricing = await getPricingConfig();
     const price = Number(data.price ?? 0);
-    if (!Number.isFinite(price) || price < 0 || price > 500) {
-      throw new Error("Album price must be between 0 and 500");
+    if (!Number.isFinite(price) || price < 0 || price > pricing.album_max) {
+      throw new Error(`Album price must be between 0 and ${pricing.album_max}`);
     }
+    if (price > 0 && price < pricing.album_min) {
+      throw new Error(`Paid albums must cost at least K${pricing.album_min}`);
+    }
+    assertOwnStoragePath("cover", data.cover_url, userId, staff);
     const { data: album, error } = await supabase
       .from("albums")
       .insert({
@@ -380,7 +434,7 @@ export const createAlbum = createServerFn({ method: "POST" })
         description: data.description ?? null,
         price,
         artist_id: (artist as any).id,
-        status: data.status ?? "draft",
+        status: clampArtistStatus(data.status, "draft", staff),
       } as any)
       .select("id")
       .single();
@@ -428,12 +482,15 @@ async function getArtistAvailableBalance(
 
   const totalEarned = (splits ?? []).reduce((sum, s: any) => sum + Number(s.amount || 0), 0);
 
-  // Get total already paid or pending
+  // Get total already committed. Every non-terminal status counts:
+  // "approved" rows were previously ignored, so approving a payout never
+  // reduced the available balance and the same earnings could be requested
+  // and spent twice. (Mirrors the label balance in labels.functions.ts.)
   const { data: payouts } = await supabase
     .from("payouts")
     .select("amount")
     .eq("artist_id", artistId)
-    .in("status", ["completed", "pending"]);
+    .in("status", ["pending", "approved", "processing", "paid", "completed"]);
 
   const totalPaid = (payouts ?? []).reduce((sum, p: any) => sum + Number(p.amount || 0), 0);
 
@@ -451,8 +508,18 @@ export const requestPayout = createServerFn({ method: "POST" })
     const withdrawalConfig = await readWithdrawalConfig();
     const minWithdrawal = withdrawalConfig.min_amount;
 
+    // Strict validation: NaN/negative/zero amounts and blank destination
+    // details must never create a payout row (NaN passes every < / >
+    // comparison, and Postgres numeric even stores NaN).
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Payout amount must be a positive number");
+    }
+    if (!data.method_code?.trim()) throw new Error("A payout method is required");
+    if (!data.destination?.trim()) throw new Error("A payout destination is required");
+
     // REQUIREMENT: Payout only allowed if money is over minimum
-    if (data.amount < minWithdrawal) {
+    if (amount < minWithdrawal) {
       throw new Error(`Minimum withdrawal amount is K${minWithdrawal} (ZMW ${minWithdrawal})`);
     }
 
@@ -470,17 +537,17 @@ export const requestPayout = createServerFn({ method: "POST" })
         `You can only apply for withdrawal if your available balance is over K${minWithdrawal} (Current: K${available.toFixed(2)})`,
       );
     }
-    if (data.amount > available) {
+    if (amount > available) {
       throw new Error(
-        `Insufficient balance. Available: K${available.toFixed(2)}, Requested: K${data.amount.toFixed(2)}`,
+        `Insufficient balance. Available: K${available.toFixed(2)}, Requested: K${amount.toFixed(2)}`,
       );
     }
 
     const { error } = await supabase.from("payouts").insert({
       artist_id: (artist as any).id,
-      amount: data.amount,
-      method_code: data.method_code,
-      destination: data.destination,
+      amount,
+      method_code: data.method_code.trim(),
+      destination: data.destination.trim(),
     } as any);
     if (error) throw new Error(error.message);
     await audit(supabase, userId, "payout.request", "artist", (artist as any).id, {
@@ -762,8 +829,10 @@ export const updateAlbum = createServerFn({ method: "POST" })
       throw new Error("Album not found");
     }
 
-    // 2. Permission check: verify the user owns this album
-    if ((album as any).artists.user_id !== userId) {
+    // 2. Permission check: owner OR staff (admins must be able to
+    // moderate/clean up albums — previously staff were blocked entirely).
+    const staff = await isStaffUser(supabase, userId);
+    if (!staff && (album as any).artists.user_id !== userId) {
       throw new Error("Forbidden: You do not have permission to edit this album");
     }
 
@@ -805,16 +874,26 @@ export const updateAlbum = createServerFn({ method: "POST" })
     }
     if (data.description !== undefined) updateData.description = data.description;
     if (data.genre !== undefined) updateData.genre = data.genre;
-    if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
+    if (data.cover_url !== undefined) {
+      assertOwnStoragePath("cover", data.cover_url, userId, staff);
+      updateData.cover_url = data.cover_url;
+    }
     if (data.release_date !== undefined) updateData.release_date = data.release_date;
     if (data.price !== undefined) {
+      const { getPricingConfig } = await import("@/lib/pricing.functions");
+      const pricing = await getPricingConfig();
       const p = Number(data.price);
-      if (!Number.isFinite(p) || p < 0 || p > 500) {
-        throw new Error("Album price must be between 0 and 500");
+      if (!Number.isFinite(p) || p < 0 || p > pricing.album_max) {
+        throw new Error(`Album price must be between 0 and ${pricing.album_max}`);
+      }
+      if (p > 0 && p < pricing.album_min) {
+        throw new Error(`Paid albums must cost at least K${pricing.album_min}`);
       }
       updateData.price = p;
     }
-    if (data.status !== undefined) updateData.status = data.status;
+    if (data.status !== undefined) {
+      updateData.status = clampArtistStatus(data.status, "draft", staff);
+    }
 
     // 5. Update the album
     const { error: updateError } = await supabaseAdmin
@@ -865,8 +944,9 @@ export const updateSong = createServerFn({ method: "POST" })
       throw new Error("Song not found");
     }
 
-    // 2. Permission check: verify the user owns this song
-    if ((song as any).artists.user_id !== userId) {
+    // 2. Permission check: owner OR staff.
+    const staff = await isStaffUser(supabase, userId);
+    if (!staff && (song as any).artists.user_id !== userId) {
       throw new Error("Forbidden: You do not have permission to edit this song");
     }
 
@@ -906,19 +986,43 @@ export const updateSong = createServerFn({ method: "POST" })
       if (t.length > 200) throw new Error("Song title is too long");
       updateData.title = t;
     }
-    if (data.cover_url !== undefined) updateData.cover_url = data.cover_url;
+    if (data.cover_url !== undefined) {
+      assertOwnStoragePath("cover", data.cover_url, userId, staff);
+      updateData.cover_url = data.cover_url;
+    }
     if (data.genre !== undefined) updateData.genre = data.genre;
     if (data.price !== undefined) {
+      const { getPricingConfig } = await import("@/lib/pricing.functions");
+      const pricing = await getPricingConfig();
       const p = Number(data.price);
-      if (!Number.isFinite(p) || p < 0 || p > 250) {
-        throw new Error("Song price must be between 0 and 250");
+      if (!Number.isFinite(p) || p < 0 || p > pricing.song_max) {
+        throw new Error(`Song price must be between 0 and ${pricing.song_max}`);
+      }
+      if (p > 0 && p < pricing.song_min) {
+        throw new Error(`Paid songs must cost at least K${pricing.song_min}`);
       }
       updateData.price = p;
     }
     if (data.track_number !== undefined) updateData.track_number = data.track_number;
-    if (data.status !== undefined) updateData.status = data.status;
+    if (data.status !== undefined) {
+      updateData.status = clampArtistStatus(data.status, "draft", staff);
+    }
     if (data.explicit !== undefined) updateData.explicit = data.explicit;
-    if (data.album_id !== undefined) updateData.album_id = data.album_id;
+    if (data.album_id !== undefined) {
+      // The target album must belong to the caller — otherwise anyone could
+      // attach their song to another artist's album.
+      if (data.album_id !== null && !staff) {
+        const { data: target } = await supabaseAdmin
+          .from("albums")
+          .select("id, artist_id")
+          .eq("id", data.album_id)
+          .maybeSingle();
+        if (!target || (target as any).artist_id !== (song as any).artist_id) {
+          throw new Error("Target album not found or not yours");
+        }
+      }
+      updateData.album_id = data.album_id;
+    }
 
     // 5. Update the song
     const { error: updateError } = await supabaseAdmin

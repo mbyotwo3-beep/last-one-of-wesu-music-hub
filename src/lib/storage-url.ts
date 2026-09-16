@@ -7,7 +7,12 @@ import { signImageUrl } from "@/lib/media.functions";
  * Values that already look like an absolute URL are returned as-is.
  */
 
-export type ImageBucket = "album-art" | "artist-images" | "user-avatars" | "hero-images";
+export type ImageBucket =
+  | "album-art"
+  | "artist-images"
+  | "user-avatars"
+  | "hero-images"
+  | "label-images";
 
 const cache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();

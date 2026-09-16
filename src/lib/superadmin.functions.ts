@@ -131,9 +131,12 @@ export const upsertPlan = createServerFn({ method: "POST" })
   .validator(
     (d: {
       id?: string;
+      code?: string;
       name: string;
       price_zmw: number;
       description?: string;
+      interval?: string;
+      sort_order?: number;
       is_active?: boolean;
     }) => d,
   )
@@ -143,6 +146,17 @@ export const upsertPlan = createServerFn({ method: "POST" })
     if (!Number.isFinite(data.price_zmw) || data.price_zmw < 0) {
       throw new Error("Plan price must be a non-negative number");
     }
+    // `code` is NOT NULL in the DB — inserts without it fail. Updates keep
+    // their existing code; new plans derive one from the name.
+    const code =
+      data.code?.trim() ||
+      data.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60);
+    if (!code) throw new Error("Plan code is required");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row: any = {
       name: data.name,
@@ -150,6 +164,9 @@ export const upsertPlan = createServerFn({ method: "POST" })
       description: data.description ?? null,
       is_active: data.is_active ?? true,
     };
+    if (!data.id) row.code = code;
+    if (data.interval !== undefined) row.interval = data.interval;
+    if (data.sort_order !== undefined) row.sort_order = data.sort_order;
     if (data.id) row.id = data.id;
     const { error } = await supabaseAdmin.from("subscription_plans").upsert(row);
     if (error) throw new Error(error.message);
@@ -232,6 +249,33 @@ export const decidePayout = createServerFn({ method: "POST" })
       .eq("status", "pending")
       .maybeSingle();
     if (!pending) throw new Error("Payout is no longer pending");
+    // Funds re-check at decision time: the balance may have moved since the
+    // request (a second payout approved first, new earnings, etc.). Approving
+    // blind would overdraw the artist. Rejected decisions skip the check.
+    if (data.decision === "approved") {
+      const { data: row } = await supabaseAdmin
+        .from("payouts")
+        .select("id, artist_id, label_id, amount")
+        .eq("id", data.id)
+        .maybeSingle();
+      const amount = Number((row as any)?.amount ?? NaN);
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid payout amount");
+      const { data: splits } = await supabaseAdmin
+        .from("revenue_splits")
+        .select("amount")
+        .eq((row as any)?.label_id ? "label_id" : "artist_id", (row as any)?.label_id ?? (row as any)?.artist_id)
+        .eq("payee_role", (row as any)?.label_id ? "label" : "artist");
+      const earned = (splits ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
+      const ownerFilter = (row as any)?.label_id ? { label_id: (row as any).label_id } : { artist_id: (row as any)?.artist_id };
+      let committedQ = supabaseAdmin.from("payouts").select("amount").match(ownerFilter);
+      committedQ = committedQ.in("status", ["pending", "approved", "processing", "paid", "completed"]);
+      const { data: committed } = await committedQ;
+      const spent = (committed ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
+      // Exclude this very row (still pending) from the committed total.
+      if (Math.max(0, earned - (spent - amount)) < amount) {
+        throw new Error("Insufficient available balance to approve this payout");
+      }
+    }
     const { error } = await supabaseAdmin
       .from("payouts")
       .update({

@@ -17,7 +17,7 @@ interface HeroSliderProps {
 
 export function HeroSlider({ slides }: HeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -49,13 +49,20 @@ export function HeroSlider({ slides }: HeroSliderProps) {
       return;
     }
     
-    setTrack({
-      id: slide.id,
-      title: slide.title,
-      artistName: slide.subtitle,
-      coverUrl: slide.imageUrl,
-      audioUrl: slide.audioUrl,
-    });
+    // Single-track queue (not bare setTrack) so Next/Prev and the queue
+    // screen keep working instead of jumping into a stale queue.
+    setQueue(
+      [
+        {
+          id: slide.id,
+          title: slide.title,
+          artistName: slide.subtitle,
+          coverUrl: slide.imageUrl,
+          audioUrl: slide.audioUrl,
+        },
+      ],
+      0,
+    );
   };
 
   if (slides.length === 0) return null;

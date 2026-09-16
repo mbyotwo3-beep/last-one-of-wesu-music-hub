@@ -24,14 +24,13 @@ function ResetPasswordPage() {
   const [expired, setExpired] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Supabase parses the recovery token from the URL hash and fires PASSWORD_RECOVERY.
+  // Supabase parses the recovery token from the URL hash and fires
+  // PASSWORD_RECOVERY. Only that event unlocks the form — a plain SIGNED_IN
+  // or an existing session must NOT (otherwise any logged-in visitor, with no
+  // recovery link at all, gets a password form).
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
-    });
-    // Also check existing session (link was already consumed on this tab).
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+      if (event === "PASSWORD_RECOVERY") setReady(true);
     });
     // Expired/used links never fire — stop hanging on "Verifying…" forever.
     const t = setTimeout(() => {

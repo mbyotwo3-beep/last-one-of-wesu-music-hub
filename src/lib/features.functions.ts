@@ -147,6 +147,14 @@ export const getHomeFeatured = createServerFn({ method: "GET" }).handler(async (
           .eq("id", s.target_id)
           .maybeSingle();
         target = data;
+      } else if (s.target_type === "playlist") {
+        const { data } = await sb
+          .from("playlists")
+          .select("id, name, cover_url")
+          .eq("id", s.target_id)
+          .eq("is_public", true)
+          .maybeSingle();
+        target = data;
       }
       return { ...s, target };
     }),

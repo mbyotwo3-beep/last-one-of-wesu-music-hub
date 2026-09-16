@@ -40,10 +40,15 @@ function Page() {
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      await supabase
+      if (!user) throw new Error("Sign in to manage notifications");
+      const { error } = await supabase
         .from("notifications")
         .update({ read_at: new Date().toISOString() } as any)
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id);
+      // Throw so failures roll back the optimistic update + toast instead
+      // of silently looking successful.
+      if (error) throw new Error(error.message);
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["notifications", user?.id] });
@@ -63,12 +68,15 @@ function Page() {
 
   const markAllRead = useMutation({
     mutationFn: async () => {
+      if (!user) throw new Error("Sign in to manage notifications");
       const unreadIds = rows?.filter((n: any) => !n.read_at).map((n: any) => n.id) || [];
       if (unreadIds.length === 0) return;
-      await supabase
+      const { error } = await supabase
         .from("notifications")
         .update({ read_at: new Date().toISOString() } as any)
-        .in("id", unreadIds);
+        .in("id", unreadIds)
+        .eq("user_id", user.id);
+      if (error) throw new Error(error.message);
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["notifications", user?.id] });

@@ -97,7 +97,19 @@ function CheckoutSuccessPage() {
     queryClient.invalidateQueries({
       predicate: (q) => q.queryKey[0] !== "transaction",
     });
-  }, [settledStatus, queryClient]);
+    // Drop any cached preview URL for the purchased song — otherwise the
+    // next play serves the stale 15s preview instead of the unlocked track.
+    try {
+      const t = transaction as any;
+      if (t?.item_type === "song" && t?.item_id) {
+        import("@/lib/audio").then(({ evictCachedAudioUrl }) =>
+          evictCachedAudioUrl(t.item_id),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [settledStatus, queryClient, transaction]);
 
   const [pollElapsed, setPollElapsed] = useState(0);
   const isAwaitingSettlement =

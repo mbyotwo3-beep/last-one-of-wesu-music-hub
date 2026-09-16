@@ -157,7 +157,8 @@ function RootComponent() {
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {
     if (platform === "native") {
-      registerDeepLinkHandler();
+      const cleanup = registerDeepLinkHandler();
+      return cleanup;
     }
   }, [platform]);
 

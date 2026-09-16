@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Music, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toggleFollow } from "@/lib/follow.functions";
 import { saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
+import { acceptInvitation } from "@/lib/invitations.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 import { toast } from "sonner";
 
@@ -24,12 +26,18 @@ export const Route = createFileRoute("/auth")({
     artistId?: string;
     itemId?: string;
     itemType?: string;
+    invite?: string;
+    type?: string;
   } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
     action: typeof search.action === "string" ? search.action : undefined,
     artistId: typeof search.artistId === "string" ? search.artistId : undefined,
     itemId: typeof search.itemId === "string" ? search.itemId : undefined,
     itemType: typeof search.itemType === "string" ? search.itemType : undefined,
+    // Collaboration / label invitation context (previously pointed at a
+    // non-existent /register route and was dropped here, so invites died).
+    invite: typeof search.invite === "string" ? search.invite : undefined,
+    type: typeof search.type === "string" ? search.type : undefined,
   }),
   component: AuthPage,
 });
@@ -46,12 +54,24 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const { redirect, action, artistId, itemId, itemType } = search;
+  const { redirect, action, artistId, itemId, itemType, invite } = search;
+  const acceptInviteFn = useServerFn(acceptInvitation);
 
   // Only same-origin paths are valid redirect targets — anything else
   // (absolute URLs, protocol-relative) falls back to the dashboard.
   const safeRedirect =
     redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : undefined;
+
+  // Invitation links survive email-confirmation signups (which create no
+  // session yet) via sessionStorage, and are consumed once after auth.
+  useEffect(() => {
+    try {
+      if (invite) sessionStorage.setItem("pending_invite", invite);
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invite]);
 
   // After an OAuth round-trip the page reloads with a session but without the
   // original ?redirect — recover it from sessionStorage (written below).
@@ -129,6 +149,22 @@ function AuthPage() {
     }
   }
 
+  function readPendingInvite(): string | null {
+    try {
+      return sessionStorage.getItem("pending_invite");
+    } catch {
+      return null;
+    }
+  }
+
+  function clearPendingInvite() {
+    try {
+      sessionStorage.removeItem("pending_invite");
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function handlePostAuthAction() {
     // Handle post-authentication actions like follow, save, like
     if (action === "follow" && artistId) {
@@ -165,6 +201,19 @@ function AuthPage() {
       // since we need them to select which playlist
       navigate({ to: (safeRedirect || "/dashboard") as any });
       return;
+    } else if (invite || readPendingInvite()) {
+      // Collaboration / label invitation accepted right after sign-in/up.
+      const invitationId = invite ?? readPendingInvite();
+      try {
+        await acceptInviteFn({ data: { invitation_id: invitationId! } });
+        clearPendingInvite();
+        toast.success("Invitation accepted — welcome aboard!");
+      } catch (err) {
+        console.error("Failed to accept invitation after auth:", err);
+        toast.error(
+          err instanceof Error ? err.message : "Signed in, but the invitation could not be accepted",
+        );
+      }
     }
     // Redirect to the original destination
     navigate({ to: (safeRedirect || "/dashboard") as any });
@@ -297,25 +346,32 @@ function AuthPage() {
               return;
             }
             setLoading(true);
-            // Keep the intended destination out of the OAuth redirect URI:
-            // it must be a public same-origin URL, so stash the path locally.
             try {
-              sessionStorage.setItem("post_auth_redirect", safeRedirect || "/dashboard");
-            } catch {
-              /* storage unavailable — the fallback below still navigates */
+              // Keep the intended destination out of the OAuth redirect URI:
+              // it must be a public same-origin URL, so stash the path locally.
+              try {
+                sessionStorage.setItem("post_auth_redirect", safeRedirect || "/dashboard");
+              } catch {
+                /* storage unavailable — the fallback below still navigates */
+              }
+              const result = await lovable.auth.signInWithOAuth("google", {
+                redirect_uri: window.location.origin,
+              });
+              if (result.error) {
+                setError(
+                  result.error instanceof Error ? result.error.message : "Google sign-in failed",
+                );
+              }
+              if (!result.redirected && !result.error) {
+                navigate({ to: (safeRedirect || "/dashboard") as any });
+              }
+            } catch (err) {
+              // A thrown SDK/network error previously left an unhandled
+              // rejection and a permanently stuck "Loading…" button.
+              setError(err instanceof Error ? err.message : "Google sign-in failed");
+            } finally {
+              setLoading(false);
             }
-            const result = await lovable.auth.signInWithOAuth("google", {
-              redirect_uri: window.location.origin,
-            });
-            if (result.error) {
-              setError(
-                result.error instanceof Error ? result.error.message : "Google sign-in failed",
-              );
-            }
-            if (!result.redirected && !result.error) {
-              navigate({ to: (safeRedirect || "/dashboard") as any });
-            }
-            setLoading(false);
           }}
           disabled={loading}
           className="w-full mt-6 py-3 bg-card border border-white/10 rounded-xl font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"

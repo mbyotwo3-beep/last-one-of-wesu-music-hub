@@ -137,8 +137,30 @@ export const saveHomepageLayout = createServerFn({ method: "POST" })
         },
       };
     });
+    // Sanitize hero slides like shelves: cap counts/lengths, restrict link
+    // types, and reject malformed UUIDs so a bad slide can never render a
+    // dead section or crash the router.
+    const LINK_TYPES = ["song", "album", "artist", "playlist", "url"];
+    const hero_slides = (data.layout.hero_slides ?? []).slice(0, 10).map((h) => {
+      if (!LINK_TYPES.includes(h.link_type ?? "")) throw new Error("Invalid hero link_type");
+      if (h.link_type !== "url" && h.link_id && !UUID_RE.test(h.link_id)) {
+        throw new Error("Invalid hero link_id");
+      }
+      if (h.link_type === "url" && h.link_url && !/^https?:\/\//i.test(h.link_url)) {
+        throw new Error("Invalid hero link_url");
+      }
+      return {
+        id: String(h.id).slice(0, 64),
+        title: String(h.title ?? "").slice(0, 120),
+        subtitle: h.subtitle ? String(h.subtitle).slice(0, 200) : undefined,
+        cover_url: h.cover_url ? String(h.cover_url).slice(0, 500) : undefined,
+        link_type: h.link_type,
+        link_id: h.link_id,
+        link_url: h.link_url ? String(h.link_url).slice(0, 500) : undefined,
+      };
+    });
     const layout: HomepageLayout = {
-      hero_slides: (data.layout.hero_slides ?? []).slice(0, 10),
+      hero_slides,
       shelves,
     };
 

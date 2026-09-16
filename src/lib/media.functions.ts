@@ -27,11 +27,22 @@ export const signUploadUrl = createServerFn({ method: "POST" })
     const safe = (data.filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
     // Scope uploads to the caller's own folder. A custom folder is only
     // honored for staff — otherwise anyone could write into another user's
-    // prefix by passing folder=<victim-id>.
+    // prefix by passing folder=<victim-id>. Label owners may additionally
+    // upload into their own label's folder (label logos live there).
     let folder = context.userId;
     if (data.folder && data.folder !== context.userId) {
       const staff = await isStaffUser(context.supabase, context.userId);
-      if (!staff) throw new Error("Forbidden: cannot upload to another user's folder");
+      let allowed = staff;
+      if (!allowed) {
+        const { data: label } = await context.supabase
+          .from("labels")
+          .select("id")
+          .eq("id", data.folder)
+          .eq("owner_user_id", context.userId)
+          .maybeSingle();
+        allowed = !!label;
+      }
+      if (!allowed) throw new Error("Forbidden: cannot upload to another user's folder");
       if (data.folder.includes("..") || data.folder.includes("/")) {
         throw new Error("Invalid folder");
       }

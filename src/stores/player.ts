@@ -63,6 +63,7 @@ interface PlayerState {
   skipPrev: () => void;
   togglePlay: () => void;
   setProgress: (s: number) => void;
+  setTrackDuration: (seconds: number) => void;
   seekTo: (seconds: number) => void;
   toggleLike: () => void;
   openNowPlaying: () => void;
@@ -107,11 +108,17 @@ export const usePlayer = create<PlayerState>()(
         set((state) => (state.track ? { track: { ...state.track, audioUrl: url } } : state)),
 
       setQueue: (tracks, startIndex = 0) => {
+        if (!tracks.length) {
+          set({ queue: [], queueIndex: 0, track: null, playing: false, progressSeconds: 0 });
+          return;
+        }
+        // Clamp out-of-bounds callers instead of storing a queueIndex with no track.
+        const safeIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
         if (tracks.length) primeAudio();
-        const track = preserveResolvedAudioUrl(tracks[startIndex] ?? null, get().track);
+        const track = preserveResolvedAudioUrl(tracks[safeIndex] ?? null, get().track);
         set((state) => ({
           queue: tracks,
-          queueIndex: startIndex,
+          queueIndex: safeIndex,
           track,
           selectionId: track ? state.selectionId + 1 : state.selectionId,
           playing: !!track,
@@ -215,6 +222,19 @@ export const usePlayer = create<PlayerState>()(
       },
 
       setProgress: (s) => set({ progressSeconds: s }),
+
+  /**
+   * Fill in the real media duration once the element reports metadata.
+   * Many queue entries are built without durationSeconds — without this,
+   * mobile progress bars and seek stay stuck at 0:00.
+   */
+  setTrackDuration: (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    set((state) => {
+      if (!state.track || state.track.durationSeconds) return state;
+      return { track: { ...state.track, durationSeconds: Math.floor(seconds) } };
+    });
+  },
 
       seekTo: (seconds: number) => {
         const { isPreview, track } = get();

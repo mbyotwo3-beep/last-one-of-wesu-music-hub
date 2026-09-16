@@ -10,6 +10,7 @@ export const getFeaturedAlbums = createServerFn({ method: "GET" }).handler(async
     .from("albums")
     .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
     .eq("featured", true)
+    .eq("status", "approved")
     .order("release_date", { ascending: false })
     .limit(12);
   if (error) throw new Error(error.message);
@@ -21,6 +22,7 @@ export const getNewReleases = createServerFn({ method: "GET" }).handler(async ()
   const { data, error } = await supabase
     .from("songs")
     .select("id,title,duration,price,cover_url,artist:artists(id,name)")
+    .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw new Error(error.message);
@@ -32,6 +34,7 @@ export const getTrendingSongs = createServerFn({ method: "GET" }).handler(async 
   const { data, error } = await supabase
     .from("songs")
     .select("id,title,play_count,price,cover_url,artist:artists(id,name)")
+    .eq("status", "approved")
     .order("play_count", { ascending: false })
     .limit(10);
   if (error) throw new Error(error.message);
@@ -47,6 +50,7 @@ export const searchSongs = createServerFn({ method: "GET" })
     let q = supabase
       .from("songs")
       .select("id,title,duration,price,cover_url,genre,artist:artists(id,name)")
+      .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(50);
     if (data.q) q = q.ilike("title", `%${data.q}%`);
@@ -73,12 +77,14 @@ export const globalSearch = createServerFn({ method: "GET" })
       supabase
         .from("songs")
         .select("id,title,cover_url,price,duration,play_count,artist:artists(id,name)")
+        .eq("status", "approved")
         .ilike("title", like)
         .order("play_count", { ascending: false })
         .limit(limit * 3),
       supabase
         .from("albums")
         .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
+        .eq("status", "approved")
         .ilike("title", like)
         .order("release_date", { ascending: false })
         .limit(limit * 3),
@@ -123,6 +129,7 @@ export const listAlbums = createServerFn({ method: "GET" }).handler(async () => 
   const { data, error } = await supabase
     .from("albums")
     .select("id,title,cover_url,price,release_date,genre,artist:artists(id,name)")
+    .eq("status", "approved")
     .order("release_date", { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
@@ -148,16 +155,18 @@ export const getArtistById = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const supabase = getPublicSupabase();
     const [artist, albums, songs] = await Promise.all([
-      supabase.from("artists").select("*").eq("id", data.id).maybeSingle(),
+      supabase.from("artists").select("*").eq("id", data.id).eq("status", "approved").maybeSingle(),
       supabase
         .from("albums")
         .select("id,title,cover_url,release_date,price")
         .eq("artist_id", data.id)
+        .eq("status", "approved")
         .order("release_date", { ascending: false }),
       supabase
         .from("songs")
         .select("id,title,duration,price,cover_url,play_count,album_id")
         .eq("artist_id", data.id)
+        .eq("status", "approved")
         .order("play_count", { ascending: false })
         .limit(20),
     ]);
@@ -179,11 +188,14 @@ export const getAlbumWithSongs = createServerFn({ method: "GET" })
         .from("albums")
         .select("*, artist:artists(id,name,avatar_url)")
         .eq("id", data.id)
+        .eq("status", "approved")
         .maybeSingle(),
       supabase
         .from("songs")
-        .select("id,title,duration,price")
+        .select("id,title,duration,price,explicit,track_number")
         .eq("album_id", data.id)
+        .eq("status", "approved")
+        .order("track_number", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true }),
     ]);
     if (album.error) throw new Error(album.error.message);
@@ -217,6 +229,7 @@ export const getPurchasableItem = createServerFn({ method: "GET" })
         .from("songs")
         .select("id,title,price,cover_url,artist:artists(id,name)")
         .eq("id", data.id)
+        .eq("status", "approved")
         .maybeSingle();
       if (error) throw new Error(error.message);
       return row;
@@ -225,6 +238,7 @@ export const getPurchasableItem = createServerFn({ method: "GET" })
       .from("albums")
       .select("id,title,price,cover_url,artist:artists(id,name)")
       .eq("id", data.id)
+      .eq("status", "approved")
       .maybeSingle();
     if (error) throw new Error(error.message);
     return row;
@@ -273,6 +287,7 @@ export const getRecentAlbums = createServerFn({ method: "GET" }).handler(async (
   const { data, error } = await supabase
     .from("albums")
     .select("id,title,cover_url,price,release_date,genre,artist:artists(id,name)")
+    .eq("status", "approved")
     .order("release_date", { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
@@ -300,6 +315,7 @@ export const getGenres = createServerFn({ method: "GET" }).handler(async () => {
   const { data, error } = await supabase
     .from("songs")
     .select("genre")
+    .eq("status", "approved")
     .not("genre", "is", null)
     .limit(500);
   if (error) throw new Error(error.message);
@@ -325,6 +341,7 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
       .from("songs")
       .select("id,title,duration,price,cover_url,play_count,artist:artists(id,name)")
       .eq("genre", data.genre)
+      .eq("status", "approved")
       .order("play_count", { ascending: false })
       .limit(data.limit ?? 12);
     if (error) throw new Error(error.message);
@@ -338,10 +355,12 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
 export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
 
-  // Get all genres and their counts
+  // Get all genres and their counts (approved tracks only so chips never
+  // point at empty shelves)
   const { data: genreRows, error: genreError } = await supabase
     .from("songs")
     .select("genre")
+    .eq("status", "approved")
     .not("genre", "is", null)
     .limit(500);
 
@@ -367,6 +386,7 @@ export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(asy
         .from("songs")
         .select("id,title,duration,price,cover_url,play_count,artist:artists(id,name)")
         .eq("genre", genre)
+        .eq("status", "approved")
         .order("play_count", { ascending: false })
         .limit(10);
 
@@ -520,6 +540,7 @@ export const getForYou = createServerFn({ method: "GET" })
             .from("songs")
             .select("id,title,cover_url,duration,price,artist:artists(id,name)")
             .in("genre", topGenres)
+            .eq("status", "approved")
             .not("id", "in", `(${songIds.join(",")})`)
             .order("play_count", { ascending: false })
             .limit(12)
@@ -529,6 +550,7 @@ export const getForYou = createServerFn({ method: "GET" })
             .from("songs")
             .select("id,title,cover_url,duration,price,artist:artists(id,name)")
             .in("artist_id", topArtistIds)
+            .eq("status", "approved")
             .not("id", "in", `(${songIds.join(",")})`)
             .order("created_at", { ascending: false })
             .limit(12)

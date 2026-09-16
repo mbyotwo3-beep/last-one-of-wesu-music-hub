@@ -863,6 +863,8 @@ function UploadWizard() {
             release_date: releaseDate || undefined,
             has_feature: doFeatureInvite,
             has_label: doLabelInvite,
+            // Server requires this for free (price 0) releases.
+            fee_acknowledged: feeAgreed,
           },
         });
 
@@ -1007,6 +1009,8 @@ function UploadWizard() {
             has_label: doLabelInvite,
             track_number: trackIdx + 1,
             status: "draft",
+            // Server requires this when the album itself is free (price 0).
+            fee_acknowledged: feeAgreed,
           },
         });
 
@@ -1429,7 +1433,11 @@ function UploadWizard() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="sr-only"
-              onChange={(e) => setCoverFile(e.target.files?.[0])}
+              onChange={(e) => {
+                setCoverFile(e.target.files?.[0]);
+                // Allow re-selecting the same file (e.g. after Remove).
+                e.target.value = "";
+              }}
             />
             {cover && <p className="mt-3 truncate text-xs text-primary">Selected: {cover.name}</p>}
           </div>
@@ -1466,7 +1474,11 @@ function UploadWizard() {
                 type="file"
                 accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/ogg,audio/opus"
                 className="sr-only"
-                onChange={(e) => addAudioFiles(e.target.files ?? [], true)}
+                onChange={(e) => {
+                  addAudioFiles(e.target.files ?? [], true);
+                  // Allow re-selecting the same file(s).
+                  e.target.value = "";
+                }}
               />
             </div>
           ) : (

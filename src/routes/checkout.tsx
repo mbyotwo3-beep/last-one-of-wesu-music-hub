@@ -84,7 +84,7 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { data: methods } = useSuspenseQuery(methodsQO);
 
-  const { data: purchasable } = useQuery({
+  const { data: purchasable, isLoading: purchasableLoading } = useQuery({
     queryKey: ["purchasable", search.item, search.id],
     queryFn: () => getPurchasableItem({ data: { item_type: search.item!, id: search.id! } }),
     enabled: !!search.item && !!search.id,
@@ -147,22 +147,37 @@ function CheckoutPage() {
 
   if (loading || !user) return null;
 
-  // Resolve line item
-  let lineName = "";
-  let linePrice = 0;
-  let itemType: "song" | "album" = "song";
-  let itemId: string | undefined;
-
-  if (purchasable) {
-    lineName = `${(purchasable as any).title}${(purchasable as any).artist?.name ? ` — ${(purchasable as any).artist.name}` : ""}`;
-    linePrice = Number((purchasable as any).price ?? 0);
-    itemType = search.item!;
-    itemId = (purchasable as any).id;
-  } else if (!purchasable) {
+  if (purchasableLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading item…</div>;
-  } else {
-    return null;
   }
+
+  // Item resolved to null: unapproved / removed / wrong id. Never hang on
+  // "Loading…" and never offer to pay for it.
+  if (!purchasable) {
+    return (
+      <div className="min-h-screen px-6 py-12">
+        <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+          <h1 className="text-xl font-semibold">This item isn't available for purchase</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            It may have been removed or is still awaiting approval.
+          </p>
+          <Link
+            to="/browse"
+            className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+          >
+            Browse Music
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Resolve line item
+  const lineName = `${(purchasable as any).title}${(purchasable as any).artist?.name ? ` — ${(purchasable as any).artist.name}` : ""}`;
+  const linePrice = Number((purchasable as any).price ?? 0);
+  const itemType: "song" | "album" = search.item!;
+  const itemId: string | undefined = (purchasable as any).id;
+  const isFree = linePrice <= 0;
 
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
   const isCard = selectedMethod?.category === "card";
@@ -171,7 +186,7 @@ function CheckoutPage() {
     !selectedMethodCode ||
     !itemId ||
     (!isCard && !phoneNumber.trim()) ||
-    linePrice <= 0;
+    isFree;
 
   return (
     <div className="min-h-screen pb-24">
@@ -190,6 +205,19 @@ function CheckoutPage() {
             <span className="text-xl font-bold text-primary">ZMW {linePrice.toFixed(2)}</span>
           </div>
         </div>
+
+        {methods.length === 0 && (
+          <div className="bg-card border border-amber-500/30 rounded-2xl p-6 mb-8 text-sm text-amber-300">
+            No payment methods are available right now. Please try again later or contact
+            support.
+          </div>
+        )}
+
+        {isFree && (
+          <div className="bg-card border border-primary/30 rounded-2xl p-6 mb-8 text-sm">
+            This item is free — no payment needed. Find it in your library.
+          </div>
+        )}
 
         <div className="bg-card border border-white/5 rounded-2xl p-6 mb-8">
           <h2 className="text-lg font-semibold mb-4">Payment Method</h2>

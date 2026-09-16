@@ -1029,8 +1029,10 @@ export type Database = {
           label_id: string | null
           play_count: number
           price: number | null
+          release_date: string | null
           status: string
           title: string
+          track_number: number | null
         }
         Insert: {
           album_id?: string | null
@@ -1047,8 +1049,10 @@ export type Database = {
           label_id?: string | null
           play_count?: number
           price?: number | null
+          release_date?: string | null
           status?: string
           title: string
+          track_number?: number | null
         }
         Update: {
           album_id?: string | null
@@ -1065,8 +1069,10 @@ export type Database = {
           label_id?: string | null
           play_count?: number
           price?: number | null
+          release_date?: string | null
           status?: string
           title?: string
+          track_number?: number | null
         }
         Relationships: [
           {

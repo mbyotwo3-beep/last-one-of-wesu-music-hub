@@ -23,7 +23,7 @@ export function AlbumCard({
   duration,
   price,
 }: AlbumCardProps) {
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -39,14 +39,22 @@ export function AlbumCard({
       togglePlay();
       return;
     }
-    setTrack({
-      id,
-      title,
-      artistName: subtitle,
-      coverUrl: imageUrl,
-      audioUrl: audioUrl || undefined,
-      durationSeconds: duration,
-    });
+    // Single-track queue (not bare setTrack) so Next/Prev and the queue
+    // screen keep working instead of jumping into a stale queue.
+    setQueue(
+      [
+        {
+          id,
+          title,
+          artistName: subtitle,
+          coverUrl: imageUrl,
+          audioUrl: audioUrl || undefined,
+          durationSeconds: duration,
+          price: price ?? undefined,
+        },
+      ],
+      0,
+    );
   };
 
   return (

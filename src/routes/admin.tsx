@@ -31,6 +31,8 @@ import {
   listAllSongsAdmin,
   deleteSong,
   moderateSong,
+  listPendingAlbums,
+  moderateAlbum,
   listPendingArtists,
   moderateArtist,
   listPendingVerifications,
@@ -47,6 +49,7 @@ import {
   reconcileAllTransactions,
   cancelStuckTransaction,
 } from "@/lib/reconcile.functions";
+import { deleteAlbum } from "@/lib/artist.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
@@ -72,6 +75,7 @@ function AdminRoute() {
 type Tab =
   | "overview"
   | "songs"
+  | "albums"
   | "artists"
   | "verifications"
   | "labels"
@@ -86,6 +90,7 @@ function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
 
   const listSongsFn = useServerFn(listPendingSongs);
+  const listAlbumsFn = useServerFn(listPendingAlbums);
   const listArtistsFn = useServerFn(listPendingArtists);
   const listVerifsFn = useServerFn(listPendingVerifications);
   const listLabelsFn = useServerFn(listPendingLabels);
@@ -110,9 +115,18 @@ function AdminPage() {
     queryFn: () => listLabelsFn(),
     retry: 1,
   });
+  const pendingAlbumsQ = useQuery({
+    queryKey: ["pending-albums-count"],
+    queryFn: () => listAlbumsFn(),
+    retry: 1,
+  });
 
   const tabsError =
-    pendingSongsQ.error || pendingArtistsQ.error || pendingVerifsQ.error || pendingLabelsQ.error;
+    pendingSongsQ.error ||
+    pendingArtistsQ.error ||
+    pendingVerifsQ.error ||
+    pendingLabelsQ.error ||
+    pendingAlbumsQ.error;
   if (tabsError) {
     return (
       <div className="text-destructive p-6">
@@ -124,6 +138,7 @@ function AdminPage() {
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "songs", label: "Songs", badge: pendingSongsQ.data?.length },
+    { id: "albums", label: "Albums", badge: pendingAlbumsQ.data?.length },
     { id: "artists", label: "Artists", badge: pendingArtistsQ.data?.length },
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
@@ -176,6 +191,7 @@ function AdminPage() {
           />
         )}
         {tab === "songs" && <SongMod />}
+        {tab === "albums" && <AlbumMod />}
         {tab === "artists" && <ArtistMod />}
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
@@ -402,6 +418,99 @@ function Overview({
             </ul>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Albums moderation (pending approvals + delete)
+// ─────────────────────────────────────────────────────────────
+function AlbumMod() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listPendingAlbums);
+  const modFn = useServerFn(moderateAlbum);
+  const delFn = useServerFn(deleteAlbum);
+
+  const pendingQ = useQuery({
+    queryKey: ["pending-albums"],
+    queryFn: () => listFn(),
+    retry: false,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["pending-albums"] });
+    qc.invalidateQueries({ queryKey: ["pending-albums-count"] });
+    qc.invalidateQueries({ queryKey: ["home-discover"] });
+    qc.invalidateQueries({ queryKey: ["recent-albums"] });
+  };
+
+  const modMutation = useMutation({
+    mutationFn: modFn,
+    onSuccess: (_, variables) => {
+      toast.success(`Album ${variables.data.status} successfully`);
+      invalidate();
+    },
+    onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
+  });
+
+  const delMutation = useMutation({
+    mutationFn: delFn,
+    onSuccess: (res: any) => {
+      toast.success(`Album "${res.title}" deleted from platform`);
+      invalidate();
+    },
+    onError: (error) => toast.error(`Delete failed: ${(error as Error).message}`),
+  });
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">
+        Pending Albums ({pendingQ.data?.length ?? 0})
+      </h2>
+      {pendingQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {pendingQ.data?.length === 0 && (
+        <p className="text-sm text-muted-foreground">No albums awaiting approval.</p>
+      )}
+      <div className="space-y-2">
+        {(pendingQ.data ?? []).map((a: any) => (
+          <div
+            key={a.id}
+            className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-card border border-border"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{a.title}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {a.artist?.name ?? "Unknown"} {a.price != null ? `• K${Number(a.price)}` : ""}
+              </p>
+            </div>
+            <button
+              onClick={() => modMutation.mutate({ data: { id: a.id, status: "approved" } })}
+              disabled={modMutation.isPending}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 cursor-pointer"
+            >
+              <Check className="size-3" /> Approve
+            </button>
+            <button
+              onClick={() => modMutation.mutate({ data: { id: a.id, status: "rejected" } })}
+              disabled={modMutation.isPending}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50 cursor-pointer"
+            >
+              <X className="size-3" /> Reject
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm(`Delete album "${a.title}" and all its songs?`)) {
+                  delMutation.mutate({ data: { id: a.id } });
+                }
+              }}
+              disabled={delMutation.isPending}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold disabled:opacity-50 cursor-pointer"
+            >
+              <Trash2 className="size-3" /> Delete
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

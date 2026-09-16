@@ -2,9 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { Play, Pause, X, Shuffle, ListMusic, Repeat, Repeat1, Trash2, Disc } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { getPublicAudioUrl, getPreviewAudioUrl } from "@/lib/listener.functions";
+
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,10 +30,7 @@ function QueuePage() {
   const shuffle = usePlayer((s) => s.shuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const repeat = usePlayer((s) => s.repeat);
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const removeFromQueue = usePlayer((s) => s.removeFromQueue);
-  const getPreviewFn = useServerFn(getPreviewAudioUrl);
-  const getPublicFn = useServerFn(getPublicAudioUrl);
   const { user } = useAuth();
 
   // Spotify behavior: empty queue falls back to owned music (purchased +
@@ -91,35 +87,13 @@ function QueuePage() {
     toast.success(`▶️ Playing ${tracks.length} song(s) from your library`);
   };
 
-  const playTrack = async (index: number) => {
-    const queueTrack = queue[index];
-    if (!queueTrack) return;
-
-    try {
-      const isPaid = queueTrack.price && Number(queueTrack.price) > 0;
-
-      if (isPaid) {
-        const { url } = await getPreviewFn({ data: { song_id: queueTrack.id } });
-        // Single setQueue with the resolved URL — the old setTrack()+setQueue()
-        // pair published the URL then immediately overwrote it with undefined,
-        // forcing a refetch + preview flash.
-        setQueue(
-          queue.map((t, i) => (i === index ? { ...t, audioUrl: url, price: t.price } : t)),
-          index,
-        );
-        setIsPreview(true);
-        toast.info(`🎵 Previewing "${queueTrack.title}" (15s)`);
-      } else {
-        const { url } = await getPublicFn({ data: { song_id: queueTrack.id } });
-        setQueue(
-          queue.map((t, i) => (i === index ? { ...t, audioUrl: url } : t)),
-          index,
-        );
-        setIsPreview(false);
-      }
-    } catch (error) {
-      toast.error(`Failed to play: ${(error as Error).message}`);
-    }
+  const playTrack = (index: number) => {
+    if (!queue[index]) return;
+    // The PlayerBar engine resolves signed-first when authed (full track for
+    // owners/purchasers) and falls back to preview otherwise. Resolving here
+    // as well caused double fetches, forced previews for entitled owners,
+    // and "requires purchase" dead-ends when the queue entry lacked a price.
+    setQueue(queue, index);
   };
 
   if (queue.length === 0) {

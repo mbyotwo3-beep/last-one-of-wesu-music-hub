@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { listSavedTrackIds, saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 export function useSavedTrack(songId: string | null | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(listSavedTrackIds);
   const saveFn = useServerFn(saveTrack);
   const unsaveFn = useServerFn(unsaveTrack);
@@ -66,6 +68,16 @@ export function useSavedTrack(songId: string | null | undefined) {
   return {
     isSaved,
     toggle: () => {
+      // Anonymous taps previously fired a mutation that could only 401.
+      // Send them to sign in first — /auth replays the like afterwards.
+      if (!user) {
+        const currentPath = window.location.pathname + window.location.search;
+        navigate({
+          to: "/auth",
+          search: { redirect: currentPath, action: "like", itemId: songId ?? undefined, itemType: "song" },
+        });
+        return;
+      }
       if (!mutation.isPending) mutation.mutate();
     },
     loading: mutation.isPending,

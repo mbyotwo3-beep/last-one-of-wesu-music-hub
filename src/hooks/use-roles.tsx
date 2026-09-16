@@ -24,11 +24,25 @@ export function useUserRoles() {
       // roles, don't flash loading and don't remount gated forms.
       if (loadedFor.current === userId) return;
       setLoading(true);
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-      if (cancel) return;
-      loadedFor.current = userId;
-      setRoles((data ?? []).map((r) => r.role as AppRole));
-      setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId);
+        if (cancel) return;
+        // Never cache a failed fetch as "loaded" — RLS/network errors
+        // previously resolved to roles=[] and bounced the user home in a loop.
+        if (error) throw error;
+        loadedFor.current = userId;
+        setRoles((data ?? []).map((r) => r.role as AppRole));
+      } catch (err) {
+        if (!cancel) {
+          console.error("[use-roles] Failed to load roles:", err);
+          setRoles([]);
+        }
+      } finally {
+        if (!cancel) setLoading(false);
+      }
     }
     if (!authLoading) load();
     return () => {

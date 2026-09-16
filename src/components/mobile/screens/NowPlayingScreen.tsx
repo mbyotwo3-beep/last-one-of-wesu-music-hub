@@ -1,7 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Heart, Music2, Pause, Play, SkipBack, SkipForward, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
@@ -10,11 +10,10 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { StorageImage } from "@/components/StorageImage";
-import { getAudio } from "@/lib/audio";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
-  const r = s % 60;
+  const r = Math.floor(s % 60);
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
@@ -35,7 +34,7 @@ export function NowPlayingScreen() {
   const togglePlay = usePlayer((s) => s.togglePlay);
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
-  const setProgress = usePlayer((s) => s.setProgress);
+  const seekTo = usePlayer((s) => s.seekTo);
   const isPreview = usePlayer((s) => s.isPreview);
   const { data: meta } = useTrackMeta(track?.id);
   const trackPrice = meta ? Number(meta.price ?? 0) : null;
@@ -60,22 +59,31 @@ export function NowPlayingScreen() {
   }
 
   function handleSeek(values: number[]) {
-    const newTime = values[0];
-    const audio = getAudio();
-    if (audio) audio.currentTime = newTime;
-    setProgress(newTime);
+    // Route through the store so preview clamping + empty-src guards apply.
+    seekTo(values[0]);
+  }
+
+  // Real swipe-down detection: track the touch start in the same coordinate
+  // space (clientY). The old code mixed clientY with screenY, which can never
+  // meaningfully exceed the threshold.
+  const touchStartY = useRef<number | null>(null);
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0]?.clientY ?? null;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    const start = touchStartY.current;
+    touchStartY.current = null;
+    const end = e.changedTouches[0]?.clientY;
+    if (start != null && end != null && end - start > 100) {
+      dismiss();
+    }
   }
 
   return (
     <div
       className="fixed inset-0 bg-background z-50 flex flex-col p-6 pt-[env(safe-area-inset-top)]"
-      // Touch-based swipe down to dismiss
-      onTouchEnd={(e) => {
-        const touch = e.changedTouches[0];
-        if (touch && touch.clientY - touch.screenY > 100) {
-          dismiss();
-        }
-      }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Dismiss button */}
       <button

@@ -82,7 +82,9 @@ function ArtistPage() {
   const similarQuery = useQuery({
     queryKey: ["similar-artists", id],
     queryFn: () => getSimilarArtists({ data: { artist_id: id } }),
-    enabled: !!followQuery.data?.following,
+    // "Fans also like" is for discovery — gating it on following hid it
+    // from nearly every visitor.
+    enabled: !!id,
     staleTime: 5 * 60 * 1000,
   });
 

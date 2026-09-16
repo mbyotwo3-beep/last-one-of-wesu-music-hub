@@ -35,7 +35,9 @@ export function MiniPlayer() {
   // player starts in `playing=true`, so loading must never lock the pause
   // control once playback has been requested.
   const isLoading = track.audioUrl === undefined && playing;
-  const dur = track.durationSeconds ?? 0;
+  // Preview streams are capped at 15s; durations fill in from the engine
+  // once media metadata loads (see setTrackDuration).
+  const dur = isPreview ? 15 : (track.durationSeconds ?? 0);
   const progress = dur > 0 ? Math.min((progressSeconds / dur) * 100, 100) : 0;
 
   return (

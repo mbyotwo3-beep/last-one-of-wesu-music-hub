@@ -20,7 +20,7 @@ interface SongRowProps {
  * Feature: wesu-plus-completion
  */
 export function SongRow({ song }: SongRowProps) {
-  const setTrack = usePlayer((s) => s.setTrack);
+  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrack = usePlayer((s) => s.track);
@@ -34,13 +34,21 @@ export function SongRow({ song }: SongRowProps) {
       return;
     }
 
-    setTrack({
-      id: song.id,
-      title: song.title,
-      artistName: song.artistName,
-      coverUrl: song.coverUrl,
-      durationSeconds: song.durationSeconds,
-    });
+    // Single-track queue (not bare setTrack) so Next/Prev and the queue
+    // screen keep working instead of jumping into a stale queue.
+    setQueue(
+      [
+        {
+          id: song.id,
+          title: song.title,
+          artistName: song.artistName,
+          coverUrl: song.coverUrl,
+          durationSeconds: song.durationSeconds,
+          price: song.price ?? undefined,
+        },
+      ],
+      0,
+    );
   };
 
   return (

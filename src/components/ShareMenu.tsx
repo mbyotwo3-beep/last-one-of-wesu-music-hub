@@ -70,7 +70,6 @@ export function ShareMenu({
   const createPlaylistFn = useServerFn(createPlaylist);
   const getSongArtistsFn = useServerFn(getSongArtists);
   const appendToQueue = usePlayer((s) => s.addToQueue);
-  const setTrack = usePlayer((s) => s.setTrack);
   const { isSaved, toggle } = useSavedTrack(songId);
 
   const { data: playlists } = useQuery({

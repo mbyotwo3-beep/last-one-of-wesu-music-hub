@@ -153,11 +153,15 @@ export const cancelStuckTransaction = createServerFn({ method: "POST" })
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Blind-cancel only touches rows that never fulfilled. `fulfillment_failed`
+    // means a purchase row ALREADY exists — marking it failed would leave a
+    // live entitlement on a "failed" ledger row that settle() then refuses to
+    // revive. Those rows must go through reconcile-by-Lenco-check instead.
     const { error } = await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", updated_at: new Date().toISOString() })
       .eq("id", data.transactionId)
-      .in("status", STUCK_STATUSES as unknown as string[]);
+      .in("status", ["pending", "processing"]);
     if (error) throw new Error(error.message);
 
     await supabaseAdmin.from("audit_log").insert({

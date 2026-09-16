@@ -169,11 +169,11 @@ export const initiatePayment = createServerFn({ method: "POST" })
     }
 
     // -- Idempotency: double-clicks/retries within 5 minutes reuse the open
-    // mobile-money transaction instead of creating duplicate pendings.
-    // (Card checkouts return a fresh hosted URL each time, so they always
-    // create a new transaction.)
+    // transaction instead of creating duplicate payable pendings. Applies to
+    // card too: the client routes a resumed transactionId to the success
+    // poller, which settles via webhook/Lenco status lookup.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (isMobile) {
+    {
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: open } = await supabaseAdmin
         .from("payment_transactions")
@@ -191,6 +191,8 @@ export const initiatePayment = createServerFn({ method: "POST" })
     }
 
     // -- Record the pending transaction --
+    // Card email is persisted so staff reconciliation always shows the buyer.
+    const cardEmail = (claims?.email as string | undefined) ?? null;
     const { data: tx, error: insertError } = await supabaseAdmin
       .from("payment_transactions")
       .insert({
@@ -202,7 +204,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
         status: "pending",
         item_type: data.item_type,
         item_id: data.item_id,
-        metadata: { phone: data.phone ?? null },
+        metadata: { phone: data.phone ?? null, email: cardEmail },
       })
       .select()
       .single();

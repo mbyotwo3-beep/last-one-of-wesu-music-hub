@@ -126,6 +126,19 @@ export const listAllSongsAdmin = createServerFn({ method: "GET" })
     return songs ?? [];
   });
 
+export const listPendingAlbums = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("albums")
+      .select("id,title,created_at,status,price,genre,cover_url,artist:artists(id,name)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    return data ?? [];
+  });
+
 export { deleteSong } from "./artist.functions";
 
 export const moderateSong = createServerFn({ method: "POST" })
@@ -140,6 +153,21 @@ export const moderateSong = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(context.userId, `song.${data.status}`, "song", data.id);
+    return { ok: true };
+  });
+
+export const moderateAlbum = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; status: "approved" | "rejected" | "taken_down" }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("albums")
+      .update({ status: data.status } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, `album.${data.status}`, "album", data.id);
     return { ok: true };
   });
 

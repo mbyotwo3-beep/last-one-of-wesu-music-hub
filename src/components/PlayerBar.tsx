@@ -128,6 +128,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
       getAudio().pause();
+      // Clear stale lock-screen / notification controls on exit.
+      try {
+        if (typeof window !== "undefined" && "mediaSession" in navigator) {
+          navigator.mediaSession.metadata = null;
+        }
+      } catch {
+        /* ignore — unsupported browsers */
+      }
       currentTrackIdRef.current = null;
       currentSelectionRef.current = null;
       setLoading(false);
@@ -207,11 +215,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         let url: string;
         let previewMode = false;
 
-        const cached = getCachedAudioUrl(track!.id);
+        const cached = getCachedAudioUrl(track!.id, user?.id ?? null);
         if (cached) {
           url = cached.url;
           previewMode = cached.previewMode;
-          if (!user && !previewMode) setShowAd(true);
         } else {
           // Get current access token for entitlement-checked preview of paid tracks.
           const { data: sess } = await supabase.auth.getSession();
@@ -244,21 +251,22 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             if (publicRes && publicRes.url) {
               url = publicRes.url;
               previewMode = false;
-              setShowAd(true);
             } else {
               const res = await getPreviewFn({
                 data: { song_id: track!.id, access_token: accessToken },
               });
               url = res.url;
               previewMode = true;
-              setShowAd(true);
             }
           }
 
           if (url && /^https?:\/\//i.test(url)) {
-            setCachedAudioUrl(track!.id, url, previewMode);
+            setCachedAudioUrl(track!.id, user?.id ?? null, url, previewMode);
           }
         }
+        // Ad banner is a function of auth state only — set it uniformly
+        // instead of only on some cache branches.
+        setShowAd(!user);
 
         // A newer selection may have replaced this request while it was
         // resolving. Never publish or play an old track's URL on the new one.
@@ -477,7 +485,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       setProgress(Math.floor(current));
     };
-    const onMeta = () => setAudioDuration(audio.duration || 0);
+    const onMeta = () => {
+      setAudioDuration(audio.duration || 0);
+      // Fill the track's duration so mobile bars/seek work even when the
+      // queue entry was built without one.
+      if (audio.duration && Number.isFinite(audio.duration)) {
+        usePlayer.getState().setTrackDuration(audio.duration);
+      }
+    };
     const onEnded = () => {
       const st = usePlayer.getState();
       if (track && user && !isPreview) {
@@ -612,10 +627,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const targetDur = isPreview ? 15 : dur;
-    const newTime = pct * targetDur;
-    const audio = getAudio();
-    audio.currentTime = newTime;
-    setProgress(Math.floor(newTime));
+    // Route through the store so preview clamping + empty-src guards apply.
+    usePlayer.getState().seekTo(pct * targetDur);
   }
 
   const VolIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
@@ -754,10 +767,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   <SkipBack className="size-6" />
                 </button>
                 <button
-                  onClick={() => !loading && !error && togglePlay()}
-                  disabled={loading || !!error}
+                  // Stays enabled on error: pressing play retries a failed
+                  // load (retryNonce) instead of sitting dead.
+                  onClick={() => !loading && togglePlay()}
+                  disabled={loading}
                   className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                   aria-label={playing ? "Pause" : "Play"}
+                  title={error ? "Retry" : undefined}
                 >
                   {playing ? (
                     <Pause className="size-6" />
@@ -835,10 +851,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   {queue.map((queueTrack, index) => (
                     <button
                       key={`${queueTrack.id}-${index}`}
+                      // Always re-select: tapping the current row restarts a
+                      // finished/errored track (selectionId forces reload).
                       onClick={() => {
-                        if (index !== queueIndex) {
-                          usePlayer.getState().setQueue(queue, index);
-                        }
+                        usePlayer.getState().setQueue(queue, index);
                       }}
                       className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
                         index === queueIndex ? "bg-primary/10" : "hover:bg-accent"
@@ -1006,10 +1022,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <SkipBack className="size-4" />
               </button>
               <button
-                onClick={() => !loading && !error && togglePlay()}
-                disabled={loading || !!error}
+                // Stays enabled on error: pressing play retries a failed load.
+                onClick={() => !loading && togglePlay()}
+                disabled={loading}
                 className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                 aria-label={playing ? "Pause" : "Play"}
+                title={error ? "Retry" : undefined}
               >
                 {playing ? (
                   <Pause className="size-4" />

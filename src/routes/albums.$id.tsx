@@ -55,12 +55,13 @@ interface SongRowProps {
   artist: { id: string; name: string; avatar_url?: string | null } | null;
   albumTracks: any[];
   albumId: string;
+  coverUrl: string | null;
   currentTrackId: string | undefined;
   playing: boolean;
   onPlaySong: (song: any, index: number) => void;
 }
 
-function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId, currentTrackId, playing, onPlaySong }: SongRowProps) {
+function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId, coverUrl, currentTrackId, playing, onPlaySong }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -113,7 +114,7 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
           </span>
         )}
 
-        <DownloadButton songId={s.id} />
+        {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
 
         <button
           onClick={(e) => {
@@ -132,7 +133,7 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
         <ShareMenu
           songId={s.id}
           songTitle={s.title}
-          coverUrl={album.cover_url}
+          coverUrl={coverUrl}
           albumId={albumId}
           artistId={artist?.id}
           artistName={artist?.name}
@@ -148,7 +149,6 @@ function AlbumPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { data } = useSuspenseQuery(albumQO(id));
-  const setIsPreview = usePlayer((s) => s.setIsPreview);
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
@@ -177,12 +177,11 @@ function AlbumPage() {
       togglePlay();
       return;
     }
-    // Single setQueue — PlayerBar resolves preview vs full audio itself.
+    // Single setQueue — the PlayerBar engine resolves preview vs full
+    // audio itself (and announces previews). Setting isPreview here would
+    // flash a wrong "Previewing" toast for entitled owners.
     // (The old setTrack()+setQueue() pair raced and dropped price info.)
     setQueue(albumTracks, 0);
-    const isPaid = (first as any).price && Number((first as any).price) > 0;
-    setIsPreview(!!isPaid);
-    if (isPaid) toast.info(`🎵 Previewing "${first.title}" (15s)`);
   };
 
   const playShuffle = async () => {
@@ -190,10 +189,6 @@ function AlbumPage() {
     const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
 
     setQueue(shuffled, 0);
-    const first = shuffled[0];
-    const isPaid = first && (first as any).price && Number((first as any).price) > 0;
-    setIsPreview(!!isPaid);
-    if (isPaid) toast.info(`🎵 Previewing "${first.title}" (15s)`);
   };
 
   const handlePlaySong = (song: any, index: number) => {
@@ -203,9 +198,6 @@ function AlbumPage() {
     }
     // Single setQueue — PlayerBar resolves preview vs full audio itself.
     setQueue(albumTracks, index);
-    const isPaid = song.price && Number(song.price) > 0;
-    setIsPreview(!!isPaid);
-    if (isPaid) toast.info(`🎵 Previewing "${song.title}" (15s)`);
   };
 
   return (
@@ -361,6 +353,7 @@ function AlbumPage() {
                   artist={artist}
                   albumTracks={albumTracks}
                   albumId={id}
+                  coverUrl={album.cover_url}
                   currentTrackId={currentTrackId}
                   playing={playing}
                   onPlaySong={handlePlaySong}

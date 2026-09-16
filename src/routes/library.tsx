@@ -381,13 +381,21 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
       player.togglePlay();
       return;
     }
-    player.setTrack({
-      id: song.id,
-      title: song.title,
-      artistName: song.artists?.name ?? "Unknown",
-      coverUrl: song.cover_url,
-      durationSeconds: song.duration,
-    });
+    // Single-track queue (not bare setTrack) so Next/Prev and the queue
+    // screen keep working instead of jumping into a stale queue.
+    player.setQueue(
+      [
+        {
+          id: song.id,
+          title: song.title,
+          artistName: song.artists?.name ?? "Unknown",
+          coverUrl: song.cover_url,
+          durationSeconds: song.duration,
+          price: song.price ?? undefined,
+        },
+      ],
+      0,
+    );
   };
 
   const removeMutation = useMutation({
@@ -492,13 +500,21 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
       player.togglePlay();
       return;
     }
-    player.setTrack({
-      id: song.id,
-      title: song.title,
-      artistName: song.artists?.name ?? "Unknown",
-      coverUrl: song.cover_url,
-      durationSeconds: song.duration,
-    });
+    // Single-track queue (not bare setTrack) so Next/Prev and the queue
+    // screen keep working instead of jumping into a stale queue.
+    player.setQueue(
+      [
+        {
+          id: song.id,
+          title: song.title,
+          artistName: song.artists?.name ?? "Unknown",
+          coverUrl: song.cover_url,
+          durationSeconds: song.duration,
+          price: song.price ?? undefined,
+        },
+      ],
+      0,
+    );
   };
 
   return (

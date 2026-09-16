@@ -20,11 +20,19 @@ function emit() {
 function ensureInit() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    cachedUser = session?.user ?? null;
-    cachedLoading = false;
-    emit();
-  });
+  supabase.auth
+    .getSession()
+    .then(({ data: { session } }) => {
+      cachedUser = session?.user ?? null;
+      cachedLoading = false;
+      emit();
+    })
+    .catch(() => {
+      // Storage-blocked / network failure must not hang the app on the
+      // loading skeleton forever with an unhandled rejection.
+      cachedLoading = false;
+      emit();
+    });
   supabase.auth.onAuthStateChange((_event, session) => {
     const nextId = session?.user?.id ?? null;
     const prevId = cachedUser?.id ?? null;

@@ -50,7 +50,9 @@ export function primeAudio(): HTMLAudioElement | null {
   }
 }
 
-// In-memory cache for resolved audio URLs to enable 0ms instant playback on repeat plays
+// In-memory cache for resolved audio URLs to enable 0ms instant playback on repeat plays.
+// Keys are scoped to the listener: an anonymous preview must never be served
+// to a logged-in owner (and vice versa) after login/logout.
 interface CachedUrl {
   url: string;
   previewMode: boolean;
@@ -59,23 +61,39 @@ interface CachedUrl {
 
 const audioUrlCache = new Map<string, CachedUrl>();
 
-export function getCachedAudioUrl(songId: string): CachedUrl | null {
-  const cached = audioUrlCache.get(songId);
+const cacheKey = (userId: string | null, songId: string) => `${userId ?? "anon"}:${songId}`;
+
+export function getCachedAudioUrl(songId: string, userId: string | null): CachedUrl | null {
+  const cached = audioUrlCache.get(cacheKey(userId, songId));
   if (!cached) return null;
   if (Date.now() > cached.expiresAt) {
-    audioUrlCache.delete(songId);
+    audioUrlCache.delete(cacheKey(userId, songId));
     return null;
   }
   return cached;
 }
 
-export function setCachedAudioUrl(songId: string, url: string, previewMode: boolean): void {
-  // Cache for 15 minutes
-  audioUrlCache.set(songId, {
+export function setCachedAudioUrl(
+  songId: string,
+  userId: string | null,
+  url: string,
+  previewMode: boolean,
+): void {
+  // Previews are signed for 45s server-side — cache them shorter so a replay
+  // re-resolves instead of playing an expired URL. Full URLs live 1h.
+  const ttl = previewMode ? 40_000 : 15 * 60 * 1000;
+  audioUrlCache.set(cacheKey(userId, songId), {
     url,
     previewMode,
-    expiresAt: Date.now() + 15 * 60 * 1000,
+    expiresAt: Date.now() + ttl,
   });
+}
+
+/** Drop cached URLs for a song (e.g. right after purchase unlocks the full track). */
+export function evictCachedAudioUrl(songId: string): void {
+  for (const key of audioUrlCache.keys()) {
+    if (key.endsWith(`:${songId}`)) audioUrlCache.delete(key);
+  }
 }
 
 // Global user interaction listener to prime the audio context on first touch/click anywhere

@@ -5,8 +5,25 @@ import type { Carousel } from "@/lib/carousel.functions";
 
 // CMS links are free text: internal paths ("/albums/...") must use SPA Link
 // (a full <a> reload wipes player queue + upload state), external URLs use <a>.
+// Unknown / malformed internal paths render as plain cards — passing them to
+// <Link> would throw inside the router and crash the shelf.
+const KNOWN_ROUTES = [
+  "/albums/",
+  "/artists/",
+  "/songs/",
+  "/playlists/",
+  "/labels/",
+  "/browse",
+  "/search",
+  "/library",
+  "/liked-songs",
+  "/hot-tracks",
+  "/recently-added",
+  "/",
+];
 function isInternalLink(url: string) {
-  return url.startsWith("/");
+  if (!url || !url.startsWith("/") || url.startsWith("//")) return false;
+  return KNOWN_ROUTES.some((r) => (r === "/" ? url === "/" : url.startsWith(r)));
 }
 
 interface Props {
@@ -81,29 +98,45 @@ export function CarouselShelf({ carousel }: Props) {
         className="flex gap-4 overflow-x-auto pb-3 px-2 scrollbar-hide snap-x snap-mandatory"
         style={{ scrollSnapType: "x mandatory" }}
       >
-        {carousel.items.map((item) =>
-          isInternalLink(item.link_url) ? (
-            <Link
-              key={item.id}
-              to={item.link_url as any}
-              className="group flex-none w-36 md:w-44 snap-start cursor-pointer"
-              aria-label={item.title}
-            >
+        {carousel.items.map((item) => {
+          const href = item.link_url ?? "";
+          const external = /^https?:\/\//i.test(href);
+          const cardClass =
+            "group flex-none w-36 md:w-44 snap-start cursor-pointer";
+          if (isInternalLink(href)) {
+            return (
+              <Link
+                key={item.id}
+                to={href as any}
+                className={cardClass}
+                aria-label={item.title}
+              >
+                <CarouselCard item={item} />
+              </Link>
+            );
+          }
+          if (external) {
+            return (
+              <a
+                key={item.id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cardClass}
+                aria-label={item.title}
+              >
+                <CarouselCard item={item} />
+              </a>
+            );
+          }
+          // Malformed CMS link: render the card with no link rather than
+          // crashing the router (<Link>) or reloading into a 404 (<a>).
+          return (
+            <div key={item.id} className={cardClass} aria-label={item.title}>
               <CarouselCard item={item} />
-            </Link>
-          ) : (
-            <a
-              key={item.id}
-              href={item.link_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex-none w-36 md:w-44 snap-start cursor-pointer"
-              aria-label={item.title}
-            >
-              <CarouselCard item={item} />
-            </a>
-          ),
-        )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

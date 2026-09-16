@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -88,12 +88,7 @@ function SuperadminPage() {
             <Shield className="size-6 text-primary" />
             <h1 className="text-3xl font-bold">Superadmin</h1>
           </div>
-          <Link
-            to="/superadmin/homepage"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
-          >
-            Homepage Builder
-          </Link>
+
         </div>
 
         <div className="flex flex-wrap gap-2 mb-8 border-b border-border pb-3">
@@ -256,7 +251,6 @@ function FeaturedTab() {
     },
   });
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const targetIdValid = UUID_RE.test(form.target_id.trim());
   const [form, setForm] = useState({
     slot_type: "home_hero",
     target_type: "song",
@@ -266,6 +260,7 @@ function FeaturedTab() {
     subtitle: "",
     image_url: "",
   });
+  const targetIdValid = UUID_RE.test(form.target_id.trim());
   return (
     <div className="space-y-4">
       <form

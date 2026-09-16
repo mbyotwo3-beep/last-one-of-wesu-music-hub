@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { listSavedAlbumIds, saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -8,6 +9,7 @@ import { toast } from "sonner";
 export function useSavedAlbum(albumId: string | null | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(listSavedAlbumIds);
   const saveFn = useServerFn(saveAlbum);
   const unsaveFn = useServerFn(unsaveAlbum);
@@ -61,6 +63,16 @@ export function useSavedAlbum(albumId: string | null | undefined) {
   return {
     isSaved,
     toggle: () => {
+      // Anonymous taps previously fired a mutation that could only 401.
+      // Send them to sign in first — /auth replays the save afterwards.
+      if (!user) {
+        const currentPath = window.location.pathname + window.location.search;
+        navigate({
+          to: "/auth",
+          search: { redirect: currentPath, action: "save", itemId: albumId ?? undefined, itemType: "album" },
+        });
+        return;
+      }
       if (!mutation.isPending) mutation.mutate();
     },
     loading: mutation.isPending,

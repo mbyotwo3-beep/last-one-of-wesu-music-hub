@@ -16,8 +16,9 @@ import {
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlayer } from "@/stores/player";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { signOutEverywhere } from "@/lib/sign-out";
 import { ThemeToggle } from "./ThemeToggle";
 import { CurrencyToggle } from "./CurrencyToggle";
 import { GlobalSearch } from "./GlobalSearch";
@@ -54,17 +55,15 @@ const NavbarComponent = function Navbar() {
   const qc = useQueryClient();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
     setMenuOpen(false);
     setMobileMenuOpen(false);
-    // SPA sign-out: clear caches + stop playback without a full reload
-    // (which previously wiped player queue and upload drafts).
-    try {
-      usePlayer.getState().exitSong();
-    } catch {
-      /* ignore */
+    // SPA sign-out: shared helper clears caches + stops playback without a
+    // full reload (which previously wiped player queue and upload drafts).
+    const ok = await signOutEverywhere(qc);
+    if (!ok) {
+      toast.error("Sign out failed — please try again");
+      return;
     }
-    qc.clear();
     navigate({ to: "/" });
   };
 

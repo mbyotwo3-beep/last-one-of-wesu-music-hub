@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { updateProfile } from "@/lib/listener.functions";
 import { uploadFileToBucket } from "@/lib/storage";
 import { StorageImage } from "@/components/StorageImage";
+import { signOutEverywhere } from "@/lib/sign-out";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Profile — Wesu+" }] }),
@@ -76,7 +77,13 @@ function Page() {
   });
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    // Shared helper: stops playback, clears private caches and stored
+    // post-auth redirects (previously none of that happened here).
+    const ok = await signOutEverywhere(qc);
+    if (!ok) {
+      toast.error("Sign out failed — please try again");
+      return;
+    }
     navigate({ to: "/" });
   }
 

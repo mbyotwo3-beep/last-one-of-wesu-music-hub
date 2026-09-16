@@ -90,8 +90,15 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
 
         const isSuccess =
           event.endsWith(".successful") || tx.status === "successful" || tx.status === "success";
+        // "cancelled" must count as failure — previously it fell through and
+        // the row sat in `pending` forever, invisible to every other path
+        // (which all treat cancelled as failed).
         const isFailure =
-          event.endsWith(".failed") || tx.status === "failed" || tx.status === "declined";
+          event.endsWith(".failed") ||
+          event.endsWith(".cancelled") ||
+          tx.status === "failed" ||
+          tx.status === "declined" ||
+          tx.status === "cancelled";
         // Lenco returns "pay-offline" while waiting for the customer to approve
         // the USSD prompt on their phone — leave the row pending, do nothing else.
         const isPending =

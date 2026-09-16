@@ -23,7 +23,9 @@ import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { usePlayer } from "@/stores/player";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { signOutEverywhere } from "@/lib/sign-out";
 
 interface Tab {
   to: string;
@@ -128,15 +130,17 @@ export function BottomTabBar() {
     }
   }
 
+  const qc = useQueryClient();
+
   async function handleSignOut() {
-    await supabase.auth.signOut();
     setMenuOpen(false);
     // SPA sign-out — no full reload (a reload wipes player queue +
-    // in-memory upload drafts).
-    try {
-      usePlayer.getState().exitSong();
-    } catch {
-      /* ignore */
+    // in-memory upload drafts). Shared helper also clears cached
+    // private data and stops playback.
+    const ok = await signOutEverywhere(qc);
+    if (!ok) {
+      toast.error("Sign out failed — please try again");
+      return;
     }
     navigate({ to: "/" });
   }

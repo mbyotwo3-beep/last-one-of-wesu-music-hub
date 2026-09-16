@@ -141,8 +141,9 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    // Generate registration link with invitation context
-    const registrationLink = `${appUrl()}/register?invite=${(invitation as any).id}&type=feature`;
+    // Sign-in link with invitation context (/auth consumes `invite` after
+    // sign-in/up — there is no /register route).
+    const registrationLink = `${appUrl()}/auth?invite=${(invitation as any).id}&type=feature`;
 
     await audit(userId, "feature_invite.create", "invitation", (invitation as any).id, {
       to_email: data.email,
@@ -252,8 +253,9 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    // Generate registration link with invitation context
-    const registrationLink = `${appUrl()}/register?invite=${(invitation as any).id}&type=label`;
+    // Sign-in link with invitation context (/auth consumes `invite` after
+    // sign-in/up — there is no /register route).
+    const registrationLink = `${appUrl()}/auth?invite=${(invitation as any).id}&type=label`;
 
     await audit(userId, "label_invite.create", "invitation", (invitation as any).id, {
       to_email: data.email,
@@ -271,37 +273,12 @@ export const inviteLabelForRelease = createServerFn({ method: "POST" })
   });
 
 /**
- * Get invitation details by ID (for registration flow)
- */
-export const getInvitationDetails = createServerFn({ method: "GET" })
-  .validator((d: { invitation_id: string }) => d)
-  .handler(async ({ data }) => {
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: invitation } = await sb
-      .from("invitations")
-      .select("*")
-      .eq("id", data.invitation_id)
-      .eq("status", "pending")
-      .maybeSingle();
-
-    if (!invitation) {
-      return { exists: false };
-    }
-
-    return {
-      exists: true,
-      kind: (invitation as any).kind,
-      payload: (invitation as any).payload,
-      from_user_id: (invitation as any).from_user_id,
-    };
-  });
-
-/**
  * Accept invitation after registration
+ *
+ * NOTE: there is deliberately no public "invitation details" endpoint — the
+ * invite is consumed post-auth by acceptInvitation below, which verifies the
+ * caller's email matches the invitee. A public details endpoint would let
+ * anyone enumerate invitation UUIDs and read their payloads.
  */
 export const acceptInvitation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

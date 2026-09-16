@@ -42,7 +42,6 @@ export function NowPlayingSheet() {
   const playing = usePlayer((s) => s.playing);
   const progressSeconds = usePlayer((s) => s.progressSeconds);
   const togglePlay = usePlayer((s) => s.togglePlay);
-  const setProgress = usePlayer((s) => s.setProgress);
   const skipNext = usePlayer((s) => s.skipNext);
   const skipPrev = usePlayer((s) => s.skipPrev);
   const closeNowPlaying = usePlayer((s) => s.closeNowPlaying);
@@ -62,7 +61,9 @@ export function NowPlayingSheet() {
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const volume = usePlayer((s) => s.volume);
+  const muted = usePlayer((s) => s.muted);
   const setVolume = usePlayer((s) => s.setVolume);
+  const seekTo = usePlayer((s) => s.seekTo);
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
@@ -77,20 +78,19 @@ export function NowPlayingSheet() {
 
   const isLoading = track?.audioUrl === undefined && playing;
 
-  // Sync volume to audio element
+  // Sync volume to audio element (muted wins — a parallel effect that
+  // ignored muted let sound leak while the sheet was mounted).
   useEffect(() => {
     const audio = getAudio();
-    if (audio) audio.volume = volume;
-  }, [volume]);
+    if (audio) audio.volume = muted ? 0 : volume;
+  }, [volume, muted]);
 
   function handleSeekClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!dur) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const newTime = pct * dur;
-    const audio = getAudio();
-    if (audio) audio.currentTime = newTime;
-    setProgress(Math.floor(newTime));
+    // Route through the store so preview clamping + empty-src guards apply.
+    seekTo(pct * dur);
   }
 
   function handleSeekTouchStart() {
@@ -108,9 +108,7 @@ export function NowPlayingSheet() {
   function handleSeekTouchEnd() {
     if (!isDragging) return;
     setIsDragging(false);
-    const audio = getAudio();
-    if (audio) audio.currentTime = dragProgress;
-    setProgress(dragProgress);
+    seekTo(dragProgress);
   }
 
   // Swipe down to dismiss
@@ -392,7 +390,7 @@ export function NowPlayingSheet() {
             min={0}
             max={1}
             step={0.01}
-            value={volume}
+            value={muted ? 0 : volume}
             onChange={(e) => setVolume(Number(e.target.value))}
             className="flex-1 accent-white h-1"
             aria-label="Volume"
@@ -412,10 +410,10 @@ export function NowPlayingSheet() {
                 {queue.map((queueTrack, index) => (
                   <button
                     key={`${queueTrack.id}-${index}`}
+                    // Always re-select: tapping the current row restarts a
+                    // finished/errored track (selectionId forces reload).
                     onClick={() => {
-                      if (index !== queueIndex) {
-                        usePlayer.getState().setQueue(queue, index);
-                      }
+                      usePlayer.getState().setQueue(queue, index);
                     }}
                     className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer ${
                       index === queueIndex ? "bg-white/10" : "hover:bg-white/5"
