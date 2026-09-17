@@ -14,8 +14,13 @@ const config: CapacitorConfig = {
   appName: "Wesu+",
   webDir: "dist",
   server: {
-    // For live-reload during development against the Lovable preview, uncomment:
-    // url: 'https://id-preview--3d992fed-0a4b-4613-aa6b-368907935324.lovable.app',
+    // The APK is a native shell around the production site (this is an SSR
+    // app, so there is no static index.html to bundle — the WebView loads
+    // the live deployment, while audio/filesystem/splash/deep-links run
+    // natively on device).
+    url: "https://www.wesuplus.com",
+    // For live-reload during development, point url at your dev server
+    // ('http://10.0.2.2:3000' for the emulator) instead.
     // cleartext: true,
     androidScheme: "https",
   },
