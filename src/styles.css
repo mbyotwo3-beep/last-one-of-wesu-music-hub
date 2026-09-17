@@ -304,3 +304,20 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 }
+
+/* ─── Native app feel (mobile shell + Capacitor) ─────────────────────
+   Kills the classic "wrapped website" tells: grey tap flash, pull-to-
+   refresh reloads, rubber-band overscroll, double-tap zoom delay, and
+   long-press image menus. Text selection stays enabled. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
+}
+
+img {
+  -webkit-touch-callout: none;
+}
