@@ -1,10 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
-import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock, LockKeyhole } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock, LockKeyhole, ChevronUp, ChevronDown, Download, Loader2, Pencil, Plus, Check, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getPlaylistWithSongs, removeFromPlaylist, getPlaylistAccess } from "@/lib/listener.functions";
+import {
+  getPlaylistWithSongs,
+  removeFromPlaylist,
+  getPlaylistAccess,
+  updatePlaylist,
+  movePlaylistSong,
+  togglePlaylistFollow,
+  isFollowingPlaylist,
+  getPlaylistFollowerCount,
+  getDownloadAudioUrl,
+} from "@/lib/listener.functions";
+import { PlaylistCover } from "@/components/PlaylistCover";
+import { downloadSongToVault } from "@/lib/offline-vault";
+import { touchVaultQueries } from "@/components/DownloadButton";
+import { useIsNative, useIsMobile } from "@/hooks/use-platform";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
@@ -45,9 +59,12 @@ interface SongRowProps {
   playing: boolean;
   onPlay: (index: number) => void;
   onRemove: (songId: string) => void;
+  onMove?: (songId: string, dir: "up" | "down") => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, onRemove }: SongRowProps) {
+function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, onRemove, onMove, isFirst, isLast }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -140,6 +157,34 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
           className="relative z-20 opacity-0 group-hover:opacity-100 transition-opacity"
         />
 
+        {isOwner && onMove && (
+          <span className="flex flex-col shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(s.id, "up");
+              }}
+              disabled={isFirst}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+              aria-label="Move up"
+              title="Move up"
+            >
+              <ChevronUp className="size-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(s.id, "down");
+              }}
+              disabled={isLast}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+              aria-label="Move down"
+              title="Move down"
+            >
+              <ChevronDown className="size-3.5" />
+            </button>
+          </span>
+        )}
         {isOwner && (
           <button
             onClick={(e) => {
@@ -273,6 +318,106 @@ function Page() {
   const showUnlockPanel =
     !!user && !!access && !access.isOwner && !access.unlocked && access.missing.length > 0;
 
+  // Spotify-style extras: edit (owner), follow (viewers), bulk download.
+  const updateFn = useServerFn(updatePlaylist);
+  const moveFn = useServerFn(movePlaylistSong);
+  const followFn = useServerFn(togglePlaylistFollow);
+  const followingFn = useServerFn(isFollowingPlaylist);
+  const followerCountFn = useServerFn(getPlaylistFollowerCount);
+  const downloadFn = useServerFn(getDownloadAudioUrl);
+  const isNative = useIsNative();
+  const isMobileWeb = useIsMobile() && !isNative;
+
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editPublic, setEditPublic] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+
+  const { data: followState } = useQuery({
+    queryKey: ["playlist-following", id, user?.id],
+    queryFn: () => followingFn({ data: { playlist_id: id } }),
+    enabled: !!user && !!data && (data as any)?.user_id !== user?.id,
+    staleTime: 30_000,
+  });
+  const { data: followerCount } = useQuery({
+    queryKey: ["playlist-followers", id],
+    queryFn: () => followerCountFn({ data: { playlist_id: id } }),
+    enabled: !!data,
+    staleTime: 60_000,
+  });
+
+  const updateM = useMutation({
+    mutationFn: updateFn,
+    onSuccess: () => {
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["playlist", id] });
+      qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      toast.success("Playlist updated");
+    },
+    onError: (e) => toast.error(`Update failed: ${(e as Error).message}`),
+  });
+
+  const moveM = useMutation({
+    mutationFn: moveFn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["playlist", id] });
+    },
+    onError: (e) => toast.error(`Reorder failed: ${(e as Error).message}`),
+  });
+
+  const followM = useMutation({
+    mutationFn: followFn,
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["playlist-following", id] });
+      qc.invalidateQueries({ queryKey: ["playlist-followers", id] });
+      qc.invalidateQueries({ queryKey: ["followed-playlists"] });
+      toast.success(res?.following ? "Saved to your library" : "Removed from your library");
+    },
+    onError: (e) => toast.error(`Failed: ${(e as Error).message}`),
+  });
+
+  async function downloadAll() {
+    if (bulkProgress) return;
+    const list = songs;
+    if (list.length === 0) {
+      toast.error("This playlist has no songs yet");
+      return;
+    }
+    let done = 0;
+    let skipped = 0;
+    for (const s of list) {
+      setBulkProgress(`${done + skipped + 1}/${list.length}`);
+      try {
+        await downloadSongToVault(
+          async (songId) => {
+            const r = await downloadFn({ data: { song_id: songId } });
+            return { url: r.url, filename: r.filename };
+          },
+          {
+            songId: s.id,
+            title: s.title,
+            artistName: s.artist?.name,
+            coverUrl: s.cover_url,
+          },
+        );
+        done += 1;
+      } catch {
+        // Unbought paid tracks (and failures) are skipped, never fatal.
+        skipped += 1;
+      }
+    }
+    setBulkProgress(null);
+    touchVaultQueries(qc);
+    if (done === 0) {
+      toast.error("Nothing downloadable — paid songs need to be bought first");
+    } else if (skipped > 0) {
+      toast.success(`Downloaded ${done} song${done === 1 ? "" : "s"} (${skipped} skipped)`);
+    } else {
+      toast.success(`Downloaded ${done} song${done === 1 ? "" : "s"} for offline listening`);
+    }
+  }
+
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   if (!data) return <div className="p-12 text-center">Playlist not found</div>;
   if (!user && !isPublic) {
@@ -291,7 +436,6 @@ function Page() {
   // True when any song from this playlist is currently active
   const isPlaylistActive = playing && songs.some((s: any) => s.id === currentTrackId);
   const totalDuration = songs.reduce((acc: number, s: any) => acc + (s.duration || 0), 0);
-  const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
 
   function playAll() {
     if (!songs.length) return;
@@ -337,41 +481,113 @@ function Page() {
       <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 lg:gap-12">
         {/* Left Column: Sticky Cover & Playlist Meta */}
         <div className="w-full max-w-sm lg:w-80 lg:shrink-0 lg:sticky lg:top-8 flex flex-col items-center lg:items-start text-center lg:text-left">
-          {/* Cover Art with subtle ambient glow shadow */}
+          {/* Cover Art: custom cover, else Spotify-style song mosaic */}
           <div className="relative w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 rounded-2xl overflow-hidden shadow-2xl shadow-primary/20 bg-card ring-1 ring-border/50 mb-6 shrink-0 flex items-center justify-center">
-            {firstCover ? (
+            {(data as any).cover_url ? (
               <StorageImage
                 bucket="album-art"
-                path={firstCover}
+                path={(data as any).cover_url}
                 alt={(data as any).name}
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/30 to-purple-600/30 flex items-center justify-center">
-                <ListMusic className="size-20 text-primary" />
-              </div>
+              <PlaylistCover
+                covers={songs.map((s: any) => s?.cover_url)}
+                alt={(data as any).name}
+                className="w-full h-full"
+              />
             )}
           </div>
 
-          {/* Badge & Title */}
-          <p className="text-xs uppercase tracking-widest font-bold text-primary mb-1.5">
-            Playlist
-          </p>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-foreground tracking-tight mb-2 break-words leading-tight">
-            {(data as any).name}
-          </h1>
-
-          {/* Description */}
-          {(data as any).description && (
-            <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-3">
-              {(data as any).description}
+          {/* Badge & Title (+ owner edit) */}
+          <div className="w-full flex items-center justify-center lg:justify-start gap-2 mb-1.5">
+            <p className="text-xs uppercase tracking-widest font-bold text-primary">
+              Playlist
             </p>
+            {isOwner && !editing && (
+              <button
+                onClick={() => {
+                  setEditName((data as any).name ?? "");
+                  setEditDesc((data as any).description ?? "");
+                  setEditPublic(isPublic);
+                  setEditing(true);
+                }}
+                className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer"
+                aria-label="Edit playlist"
+                title="Edit name, description and visibility"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+          </div>
+          {isOwner && editing ? (
+            <div className="w-full bg-card border border-border rounded-2xl p-4 mb-4 space-y-3 text-left">
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Playlist name"
+                maxLength={120}
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border font-semibold"
+              />
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                placeholder="Description (optional)"
+                rows={2}
+                maxLength={1000}
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+              />
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editPublic}
+                  onChange={(e) => setEditPublic(e.target.checked)}
+                />
+                <Globe className="size-4 text-muted-foreground" />
+                Public — anyone with the link can open it, followers welcome
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    updateM.mutate({
+                      data: { id, name: editName, description: editDesc, is_public: editPublic },
+                    })
+                  }
+                  disabled={updateM.isPending || !editName.trim()}
+                  className="inline-flex items-center gap-1 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  <Check className="size-4" /> Save
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="px-4 py-2 rounded-full bg-secondary text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-foreground tracking-tight mb-2 break-words leading-tight">
+                {(data as any).name}
+              </h1>
+
+              {/* Description */}
+              {(data as any).description && (
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-3">
+                  {(data as any).description}
+                </p>
+              )}
+            </>
           )}
 
           {/* Metadata */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium mb-6">
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-xs text-muted-foreground font-medium mb-6">
             <span>{songs.length} {songs.length === 1 ? "song" : "songs"}</span>
             {totalDuration > 0 && <span>• {formatTotalRuntime(totalDuration)}</span>}
+            {(followerCount?.count ?? 0) > 0 && (
+              <span>• {followerCount!.count} follower{followerCount!.count === 1 ? "" : "s"}</span>
+            )}
             {!isPublic ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-secondary px-2 py-0.5 rounded-full">
                 <Lock className="size-3" /> Private
@@ -417,6 +633,35 @@ function Page() {
                 type="playlist"
                 className="p-3 rounded-full bg-secondary border border-border hover:bg-accent text-foreground transition-colors cursor-pointer"
               />
+            )}
+          </div>
+
+          {/* Follow (non-owners) + Download all */}
+          <div className="w-full flex flex-wrap items-center gap-2 mt-3">
+            {!isOwner && !!user && (
+              <button
+                onClick={() => followM.mutate({ data: { playlist_id: id } })}
+                disabled={followM.isPending}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Plus className="size-4" />
+                {followState?.following ? "Following" : "Follow"}
+              </button>
+            )}
+            {!!user && !isMobileWeb && (
+              <button
+                onClick={downloadAll}
+                disabled={bulkProgress !== null || songs.length === 0}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
+                title="Download every entitled song for offline listening"
+              >
+                {bulkProgress !== null ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                {bulkProgress !== null ? `Downloading ${bulkProgress}…` : "Download all"}
+              </button>
             )}
           </div>
         </div>
@@ -502,6 +747,14 @@ function Page() {
                   playing={playing}
                   onPlay={playSong}
                   onRemove={(songId) => remove.mutate({ data: { playlist_id: id, song_id: songId } })}
+                  onMove={
+                    isOwner
+                      ? (songId, dir) =>
+                          moveM.mutate({ data: { playlist_id: id, song_id: songId, direction: dir } })
+                      : undefined
+                  }
+                  isFirst={i === 0}
+                  isLast={i === songs.length - 1}
                 />
               ))}
             </div>

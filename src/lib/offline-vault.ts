@@ -218,6 +218,58 @@ export async function removeTrackFromVault(songId: string): Promise<void> {
   }
 }
 
+export interface VaultDownloadMeta {
+  songId: string;
+  title?: string;
+  artistName?: string;
+  coverUrl?: string | null;
+}
+
+/**
+ * Download one entitled song straight into the encrypted vault (shared by
+ * the per-track button and whole-playlist bulk download). The `fetchSigned`
+ * callback must return the server-minted download URL + filename — the
+ * server enforces purchase/free/staff entitlement, so unbought paid tracks
+ * fail here and callers can count them as skipped.
+ */
+export async function downloadSongToVault(
+  fetchSigned: (songId: string) => Promise<{ url: string; filename: string }>,
+  meta: VaultDownloadMeta,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  const { url } = await fetchSigned(meta.songId);
+  const response = await fetch(url, { credentials: "omit" });
+  if (!response.ok || !response.body) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+  const total = Number(response.headers.get("content-length") || 0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      received += value.length;
+      if (total > 0) onProgress?.(Math.min(99, Math.round((received / total) * 100)));
+    }
+  }
+  const mime = response.headers.get("content-type") || "audio/mpeg";
+  const buf = await new Blob(chunks as BlobPart[], { type: mime }).arrayBuffer();
+  await saveTrackToVault(
+    {
+      songId: meta.songId,
+      title: meta.title ?? "Unknown title",
+      artistName: meta.artistName ?? "Unknown artist",
+      coverUrl: meta.coverUrl ?? null,
+      mime,
+    },
+    buf,
+  );
+  onProgress?.(100);
+}
+
 /** Decrypt one track into memory. Returns null when not downloaded. */
 export async function readVaultTrack(
   songId: string,

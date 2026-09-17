@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Heart,
   Music,
@@ -20,7 +21,9 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { usePlayer } from "@/stores/player";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
+import { PlaylistCover } from "@/components/PlaylistCover";
 import { DownloadButton } from "@/components/DownloadButton";
+import { listFollowedPlaylists } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
@@ -45,6 +48,14 @@ function hasId(value: unknown): value is { id: string } {
 
 function Page() {
   const { user } = useAuth();
+  const followedFn = useServerFn(listFollowedPlaylists);
+
+  const { data: followedPlaylists, isLoading: followedLoading } = useQuery({
+    queryKey: ["followed-playlists", user?.id],
+    queryFn: () => followedFn(),
+    enabled: !!user?.id,
+    staleTime: 30_000,
+  });
 
   const { data: userPlaylists, isLoading: playlistsLoading } = useQuery({
     queryKey: ["my-playlists", user?.id],
@@ -132,7 +143,8 @@ function Page() {
     likedLoading ||
     purchasedLoading ||
     purchasedAlbumsLoading ||
-    followingLoading
+    followingLoading ||
+    followedLoading
   ) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
@@ -140,6 +152,7 @@ function Page() {
   // Relationships can be null when a referenced row was deleted or hidden by
   // RLS. Keep rendering defensive even if a cached query contains one.
   const safePlaylists = (userPlaylists ?? []).filter(hasId);
+  const safeFollowedPlaylists = (followedPlaylists ?? []).filter(hasId);
   const safeLikedSongs = (likedSongs ?? []).filter(hasId);
   const safePurchasedSongs = (purchasedSongs ?? []).filter(hasId);
   const safePurchasedAlbums = (purchasedAlbums ?? []).filter(hasId);
@@ -215,6 +228,20 @@ function Page() {
           </div>
         )}
       </section>
+
+      {safeFollowedPlaylists.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center gap-2 mb-4">
+            <ListMusic className="size-5 text-primary" />
+            <h2 className="text-xl font-semibold">Followed Playlists</h2>
+          </div>
+          <div className="space-y-2">
+            {safeFollowedPlaylists.map((playlist: any) => (
+              <PlaylistCard key={playlist.id} playlist={playlist} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="flex items-center gap-2 mb-4">
@@ -575,14 +602,22 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
 function PlaylistCard({ playlist }: { playlist: any }) {
   const player = usePlayer();
 
+  // PostgREST may return the embedded song as an object or a 1-array —
+  // unwrap defensively like the playlists pages do.
   const songs = (playlist.playlist_songs ?? [])
     .slice()
     .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
-    .map((ps: any) => ps.song)
+    .map((ps: any) => {
+      let s = ps.song ?? ps.songs;
+      if (Array.isArray(s)) s = s[0];
+      if (!s || !s.id) return null;
+      let art = s.artist ?? s.artists;
+      if (Array.isArray(art)) art = art[0];
+      return { ...s, artist: art ? { id: art.id, name: art.name } : s.artist ?? null };
+    })
     .filter(Boolean);
 
   const songCount = songs.length;
-  const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
   const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
 
   const handlePlay = (e?: React.MouseEvent) => {
@@ -617,18 +652,13 @@ function PlaylistCard({ playlist }: { playlist: any }) {
       }`}
     >
       <Link to="/playlists/$id" params={{ id: playlist.id }} className="relative shrink-0">
-        {firstCover ? (
-          <StorageImage
-            bucket="album-art"
-            path={firstCover}
-            alt={playlist.name}
-            className="size-14 rounded-lg object-cover bg-muted"
-          />
-        ) : (
-          <div className="size-14 rounded-lg bg-secondary/80 border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
-            <ListMusic className="size-6" />
-          </div>
-        )}
+        <PlaylistCover
+          covers={
+            playlist.cover_url ? [playlist.cover_url] : songs.map((s: any) => s?.cover_url)
+          }
+          alt={playlist.name}
+          className="size-14 rounded-lg"
+        />
       </Link>
       <Link to="/playlists/$id" params={{ id: playlist.id }} className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

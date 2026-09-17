@@ -306,11 +306,6 @@ export function ShareMenu({
     }
   };
 
-  const handleFollow = () => {
-    // Follow lives on artist pages / library — no dead menu item references this.
-    setIsOpen(false);
-  };
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;

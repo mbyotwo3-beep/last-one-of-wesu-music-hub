@@ -8,9 +8,8 @@ import { createPlaylist, deletePlaylist } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUserRoles } from "@/hooks/use-roles";
 import { ShareMenu } from "@/components/ShareMenu";
-import { StorageImage } from "@/components/StorageImage";
+import { PlaylistCover } from "@/components/PlaylistCover";
 import { usePlayer } from "@/stores/player";
 
 export const Route = createFileRoute("/playlists")({
@@ -26,7 +25,6 @@ export const Route = createFileRoute("/playlists")({
 
 function Page() {
   const { user } = useAuth();
-  const { isAdmin } = useUserRoles();
   const qc = useQueryClient();
   const player = usePlayer();
   const createFn = useServerFn(createPlaylist);
@@ -166,22 +164,16 @@ function Page() {
               value={newPlaylist.description}
               onChange={(e) => setNewPlaylist({ ...newPlaylist, description: e.target.value })}
             />
-            {isAdmin ? (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={newPlaylist.make_public}
-                  onChange={(e) =>
-                    setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })
-                  }
-                />
-                Publish as an editorial playlist
-              </label>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Your playlist will be private. Only Wesu+ staff can publish editorial playlists.
-              </p>
-            )}
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newPlaylist.make_public}
+                onChange={(e) =>
+                  setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })
+                }
+              />
+              Public — anyone with the link can open it
+            </label>
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -223,7 +215,6 @@ function Page() {
               })
               .filter(Boolean);
             const songCount = songs.length;
-            const firstCover = songs.find((s: any) => s?.cover_url)?.cover_url;
             const isThisPlaylistActive =
               player.playing && songs.some((s: any) => s.id === player.track?.id);
 
@@ -236,24 +227,21 @@ function Page() {
                     : "border-border hover:border-primary/40"
                 }`}
               >
-                {/* Playlist Thumbnail */}
+                {/* Playlist Thumbnail (cover or song mosaic) */}
                 <Link
                   to="/playlists/$id"
                   params={{ id: playlist.id }}
                   className="relative shrink-0"
                 >
-                  {firstCover ? (
-                    <StorageImage
-                      bucket="album-art"
-                      path={firstCover}
-                      alt={playlist.name}
-                      className="size-14 rounded-lg object-cover bg-muted"
-                    />
-                  ) : (
-                    <div className="size-14 rounded-lg bg-secondary/80 border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
-                      <ListMusic className="size-6" />
-                    </div>
-                  )}
+                  <PlaylistCover
+                    covers={
+                      playlist.cover_url
+                        ? [playlist.cover_url]
+                        : songs.map((s: any) => s?.cover_url)
+                    }
+                    alt={playlist.name}
+                    className="size-14 rounded-lg"
+                  />
                 </Link>
 
                 {/* Playlist Info */}

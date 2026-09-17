@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsNative, useIsMobile } from "@/hooks/use-platform";
 import {
   isTrackDownloaded,
-  saveTrackToVault,
+  downloadSongToVault,
   removeTrackFromVault,
   isVaultSupported,
 } from "@/lib/offline-vault";
@@ -94,35 +94,13 @@ export function DownloadButton({
     try {
       // Entitlement (purchase / free / staff / owner-artist) is enforced
       // server-side — the signed URL is only minted for allowed callers.
-      const result = await downloadFn({ data: { song_id: songId } });
-      const response = await fetch(result.url, { credentials: "omit" });
-      if (!response.ok || !response.body) {
-        throw new Error(`Download failed (${response.status})`);
-      }
-      const total = Number(response.headers.get("content-length") || 0);
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          chunks.push(value);
-          received += value.length;
-          if (total > 0) setProgress(Math.min(99, Math.round((received / total) * 100)));
-        }
-      }
-      const mime = response.headers.get("content-type") || "audio/mpeg";
-      const buf = await new Blob(chunks as BlobPart[], { type: mime }).arrayBuffer();
-      await saveTrackToVault(
-        {
-          songId,
-          title: title ?? "Unknown title",
-          artistName: artistName ?? "Unknown artist",
-          coverUrl: coverUrl ?? null,
-          mime,
+      await downloadSongToVault(
+        async (id) => {
+          const result = await downloadFn({ data: { song_id: id } });
+          return { url: result.url, filename: result.filename };
         },
-        buf,
+        { songId, title, artistName, coverUrl },
+        (pct) => setProgress(pct),
       );
       touchVaultQueries(qc);
       toast.success(`Downloaded "${title ?? "song"}" — plays offline, only in Wesu+`);

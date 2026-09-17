@@ -179,6 +179,116 @@ describe("Bundle fan-out idempotency", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Reorder model (mirrors movePlaylistSong: adjacent swap by direction)
+// ---------------------------------------------------------------------------
+
+function moveSong(ids: string[], songId: string, dir: "up" | "down"): string[] {
+  const next = [...ids];
+  const idx = next.findIndex((id) => id === songId);
+  if (idx === -1) return next;
+  const swapWith = dir === "up" ? idx - 1 : idx + 1;
+  if (swapWith < 0 || swapWith >= next.length) return next;
+  [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+  return next;
+}
+
+describe("Playlist reorder", () => {
+  it("moves a middle song up and down", () => {
+    expect(moveSong(["a", "b", "c"], "b", "up")).toEqual(["b", "a", "c"]);
+    expect(moveSong(["a", "b", "c"], "b", "down")).toEqual(["a", "c", "b"]);
+  });
+
+  it("edges are no-ops", () => {
+    expect(moveSong(["a", "b"], "a", "up")).toEqual(["a", "b"]);
+    expect(moveSong(["a", "b"], "b", "down")).toEqual(["a", "b"]);
+  });
+
+  it("unknown song leaves order untouched", () => {
+    fc.assert(
+      fc.property(fc.array(fc.uuid(), { maxLength: 8 }), fc.uuid(), (ids, missing) => {
+        fc.pre(!ids.includes(missing));
+        expect(moveSong(ids, missing, "up")).toEqual(ids);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("up then down round-trips", () => {
+    fc.assert(
+      fc.property(fc.array(fc.uuid(), { minLength: 3, maxLength: 8 }), (ids) => {
+        const uniq = [...new Set(ids)];
+        fc.pre(uniq.length >= 3);
+        const mid = uniq[1];
+        expect(moveSong(moveSong(uniq, mid, "up"), mid, "down")).toEqual(uniq);
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Follow rules model (mirrors togglePlaylistFollow)
+// ---------------------------------------------------------------------------
+
+function canFollow(args: {
+  isOwner: boolean;
+  isPublic: boolean;
+  alreadyFollowing: boolean;
+}): { ok: boolean; following?: boolean; error?: string } {
+  if (args.isOwner) return { ok: false, error: "already in library" };
+  if (!args.isPublic) return { ok: false, error: "private" };
+  return { ok: true, following: !args.alreadyFollowing };
+}
+
+describe("Playlist follow rules", () => {
+  it("owners cannot follow their own list", () => {
+    expect(canFollow({ isOwner: true, isPublic: true, alreadyFollowing: false }).ok).toBe(false);
+  });
+
+  it("private lists cannot be followed", () => {
+    expect(canFollow({ isOwner: false, isPublic: false, alreadyFollowing: false }).ok).toBe(false);
+  });
+
+  it("follow toggles both ways on public lists", () => {
+    expect(canFollow({ isOwner: false, isPublic: true, alreadyFollowing: false })).toEqual({
+      ok: true,
+      following: true,
+    });
+    expect(canFollow({ isOwner: false, isPublic: true, alreadyFollowing: true })).toEqual({
+      ok: true,
+      following: false,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Playlist update validation model (mirrors updatePlaylist)
+// ---------------------------------------------------------------------------
+
+function validatePlaylistPatch(patch: { name?: string; description?: string | null }): string[] {
+  const errors: string[] = [];
+  if (patch.name !== undefined) {
+    if (!patch.name.trim()) errors.push("name required");
+    if (patch.name.trim().length > 120) errors.push("name too long");
+  }
+  const desc = (patch.description ?? "").trim();
+  if (desc.length > 1000) errors.push("description too long");
+  return errors;
+}
+
+describe("Playlist update validation", () => {
+  it("blank names rejected, 120 chars accepted", () => {
+    expect(validatePlaylistPatch({ name: "  " })).toContain("name required");
+    expect(validatePlaylistPatch({ name: "a".repeat(120) })).toEqual([]);
+    expect(validatePlaylistPatch({ name: "a".repeat(121) })).toContain("name too long");
+  });
+
+  it("empty patch is a no-op", () => {
+    expect(validatePlaylistPatch({})).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Settle gate model
 // ---------------------------------------------------------------------------
 

@@ -221,16 +221,15 @@ export const createPlaylist = createServerFn({ method: "POST" })
     if (description && description.length > 1_000) {
       throw new Error("Playlist description must be at most 1,000 characters");
     }
-    const isStaff = await isStaffUser(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
       .from("playlists")
       .insert({
         user_id: context.userId,
         name,
         description,
-        // Listener and artist playlists are private. Only platform staff can
-        // intentionally publish an editorial playlist to Browse.
-        is_public: isStaff && data.make_public === true,
+        // Spotify-style: anyone may publish a public playlist (staff
+        // editorial lists are just public playlists curated by staff).
+        is_public: data.make_public === true,
       } as any)
       .select("id")
       .single();
@@ -325,6 +324,169 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
       .eq("song_id", data.song_id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+async function requirePlaylistOwner(supabase: any, userId: string, playlistId: string) {
+  const { data: pl } = await supabase
+    .from("playlists")
+    .select("user_id")
+    .eq("id", playlistId)
+    .maybeSingle();
+  if (!pl) throw new Error("Playlist not found");
+  const staff = await isStaffUser(supabase, userId);
+  if ((pl as any).user_id !== userId && !staff) {
+    throw new Error("You can only edit your own playlists");
+  }
+  return pl as { user_id: string };
+}
+
+export const updatePlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; name?: string; description?: string | null; is_public?: boolean }) => d)
+  .handler(async ({ context, data }) => {
+    await requirePlaylistOwner(context.supabase, context.userId, data.id);
+    const patch: Record<string, unknown> = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name) throw new Error("Playlist name is required");
+      if (name.length > 120) throw new Error("Playlist name must be at most 120 characters");
+      patch.name = name;
+    }
+    if (data.description !== undefined) {
+      const description = (data.description ?? "").trim() || null;
+      if (description && description.length > 1_000) {
+        throw new Error("Playlist description must be at most 1,000 characters");
+      }
+      patch.description = description;
+    }
+    if (data.is_public !== undefined) patch.is_public = !!data.is_public;
+    if (Object.keys(patch).length === 0) return { ok: true };
+    const { error } = await context.supabase
+      .from("playlists")
+      .update(patch as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const movePlaylistSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string; song_id: string; direction: "up" | "down" }) => d)
+  .handler(async ({ context, data }) => {
+    await requirePlaylistOwner(context.supabase, context.userId, data.playlist_id);
+    const { data: rows } = await context.supabase
+      .from("playlist_songs")
+      .select("song_id, position")
+      .eq("playlist_id", data.playlist_id)
+      .order("position", { ascending: true });
+    const list = (rows ?? []) as { song_id: string; position: number }[];
+    const idx = list.findIndex((r) => r.song_id === data.song_id);
+    if (idx === -1) throw new Error("Song is not in this playlist");
+    const swapWith = data.direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= list.length) return { ok: true, moved: false };
+    // Swap positions with two plain updates (no unique-constraint
+    // assumption — duplicates are already prevented at add time).
+    const a = list[idx];
+    const b = list[swapWith];
+    const { error: e1 } = await context.supabase
+      .from("playlist_songs")
+      .update({ position: -1 } as any)
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", a.song_id);
+    if (e1) throw new Error(e1.message);
+    const { error: e2 } = await context.supabase
+      .from("playlist_songs")
+      .update({ position: a.position } as any)
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", b.song_id);
+    if (e2) throw new Error(e2.message);
+    const { error: e3 } = await context.supabase
+      .from("playlist_songs")
+      .update({ position: b.position } as any)
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", a.song_id);
+    if (e3) throw new Error(e3.message);
+    return { ok: true, moved: true };
+  });
+
+export const togglePlaylistFollow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { data: pl } = await context.supabase
+      .from("playlists")
+      .select("user_id, is_public")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (!pl) throw new Error("Playlist not found");
+    if ((pl as any).user_id === context.userId) {
+      throw new Error("This playlist is already in your library");
+    }
+    if (!(pl as any).is_public) {
+      throw new Error("Only public playlists can be followed");
+    }
+    const { data: existing } = await context.supabase
+      .from("saved_playlists")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("playlist_id", data.playlist_id)
+      .maybeSingle();
+    if (existing) {
+      const { error } = await context.supabase
+        .from("saved_playlists")
+        .delete()
+        .eq("user_id", context.userId)
+        .eq("playlist_id", data.playlist_id);
+      if (error) throw new Error(error.message);
+      return { ok: true, following: false };
+    }
+    const { error } = await context.supabase
+      .from("saved_playlists")
+      .insert({ user_id: context.userId, playlist_id: data.playlist_id } as any);
+    if (error) throw new Error(error.message);
+    return { ok: true, following: true };
+  });
+
+export const listFollowedPlaylists = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    // Include each list's songs (id/title/cover only) so library cards can
+    // count tracks, render mosaic covers, and play without extra roundtrips.
+    const { data, error } = await context.supabase
+      .from("saved_playlists")
+      .select(
+        "playlist_id, created_at, playlists(id,name,description,cover_url,is_public,user_id,playlist_songs(position,song:songs(id,title,duration,price,cover_url,artist:artists(id,name))))",
+      )
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? [])
+      .map((r: any) => r.playlists)
+      .filter(Boolean);
+  });
+
+export const getPlaylistFollowerCount = createServerFn({ method: "GET" })
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ data }) => {
+    const supabase = getPublicSupabase();
+    const { count } = await supabase
+      .from("saved_playlists")
+      .select("id", { count: "exact", head: true })
+      .eq("playlist_id", data.playlist_id);
+    return { count: count ?? 0 };
+  });
+
+export const isFollowingPlaylist = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { data: row } = await context.supabase
+      .from("saved_playlists")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("playlist_id", data.playlist_id)
+      .maybeSingle();
+    return { following: !!row };
   });
 
 export const getPlaylistWithSongs = createServerFn({ method: "GET" })
