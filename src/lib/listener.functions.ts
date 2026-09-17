@@ -542,7 +542,6 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
 /**
  * Get a signed audio URL for a free song without requiring authentication.
  * If the song has a price > 0, throws an error — use getSignedAudioUrl instead.
- * Anonymous listeners hear the song with ads (enforced client-side).
  */
 export const getPublicAudioUrl = createServerFn({ method: "POST" })
   .validator((d: { song_id: string }) => d)

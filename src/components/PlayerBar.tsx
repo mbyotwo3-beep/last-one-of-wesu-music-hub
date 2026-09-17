@@ -92,7 +92,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAd, setShowAd] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const isPreview = usePlayer((s) => s.isPreview);
@@ -281,7 +280,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               previewMode = true;
             }
           } else {
-            // Check if it's a free track first so anonymous listeners hear the full song with ads
+            // Check if it's a free track first so anonymous listeners hear the full song
             let publicRes: { url: string } | null = null;
             try {
               publicRes = await getPublicFn({ data: { song_id: track!.id } });
@@ -304,9 +303,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             setCachedAudioUrl(track!.id, user?.id ?? null, url, previewMode);
           }
         }
-        // Ad banner is a function of auth state only — set it uniformly
-        // instead of only on some cache branches.
-        setShowAd(!user);
+
 
         // A newer selection may have replaced this request while it was
         // resolving. Never publish or play an old track's URL on the new one.
@@ -961,16 +958,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       {/* Desktop Spotify-style floating glass bar */}
       <div className="fixed bottom-3 inset-x-3 z-50">
       <div className="bg-obsidian/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_-2px_24px_rgba(0,0,0,0.5)] overflow-hidden">
-        {showAd && !user && (
-          <div className="flex items-center justify-between px-6 py-1.5 bg-primary/10 border-b border-primary/20 text-xs">
-            <span className="flex items-center gap-1.5 text-gray-300">
-              <Radio className="size-3 text-primary" /> You're listening with ads.
-            </span>
-            <Link to="/auth" className="font-semibold text-primary hover:underline">
-              Sign up free →
-            </Link>
-          </div>
-        )}
         {isPreview && (
           <div className="flex items-center justify-between px-6 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs">
             <span className="flex items-center gap-1.5 text-amber-400">

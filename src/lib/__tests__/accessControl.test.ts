@@ -78,14 +78,6 @@ function canGetPublicUrl(song: Song): { allowed: boolean; error?: string } {
 }
 
 /**
- * Pure model of ad banner visibility:
- * Subscriptions are paused, so the ad banner remains visible for every user.
- */
-function shouldShowAdBanner(_user: User): boolean {
-  return true;
-}
-
-/**
  * Auth-required route redirect check.
  */
 const AUTH_REQUIRED_ROUTES = [
@@ -247,40 +239,9 @@ describe("Property 3: Play count increment by exactly 1 (Req 2.1)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Property 4: Ad banner visibility rule
-// Feature: wesu-plus-completion, Property 4: Ad banner visibility rule
-// Validates: Requirements 3.3, 3.5
+// Property 4 removed: the "listen with ads" banner was retired because
+// subscription plans are not in use — there is no ad model to verify.
 // ---------------------------------------------------------------------------
-
-describe("Property 4: Ad banner visibility rule (Req 3.3, 3.5)", () => {
-  it("unauthenticated user always sees ad banner", () => {
-    fc.assert(
-      fc.property(unauthUser, (user) => {
-        expect(shouldShowAdBanner(user)).toBe(true);
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("authenticated user always sees ad banner while subscriptions are paused", () => {
-    fc.assert(
-      fc.property(freeUser, (user) => {
-        expect(shouldShowAdBanner(user)).toBe(true);
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("ad banner visibility does not depend on previous subscription state", () => {
-    fc.assert(
-      fc.property(userId, (uid) => {
-        const user: User = { id: uid, purchasedSongIds: [], purchasedAlbumIds: [] };
-        expect(shouldShowAdBanner(user)).toBe(true);
-      }),
-      { numRuns: 100 },
-    );
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Property 5: Auth-required routes redirect unauthenticated users
