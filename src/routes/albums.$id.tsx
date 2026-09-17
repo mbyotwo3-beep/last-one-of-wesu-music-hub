@@ -114,7 +114,9 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
           </span>
         )}
 
-        {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+        {Number(s.price ?? 0) <= 0 && (
+          <DownloadButton songId={s.id} title={s.title} artistName={artist?.name} coverUrl={coverUrl} />
+        )}
 
         <button
           onClick={(e) => {

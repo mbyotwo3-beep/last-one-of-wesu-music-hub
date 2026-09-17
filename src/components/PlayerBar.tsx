@@ -42,7 +42,13 @@ import {
   stopNative,
   onNativeComplete,
   isNativeAudioAvailable,
+  prepareNativeOfflineTrack,
+  deleteNativeTempFile,
 } from "@/lib/native-audio";
+import {
+  isTrackDownloaded,
+  getOfflineObjectUrl,
+} from "@/lib/offline-vault";
 import { supabase } from "@/integrations/supabase/client";
 import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/lib/audio";
 
@@ -102,6 +108,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // (queue duplicates, retry after failure) always reloads.
   const currentSelectionRef = useRef<number | null>(null);
   const currentTrackIdRef = useRef<string | null>(null);
+  // App-private staged file for native offline playback (deleted on change).
+  const nativeTempPathRef = useRef<string | null>(null);
   const trackedHistoryTrackRef = useRef<string | null>(null);
   const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
@@ -127,6 +135,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (currentTrackIdRef.current) stopNative(currentTrackIdRef.current).catch(() => {});
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
+      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
+      nativeTempPathRef.current = null;
       getAudio().pause();
       // Clear stale lock-screen / notification controls on exit.
       try {
@@ -174,6 +184,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
+      // Drop the previous track's staged offline file (app-private cache).
+      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
+      nativeTempPathRef.current = null;
     }
 
     currentSelectionRef.current = selectionId;
@@ -214,12 +227,39 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       try {
         let url: string;
         let previewMode = false;
+        // Encrypted on-device copy wins over streaming (instant, works
+        // offline). Vault tracks only ever land there after a server-side
+        // entitlement check, so this is always full-length audio.
+        let offline = false;
+        try {
+          if (await isTrackDownloaded(track!.id)) {
+            const obj = await getOfflineObjectUrl(track!.id);
+            if (obj && isCurrentTrack()) {
+              url = obj;
+              offline = true;
+            }
+          }
+        } catch {
+          offline = false; // corrupt vault copy → fall through to streaming
+        }
 
-        const cached = getCachedAudioUrl(track!.id, user?.id ?? null);
+        if (offline) {
+          // Resolved from the vault — nothing more to fetch.
+        } else if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          // Fail fast while offline: retries would just burn 2s re-hitting
+          // an unreachable network before showing the same message.
+          setLoading(false);
+          setAudioUrl(null);
+          setError("You're offline — play a downloaded song or reconnect.");
+          if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+          return;
+        }
+
+        const cached = !offline && getCachedAudioUrl(track!.id, user?.id ?? null);
         if (cached) {
           url = cached.url;
           previewMode = cached.previewMode;
-        } else {
+        } else if (!offline) {
           // Get current access token for entitlement-checked preview of paid tracks.
           const { data: sess } = await supabase.auth.getSession();
           const accessToken = sess.session?.access_token ?? null;
@@ -260,7 +300,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             }
           }
 
-          if (url && /^https?:\/\//i.test(url)) {
+          if (!offline && url && /^https?:\/\//i.test(url)) {
             setCachedAudioUrl(track!.id, user?.id ?? null, url, previewMode);
           }
         }
@@ -272,10 +312,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // resolving. Never publish or play an old track's URL on the new one.
         if (!isCurrentTrack()) return;
 
-        // Validate URL is absolute HTTPS/HTTP so the browser can't accidentally
-        // resolve a bare filename against the current origin (which caused the
-        // OpaqueResponseBlocking errors on wesuplusly.com).
-        if (!url || !/^https?:\/\//i.test(url)) {
+        // Validate URL. Offline copies are same-tab Blob URLs (never touch
+        // the network); remote URLs must be absolute HTTPS/HTTP so the
+        // browser can't resolve a bare filename against the current origin
+        // (which caused the OpaqueResponseBlocking errors on wesuplusly.com).
+        const isUsableUrl =
+          !!url && (offline || /^https?:\/\//i.test(url) || /^blob:/i.test(url));
+        if (!isUsableUrl) {
           throw new Error("Audio unavailable (invalid URL)");
         }
 
@@ -286,14 +329,30 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             _nativeAvailable = await isNativeAudioAvailable();
           }
           if (_nativeAvailable) {
-            const preloaded = await preloadNative(track!.id, url);
+            // Native plugin cannot play Blob URLs: stage the decrypted
+            // vault bytes as an app-private temp file instead.
+            let assetUrl = url;
+            let assetIsUrl = true;
+            if (offline) {
+              const staged = await prepareNativeOfflineTrack(track!.id);
+              if (!staged) {
+                throw new Error("Offline file unavailable — please re-download this song");
+              }
+              if (!isCurrentTrack()) return;
+              await deleteNativeTempFile(nativeTempPathRef.current);
+              nativeTempPathRef.current = staged.path;
+              assetUrl = staged.uri;
+              assetIsUrl = false;
+            }
+            const preloaded = await preloadNative(track!.id, assetUrl, assetIsUrl);
             if (preloaded) {
               if (!isCurrentTrack()) {
                 await stopNative(track!.id).catch(() => {});
                 return;
               }
               // Native playback is ready only after preload succeeds.
-              setAudioUrl(url);
+              // For offline tracks the marker is the staged file URI.
+              setAudioUrl(assetUrl);
               if (usePlayer.getState().playing) {
                 await playNative(track!.id);
               }
@@ -601,6 +660,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       audioEventsCleanupRef.current?.();
       nativeCleanupRef.current?.();
+      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
+      nativeTempPathRef.current = null;
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
       }

@@ -10,6 +10,7 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { StorageImage } from "@/components/StorageImage";
+import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -38,6 +39,7 @@ export function NowPlayingScreen() {
   const isPreview = usePlayer((s) => s.isPreview);
   const { data: meta } = useTrackMeta(track?.id);
   const trackPrice = meta ? Number(meta.price ?? 0) : null;
+  const { owned } = useSongEntitlement(track?.id, trackPrice, (meta as any)?.album_id);
   const { isSaved, toggle: toggleSaved } = useSavedTrack(track?.id);
 
   if (!track) return null;
@@ -148,9 +150,15 @@ export function NowPlayingScreen() {
           />
         </div>
       </div>
-      {user && trackPrice !== null && trackPrice <= 0 && (
+      {user && (trackPrice === null || owned) && (
         <div className="mb-4">
-          <DownloadButton songId={track.id} label="Download free song" />
+          <DownloadButton
+            songId={track.id}
+            label="Download"
+            title={track.title}
+            artistName={track.artistName}
+            coverUrl={track.coverUrl}
+          />
         </div>
       )}
 

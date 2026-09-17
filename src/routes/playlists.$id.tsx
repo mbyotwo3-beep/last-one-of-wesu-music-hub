@@ -113,7 +113,9 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
 
       {/* Action buttons */}
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+        {Number(s.price ?? 0) <= 0 && (
+          <DownloadButton songId={s.id} title={s.title} artistName={s.artist?.name} coverUrl={s.cover_url} />
+        )}
 
         <button
           onClick={(e) => {

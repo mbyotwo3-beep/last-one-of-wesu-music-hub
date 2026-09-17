@@ -418,7 +418,9 @@ function ArtistTopSongRow({
             <ShoppingBag className="size-4" />
           </Link>
         )}
-        {Number(s.price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+        {Number(s.price ?? 0) <= 0 && (
+          <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();

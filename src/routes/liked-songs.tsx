@@ -318,7 +318,9 @@ function LikedSongRow({
 
       {/* Action buttons */}
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
+        {Number(song.price ?? 0) <= 0 && (
+          <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        )}
 
         <button
           onClick={(e) => {

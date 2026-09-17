@@ -19,6 +19,7 @@ import { usePlayer } from "@/stores/player";
 import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
+import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { DownloadButton } from "@/components/DownloadButton";
 import { getAudio } from "@/lib/audio";
@@ -52,6 +53,7 @@ export function NowPlayingSheet() {
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const price: number = Number(meta?.price ?? 0);
+  const { owned: entitled } = useSongEntitlement(track?.id, price, albumId);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
   const shuffle = usePlayer((s) => s.shuffle);
@@ -295,9 +297,15 @@ export function NowPlayingSheet() {
             </button>
           )}
         </div>
-        {user && meta && price <= 0 && (
+        {user && meta && (price <= 0 || entitled) && (
           <div className="px-6 mb-4">
-            <DownloadButton songId={track.id} label="Download free song" />
+            <DownloadButton
+              songId={track.id}
+              label="Download"
+              title={track.title}
+              artistName={track.artistName}
+              coverUrl={track.coverUrl}
+            />
           </div>
         )}
 

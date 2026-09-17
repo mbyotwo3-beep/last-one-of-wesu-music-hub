@@ -157,7 +157,9 @@ function SearchPage() {
                         </div>
                       </div>
                     </Link>
-                    {Number((s as any).price ?? 0) <= 0 && <DownloadButton songId={s.id} />}
+                    {Number((s as any).price ?? 0) <= 0 && (
+                      <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
+                    )}
                   </div>
                 ))}
               </div>

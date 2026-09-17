@@ -142,7 +142,13 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         </div>
         <div className="flex items-center gap-1 shrink-0 relative z-10">
           {user && Number(song.price ?? 0) <= 0 && (
-            <DownloadButton songId={song.id} label="Download" />
+            <DownloadButton
+              songId={song.id}
+              label="Download"
+              title={song.title}
+              artistName={artistName}
+              coverUrl={song.cover_url}
+            />
           )}
           <ShareMenu
             songId={song.id}

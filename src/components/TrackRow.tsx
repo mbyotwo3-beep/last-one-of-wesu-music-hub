@@ -104,7 +104,9 @@ export function TrackRow({
         <div className="text-sm font-medium text-primary w-20 text-right">{formatPrice(price)}</div>
       )}
 
-      {Number(price ?? 0) <= 0 && <DownloadButton songId={id} />}
+      {Number(price ?? 0) <= 0 && (
+        <DownloadButton songId={id} title={title} artistName={artist} coverUrl={coverUrl} />
+      )}
       <ShareMenu songId={id} songTitle={title} coverUrl={coverUrl} artistName={artist} type="song" />
 
       {/* Like Button */}

@@ -976,6 +976,28 @@ function SettingsTab() {
             onChange={(e) => setSite({ ...site, commission_pct: Number(e.target.value) })}
           />
         </label>
+        <label className="block text-sm">
+          Android app URL (APK or Play Store link)
+          <input
+            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            placeholder="https://…"
+            value={site.mobile_app_url ?? ""}
+            onChange={(e) => setSite({ ...site, mobile_app_url: e.target.value })}
+          />
+        </label>
+        <label className="block text-sm">
+          iPhone app URL (App Store link)
+          <input
+            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            placeholder="https://…"
+            value={site.ios_app_url ?? ""}
+            onChange={(e) => setSite({ ...site, ios_app_url: e.target.value })}
+          />
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Mobile browsers that tap Download are sent to /get-app, which shows these links.
+          Leave blank to show a "coming soon" note instead.
+        </p>
         <button
           onClick={() => m.mutate({ data: { key: "site", value: site } })}
           className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"

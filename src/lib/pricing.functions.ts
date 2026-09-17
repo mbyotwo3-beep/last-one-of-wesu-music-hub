@@ -44,6 +44,9 @@ export interface SiteConfig {
   url: string;
   description: string;
   twitter_handle: string;
+  /** Native app download links (configured in superadmin Settings). */
+  mobile_app_url?: string;
+  ios_app_url?: string;
 }
 
 export const DEFAULT_SITE: SiteConfig = {
@@ -53,6 +56,8 @@ export const DEFAULT_SITE: SiteConfig = {
   url: "https://www.wesuplus.com",
   description: "Stream Zambian and African music. Free & Premium tiers with Mobile Money payments.",
   twitter_handle: "@wesuplus",
+  mobile_app_url: "",
+  ios_app_url: "",
 };
 
 /**
@@ -208,6 +213,8 @@ export const getSiteConfig = createServerFn({ method: "GET" }).handler(
         url: v.url ?? appUrl,
         description: v.description ?? DEFAULT_SITE.description,
         twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
+        mobile_app_url: v.mobile_app_url ?? "",
+        ios_app_url: v.ios_app_url ?? "",
       };
     } catch {
       return DEFAULT_SITE;
@@ -235,6 +242,8 @@ export async function getSiteConfigServer(): Promise<SiteConfig> {
       url: v.url ?? appUrl,
       description: v.description ?? DEFAULT_SITE.description,
       twitter_handle: v.twitter_handle ?? DEFAULT_SITE.twitter_handle,
+      mobile_app_url: v.mobile_app_url ?? "",
+      ios_app_url: v.ios_app_url ?? "",
     };
   } catch {
     return DEFAULT_SITE;

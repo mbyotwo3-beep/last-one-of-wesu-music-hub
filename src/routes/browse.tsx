@@ -408,7 +408,9 @@ function TrackListRow({
       <span className="text-xs text-muted-foreground hidden sm:inline">
         {(song.play_count ?? 0).toLocaleString()} plays
       </span>
-      {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
+      {Number(song.price ?? 0) <= 0 && (
+        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+      )}
     </div>
   );
 }

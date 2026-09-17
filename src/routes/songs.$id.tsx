@@ -8,6 +8,7 @@ import { ShareMenu } from "@/components/ShareMenu";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 
 const songQO = (id: string) =>
   queryOptions({
@@ -46,6 +47,7 @@ function SongPage() {
   const formatPrice = useCurrency((state) => state.formatPrice);
   const artist = song!.artist as { id: string; name: string } | null;
   const isFree = Number(song!.price ?? 0) <= 0;
+  const { owned } = useSongEntitlement(id, song!.price, song!.album_id);
   const { isSaved, toggle } = useSavedTrack(id);
 
   const isCurrentTrack = currentTrackId === song!.id;
@@ -124,8 +126,14 @@ function SongPage() {
             )}
             {isPlayingThisTrack ? "Pause" : "Play"}
           </button>
-          {isFree ? (
-            <DownloadButton songId={song!.id} label="Download" />
+          {isFree || owned ? (
+            <DownloadButton
+              songId={song!.id}
+              label="Download"
+              title={song!.title}
+              artistName={artist?.name}
+              coverUrl={song!.cover_url}
+            />
           ) : (
             <Link
               to="/checkout"

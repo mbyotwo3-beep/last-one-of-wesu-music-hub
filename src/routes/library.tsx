@@ -466,7 +466,9 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
             <Play className="size-4 fill-current" />
           )}
         </button>
-        {Number(song.price ?? 0) <= 0 && <DownloadButton songId={song.id} />}
+        {Number(song.price ?? 0) <= 0 && (
+          <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        )}
         {song.price && Number(song.price) > 0 && (
           <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
             ZMW {Number(song.price).toFixed(2)}
@@ -558,7 +560,7 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
             <Play className="size-4 fill-current" />
           )}
         </button>
-        <DownloadButton songId={song.id} />
+        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
         <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">
           Owned
         </span>
