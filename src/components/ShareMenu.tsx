@@ -164,7 +164,7 @@ export function ShareMenu({
 
   const handleAddToQueue = async () => {
     if (!songId || !songTitle) return;
-    // Spotify behavior: append only — never interrupt current playback.
+    // Queue behavior: append only — never interrupt current playback.
     // Ensure every queued instance carries its cover (so duplicates all show art)
     // even when the caller didn't pass coverUrl. Fall back to the existing queue
     // entry with the same id, then try a lightweight DB fetch.
@@ -207,7 +207,7 @@ export function ShareMenu({
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
 
-      // Calculate position like Spotify - align to right of button, but ensure it doesn't go off-screen
+      // Align to the right of the button, but ensure it doesn't go off-screen
       const menuWidth = 208; // w-52 = 13rem = 208px
       const menuHeight = 300; // Approximate menu height
       const viewportWidth = window.innerWidth;

@@ -1,12 +1,11 @@
 /**
- * Spotify-style encrypted offline vault.
+ * Encrypted offline vault.
  *
  * Downloads are NOT saved as playable audio files. Each track is encrypted
  * with AES-GCM under a device-local, non-extractable key and stored as
  * ciphertext in IndexedDB. Playback decrypts into memory and feeds a
  * same-session Blob URL (web) or an app-private temp file (native) — so a
- * downloaded song cannot be opened, copied, or played outside this app,
- * exactly like Spotify/YouTube offline content.
+ * downloaded song cannot be opened, copied, or played outside this app.
  *
  * Honest limits (no Widevine/FairPlay license server here): the bytes cross
  * the network once during download, and a rooted/jailbroken device or a
@@ -19,7 +18,7 @@ const DB_VERSION = 1;
 const TRACKS_STORE = "tracks";
 const DEVICE_STORE = "device";
 const DEVICE_KEY_ID = "aes-gcm-256";
-/** Hard cap so one device can't fill its disk (Spotify-style bounded cache). */
+/** Hard cap so one device can't fill its disk (bounded offline cache). */
 export const MAX_VAULT_BYTES = 1_500_000_000;
 
 export interface VaultTrackMeta {

@@ -33,7 +33,7 @@ function QueuePage() {
   const removeFromQueue = usePlayer((s) => s.removeFromQueue);
   const { user } = useAuth();
 
-  // Spotify behavior: empty queue falls back to owned music (purchased +
+  // Empty queue falls back to owned music (purchased +
   // liked). Previously empty queue was a dead end with only "Browse Music".
   const { data: fallbackTracks } = useQuery({
     queryKey: ["queue-fallback", user?.id],
@@ -104,7 +104,7 @@ function QueuePage() {
           <h1 className="text-2xl font-bold">Your queue is empty</h1>
           <p className="text-muted-foreground">
             {fallbackTracks && fallbackTracks.length > 0
-              ? `Start with the ${fallbackTracks.length} song(s) you've bought or liked — just like Spotify keeps your music going.`
+              ? `Start with the ${fallbackTracks.length} song(s) you've bought or liked to keep your music going.`
               : "Add songs to your queue to listen to them later"}
           </p>
           <div className="flex flex-wrap justify-center gap-3">

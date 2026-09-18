@@ -61,7 +61,7 @@ export const searchSongs = createServerFn({ method: "GET" })
   });
 
 /**
- * Spotify-style global search — hits songs, albums, and artists in parallel.
+ * Global search — hits songs, albums, and artists in parallel.
  * Ranks by exact/prefix match first, then substring match, then popularity.
  */
 export const globalSearch = createServerFn({ method: "GET" })
@@ -349,7 +349,7 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
   });
 
 /**
- * Get top 10 songs for each of the top genres (Spotify-style genre shelves).
+ * Get top 10 songs for each of the top genres (genre shelves).
  * Returns an array of { genre, songs } where songs are the top 10 by play_count.
  */
 export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(async () => {

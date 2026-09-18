@@ -48,7 +48,7 @@ function GetAppPage() {
         <h1 className="text-3xl font-black tracking-tight">Take Wesu+ anywhere</h1>
         <p className="mt-3 text-muted-foreground">
           Downloads, offline listening, and background play live in the Wesu+ mobile app.
-          Anything you download plays only inside the app — just like Spotify.
+          Anything you download plays only inside the Wesu+ app.
         </p>
 
         <div className="mt-6 grid gap-3 text-left">

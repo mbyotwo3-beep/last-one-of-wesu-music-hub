@@ -1,5 +1,5 @@
 /**
- * Regression tests for the Spotify-style encrypted offline vault.
+ * Regression tests for the encrypted offline vault.
  *
  * - Real AES-GCM round-trip through a non-extractable device key (Node has
  *   WebCrypto), mirroring offline-vault.ts: ciphertext decrypts with the

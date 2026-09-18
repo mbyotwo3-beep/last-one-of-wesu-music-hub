@@ -318,7 +318,7 @@ function Page() {
   const showUnlockPanel =
     !!user && !!access && !access.isOwner && !access.unlocked && access.missing.length > 0;
 
-  // Spotify-style extras: edit (owner), follow (viewers), bulk download.
+  // Playlist extras: edit (owner), follow (viewers), bulk download.
   const updateFn = useServerFn(updatePlaylist);
   const moveFn = useServerFn(movePlaylistSong);
   const followFn = useServerFn(togglePlaylistFollow);
@@ -481,7 +481,7 @@ function Page() {
       <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 lg:gap-12">
         {/* Left Column: Sticky Cover & Playlist Meta */}
         <div className="w-full max-w-sm lg:w-80 lg:shrink-0 lg:sticky lg:top-8 flex flex-col items-center lg:items-start text-center lg:text-left">
-          {/* Cover Art: custom cover, else Spotify-style song mosaic */}
+          {/* Cover Art: custom cover, else song mosaic */}
           <div className="relative w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 rounded-2xl overflow-hidden shadow-2xl shadow-primary/20 bg-card ring-1 ring-border/50 mb-6 shrink-0 flex items-center justify-center">
             {(data as any).cover_url ? (
               <StorageImage

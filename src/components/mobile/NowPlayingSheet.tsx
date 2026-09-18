@@ -31,7 +31,7 @@ function formatTime(s: number): string {
 }
 
 /**
- * Spotify-style full-screen Now Playing sheet.
+ * Full-screen Now Playing sheet.
  * Slides up from the bottom with animation when nowPlayingOpen = true.
  * Supports swipe-down to dismiss.
  *

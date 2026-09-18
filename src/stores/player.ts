@@ -275,7 +275,7 @@ export const usePlayer = create<PlayerState>()(
     }),
     {
       name: "wesu-player",
-      // Persist queue + prefs across reloads like Spotify. Never auto-resume
+      // Persist queue + prefs across reloads. Never auto-resume
       // audio (browser policy) — restore paused at saved position.
       // Strip the signed audioUrl: it expires, so rehydrate must re-resolve.
       partialize: (s) =>

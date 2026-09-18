@@ -6,9 +6,9 @@ import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useState } from "react";
 
 /**
- * Spotify-style persistent mini player rendered above BottomTabBar.
+ * Persistent mini player rendered above BottomTabBar.
  * - Always visible when a track is loaded (cannot be dismissed)
- * - Thin progress bar at the very bottom (like Spotify)
+ * - Thin progress bar at the very bottom of the bar
  * - Tap body → opens full NowPlayingSheet
  * - Play/Pause + Next/Prev on the right
  *
@@ -137,7 +137,7 @@ export function MiniPlayer() {
           </div>
         </div>
 
-        {/* Spotify-style thin progress bar at the very bottom of the bar */}
+        {/* Thin progress bar at the very bottom of the bar */}
         <div className="h-[2px] bg-white/10 w-full">
           <div
             className="h-full bg-white rounded-full transition-all duration-500"

@@ -2,7 +2,7 @@ import { ListMusic } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 
 /**
- * Spotify-style playlist artwork: a 2x2 mosaic of the first song covers
+ * Playlist artwork: a 2x2 mosaic of the first song covers
  * when the playlist has no custom cover, a single cover when there is only
  * one, and a music-note placeholder when empty.
  */

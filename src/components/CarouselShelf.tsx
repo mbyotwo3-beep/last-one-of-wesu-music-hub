@@ -32,7 +32,7 @@ interface Props {
 
 /**
  * CarouselShelf — horizontal swipeable card row rendered on the homepage.
- * Looks like Spotify / Apple Music section rows with image cards + title + link.
+ * Section rows with image cards + title + link.
  */
 export function CarouselShelf({ carousel }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);

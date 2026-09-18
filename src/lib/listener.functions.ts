@@ -227,7 +227,7 @@ export const createPlaylist = createServerFn({ method: "POST" })
         user_id: context.userId,
         name,
         description,
-        // Spotify-style: anyone may publish a public playlist (staff
+        // Anyone may publish a public playlist (staff
         // editorial lists are just public playlists curated by staff).
         is_public: data.make_public === true,
       } as any)

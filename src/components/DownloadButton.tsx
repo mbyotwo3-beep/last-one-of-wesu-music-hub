@@ -37,7 +37,7 @@ export function useVaultDownloaded(songId: string | null | undefined) {
 }
 
 /**
- * Spotify-style download control.
+ * Offline download control.
  *
  * - Desktop browser / native app → downloads into the encrypted on-device
  *   vault (AES-GCM, device-bound key). Files are never saved as playable

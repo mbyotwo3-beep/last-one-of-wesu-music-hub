@@ -8,7 +8,7 @@ import { StorageImage } from "@/components/StorageImage";
 type Results = Awaited<ReturnType<typeof globalSearch>> | null;
 
 /**
- * Spotify-style typeahead search.
+ * Typeahead search overlay.
  * 250ms debounce, groups results by Songs / Artists / Albums,
  * keyboard: Esc closes, Enter navigates to /search?q=..., click a row to go to the item.
  */

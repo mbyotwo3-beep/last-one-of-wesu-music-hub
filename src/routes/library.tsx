@@ -298,7 +298,7 @@ function Page() {
 }
 
 /**
- * One followed artist, with a Spotify-style Following/Unfollow control.
+ * One followed artist, with a Following/Unfollow control.
  * The toggle updates the count and the button optimistically, and removes the
  * card from this list as soon as the unfollow lands.
  */

@@ -169,7 +169,7 @@ function ArtistPage() {
 
   return (
     <div className="min-h-screen pb-24">
-      {/* Spotify-style hero */}
+      {/* Artist hero */}
       <div className="relative">
         <div
           className="h-64 md:h-96 w-full bg-gradient-to-b from-primary/40 via-primary/20 to-background relative overflow-hidden"

@@ -585,7 +585,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     getAudio().volume = muted ? 0 : volume;
   }, [volume, muted]);
 
-  // MediaSession — lock-screen / notification controls (Spotify feel)
+  // MediaSession — lock-screen / notification controls
   useEffect(() => {
     try {
       if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
@@ -693,7 +693,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
   return (
     <>
-      {/* Expanded Now Playing (Spotify-style desktop layout) */}
+      {/* Expanded Now Playing (desktop layout) */}
       {isExpanded && (
         <div className="fixed inset-0 bg-gradient-to-b from-background to-background/95 z-[100] flex flex-col">
           <div className="flex items-center justify-between p-4 border-b border-border">
@@ -955,7 +955,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         </div>
       )}
 
-      {/* Desktop Spotify-style floating glass bar */}
+      {/* Desktop floating glass bar */}
       <div className="fixed bottom-3 inset-x-3 z-50">
       <div className="bg-obsidian/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_-2px_24px_rgba(0,0,0,0.5)] overflow-hidden">
         {isPreview && (

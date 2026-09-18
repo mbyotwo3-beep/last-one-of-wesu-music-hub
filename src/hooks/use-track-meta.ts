@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Fetches artist_id, album_id, price, and artist name for the current
- * playing track so the player can render Spotify-style links to the
+ * playing track so the player can render rich links to the
  * artist and album pages and a Buy CTA when the track is paid.
  */
 export function useTrackMeta(songId: string | null | undefined) {
