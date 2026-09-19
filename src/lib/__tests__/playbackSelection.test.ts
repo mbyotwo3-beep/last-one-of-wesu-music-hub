@@ -107,6 +107,71 @@ describe("Selection token forces reload on every selection", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cover hydration model (mirrors hydrateTrackCovers in stores/player.ts):
+// fills only missing covers, preserves existing ones, covers duplicates
+// via shared song id, and never counts as a new selection.
+// ---------------------------------------------------------------------------
+
+interface HydTrack {
+  id: string;
+  coverUrl?: string | null;
+}
+
+function hydrateTrackCovers(
+  track: HydTrack | null,
+  queue: HydTrack[],
+  covers: Record<string, string>,
+): { track: HydTrack | null; queue: HydTrack[]; changed: boolean } {
+  let changed = false;
+  const fill = (t: HydTrack): HydTrack => {
+    const url = covers[t.id];
+    if (!t.coverUrl && url) {
+      changed = true;
+      return { ...t, coverUrl: url };
+    }
+    return t;
+  };
+  const nextTrack = track ? fill(track) : track;
+  let nextQueue = queue;
+  if (changed || queue.some((t) => !t.coverUrl && covers[t.id])) {
+    nextQueue = queue.map(fill);
+  }
+  return { track: nextTrack, queue: nextQueue, changed: changed || nextQueue !== queue };
+}
+
+describe("Cover hydration fills only what is missing", () => {
+  it("fills missing covers, preserves existing ones", () => {
+    const track = { id: "a" };
+    const queue = [{ id: "a" }, { id: "b", coverUrl: "keep" }, { id: "c" }];
+    const { track: t, queue: q, changed } = hydrateTrackCovers(track, queue, {
+      a: "url-a",
+      b: "url-b",
+      c: "url-c",
+    });
+    expect(changed).toBe(true);
+    expect(t?.coverUrl).toBe("url-a");
+    expect(q[0].coverUrl).toBe("url-a");
+    expect(q[1].coverUrl).toBe("keep");
+    expect(q[2].coverUrl).toBe("url-c");
+  });
+
+  it("no missing covers → no change", () => {
+    const track = { id: "a", coverUrl: "x" };
+    const queue = [{ id: "a", coverUrl: "x" }];
+    const res = hydrateTrackCovers(track, queue, { a: "other" });
+    expect(res.changed).toBe(false);
+    expect(res.track).toBe(track);
+    expect(res.queue).toBe(queue);
+  });
+
+  it("unknown ids stay empty (deleted songs keep the placeholder)", () => {
+    const { queue, changed } = hydrateTrackCovers(null, [{ id: "gone" }], {});
+    expect(changed).toBe(false);
+    expect(queue[0].coverUrl).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sync guard: never play stale audio while resolving
 // ---------------------------------------------------------------------------
 

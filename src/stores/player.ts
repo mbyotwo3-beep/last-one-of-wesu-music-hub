@@ -64,6 +64,7 @@ interface PlayerState {
   togglePlay: () => void;
   setProgress: (s: number) => void;
   setTrackDuration: (seconds: number) => void;
+  hydrateTrackCovers: (covers: Record<string, string>) => void;
   seekTo: (seconds: number) => void;
   toggleLike: () => void;
   openNowPlaying: () => void;
@@ -222,6 +223,37 @@ export const usePlayer = create<PlayerState>()(
       },
 
       setProgress: (s) => set({ progressSeconds: s }),
+
+  /**
+   * Fill in missing cover art for the current track / queue entries.
+   * Not every play entry point builds a complete track object, so the
+   * engine backfills covers from the DB on demand. Never bumps
+   * selectionId (this is not a new selection) and no-ops — returning the
+   * identical state — when there is nothing to fill, so it can't loop
+   * with the effect that calls it.
+   */
+  hydrateTrackCovers: (covers: Record<string, string>) => {
+    set((state) => {
+      let changed = false;
+      const fill = (t: PlayerTrack): PlayerTrack => {
+        const url = covers[t.id];
+        if (!t.coverUrl && url) {
+          changed = true;
+          return { ...t, coverUrl: url };
+        }
+        return t;
+      };
+      const track = state.track ? fill(state.track) : state.track;
+      // Skip the queue map entirely when the current track was the only
+      // thing that could change and didn't.
+      let queue = state.queue;
+      if (changed || state.queue.some((t) => !t.coverUrl && covers[t.id])) {
+        queue = state.queue.map(fill);
+      }
+      if (!changed && queue === state.queue) return state;
+      return { track, queue };
+    });
+  },
 
   /**
    * Fill in the real media duration once the element reports metadata.

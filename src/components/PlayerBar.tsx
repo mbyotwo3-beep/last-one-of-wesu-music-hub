@@ -486,6 +486,46 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, selectionId, retryNonce, user?.id]);
 
+  // Backfill missing cover art for the current track + queue. Not every
+  // play entry point builds a complete track object, so some queue rows
+  // arrive with coverUrl undefined and render the placeholder ("sometimes
+  // no cover"). One batched lookup fills them all — including duplicates,
+  // which share the same song id.
+  useEffect(() => {
+    const missing = new Set<string>();
+    if (track && !track.coverUrl) missing.add(track.id);
+    for (const t of queue) {
+      if (!t.coverUrl) {
+        missing.add(t.id);
+        if (missing.size >= 100) break;
+      }
+    }
+    if (missing.size === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("songs")
+          .select("id,cover_url")
+          .in("id", [...missing]);
+        if (cancelled || !data) return;
+        const map: Record<string, string> = {};
+        for (const r of data as any[]) {
+          if (r?.id && r?.cover_url) map[r.id] = r.cover_url;
+        }
+        if (!cancelled && Object.keys(map).length > 0) {
+          usePlayer.getState().hydrateTrackCovers(map);
+        }
+      } catch {
+        /* covers are decorative — never break playback for them */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id, selectionId, queue]);
+
   // Sync playing state
   useEffect(() => {
     const audio = getAudio();

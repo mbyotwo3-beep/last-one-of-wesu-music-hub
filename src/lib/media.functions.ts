@@ -66,6 +66,46 @@ export const signUploadUrl = createServerFn({ method: "POST" })
     return { url: signed.signedUrl, path, provider: "supabase" as const };
   });
 
+/**
+ * Batch version of signImageUrl: signs up to 100 image paths in ONE RPC
+ * roundtrip instead of one per cover. Pages rendering dozens of covers
+ * (browse, library, search) previously fired one server call per image.
+ * Same validation per item; failures resolve to null for that key only.
+ */
+export const signImageUrls = createServerFn({ method: "POST" })
+  .validator(
+    (d: { items: { bucket: Exclude<MediaBucketName, "song-audio">; path: string }[] }) => d,
+  )
+  .handler(async ({ data }) => {
+    const clean = (data.items ?? [])
+      .filter(
+        (it) =>
+          it &&
+          BUCKETS.includes(it.bucket) &&
+          (it.bucket as string) !== "song-audio" &&
+          typeof it.path === "string" &&
+          it.path.length > 0 &&
+          it.path.length <= 500 &&
+          !/^(https?:|data:|blob:)/i.test(it.path) &&
+          !it.path.includes(".."),
+      )
+      .slice(0, 100);
+    const { signMediaUrl } = await import("./media.server");
+    const entries = await Promise.all(
+      clean.map(async ({ bucket, path }) => {
+        try {
+          const url = await signMediaUrl(bucket, path, { expiresIn: 3600 });
+          return [`${bucket}:${path}`, url] as const;
+        } catch {
+          return [`${bucket}:${path}`, null] as const;
+        }
+      }),
+    );
+    const urls: Record<string, string | null> = {};
+    for (const [key, url] of entries) urls[key] = url;
+    return { urls };
+  });
+
 /** Short-lived read URL for cover art / avatars (publicly viewable media). */
 export const signImageUrl = createServerFn({ method: "POST" })
   .validator((d: { bucket: Exclude<MediaBucketName, "song-audio">; path: string }) => d)
