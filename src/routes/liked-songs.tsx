@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { IncrementalList } from "@/components/IncrementalList";
 
 export const Route = createFileRoute("/liked-songs")({
   head: () => ({ meta: [{ title: "Liked Songs — Wesu+" }] }),
@@ -218,11 +219,14 @@ function Page() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-1">
-              {safeLikedSongs.map((song: any, index: number) => (
-                <LikedSongRow key={song.id} song={song} index={index} songTracks={songTracks} />
-              ))}
-            </div>
+            <IncrementalList
+              items={safeLikedSongs}
+              className="space-y-1"
+              keyFor={(song: any) => song.id}
+              renderItem={(song: any, index: number) => (
+                <LikedSongRow song={song} index={index} songTracks={songTracks} />
+              )}
+            />
           )}
         </div>
       </div>

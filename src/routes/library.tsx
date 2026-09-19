@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { PlaylistCover } from "@/components/PlaylistCover";
 import { DownloadButton } from "@/components/DownloadButton";
+import { IncrementalList } from "@/components/IncrementalList";
 import { listFollowedPlaylists } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
@@ -251,11 +252,14 @@ function Page() {
         {safePurchasedSongs.length === 0 ? (
           <p className="text-muted-foreground">No purchased singles yet.</p>
         ) : (
-          <div className="space-y-2">
-            {safePurchasedSongs.map((song: any) => (
-              <PurchasedSongCard key={song.id} song={song} userId={user?.id ?? null} />
-            ))}
-          </div>
+          <IncrementalList
+            items={safePurchasedSongs}
+            className="space-y-2"
+            keyFor={(song: any) => song.id}
+            renderItem={(song: any) => (
+              <PurchasedSongCard song={song} userId={user?.id ?? null} />
+            )}
+          />
         )}
       </section>
 

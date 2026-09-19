@@ -24,6 +24,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { IncrementalList } from "@/components/IncrementalList";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 
@@ -735,10 +736,12 @@ function Page() {
               <p className="text-xs text-muted-foreground/80 mt-1">Add songs from any track or album page.</p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {songs.map((s: any, i: number) => (
+            <IncrementalList
+              items={songs}
+              className="space-y-1"
+              keyFor={(s: any) => s.id}
+              renderItem={(s: any, i: number) => (
                 <SongRow
-                  key={s.id}
                   song={s}
                   index={i}
                   isOwner={isOwner}
@@ -756,8 +759,8 @@ function Page() {
                   isFirst={i === 0}
                   isLast={i === songs.length - 1}
                 />
-              ))}
-            </div>
+              )}
+            />
           )}
         </div>
       </div>

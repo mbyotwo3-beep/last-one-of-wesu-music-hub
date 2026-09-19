@@ -3,6 +3,7 @@ import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { Play, Pause, X, Shuffle, ListMusic, Repeat, Repeat1, Trash2, Disc } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { IncrementalList } from "@/components/IncrementalList";
 
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -160,11 +161,13 @@ function QueuePage() {
         </div>
       </div>
 
-      {/* Queue list */}
-      <div className="space-y-2">
-        {queue.map((queueTrack, index) => (
+      {/* Queue list — windowed so 100+ track queues stay fast on low-end devices */}
+      <IncrementalList
+        items={queue}
+        className="space-y-2"
+        keyFor={(queueTrack, index) => `${queueTrack.id}-${index}`}
+        renderItem={(queueTrack, index) => (
           <div
-            key={`${queueTrack.id}-${index}`}
             className={`flex items-center gap-4 p-4 rounded-xl transition-colors ${
               queueIndex === index
                 ? "bg-primary/10 border border-primary/20"
@@ -243,8 +246,8 @@ function QueuePage() {
               )}
             </button>
           </div>
-        ))}
-      </div>
+        )}
+      />
     </div>
   );
 }
