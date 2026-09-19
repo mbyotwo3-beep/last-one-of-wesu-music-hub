@@ -113,6 +113,7 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
       alt={alt}
       className={className}
       loading={loading}
+      decoding="async"
       onClick={onClick}
       onError={handleError}
       onLoad={handleLoad}

@@ -106,38 +106,14 @@ function ArtistProfileEditPage() {
       try {
         // Upload avatar if changed
         if (avatarFile) {
-          console.log("[Artist Profile] Uploading avatar...", {
-            bucket: "artist-images",
-            userId: user.id,
-            fileName: avatarFile.name,
-            fileSize: avatarFile.size,
-            fileType: avatarFile.type,
-          });
-          const uploadStart = Date.now();
           // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
           avatarUrl = await uploadFileToBucket("artist-images", user.id, avatarFile);
-          console.log("[Artist Profile] Avatar uploaded successfully:", {
-            path: avatarUrl,
-            duration: Date.now() - uploadStart,
-          });
         }
 
         // Upload cover if changed
         if (coverFile) {
-          console.log("[Artist Profile] Uploading cover...", {
-            bucket: "artist-images",
-            userId: user.id,
-            fileName: coverFile.name,
-            fileSize: coverFile.size,
-            fileType: coverFile.type,
-          });
-          const uploadStart = Date.now();
           // Use user.id for artist-images bucket (RLS policy requires user_id as folder)
           coverUrl = await uploadFileToBucket("artist-images", user.id, coverFile);
-          console.log("[Artist Profile] Cover uploaded successfully:", {
-            path: coverUrl,
-            duration: Date.now() - uploadStart,
-          });
         }
 
         // Update profile
@@ -150,15 +126,7 @@ function ArtistProfileEditPage() {
           social_links: formData.social_links,
         };
 
-        console.log("[Artist Profile] Updating profile with data:", profileData);
-        const updateStart = Date.now();
-
         const result = await updateProfile({ data: profileData });
-
-        console.log("[Artist Profile] Profile update completed:", {
-          result,
-          duration: Date.now() - updateStart,
-        });
 
         return result;
       } catch (error) {

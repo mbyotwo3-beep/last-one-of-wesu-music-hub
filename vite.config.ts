@@ -22,6 +22,29 @@ export default defineConfig({
     build: {
       rollupOptions: {
         external: ['crypto', 'node:crypto'],
+        output: {
+          // Split the ~840KB index bundle into cacheable vendor chunks so
+          // repeat visits and route changes only download what changed.
+          // Order matters: tanstack entries also match /react/, so test
+          // the most specific packages first.
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (id.includes("@tanstack")) return "vendor-tanstack";
+            if (id.includes("@supabase")) return "vendor-supabase";
+            if (id.includes("@radix-ui")) return "vendor-radix";
+            if (id.includes("lucide-react")) return "vendor-lucide";
+            if (id.includes("@capacitor") || id.includes("@capgo")) return "vendor-capacitor";
+            if (id.includes("dnd-kit") || id.includes("embla-carousel")) return "vendor-dnd";
+            if (
+              id.includes("/react/") ||
+              id.includes("react-dom") ||
+              id.includes("/scheduler/") ||
+              id.includes("zustand")
+            )
+              return "vendor-react";
+            return "vendor";
+          },
+        },
         onwarn(warning, warn) {
           // Ignore warnings about external crypto module
           if (warning.code === 'MODULE_NOT_FOUND' && warning.message.includes('crypto')) {
