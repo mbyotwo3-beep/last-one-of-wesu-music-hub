@@ -9,9 +9,6 @@ import {
   X,
   FileText,
   Mic2,
-  Home,
-  LayoutGrid,
-  Library,
 } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
@@ -67,11 +64,8 @@ const NavbarComponent = function Navbar() {
     navigate({ to: "/" });
   };
 
-  const navLinks: { to: string; label: string; icon: any }[] = [
-    { to: "/", label: "Home", icon: Home },
-    { to: "/browse", label: "Browse", icon: LayoutGrid },
-    { to: "/library", label: "Library", icon: Library },
-  ];
+  // Navigation links live in the sidebar (Spotify-style: the header
+  // carries no page links, only logo, search, and account controls).
 
   // During initial auth loading, show skeleton to prevent flicker
   if (isLoading) {
@@ -218,17 +212,6 @@ const NavbarComponent = function Navbar() {
           <Link to="/" className="flex items-center gap-2" aria-label="Wesu+ home">
             <img src="/images/wesu-logo.png" alt="Wesu+" className="h-11 w-auto" />
           </Link>
-          <div className="hidden lg:flex items-center gap-1 ml-4">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
@@ -261,31 +244,13 @@ const NavbarComponent = function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu (account links only — page navigation lives in the
+          sidebar and bottom tab bar) */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-border bg-background/95 backdrop-blur-xl">
           <div className="px-4 py-4 space-y-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-              >
-                <link.icon className="size-5" />
-                {link.label}
-              </Link>
-            ))}
             {user && (
               <>
-                <div className="border-t border-border my-2" />
-                <Link
-                  to="/library"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-                >
-                  My Library
-                </Link>
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}

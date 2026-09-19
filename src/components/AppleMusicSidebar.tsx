@@ -10,6 +10,8 @@ import {
   ListMusic,
   Heart,
   Plus,
+  Home,
+  Library,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -26,11 +28,12 @@ export function AppleMusicSidebar() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const mainNav = [
-    { to: "/", label: "Listen Now", icon: Play },
+    { to: "/", label: "Home", icon: Home },
     { to: "/browse", label: "Browse", icon: Grid, highlight: true },
   ];
 
   const libraryNav = [
+    { to: "/library", label: "Library", icon: Library },
     { to: "/recently-added", label: "Recently Added", icon: Clock },
     { to: "/artists", label: "Artists", icon: Disc },
     { to: "/albums", label: "Albums", icon: Music },
