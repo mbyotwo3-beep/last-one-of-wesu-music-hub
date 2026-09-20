@@ -98,8 +98,12 @@ adaptive/launcher icons and splash generated from `public/images/wesu-logo.png`.
   with cover art; in-app UI reconciles with lock-screen/notification buttons.
 - **Offline** — encrypted on-device vault (AES-GCM, device-bound key,
   IndexedDB); downloads play only inside the app; bulk download per playlist.
-- **Error screen** — load failures show a branded offline page with retry;
-  raw URLs are never displayed (Facebook-style).
+  `@capacitor/filesystem` is registered so downloads stage to app-private
+  files for native background playback (offline plays even with the screen
+  off); mobile browsers route to `/get-app` instead of downloading.
+- **Error screen** — network, SSL, and server errors all show a branded
+  offline page with retry; raw URLs are never displayed (Facebook-style).
+  SSL failures fail closed (never bypassed).
 - **Back button** — navigates web history, otherwise backgrounds the app
   (`moveTaskToBack`) so playback survives; reopening restores state.
 - **Deep links** — `com.wesu.music://login-callback…` opens the app and

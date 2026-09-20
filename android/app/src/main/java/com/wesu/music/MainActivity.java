@@ -1,9 +1,12 @@
 package com.wesu.music;
 
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Bundle;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -73,6 +76,32 @@ public class MainActivity extends BridgeActivity {
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
             // Pre-API-23 callback is main-frame only.
             lastFailedUrl = failingUrl;
+            view.loadUrl(ERROR_PAGE);
+        }
+
+        @Override
+        public void onReceivedHttpError(
+                WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+            // Server errors (404/500/…) on the main frame would otherwise
+            // leave a blank or server-branded page — show ours instead.
+            if (request != null && request.isForMainFrame()
+                    && errorResponse != null && errorResponse.getStatusCode() >= 400) {
+                lastFailedUrl = request.getUrl().toString();
+                view.loadUrl(ERROR_PAGE);
+            } else {
+                super.onReceivedHttpError(view, request, errorResponse);
+            }
+        }
+
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            // Fail closed (never bypass certificate errors — Play policy),
+            // but show the branded page instead of the system interstitial
+            // that exposes the URL.
+            handler.cancel();
+            if (error != null && error.getUrl() != null) {
+                lastFailedUrl = error.getUrl();
+            }
             view.loadUrl(ERROR_PAGE);
         }
 
