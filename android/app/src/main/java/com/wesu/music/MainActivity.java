@@ -30,6 +30,22 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    /**
+     * Spotify-style back behavior: navigate web history when there is any,
+     * otherwise send the app to the background INSTEAD of finishing the
+     * activity — so music keeps playing and the back button never kills
+     * playback. Reopening restores the exact state.
+     */
+    @Override
+    public void onBackPressed() {
+        Bridge bridge = getBridge();
+        if (bridge != null && bridge.getWebView() != null && bridge.getWebView().canGoBack()) {
+            bridge.getWebView().goBack();
+        } else {
+            moveTaskToBack(true);
+        }
+    }
+
     private static class WesuWebViewClient extends BridgeWebViewClient {
 
         private static final String ERROR_PAGE = "file:///android_asset/error.html";

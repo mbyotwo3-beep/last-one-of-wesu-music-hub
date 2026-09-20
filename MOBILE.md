@@ -86,3 +86,36 @@ Common ones for a music app:
 - `@capacitor/preferences` — persisted settings
 - `@capacitor/share` — share songs/albums
 - `@capgo/native-audio` (third-party) — background audio playback
+
+## Android app features (shipped in the release AAB/APK)
+
+Shell: `com.wesu.music` / "Wesu+", fullscreen WebView around the live site
+(`server.url`), no address bar, branded splash (`#fbf7ee`) + status bar,
+adaptive/launcher icons and splash generated from `public/images/wesu-logo.png`.
+
+- **Playback** — `@capgo/native-audio` with `background + showNotification +
+  focus`: background audio, notification-bar player, lock-screen controls
+  with cover art; in-app UI reconciles with lock-screen/notification buttons.
+- **Offline** — encrypted on-device vault (AES-GCM, device-bound key,
+  IndexedDB); downloads play only inside the app; bulk download per playlist.
+- **Error screen** — load failures show a branded offline page with retry;
+  raw URLs are never displayed (Facebook-style).
+- **Back button** — navigates web history, otherwise backgrounds the app
+  (`moveTaskToBack`) so playback survives; reopening restores state.
+- **Deep links** — `com.wesu.music://login-callback…` opens the app and
+  completes Supabase auth (magic-link / OAuth / PKCE code exchange).
+- **Nav** — max 5 bottom-bar items (Home/Browse/Library/Search/Menu);
+  everything else lives in the Menu sheet. Safe-area insets throughout.
+
+Release signing: `android/app/wesu-release.keystore` (gitignored) +
+`android/app/keystore.properties`. Back both up privately — losing them
+means the app can never be updated. Rebuild with:
+`npx cap sync android && gradlew bundleRelease assembleRelease`.
+
+## iOS (later, needs Xcode on macOS)
+
+No `ios/` platform in this repo yet — add it there with `npx cap add ios`.
+Code-level iOS readiness is done: platform branching is native-vs-web
+(`usePlatform`), splash/status-bar config has an `ios` section, downloads
+use the cross-platform Filesystem bridge, and `@capgo/native-audio`
+supports iOS background + Control Center with the same JS API.
