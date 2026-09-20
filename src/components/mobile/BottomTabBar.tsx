@@ -36,14 +36,17 @@ interface Tab {
   show: boolean;
 }
 
-/** Pure function: compute tabs based on auth/role state. Exported for testing. */
-export function computeTabs(opts: {
-  isAuthenticated: boolean;
-  isArtist: boolean;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;
-}): Tab[] {
-  const { isAuthenticated, isArtist, isAdmin, isSuperAdmin } = opts;
+/**
+ * Hard cap on bottom-bar buttons (tabs + Search + Menu). Everything else
+ * (Profile, Studio, Admin, playlists…) lives in the Menu sheet.
+ */
+export const MAX_BAR_ITEMS = 6;
+
+/** Pure function: the fixed bottom-bar tab set. Exported for testing. */
+export function computeTabs(): Tab[] {
+  // Fixed for every role and auth state: Home, Browse, Library.
+  // Rendered together with the Search and Menu buttons the bar always
+  // shows exactly 5 items — Profile/Studio/Admin moved into the Menu.
   return [
     {
       to: "/",
@@ -66,28 +69,6 @@ export function computeTabs(opts: {
       ariaLabel: "My library",
       requireAuth: true,
       show: true,
-    },
-    {
-      to: "/profile",
-      label: "Profile",
-      icon: User,
-      ariaLabel: "My profile",
-      requireAuth: true,
-      show: true,
-    },
-    {
-      to: "/artist-studio",
-      label: "Studio",
-      icon: Music,
-      ariaLabel: "Artist studio",
-      show: isArtist || isAdmin || isSuperAdmin,
-    },
-    {
-      to: isSuperAdmin ? "/superadmin" : "/admin",
-      label: "Admin",
-      icon: Shield,
-      ariaLabel: "Admin panel",
-      show: isAdmin || isSuperAdmin,
     },
   ].filter((t) => t.show);
 }
@@ -115,12 +96,7 @@ export function BottomTabBar() {
       .then(({ data }) => setUserPlaylists(data ?? []));
   }, [user]);
 
-  const tabs = computeTabs({
-    isAuthenticated: !!user,
-    isArtist,
-    isAdmin,
-    isSuperAdmin,
-  });
+  const tabs = computeTabs();
 
   function handleTab(tab: Tab) {
     if (tab.requireAuth && !user) {
@@ -398,6 +374,18 @@ export function BottomTabBar() {
                   >
                     <Music className="size-5" />
                     <span className="text-sm font-medium">Artist Portal</span>
+                  </button>
+                )}
+                {(isArtist || isAdmin || isSuperAdmin) && (
+                  <button
+                    onClick={() => {
+                      navigate({ to: "/artist-studio" });
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                  >
+                    <Mic2 className="size-5" />
+                    <span className="text-sm font-medium">Artist Studio</span>
                   </button>
                 )}
                 {isAdmin && (

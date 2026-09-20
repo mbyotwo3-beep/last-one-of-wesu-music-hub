@@ -19,13 +19,6 @@ import type { PlayerTrack } from "@/stores/player";
 // Arbitraries
 // ---------------------------------------------------------------------------
 
-const boolState = fc.record({
-  isAuthenticated: fc.boolean(),
-  isArtist: fc.boolean(),
-  isAdmin: fc.boolean(),
-  isSuperAdmin: fc.boolean(),
-});
-
 const nonEmptyStr = fc.string({ minLength: 1, maxLength: 80 });
 
 const playerTrack: fc.Arbitrary<PlayerTrack> = fc.record({
@@ -44,52 +37,22 @@ const playerTrack: fc.Arbitrary<PlayerTrack> = fc.record({
 // ---------------------------------------------------------------------------
 
 describe("Property 25: ARIA labels on BottomTabBar tabs (Req 20.1)", () => {
-  it("every BottomTabBar tab should have a non-empty ariaLabel for any role combination", () => {
-    fc.assert(
-      fc.property(boolState, (state) => {
-        const tabs = computeTabs(state);
-        for (const tab of tabs) {
-          expect(tab.ariaLabel).toBeTruthy();
-          expect(typeof tab.ariaLabel).toBe("string");
-          expect(tab.ariaLabel.length).toBeGreaterThan(0);
-        }
-      }),
-      { numRuns: 100 },
-    );
+  it("every BottomTabBar tab should have a non-empty ariaLabel", () => {
+    const tabs = computeTabs();
+    expect(tabs.length).toBeGreaterThan(0);
+    for (const tab of tabs) {
+      expect(tab.ariaLabel).toBeTruthy();
+      expect(typeof tab.ariaLabel).toBe("string");
+      expect(tab.ariaLabel.length).toBeGreaterThan(0);
+    }
   });
 
   it("BottomTabBar tabs have expected ariaLabel values", () => {
-    const tabs = computeTabs({
-      isAuthenticated: false,
-      isArtist: false,
-      isAdmin: false,
-      isSuperAdmin: false,
-    });
+    const tabs = computeTabs();
     const ariaLabels = tabs.map((t) => t.ariaLabel);
     expect(ariaLabels).toContain("Home");
     expect(ariaLabels).toContain("Browse music");
-  });
-
-  it("Studio tab ariaLabel is non-empty when artist is present", () => {
-    const tabs = computeTabs({
-      isAuthenticated: true,
-      isArtist: true,
-      isAdmin: false,
-      isSuperAdmin: false,
-    });
-    const studioTab = tabs.find((t) => t.to === "/artist-studio");
-    expect(studioTab?.ariaLabel).toBeTruthy();
-  });
-
-  it("Admin tab ariaLabel is non-empty when admin is present", () => {
-    const tabs = computeTabs({
-      isAuthenticated: true,
-      isArtist: false,
-      isAdmin: true,
-      isSuperAdmin: false,
-    });
-    const adminTab = tabs.find((t) => t.to === "/admin" || t.to === "/superadmin");
-    expect(adminTab?.ariaLabel).toBeTruthy();
+    expect(ariaLabels).toContain("My library");
   });
 });
 

@@ -9,7 +9,6 @@
  */
 
 import { describe, it, expect } from "vitest";
-import fc from "fast-check";
 import { computeTabs } from "@/components/mobile/BottomTabBar";
 
 // ---------------------------------------------------------------------------
@@ -51,13 +50,14 @@ interface RouteAccess {
   methods: AccessMethod[];
 }
 
-// Routes directly accessible from BottomTabBar tabs
+// Routes directly accessible from BottomTabBar tabs (fixed set: Home,
+// Browse, Library — plus the Search and Menu buttons, max 6 bar items).
 // NOTE: the Library tab points at /library (real library content for every
 // role). /dashboard is a role-router (listeners see "My Library" there,
 // staff/artists bounce to their portals) and stays reachable contextually.
-const TAB_ROUTES: Route[] = ["/", "/browse", "/library", "/profile"];
-// Routes accessible via role-based tabs
-const ROLE_TAB_ROUTES: Route[] = ["/artist-studio", "/admin", "/superadmin"];
+const TAB_ROUTES: Route[] = ["/", "/browse", "/library"];
+// Former role tabs (Profile, Studio, Admin) moved into the Menu sheet.
+const MENU_ROUTES: Route[] = ["/profile", "/artist-studio", "/admin", "/superadmin"];
 // Routes accessible contextually (links, buttons, navigation actions)
 const CONTEXTUAL_ROUTES: Route[] = [
   "/artists",
@@ -75,7 +75,7 @@ const CONTEXTUAL_ROUTES: Route[] = [
 
 const ROUTE_ACCESS_MAP: RouteAccess[] = [
   ...TAB_ROUTES.map((r) => ({ route: r, methods: ["tab"] as AccessMethod[] })),
-  ...ROLE_TAB_ROUTES.map((r) => ({ route: r, methods: ["tab"] as AccessMethod[] })),
+  ...MENU_ROUTES.map((r) => ({ route: r, methods: ["contextual"] as AccessMethod[] })),
   ...CONTEXTUAL_ROUTES.map((r) => ({ route: r, methods: ["contextual"] as AccessMethod[] })),
 ];
 
@@ -94,31 +94,26 @@ describe("Property 23: All web routes reachable on native platform", () => {
     }
   });
 
-  it("tab routes are included in BottomTabBar for fully-authenticated superadmin user", () => {
-    const tabs = computeTabs({
-      isAuthenticated: true,
-      isArtist: true,
-      isAdmin: true,
-      isSuperAdmin: true,
-    });
+  it("tab routes are the fixed Home/Browse/Library set", () => {
+    const tabs = computeTabs();
     const tabRoutes = tabs.map((t) => t.to);
-    // Core always-visible tabs
-    expect(tabRoutes).toContain("/");
-    expect(tabRoutes).toContain("/browse");
-    expect(tabRoutes).toContain("/library");
-    expect(tabRoutes).toContain("/profile");
-    // Role-specific tabs
-    expect(tabRoutes).toContain("/artist-studio");
-    expect(tabRoutes).toContain("/superadmin");
+    expect(tabRoutes).toEqual(["/", "/browse", "/library"]);
   });
 
-  it("all routes in TAB_ROUTES are present in BottomTabBar for authenticated user", () => {
-    const tabs = computeTabs({
-      isAuthenticated: true,
-      isArtist: false,
-      isAdmin: false,
-      isSuperAdmin: false,
-    });
+  it("former role tabs (Profile/Studio/Admin) are reachable via the Menu sheet", () => {
+    for (const route of MENU_ROUTES) {
+      const access = ROUTE_ACCESS_MAP.find((a) => a.route === route);
+      expect(access).toBeDefined();
+      expect(access!.methods).toContain("contextual");
+    }
+    const tabRoutes = computeTabs().map((t) => t.to);
+    for (const route of MENU_ROUTES) {
+      expect(tabRoutes).not.toContain(route);
+    }
+  });
+
+  it("all routes in TAB_ROUTES are present in BottomTabBar", () => {
+    const tabs = computeTabs();
     const tabRoutes = tabs.map((t) => t.to);
     for (const route of TAB_ROUTES) {
       expect(tabRoutes, `Tab route ${route} missing from BottomTabBar`).toContain(route);
@@ -141,24 +136,11 @@ describe("Property 23: All web routes reachable on native platform", () => {
     }
   });
 
-  it("property: for any subset of roles, at least Home and Browse are tab-accessible", () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          isAuthenticated: fc.boolean(),
-          isArtist: fc.boolean(),
-          isAdmin: fc.boolean(),
-          isSuperAdmin: fc.boolean(),
-        }),
-        (state) => {
-          const tabs = computeTabs(state);
-          const routes = tabs.map((t) => t.to);
-          expect(routes).toContain("/");
-          expect(routes).toContain("/browse");
-        },
-      ),
-      { numRuns: 100 },
-    );
+  it("property: Home and Browse are always tab-accessible", () => {
+    const tabs = computeTabs();
+    const routes = tabs.map((t) => t.to);
+    expect(routes).toContain("/");
+    expect(routes).toContain("/browse");
   });
 
   it("now-playing route is reachable via MiniPlayer tap (contextual)", () => {
