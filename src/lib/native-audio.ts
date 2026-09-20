@@ -12,9 +12,23 @@
  * Errors are caught silently — the caller should fall back to HTMLAudioElement.
  *
  * @param id  Unique asset identifier (e.g. song id)
- * @param url Remote audio URL (signed Supabase URL)
+ * @param url Remote audio URL (signed Supabase URL) or file:// URI
+ * @param isUrl Pass true for remote URLs AND file:// URIs (per plugin docs)
+ * @param metadata Notification / lock-screen metadata (requires configure())
  */
-export async function preloadNative(id: string, url: string, isUrl = true): Promise<boolean> {
+export interface NativeTrackMetadata {
+  title: string;
+  artist: string;
+  album?: string;
+  artworkUrl?: string;
+}
+
+export async function preloadNative(
+  id: string,
+  url: string,
+  isUrl = true,
+  metadata?: NativeTrackMetadata | null,
+): Promise<boolean> {
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.preload({
@@ -22,12 +36,41 @@ export async function preloadNative(id: string, url: string, isUrl = true): Prom
       assetPath: url,
       audioChannelNum: 1,
       isUrl,
+      ...(metadata ? { notificationMetadata: metadata } : null),
     });
     return true;
   } catch {
     // Plugin absent, unsupported, or preload failed — fall through to HTMLAudioElement
     return false;
   }
+}
+
+/**
+ * One-time plugin setup for music-app behavior: background playback,
+ * notification / lock-screen controls, and audio-focus handling.
+ * Safe to call repeatedly — configures at most once per page load.
+ */
+let _configured: boolean | null = null;
+
+export async function configureNativeAudio(): Promise<boolean> {
+  if (_configured !== null) return _configured;
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    await NativeAudio.configure({
+      background: true,
+      showNotification: true,
+      focus: true,
+    });
+    _configured = true;
+  } catch {
+    _configured = false;
+  }
+  return _configured;
+}
+
+/** Test-only reset for the configure once-guard. */
+export function __resetNativeAudioConfig() {
+  _configured = null;
 }
 
 function guessOfflineExt(mime: string): string {
@@ -126,6 +169,7 @@ export async function deleteNativeTempFile(path: string | null): Promise<void> {
  * Returns true on success, false if plugin is unavailable or asset not loaded.
  */
 export async function playNative(id: string): Promise<boolean> {
+  markNativeCommand();
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.play({ assetId: id });
@@ -136,14 +180,107 @@ export async function playNative(id: string): Promise<boolean> {
 }
 
 /**
+ * Resume a paused native audio asset (pause → play via notification or UI).
+ */
+export async function resumeNative(id: string): Promise<boolean> {
+  markNativeCommand();
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    await NativeAudio.resume({ assetId: id });
+    return true;
+  } catch {
+    return playNative(id);
+  }
+}
+
+/**
  * Pause native audio playback.
  */
 export async function pauseNative(id: string): Promise<void> {
+  markNativeCommand();
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.pause({ assetId: id });
   } catch {
     // Silently ignore — HTMLAudioElement fallback handles this
+  }
+}
+
+/** Seek the native asset (seconds). No-op on failure. */
+export async function seekNative(id: string, seconds: number): Promise<void> {
+  markNativeCommand();
+  if (!Number.isFinite(seconds) || seconds < 0) return;
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    await NativeAudio.setCurrentTime({ assetId: id, time: seconds });
+  } catch {
+    /* fallback element handles web */
+  }
+}
+
+/** Volume 0..1 for the native asset. No-op on failure. */
+export async function setNativeVolume(id: string, volume: number): Promise<void> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const v = Math.max(0, Math.min(1, Number(volume) || 0));
+    await NativeAudio.setVolume({ assetId: id, volume: v });
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Duration in seconds, or null when unknown/unavailable. */
+export async function getNativeDuration(id: string): Promise<number | null> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const { duration } = await NativeAudio.getDuration({ assetId: id });
+    return Number.isFinite(duration) && duration > 0 ? duration : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Current position in seconds, or null when unknown/unavailable. */
+export async function getNativeCurrentTime(id: string): Promise<number | null> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const { currentTime } = await NativeAudio.getCurrentTime({ assetId: id });
+    return Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the native asset is currently playing. Null when unknowable. */
+export async function isNativePlaying(id: string): Promise<boolean | null> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const { isPlaying } = await NativeAudio.isPlaying({ assetId: id });
+    return typeof isPlaying === "boolean" ? isPlaying : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to native position updates (~100ms while playing).
+ * Only fires the callback for the matching asset id.
+ */
+export async function onNativeTimeUpdate(
+  assetId: string,
+  callback: (seconds: number) => void,
+): Promise<() => void> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const handle = await NativeAudio.addListener("currentTime", (event: any) => {
+      if (!event || event.assetId === undefined || event.assetId === assetId) {
+        const t = Number(event?.currentTime);
+        if (Number.isFinite(t) && t >= 0) callback(t);
+      }
+    });
+    return () => handle.remove();
+  } catch {
+    return () => {};
   }
 }
 
@@ -192,4 +329,78 @@ export async function isNativeAudioAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Store ↔ native bridges (module-level so the zustand store, which owns
+// seek/toggle semantics, can drive the native engine without importing UI).
+// ---------------------------------------------------------------------------
+
+type SeekHook = ((seconds: number) => void) | null;
+let seekHook: SeekHook = null;
+
+/** PlayerBar registers this; the store calls it on every seek so the native
+ *  engine follows HTMLAudioElement semantics. No-op on web. */
+export function setNativeSeekHook(hook: SeekHook) {
+  seekHook = hook;
+}
+
+/** Store entry point: mirror a seek onto the native engine when active. */
+export function emitNativeSeek(seconds: number) {
+  try {
+    seekHook?.(seconds);
+  } catch {
+    /* never break the store for native */
+  }
+}
+
+let lastNativeCommandAt = 0;
+
+/** Stamp every JS-initiated native command so the remote-control reconciler
+ *  can tell "user pressed pause in-app" from "user pressed pause on the
+ *  lock screen". */
+export function markNativeCommand() {
+  lastNativeCommandAt = Date.now();
+}
+
+export function getLastNativeCommandAt(): number {
+  return lastNativeCommandAt;
+}
+
+/** Test-only reset for command timestamps. */
+export function __resetNativeCommandClock() {
+  lastNativeCommandAt = 0;
+}
+
+/**
+ * Pure reconciler decision: should the JS store adopt the native player's
+ * truth? Returns true only when they genuinely disagree AND enough time has
+ * passed since the last in-app command (so our own play/pause/seek round
+ * trip can't flap the UI). Unknown native state (null) never syncs.
+ */
+export function shouldSyncPlaying(
+  storePlaying: boolean,
+  nativePlaying: boolean | null,
+  nowMs = Date.now(),
+  commandAt = lastNativeCommandAt,
+  graceMs = 2000,
+): boolean {
+  if (nativePlaying === null) return false;
+  if (nativePlaying === storePlaying) return false;
+  return nowMs - commandAt >= graceMs;
+}
+
+/** Build lock-screen/notification metadata from a player track. */
+export function buildNotificationMetadata(track: {
+  title: string;
+  artistName: string;
+  albumTitle?: string | null;
+  artworkUrl?: string | null;
+}): NativeTrackMetadata {
+  return {
+    title: track.title,
+    artist: track.artistName,
+    ...(track.albumTitle ? { album: track.albumTitle } : null),
+    ...(track.artworkUrl ? { artworkUrl: track.artworkUrl } : null),
+  };
 }

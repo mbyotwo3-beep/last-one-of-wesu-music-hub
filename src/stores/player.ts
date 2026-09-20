@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { primeAudio, getAudio } from "@/lib/audio";
+import { emitNativeSeek } from "@/lib/native-audio";
 
 export interface PlayerTrack {
   id: string;
@@ -194,6 +195,7 @@ export const usePlayer = create<PlayerState>()(
           set({ progressSeconds: 0 });
           const audio = getAudio();
           if (audio) audio.currentTime = 0;
+          emitNativeSeek(0);
           return;
         }
         if (!queue.length) return;
@@ -216,6 +218,7 @@ export const usePlayer = create<PlayerState>()(
         // If a 15-second preview has reached the end and user clicks Play, replay from 0
         if (!playing && isPreview && progressSeconds >= 15) {
           if (audio) audio.currentTime = 0;
+          emitNativeSeek(0);
           set({ progressSeconds: 0, playing: true });
           return;
         }
@@ -277,6 +280,7 @@ export const usePlayer = create<PlayerState>()(
         if (audio) {
           audio.currentTime = target;
         }
+        emitNativeSeek(target);
         set({ progressSeconds: Math.floor(target) });
       },
 

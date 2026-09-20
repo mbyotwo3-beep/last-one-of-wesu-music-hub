@@ -39,12 +39,26 @@ import {
   preloadNative,
   playNative,
   pauseNative,
+  resumeNative,
   stopNative,
   onNativeComplete,
+  onNativeTimeUpdate,
   isNativeAudioAvailable,
+  configureNativeAudio,
   prepareNativeOfflineTrack,
   deleteNativeTempFile,
+  seekNative,
+  setNativeVolume,
+  getNativeDuration,
+  getNativeCurrentTime,
+  isNativePlaying,
+  setNativeSeekHook,
+  shouldSyncPlaying,
+  getLastNativeCommandAt,
+  markNativeCommand,
+  buildNotificationMetadata,
 } from "@/lib/native-audio";
+import { resolveImageUrl } from "@/lib/storage-url";
 import {
   isTrackDownloaded,
   getOfflineObjectUrl,
@@ -113,6 +127,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const audioEventsCleanupRef = useRef<(() => void) | null>(null);
+  const trackSessionDetachRef = useRef<(() => void) | null>(null);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
@@ -195,6 +210,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     trackedHistoryTrackRef.current = null;
     setError(null);
     setLoading(true);
+    // Stamp the command clock: the reconciler must not mistake slow
+    // buffering for a lock-screen pause while this selection loads.
+    markNativeCommand();
     // Mobile controls use the shared track URL to distinguish in-flight
     // resolution from a ready or failed audio source.
     setAudioUrl(undefined);
@@ -326,9 +344,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             _nativeAvailable = await isNativeAudioAvailable();
           }
           if (_nativeAvailable) {
+            // Music-app behavior: background playback + notification /
+            // lock-screen controls. Without this the plugin plays in the
+            // foreground only, with no system controls.
+            await configureNativeAudio().catch(() => {});
+            if (!isCurrentTrack()) return;
             // Native plugin cannot play Blob URLs: stage the decrypted
             // vault bytes as an app-private temp file instead.
             let assetUrl = url;
+            // file:// (and content://) URIs count as URLs per plugin docs.
             let assetIsUrl = true;
             if (offline) {
               const staged = await prepareNativeOfflineTrack(track!.id);
@@ -339,9 +363,31 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               await deleteNativeTempFile(nativeTempPathRef.current);
               nativeTempPathRef.current = staged.path;
               assetUrl = staged.uri;
-              assetIsUrl = false;
+              assetIsUrl = true;
             }
-            const preloaded = await preloadNative(track!.id, assetUrl, assetIsUrl);
+            // Resolve cover art to a renderable URL for the notification /
+            // lock screen. Raw DB storage paths are not playable artwork —
+            // covers are decorative, so failures never break playback.
+            let artworkUrl: string | undefined;
+            try {
+              const resolved = await resolveImageUrl("album-art", track!.coverUrl);
+              if (resolved) artworkUrl = resolved;
+            } catch {
+              /* ignore */
+            }
+            if (!isCurrentTrack()) return;
+            const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
+            const preloaded = await preloadNative(
+              track!.id,
+              assetUrl,
+              assetIsUrl,
+              buildNotificationMetadata({
+                title: track!.title,
+                artistName: track!.artistName,
+                albumTitle: typeof albumTitle === "string" ? albumTitle : null,
+                artworkUrl: artworkUrl ?? null,
+              }),
+            );
             if (preloaded) {
               if (!isCurrentTrack()) {
                 await stopNative(track!.id).catch(() => {});
@@ -386,7 +432,26 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 await stopNative(track!.id).catch(() => {});
                 return;
               }
-              nativeCleanupRef.current = cleanup;
+              // Native engine drives position now (the HTML element has no
+              // src on this path): mirror position + duration into the store
+              // so progress bars, seek, and previews keep working.
+              const timeCleanup = await onNativeTimeUpdate(track!.id, (seconds) => {
+                if (currentTrackIdRef.current !== track!.id) return;
+                if (usePlayer.getState().isPreview && seconds >= 15) return;
+                setProgress(Math.floor(seconds));
+              });
+              getNativeDuration(track!.id)
+                .then((d) => {
+                  if (d && currentTrackIdRef.current === track!.id) {
+                    setAudioDuration(d);
+                    usePlayer.getState().setTrackDuration(d);
+                  }
+                })
+                .catch(() => {});
+              nativeCleanupRef.current = () => {
+                cleanup();
+                timeCleanup();
+              };
               return;
             }
           }
@@ -545,7 +610,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         return;
       }
       if (isNative && _nativeAvailable && nativeCleanupRef.current) {
-        if (playing) await playNative(track.id).catch(() => {});
+        // Pause → play on a live native asset is a resume (play() would
+        // restart it). Both stamp the command clock for the reconciler.
+        if (playing) await resumeNative(track.id).catch(() => {});
         else await pauseNative(track.id).catch(() => {});
         return;
       }
@@ -623,56 +690,152 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Volume
   useEffect(() => {
     getAudio().volume = muted ? 0 : volume;
-  }, [volume, muted]);
+    if (isNative && _nativeAvailable && currentTrackIdRef.current && nativeCleanupRef.current) {
+      setNativeVolume(currentTrackIdRef.current, muted ? 0 : volume).catch(() => {});
+    }
+  }, [volume, muted, isNative, track?.id]);
 
-  // MediaSession — lock-screen / notification controls
+  // Bridge store seeks onto the native engine (the store only drives the
+  // HTML element, which has no src on the native path).
+  useEffect(() => {
+    if (!isNative) return;
+    setNativeSeekHook((seconds) => {
+      const id = currentTrackIdRef.current;
+      if (_nativeAvailable && id && nativeCleanupRef.current) {
+        seekNative(id, seconds).catch(() => {});
+      }
+    });
+    return () => setNativeSeekHook(null);
+  }, [isNative]);
+
+  // Remote-control reconciler: notification / lock-screen buttons drive the
+  // native player directly, bypassing the store. Poll the native truth and
+  // adopt it — so the in-app UI never disagrees with what's audible.
+  useEffect(() => {
+    if (!isNative || !track) return;
+    const timer = setInterval(async () => {
+      try {
+        const id = currentTrackIdRef.current;
+        if (!id || id !== track.id || !nativeCleanupRef.current) return;
+        const st = usePlayer.getState();
+        const nativePlaying = await isNativePlaying(id);
+        // Generous grace: slow networks can still be buffering several
+        // seconds after resolve. A false sync self-heals on the next tick
+        // (native truth wins both directions).
+        if (shouldSyncPlaying(st.playing, nativePlaying, Date.now(), getLastNativeCommandAt(), 4000)) {
+          usePlayer.setState({ playing: !!nativePlaying });
+          if (nativePlaying) {
+            const pos = await getNativeCurrentTime(id);
+            if (pos !== null && currentTrackIdRef.current === id) {
+              st.setProgress(Math.floor(pos));
+            }
+          }
+        }
+      } catch {
+        /* never break playback for telemetry */
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNative, track?.id]);
+
+  // MediaSession — lock-screen / notification controls (web + webview).
+  // Artwork must be a renderable URL: raw DB storage paths are not, so the
+  // cover is resolved exactly like <StorageImage> does. Without this the
+  // lock screen shows controls with no art.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+        if (!track) return;
+        let artwork: string | undefined;
+        try {
+          const resolved = await resolveImageUrl("album-art", track.coverUrl);
+          if (!cancelled && resolved) artwork = resolved;
+        } catch {
+          /* covers are decorative — never break playback for them */
+        }
+        if (cancelled) return;
+        navigator.mediaSession.metadata = new (window as any).MediaMetadata({
+          title: track.title,
+          artist: track.artistName,
+          artwork: artwork ? [{ src: artwork, sizes: "512x512" }] : [],
+        });
+        const st = () => usePlayer.getState();
+        navigator.mediaSession.setActionHandler("play", () => {
+          if (!st().playing) st().togglePlay();
+        });
+        navigator.mediaSession.setActionHandler("pause", () => {
+          if (st().playing) st().togglePlay();
+        });
+        navigator.mediaSession.setActionHandler("previoustrack", () => st().skipPrev());
+        navigator.mediaSession.setActionHandler("nexttrack", () => st().skipNext());
+        navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+          const skip = details.seekOffset || 10;
+          st().seekTo(Math.max(0, st().progressSeconds - skip));
+        });
+        navigator.mediaSession.setActionHandler("seekforward", (details) => {
+          const skip = details.seekOffset || 10;
+          st().seekTo(st().progressSeconds + skip);
+        });
+        navigator.mediaSession.setActionHandler("seekto", (details) => {
+          const audio = getAudio();
+          if (details.seekTime != null) {
+            if (audio && audio.src && !audio.src.startsWith("data:")) {
+              audio.currentTime = details.seekTime;
+            }
+            st().seekTo(details.seekTime);
+          }
+        });
+        try {
+          (navigator.mediaSession as any).playbackState = st().playing ? "playing" : "paused";
+        } catch {
+          /* older implementations */
+        }
+        // Update positionState periodically for lock-screen progress
+        const updatePosition = () => {
+          const audio = getAudio();
+          if (audio && audio.duration && Number.isFinite(audio.duration)) {
+            try {
+              navigator.mediaSession.setPositionState({
+                duration: audio.duration,
+                playbackRate: audio.playbackRate,
+                position: Math.min(audio.currentTime, audio.duration),
+              });
+            } catch { /* ignore */ }
+          }
+        };
+        const audio = getAudio();
+        audio?.addEventListener("timeupdate", updatePosition);
+        // Remove the timeupdate listener when this track's session is replaced.
+        const detach = () => audio?.removeEventListener("timeupdate", updatePosition);
+        if (cancelled) detach();
+        else trackSessionDetachRef.current = detach;
+      } catch {
+        /* ignore — unsupported browsers */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      trackSessionDetachRef.current?.();
+      trackSessionDetachRef.current = null;
+    };
+  }, [track?.id, track?.title, track?.artistName, track?.coverUrl]);
+
+  // Keep the lock-screen play/pause glyph in sync with the store.
   useEffect(() => {
     try {
       if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-      if (!track) return;
-      navigator.mediaSession.metadata = new (window as any).MediaMetadata({
-        title: track.title,
-        artist: track.artistName,
-        artwork: track.coverUrl ? [{ src: track.coverUrl, sizes: "512x512" }] : [],
-      });
-      const st = () => usePlayer.getState();
-      navigator.mediaSession.setActionHandler("play", () => {
-        if (!st().playing) st().togglePlay();
-      });
-      navigator.mediaSession.setActionHandler("pause", () => {
-        if (st().playing) st().togglePlay();
-      });
-      navigator.mediaSession.setActionHandler("previoustrack", () => st().skipPrev());
-      navigator.mediaSession.setActionHandler("nexttrack", () => st().skipNext());
-      navigator.mediaSession.setActionHandler("seekto", (details) => {
-        const audio = getAudio();
-        if (audio && details.seekTime != null) {
-          audio.currentTime = details.seekTime;
-          st().setProgress(Math.floor(details.seekTime));
-        }
-      });
-      // Update positionState periodically for lock-screen progress
-      const updatePosition = () => {
-        const audio = getAudio();
-        if (audio && audio.duration && Number.isFinite(audio.duration)) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: audio.duration,
-              playbackRate: audio.playbackRate,
-              position: Math.min(audio.currentTime, audio.duration),
-            });
-          } catch { /* ignore */ }
-        }
-      };
-      const audio = getAudio();
-      audio?.addEventListener("timeupdate", updatePosition);
-      return () => {
-        audio?.removeEventListener("timeupdate", updatePosition);
-      };
+      (navigator.mediaSession as any).playbackState = !track
+        ? "none"
+        : playing
+          ? "playing"
+          : "paused";
     } catch {
       /* ignore — unsupported browsers */
     }
-  }, [track?.id, track?.title, track?.artistName, track?.coverUrl]);
+  }, [playing, track?.id]);
 
   // Resume playback on user gesture if browser deferred autoplay
   useEffect(() => {
