@@ -64,8 +64,7 @@ public class MainActivity extends BridgeActivity {
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             if (request != null && request.isForMainFrame()) {
-                lastFailedUrl = request.getUrl().toString();
-                view.loadUrl(ERROR_PAGE);
+                showErrorPage(view, request.getUrl().toString());
             } else {
                 super.onReceivedError(view, request, error);
             }
@@ -75,19 +74,18 @@ public class MainActivity extends BridgeActivity {
         @SuppressWarnings("deprecation")
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
             // Pre-API-23 callback is main-frame only.
-            lastFailedUrl = failingUrl;
-            view.loadUrl(ERROR_PAGE);
+            showErrorPage(view, failingUrl);
         }
 
         @Override
         public void onReceivedHttpError(
                 WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-            // Server errors (404/500/…) on the main frame would otherwise
-            // leave a blank or server-branded page — show ours instead.
+            // Server 5xx on the main frame gets the branded page. 4xx passes
+            // through: those are real app responses (e.g. a removed page),
+            // and retrying them would just loop on the same error.
             if (request != null && request.isForMainFrame()
-                    && errorResponse != null && errorResponse.getStatusCode() >= 400) {
-                lastFailedUrl = request.getUrl().toString();
-                view.loadUrl(ERROR_PAGE);
+                    && errorResponse != null && errorResponse.getStatusCode() >= 500) {
+                showErrorPage(view, request.getUrl().toString());
             } else {
                 super.onReceivedHttpError(view, request, errorResponse);
             }
@@ -99,8 +97,24 @@ public class MainActivity extends BridgeActivity {
             // but show the branded page instead of the system interstitial
             // that exposes the URL.
             handler.cancel();
-            if (error != null && error.getUrl() != null) {
-                lastFailedUrl = error.getUrl();
+            showErrorPage(view, error != null ? error.getUrl() : null);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+            // A successful load clears the retry target — a later unrelated
+            // failure must never retry a stale URL.
+            if (url != null && !url.equals(ERROR_PAGE)) {
+                lastFailedUrl = null;
+            }
+        }
+
+        /** Show the branded offline page. Never records the page itself as
+         *  a retry target (that would loop Try-again on the error page). */
+        private void showErrorPage(WebView view, String failingUrl) {
+            if (failingUrl != null && !failingUrl.equals(ERROR_PAGE)) {
+                lastFailedUrl = failingUrl;
             }
             view.loadUrl(ERROR_PAGE);
         }

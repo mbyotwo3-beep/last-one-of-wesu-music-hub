@@ -23,6 +23,7 @@ import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
 import { StatusBarInit } from "../components/mobile/StatusBarInit";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { registerDeepLinkHandler } from "../integrations/supabase/auth-deep-link";
+import { usePlayer } from "../stores/player";
 
 function NotFoundComponent() {
   return (
@@ -156,6 +157,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const platform = usePlatform();
+  // MiniPlayer reserves ~4rem above the 4rem tab bar only when a track is
+  // loaded — don't leave dead whitespace on track-less pages.
+  const hasTrack = usePlayer((s) => !!s.track);
 
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {
@@ -187,7 +191,7 @@ function RootComponent() {
               </Link>
               <ThemeToggle />
             </header>
-            <main className="flex-1 pt-[calc(env(safe-area-inset-top)+3.25rem)] lg:pt-0 pb-[calc(env(safe-area-inset-bottom)+8rem)] lg:pb-0">
+            <main className={`flex-1 pt-[calc(env(safe-area-inset-top)+3.25rem)] lg:pt-0 lg:pb-0 ${hasTrack ? "pb-[calc(env(safe-area-inset-bottom)+8rem)]" : "pb-[calc(env(safe-area-inset-bottom)+4rem)]"}`}>
               <Outlet />
             </main>
             {/* Single audio engine + desktop UI. Stays mounted at all

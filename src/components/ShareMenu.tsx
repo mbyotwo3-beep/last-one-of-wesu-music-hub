@@ -249,7 +249,7 @@ export function ShareMenu({
     }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     // Use the current page's base URL to ensure we get the correct domain
     // This handles both wesuplus.com and wesuplusly.com correctly
     const baseUrl = window.location.origin;
@@ -270,26 +270,37 @@ export function ShareMenu({
       title = playlistName || "Playlist";
     }
 
-    // Use Web Share API if available (like Apple Music)
-    if (navigator.share && title) {
-      navigator
-        .share({
-          title: title,
-          url: url,
-        })
-        .catch(() => {
-          // Fallback to clipboard if share fails or is cancelled
-          navigator.clipboard.writeText(url);
+    // Copy helper: clipboard is unavailable/denied in some WebViews —
+    // never let a share attempt throw an unhandled rejection.
+    const copyLink = async () => {
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url);
           setCopied(true);
           toast.success("Link copied to clipboard");
           setTimeout(() => setCopied(false), 2000);
+        } else {
+          toast.error("Sharing isn't available on this device");
+        }
+      } catch {
+        toast.error("Couldn't copy the link");
+      }
+    };
+
+    // Use Web Share API if available (like Apple Music)
+    if (typeof navigator.share === "function" && title) {
+      try {
+        await navigator.share({
+          title: title,
+          url: url,
         });
+      } catch {
+        // Share failed or was cancelled — fall back to clipboard.
+        await copyLink();
+      }
     } else {
       // Fallback for browsers without Web Share API
-      navigator.clipboard.writeText(url);
-      setCopied(true);
-      toast.success("Link copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      await copyLink();
     }
     setIsOpen(false);
   };

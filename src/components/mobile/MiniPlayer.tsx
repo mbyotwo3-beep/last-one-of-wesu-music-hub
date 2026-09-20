@@ -62,6 +62,55 @@ export function MiniPlayer() {
         </div>
       )}
 
+      {/* Queue overlay — above the bar so the tab bar never covers it */}
+      {showQueue && (
+        <div className="mx-2 mb-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl max-h-80">
+          <div className="p-4 border-b border-white/10">
+            <h3 className="text-lg font-semibold text-white">Queue</h3>
+          </div>
+          {queue.length === 0 ? (
+            <div className="p-8 text-center text-white/60">
+              <p className="text-sm">Queue is empty</p>
+            </div>
+          ) : (
+            <div className="p-2 space-y-1 overflow-y-auto max-h-60">
+              {queue.map((queueTrack, index) => (
+                <button
+                  key={`${queueTrack.id}-${index}`}
+                  onClick={() => {
+                    usePlayer.getState().setQueue(queue, index);
+                    setShowQueue(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left"
+                >
+                  <StorageImage
+                    bucket="album-art"
+                    path={queueTrack.coverUrl}
+                    alt={queueTrack.title}
+                    className="size-8 rounded overflow-hidden bg-[#2c2c2e] shrink-0 object-cover"
+                  />
+                  <div className="flex-1 min-w-0 text-left">
+                    <p
+                      className={`text-sm font-medium truncate ${index === queueIndex ? "text-white" : "text-white/70"}`}
+                    >
+                      {queueTrack.title}
+                    </p>
+                    <p className="text-xs text-white/50 truncate">{queueTrack.artistName}</p>
+                  </div>
+                  {index === queueIndex && playing && (
+                    <div className="flex items-center gap-0.5">
+                      <div className="w-0.5 h-3 bg-white animate-pulse" />
+                      <div className="w-0.5 h-3 bg-white animate-pulse delay-75" />
+                      <div className="w-0.5 h-3 bg-white animate-pulse delay-150" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main bar */}
       <div
         className="mx-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl"
@@ -145,55 +194,6 @@ export function MiniPlayer() {
           />
         </div>
       </div>
-
-      {/* Queue overlay */}
-      {showQueue && (
-        <div className="mx-2 mt-2 rounded-xl overflow-hidden bg-[#1c1c1e] border border-white/10 shadow-2xl max-h-80">
-          <div className="p-4 border-b border-white/10">
-            <h3 className="text-lg font-semibold text-white">Queue</h3>
-          </div>
-          {queue.length === 0 ? (
-            <div className="p-8 text-center text-white/60">
-              <p className="text-sm">Queue is empty</p>
-            </div>
-          ) : (
-            <div className="p-2 space-y-1 overflow-y-auto max-h-60">
-              {queue.map((queueTrack, index) => (
-                <button
-                  key={`${queueTrack.id}-${index}`}
-                  onClick={() => {
-                    usePlayer.getState().setQueue(queue, index);
-                    setShowQueue(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left"
-                >
-                  <StorageImage
-                    bucket="album-art"
-                    path={queueTrack.coverUrl}
-                    alt={queueTrack.title}
-                    className="size-8 rounded overflow-hidden bg-[#2c2c2e] shrink-0 object-cover"
-                  />
-                  <div className="flex-1 min-w-0 text-left">
-                    <p
-                      className={`text-sm font-medium truncate ${index === queueIndex ? "text-white" : "text-white/70"}`}
-                    >
-                      {queueTrack.title}
-                    </p>
-                    <p className="text-xs text-white/50 truncate">{queueTrack.artistName}</p>
-                  </div>
-                  {index === queueIndex && playing && (
-                    <div className="flex items-center gap-0.5">
-                      <div className="w-0.5 h-3 bg-white animate-pulse" />
-                      <div className="w-0.5 h-3 bg-white animate-pulse delay-75" />
-                      <div className="w-0.5 h-3 bg-white animate-pulse delay-150" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

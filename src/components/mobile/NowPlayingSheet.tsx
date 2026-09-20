@@ -21,6 +21,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { useIsNative } from "@/hooks/use-platform";
 import { DownloadButton } from "@/components/DownloadButton";
 import { getAudio } from "@/lib/audio";
 
@@ -49,6 +50,7 @@ export function NowPlayingSheet() {
   const isPreview = usePlayer((s) => s.isPreview);
 
   const { user } = useAuth();
+  const isNative = useIsNative();
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
@@ -161,6 +163,7 @@ export function NowPlayingSheet() {
           background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)",
           borderRadius: "24px 24px 0 0",
           maxHeight: "100dvh",
+          paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
         onTouchStart={onTouchStart}
@@ -222,7 +225,9 @@ export function NowPlayingSheet() {
           </div>
         )}
 
-        {/* Album Art — large, with drop shadow */}
+        {/* Album Art — large, with drop shadow. Hidden in queue mode so
+            the list gets the space (the header toggle is exclusive). */}
+        {!showQueue && (
         <div className="flex-1 flex items-center justify-center px-8 py-4 min-h-0">
           <div
             className="w-full max-w-xs aspect-square rounded-2xl overflow-hidden bg-[#2c2c2e]"
@@ -246,6 +251,7 @@ export function NowPlayingSheet() {
             )}
           </div>
         </div>
+        )}
 
         {/* Track info + Like */}
         <div className="flex items-center justify-between px-6 mb-3 shrink-0">
@@ -285,17 +291,16 @@ export function NowPlayingSheet() {
               <p className="text-sm text-white/60 truncate mt-0.5">{track.artistName}</p>
             )}
           </div>
-          {user && (
-            <button
-              onClick={toggleLike}
-              className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform cursor-pointer rounded-full hover:bg-white/10"
-              aria-label={liked ? "Unlike" : "Like"}
-            >
-              <Heart
-                className={`size-6 transition-colors ${liked ? "fill-primary text-primary" : "text-white/40"}`}
-              />
-            </button>
-          )}
+          {/* Anonymous taps redirect to /auth via the hook (replays after sign-in). */}
+          <button
+            onClick={toggleLike}
+            className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform cursor-pointer rounded-full hover:bg-white/10"
+            aria-label={liked ? "Unlike" : "Like"}
+          >
+            <Heart
+              className={`size-6 transition-colors ${liked ? "fill-primary text-primary" : "text-white/40"}`}
+            />
+          </button>
         </div>
         {user && meta && (price <= 0 || entitled) && (
           <div className="px-6 mb-4">
@@ -390,7 +395,9 @@ export function NowPlayingSheet() {
           </button>
         </div>
 
-        {/* Volume */}
+        {/* Volume — hidden on native: devices use hardware buttons (and
+            the slider is a no-op on iOS). */}
+        {!isNative && (
         <div className="flex items-center gap-3 px-6 mb-6 shrink-0">
           <Volume2 className="size-4 text-white/40 shrink-0" />
           <input
@@ -406,6 +413,7 @@ export function NowPlayingSheet() {
           />
           <Volume2 className="size-5 text-white/70 shrink-0" />
         </div>
+        )}
 
         {/* Queue Display */}
         {showQueue && (

@@ -241,3 +241,63 @@ describe("Sync guard never touches the element while resolving", () => {
     expect(action).toBe("pause");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Preview URLs must never carry into a new selection: they are short,
+// expiring, and the engine would briefly play the stale preview while
+// re-resolving. Mirrors preserveResolvedAudioUrl in stores/player.ts.
+// ---------------------------------------------------------------------------
+
+interface MiniTrack {
+  id: string;
+  audioUrl?: string | null;
+}
+
+function preserveResolvedAudioUrl(
+  next: MiniTrack | null,
+  current: MiniTrack | null,
+  currentIsPreview = false,
+): MiniTrack | null {
+  if (!next || !current || next.id !== current.id || next.audioUrl !== undefined) {
+    return next;
+  }
+  if (currentIsPreview) {
+    return { ...next, audioUrl: undefined };
+  }
+  return { ...next, audioUrl: current.audioUrl };
+}
+
+describe("Preview URLs never carry into a new selection", () => {
+  it("same-id reselect while full keeps the resolved URL (no re-resolve flicker)", () => {
+    const next = preserveResolvedAudioUrl(
+      { id: "s1" },
+      { id: "s1", audioUrl: "https://cdn.example/full.mp3" },
+      false,
+    );
+    expect(next?.audioUrl).toBe("https://cdn.example/full.mp3");
+  });
+
+  it("same-id reselect while preview drops the URL (forces fresh resolve)", () => {
+    const next = preserveResolvedAudioUrl(
+      { id: "s1" },
+      { id: "s1", audioUrl: "https://cdn.example/preview.mp3" },
+      true,
+    );
+    expect(next?.audioUrl).toBeUndefined();
+  });
+
+  it("different-id selections never inherit anything", () => {
+    fc.assert(
+      fc.property(fc.uuid(), fc.uuid(), (a, b) => {
+        fc.pre(a !== b);
+        const next = preserveResolvedAudioUrl(
+          { id: a },
+          { id: b, audioUrl: "https://cdn.example/x.mp3" },
+          true,
+        );
+        expect(next).toEqual({ id: a });
+      }),
+      { numRuns: 100 },
+    );
+  });
+});

@@ -10,6 +10,7 @@ import { saveAlbum, unsaveAlbum } from "@/lib/saved-albums.functions";
 import { acceptInvitation } from "@/lib/invitations.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 import { toast } from "sonner";
+import { useIsNative } from "@/hooks/use-platform";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -45,6 +46,9 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
+  // Google blocks OAuth inside embedded WebViews: on native the Google
+  // button is hidden (email sign-in works; Google stays on the website).
+  const isNative = useIsNative();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -324,6 +328,8 @@ function AuthPage() {
           </button>
         </form>
 
+        {!isNative && (
+        <>
         <div className="mt-6 relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
@@ -396,6 +402,13 @@ function AuthPage() {
           </svg>
           Continue with Google
         </button>
+        </>
+        )}
+        {isNative && (
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Google sign-in lives on the website — in the app, sign in with email.
+          </p>
+        )}
 
         <div className="mt-6 text-center space-y-3">
           <button

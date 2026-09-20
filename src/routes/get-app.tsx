@@ -20,7 +20,7 @@ export const Route = createFileRoute("/get-app")({
     ],
   }),
   loader: ({ context }) => {
-    context.queryClient.ensureQueryData(siteQO);
+    return context.queryClient.ensureQueryData(siteQO);
   },
   component: GetAppPage,
 });

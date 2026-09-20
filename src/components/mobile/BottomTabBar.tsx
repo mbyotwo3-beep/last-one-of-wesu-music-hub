@@ -167,7 +167,13 @@ export function BottomTabBar() {
 
       {/* Search Modal */}
       {searchOpen && (
-        <div className="fixed inset-0 bg-background/95 backdrop-blur-xl z-[60] flex flex-col p-4">
+        <div
+          className="fixed inset-0 bg-background/95 backdrop-blur-xl z-[60] flex flex-col p-4"
+          style={{
+            paddingTop: "max(1rem, env(safe-area-inset-top))",
+            paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+          }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={() => setSearchOpen(false)}
@@ -202,8 +208,14 @@ export function BottomTabBar() {
 
       {/* Menu Modal */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-background/95 backdrop-blur-xl z-[60] flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-border">
+        <div
+          className="fixed inset-0 bg-background/95 backdrop-blur-xl z-[60] flex flex-col"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div
+            className="flex items-center justify-between p-4 border-b border-border"
+            style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+          >
             <h2 className="text-lg font-semibold">Menu</h2>
             <button
               onClick={() => setMenuOpen(false)}
@@ -422,8 +434,9 @@ export function BottomTabBar() {
               </>
             )}
           </div>
-          {/* Pinned bottom: Become an Artist */}
-          {!isArtist && (
+          {/* Pinned bottom: Become an Artist (signed-in non-artists only —
+              anonymous users land on a RoleGate dead end otherwise). */}
+          {!isArtist && user && (
             <div className="border-t border-border p-4">
               <button
                 onClick={() => {

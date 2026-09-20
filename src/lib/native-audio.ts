@@ -320,11 +320,15 @@ export async function onNativeComplete(assetId: string, callback: () => void): P
 
 /**
  * Check if the @capgo/native-audio plugin is available in the current environment.
+ * Proves a registered runtime plugin (not just a resolvable npm import, which
+ * is also true on desktop browsers where no native runtime exists).
  */
 export async function isNativeAudioAvailable(): Promise<boolean> {
   try {
+    if (typeof window === "undefined") return false;
+    const registered = (window as any).Capacitor?.Plugins?.NativeAudio;
+    if (!registered) return false;
     const { NativeAudio } = await import("@capgo/native-audio");
-    // If the import succeeds and the plugin object exists, it's available
     return !!NativeAudio;
   } catch {
     return false;

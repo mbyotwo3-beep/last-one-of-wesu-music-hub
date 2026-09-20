@@ -45,8 +45,10 @@ export function NowPlayingScreen() {
   if (!track) return null;
 
   const dur = isPreview ? 15 : (track.durationSeconds ?? 0);
-  // Keep pause available while the requested source is still resolving.
-  const isLoading = audioUrl === undefined && !playing;
+  // Spinner only while playback was requested but the source isn't ready.
+  // The button stays enabled: tapping it starts/retries instead of idling
+  // on a dead spinner when paused-unresolved.
+  const isLoading = audioUrl === undefined && playing;
 
   function dismiss() {
     // Direct loads (deep link) have no in-app history — fall back home
@@ -56,7 +58,8 @@ export function NowPlayingScreen() {
   }
 
   function handleLike() {
-    if (!user || !track) return;
+    if (!track) return;
+    // Anonymous taps redirect to /auth via the hook (replays after sign-in).
     toggleSaved();
   }
 
@@ -83,7 +86,7 @@ export function NowPlayingScreen() {
 
   return (
     <div
-      className="fixed inset-0 bg-background z-50 flex flex-col p-6 pt-[env(safe-area-inset-top)]"
+      className="fixed inset-0 bg-background z-[70] flex flex-col p-6 pt-[env(safe-area-inset-top)] pb-[max(1.5rem,env(safe-area-inset-bottom))]"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -195,8 +198,7 @@ export function NowPlayingScreen() {
         </button>
         <button
           onClick={togglePlay}
-          disabled={isLoading}
-          className="min-h-[56px] min-w-[56px] flex items-center justify-center bg-foreground text-obsidian rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+          className="min-h-[56px] min-w-[56px] flex items-center justify-center bg-foreground text-obsidian rounded-full hover:scale-105 transition-transform"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (

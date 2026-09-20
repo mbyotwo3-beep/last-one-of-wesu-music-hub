@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Wesu+ brand colors (previously fell through to Capacitor's default
+         indigo/pink). Cream background, deep-blue primary accent. -->
+    <color name="colorPrimary">#0c3c93</color>
+    <color name="colorPrimaryDark">#0a2f73</color>
+    <color name="colorAccent">#0c3c93</color>
+    <color name="wesuCream">#fbf7ee</color>
+</resources>

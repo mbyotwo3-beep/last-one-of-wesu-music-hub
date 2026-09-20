@@ -24,7 +24,7 @@ interface DownloadButtonProps {
 
 /** Refresh every download button after a vault change. */
 export function touchVaultQueries(qc: QueryClient) {
-  qc.invalidateQueries({ queryKey: ["vault-track"] });
+  return qc.invalidateQueries({ queryKey: ["vault-track"] });
 }
 
 export function useVaultDownloaded(songId: string | null | undefined) {
@@ -59,6 +59,7 @@ export function DownloadButton({
   const downloadFn = useServerFn(getDownloadAudioUrl);
   const qc = useQueryClient();
   const [progress, setProgress] = useState<number | null>(null);
+  const [progressBytes, setProgressBytes] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const { data: downloaded } = useVaultDownloaded(songId);
 
@@ -90,6 +91,7 @@ export function DownloadButton({
   async function download() {
     if (progress !== null) return;
     setProgress(0);
+    setProgressBytes(0);
     setError(null);
     try {
       // Entitlement (purchase / free / staff / owner-artist) is enforced
@@ -100,12 +102,23 @@ export function DownloadButton({
           return { url: result.url, filename: result.filename };
         },
         { songId, title, artistName, coverUrl },
-        (pct) => setProgress(pct),
+        (pct, bytes) => {
+          setProgress(pct);
+          if (typeof bytes === "number") setProgressBytes(bytes);
+        },
       );
-      touchVaultQueries(qc);
+      // Invalidate first so the button flips to Downloaded only when the
+      // vault query confirms it — no double-download window.
+      await touchVaultQueries(qc);
       toast.success(`Downloaded "${title ?? "song"}" — plays offline, only in Wesu+`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Download failed");
+      const msg = err instanceof Error ? err.message : "Download failed";
+      // Unbought paid tracks fail server-side: say so instead of a raw error.
+      setError(
+        /purchase|buy|entitl|unlock|payment|402|403/i.test(msg)
+          ? "Available after purchase — buy this track to download it"
+          : msg,
+      );
     } finally {
       setProgress(null);
     }
@@ -113,8 +126,18 @@ export function DownloadButton({
 
   async function remove() {
     try {
+      // Removing the currently-playing track would kill playback mid-song
+      // with a generic audio error — stop it first.
+      try {
+        const { usePlayer } = await import("@/stores/player");
+        if (usePlayer.getState().track?.id === songId) {
+          usePlayer.getState().exitSong();
+        }
+      } catch {
+        /* player unavailable — proceed with removal */
+      }
       await removeTrackFromVault(songId);
-      touchVaultQueries(qc);
+      await touchVaultQueries(qc);
       toast.success("Download removed from this device");
     } catch {
       toast.error("Could not remove this download");
@@ -152,7 +175,13 @@ export function DownloadButton({
         ) : (
           <Download className="size-3.5" />
         )}
-        {progress !== null ? (progress > 0 ? `${progress}%` : "Preparing…") : label}
+        {progress !== null
+          ? progress > 0
+            ? `${progress}%`
+            : progressBytes > 0
+              ? `${(progressBytes / 1048576).toFixed(1)} MB`
+              : "Preparing…"
+          : label}
       </button>
       {error && <span className="text-[10px] text-destructive max-w-40 text-right">{error}</span>}
     </span>

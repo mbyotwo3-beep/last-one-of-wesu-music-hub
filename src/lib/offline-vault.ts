@@ -234,7 +234,7 @@ export interface VaultDownloadMeta {
 export async function downloadSongToVault(
   fetchSigned: (songId: string) => Promise<{ url: string; filename: string }>,
   meta: VaultDownloadMeta,
-  onProgress?: (pct: number) => void,
+  onProgress?: (pct: number, bytesReceived?: number) => void,
 ): Promise<void> {
   const { url } = await fetchSigned(meta.songId);
   const response = await fetch(url, { credentials: "omit" });
@@ -245,13 +245,22 @@ export async function downloadSongToVault(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
+  let lastHeartbeat = 0;
+  onProgress?.(0, 0);
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     if (value) {
       chunks.push(value);
       received += value.length;
-      if (total > 0) onProgress?.(Math.min(99, Math.round((received / total) * 100)));
+      if (total > 0) {
+        onProgress?.(Math.min(99, Math.round((received / total) * 100)), received);
+      } else if (received - lastHeartbeat > 524288) {
+        // No content-length (chunked): heartbeat byte counts so the UI
+        // shows progress instead of sticking on "Preparing…".
+        lastHeartbeat = received;
+        onProgress?.(0, received);
+      }
     }
   }
   const mime = response.headers.get("content-type") || "audio/mpeg";

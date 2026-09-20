@@ -387,8 +387,9 @@ function Page() {
     }
     let done = 0;
     let skipped = 0;
+    let failed = 0;
     for (const s of list) {
-      setBulkProgress(`${done + skipped + 1}/${list.length}`);
+      setBulkProgress(`${done + skipped + failed + 1}/${list.length}`);
       try {
         await downloadSongToVault(
           async (songId) => {
@@ -403,17 +404,27 @@ function Page() {
           },
         );
         done += 1;
-      } catch {
-        // Unbought paid tracks (and failures) are skipped, never fatal.
-        skipped += 1;
+        // Refresh per track so progress is visible immediately.
+        touchVaultQueries(qc);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        // Unbought paid tracks are skipped, never fatal; storage/quota and
+        // other errors are reported separately (not as "buy first").
+        if (/purchase|buy|entitl|unlock|payment|402|403/i.test(msg)) skipped += 1;
+        else failed += 1;
       }
     }
     setBulkProgress(null);
     touchVaultQueries(qc);
-    if (done === 0) {
+    if (done === 0 && failed > 0 && skipped === 0) {
+      toast.error("Downloads failed — check your connection and storage space");
+    } else if (done === 0) {
       toast.error("Nothing downloadable — paid songs need to be bought first");
-    } else if (skipped > 0) {
-      toast.success(`Downloaded ${done} song${done === 1 ? "" : "s"} (${skipped} skipped)`);
+    } else if (skipped > 0 || failed > 0) {
+      const parts = [`Downloaded ${done} song${done === 1 ? "" : "s"}`];
+      if (skipped > 0) parts.push(`${skipped} need purchase`);
+      if (failed > 0) parts.push(`${failed} failed`);
+      toast.success(`${parts.join(", ")}`);
     } else {
       toast.success(`Downloaded ${done} song${done === 1 ? "" : "s"} for offline listening`);
     }

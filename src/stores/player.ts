@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { primeAudio, getAudio } from "@/lib/audio";
-import { emitNativeSeek } from "@/lib/native-audio";
+import { emitNativeSeek, setNativeSeekHook } from "@/lib/native-audio";
 
 export interface PlayerTrack {
   id: string;
@@ -18,9 +18,15 @@ export type RepeatMode = "off" | "all" | "one";
 function preserveResolvedAudioUrl(
   next: PlayerTrack | null,
   current: PlayerTrack | null,
+  currentIsPreview = false,
 ): PlayerTrack | null {
   if (!next || !current || next.id !== current.id || next.audioUrl !== undefined) {
     return next;
+  }
+  // Never carry a preview (short, expiring) URL into a new selection —
+  // the engine would briefly play the stale preview while re-resolving.
+  if (currentIsPreview) {
+    return { ...next, audioUrl: undefined };
   }
   return { ...next, audioUrl: current.audioUrl };
 }
@@ -98,7 +104,7 @@ export const usePlayer = create<PlayerState>()(
       setTrack: (t) => {
         if (t) primeAudio();
         set((state) => ({
-          track: preserveResolvedAudioUrl(t, state.track),
+          track: preserveResolvedAudioUrl(t, state.track, state.isPreview),
           selectionId: t ? state.selectionId + 1 : state.selectionId,
           playing: !!t,
           progressSeconds: 0,
@@ -117,7 +123,7 @@ export const usePlayer = create<PlayerState>()(
         // Clamp out-of-bounds callers instead of storing a queueIndex with no track.
         const safeIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
         if (tracks.length) primeAudio();
-        const track = preserveResolvedAudioUrl(tracks[safeIndex] ?? null, get().track);
+        const track = preserveResolvedAudioUrl(tracks[safeIndex] ?? null, get().track, get().isPreview);
         set((state) => ({
           queue: tracks,
           queueIndex: safeIndex,
@@ -179,7 +185,7 @@ export const usePlayer = create<PlayerState>()(
         }
         set((state) => ({
           queueIndex: next,
-          track: preserveResolvedAudioUrl(queue[next], state.track),
+          track: preserveResolvedAudioUrl(queue[next], state.track, state.isPreview),
           selectionId: state.selectionId + 1,
           progressSeconds: 0,
           liked: false,
@@ -194,7 +200,7 @@ export const usePlayer = create<PlayerState>()(
         if (progressSeconds > 3) {
           set({ progressSeconds: 0 });
           const audio = getAudio();
-          if (audio) audio.currentTime = 0;
+          if (audio?.src) audio.currentTime = 0;
           emitNativeSeek(0);
           return;
         }
@@ -202,7 +208,7 @@ export const usePlayer = create<PlayerState>()(
         const prev = (queueIndex - 1 + queue.length) % queue.length;
         set((state) => ({
           queueIndex: prev,
-          track: preserveResolvedAudioUrl(queue[prev], state.track),
+          track: preserveResolvedAudioUrl(queue[prev], state.track, state.isPreview),
           selectionId: state.selectionId + 1,
           progressSeconds: 0,
           liked: false,
@@ -217,7 +223,7 @@ export const usePlayer = create<PlayerState>()(
         if (!playing) primeAudio();
         // If a 15-second preview has reached the end and user clicks Play, replay from 0
         if (!playing && isPreview && progressSeconds >= 15) {
-          if (audio) audio.currentTime = 0;
+          if (audio?.src) audio.currentTime = 0;
           emitNativeSeek(0);
           set({ progressSeconds: 0, playing: true });
           return;
@@ -277,7 +283,9 @@ export const usePlayer = create<PlayerState>()(
         const maxTime = isPreview ? 15 : dur > 0 ? dur : 100000;
         const target = Math.max(0, Math.min(seconds, maxTime));
         const audio = getAudio();
-        if (audio) {
+        // The shared element may have no src (native path, or seek before
+        // load) — setting currentTime then is a no-op at best.
+        if (audio?.src) {
           audio.currentTime = target;
         }
         emitNativeSeek(target);
@@ -294,6 +302,15 @@ export const usePlayer = create<PlayerState>()(
           audio.removeAttribute("src");
           audio.load();
         }
+        // Stop the native engine too — otherwise audible native playback
+        // outlives the UI until the engine effect runs. The id is captured
+        // before the track is nulled below. Dynamic import keeps
+        // native-audio (and its plugin import) out of bundles that never play.
+        const exitingId = get().track?.id ?? null;
+        setNativeSeekHook(null);
+        import("@/lib/native-audio").then(({ stopNative }) => {
+          if (exitingId) stopNative(exitingId).catch(() => {});
+        }).catch(() => {});
         set({
           track: null,
           playing: false,

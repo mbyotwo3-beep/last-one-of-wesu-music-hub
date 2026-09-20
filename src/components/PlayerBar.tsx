@@ -56,6 +56,7 @@ import {
   shouldSyncPlaying,
   getLastNativeCommandAt,
   markNativeCommand,
+  seekNative,
   buildNotificationMetadata,
 } from "@/lib/native-audio";
 import { resolveImageUrl } from "@/lib/storage-url";
@@ -128,6 +129,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const audioEventsCleanupRef = useRef<(() => void) | null>(null);
   const trackSessionDetachRef = useRef<(() => void) | null>(null);
+  // In-flight native stop from the track-change branch, awaited at the top
+  // of loadUrl so a reselect can't unload the asset being preloaded.
+  const pendingStopRef = useRef<Promise<void> | null>(null);
+  // Latest known media duration for the lock-screen position state
+  // (HTML element on web, native getDuration on device).
+  const durationRef = useRef<number>(0);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
@@ -147,6 +154,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         }).catch(() => {});
       }
       if (currentTrackIdRef.current) stopNative(currentTrackIdRef.current).catch(() => {});
+      nativeCleanupRef.current?.();
+      nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
       deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
@@ -193,7 +202,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           data: { song_id: previousId, progress_seconds: previousProgress },
         }).catch(() => {});
       }
-      stopNative(previousId).catch(() => {});
+      // Stop the old asset first: same-id reselect (queue duplicate /
+      // retry) would otherwise unload the asset the new load below is
+      // about to preload. Awaited at the top of loadUrl (this body is sync).
+      pendingStopRef.current = stopNative(previousId).catch(() => {});
       nativeCleanupRef.current?.();
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
@@ -242,6 +254,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       currentSelectionRef.current === selectionId && appliedRetryRef.current === retryNonce;
     async function loadUrl() {
       try {
+        // Let the previous asset's stop/unload land before preloading —
+        // otherwise a same-id reselect kills the new playback.
+        await pendingStopRef.current;
+        pendingStopRef.current = null;
         let url: string;
         let previewMode = false;
         // Encrypted on-device copy wins over streaming (instant, works
@@ -353,18 +369,34 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             // vault bytes as an app-private temp file instead.
             let assetUrl = url;
             // file:// (and content://) URIs count as URLs per plugin docs.
-            let assetIsUrl = true;
+            const assetIsUrl = true;
+            let nativeViable = true;
             if (offline) {
               const staged = await prepareNativeOfflineTrack(track!.id);
-              if (!staged) {
-                throw new Error("Offline file unavailable — please re-download this song");
+              if (!isCurrentTrack()) {
+                // Superseded while staging: drop the orphan instead of
+                // leaking it in the cache dir.
+                if (staged) await deleteNativeTempFile(staged.path);
+                return;
               }
-              if (!isCurrentTrack()) return;
-              await deleteNativeTempFile(nativeTempPathRef.current);
-              nativeTempPathRef.current = staged.path;
-              assetUrl = staged.uri;
-              assetIsUrl = true;
+              if (staged) {
+                // Same-song reselect stages the identical path — never
+                // delete the file we just wrote.
+                if (nativeTempPathRef.current !== staged.path) {
+                  await deleteNativeTempFile(nativeTempPathRef.current);
+                }
+                nativeTempPathRef.current = staged.path;
+                assetUrl = staged.uri;
+              } else {
+                // Staging unavailable (no Filesystem plugin / corrupt
+                // vault) — fall through to the HTML path below, which
+                // plays the Blob URL fine.
+                nativeViable = false;
+              }
             }
+            if (!nativeViable) {
+              // Skip the native block without touching availability flags.
+            } else {
             // Resolve cover art to a renderable URL for the notification /
             // lock screen. Raw DB storage paths are not playable artwork —
             // covers are decorative, so failures never break playback.
@@ -388,6 +420,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 artworkUrl: artworkUrl ?? null,
               }),
             );
+            if (!preloaded) {
+              // Transient failure (or late plugin registration): re-probe
+              // next selection, play via HTML below right now.
+              _nativeAvailable = null;
+            }
             if (preloaded) {
               if (!isCurrentTrack()) {
                 await stopNative(track!.id).catch(() => {});
@@ -405,14 +442,24 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
               }
               if (previewMode) {
+                const previewSelection = selectionId;
                 previewTimerRef.current = setTimeout(() => {
+                  // Stale timer (track changed) or paused meanwhile: a
+                  // preview must never cut off another selection or error
+                  // while paused.
+                  if (currentSelectionRef.current !== previewSelection) return;
+                  const st = usePlayer.getState();
+                  if (!st.playing) return;
                   stopNative(track!.id).catch(() => {});
-                  if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+                  st.togglePlay();
                   setError("Preview ended. Buy this track for full access.");
                 }, 15000);
               }
               const cleanup = await onNativeComplete(track!.id, () => {
                 if (usePlayer.getState().repeat === "one") {
+                  // Restart from 0 — replaying a completed asset directly
+                  // is plugin-dependent.
+                  seekNative(track!.id, 0).catch(() => {});
                   playNative(track!.id).catch(() => {});
                   return;
                 }
@@ -437,13 +484,24 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               // so progress bars, seek, and previews keep working.
               const timeCleanup = await onNativeTimeUpdate(track!.id, (seconds) => {
                 if (currentTrackIdRef.current !== track!.id) return;
-                if (usePlayer.getState().isPreview && seconds >= 15) return;
+                const st = usePlayer.getState();
+                if (st.isPreview && seconds >= 15) {
+                  // Backstop for the wall-clock timer: a preview must never
+                  // play past 15s even if the timer misfires (entitlement).
+                  stopNative(track!.id).catch(() => {});
+                  if (st.playing) {
+                    usePlayer.setState({ playing: false, progressSeconds: 0 });
+                  }
+                  setError("Preview ended. Buy this track for full access.");
+                  return;
+                }
                 setProgress(Math.floor(seconds));
               });
               getNativeDuration(track!.id)
                 .then((d) => {
                   if (d && currentTrackIdRef.current === track!.id) {
                     setAudioDuration(d);
+                    durationRef.current = d;
                     usePlayer.getState().setTrackDuration(d);
                   }
                 })
@@ -453,9 +511,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 timeCleanup();
               };
               return;
-            }
-          }
-        }
+              } // preloaded
+            } // nativeViable
+          } // _nativeAvailable
+        } // isNative
 
         // Attach event-driven loading state so the spinner clears the moment
         // the browser reports the media is ready — not just when play() resolves.
@@ -650,6 +709,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     };
     const onMeta = () => {
       setAudioDuration(audio.duration || 0);
+      durationRef.current = audio.duration || 0;
       // Fill the track's duration so mobile bars/seek work even when the
       // queue entry was built without one.
       if (audio.duration && Number.isFinite(audio.duration)) {
@@ -716,7 +776,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     const timer = setInterval(async () => {
       try {
         const id = currentTrackIdRef.current;
-        if (!id || id !== track.id || !nativeCleanupRef.current) return;
+        // Keyed on the live selection: same-song A→B→A must never adopt
+        // the old asset's truth.
+        if (!id || id !== track.id || currentSelectionRef.current !== selectionId) return;
+        if (!nativeCleanupRef.current) return;
         const st = usePlayer.getState();
         const nativePlaying = await isNativePlaying(id);
         // Generous grace: slow networks can still be buffering several
@@ -737,7 +800,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }, 3000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNative, track?.id]);
+  }, [isNative, track?.id, selectionId]);
 
   // MediaSession — lock-screen / notification controls (web + webview).
   // Artwork must be a renderable URL: raw DB storage paths are not, so the
@@ -748,7 +811,26 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     (async () => {
       try {
         if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-        if (!track) return;
+        if (!track) {
+          // No track: clear stale handlers so lock-screen buttons can't
+          // resurrect playback after exit.
+          try {
+            for (const action of [
+              "play",
+              "pause",
+              "previoustrack",
+              "nexttrack",
+              "seekbackward",
+              "seekforward",
+              "seekto",
+            ] as const) {
+              navigator.mediaSession.setActionHandler(action, null);
+            }
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
         let artwork: string | undefined;
         try {
           const resolved = await resolveImageUrl("album-art", track.coverUrl);
@@ -793,18 +875,30 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         } catch {
           /* older implementations */
         }
-        // Update positionState periodically for lock-screen progress
+        // Update positionState periodically for lock-screen progress.
+        // On the native path the HTML element has no src/duration, so feed
+        // the last known native duration + store position instead.
         const updatePosition = () => {
-          const audio = getAudio();
-          if (audio && audio.duration && Number.isFinite(audio.duration)) {
-            try {
+          try {
+            const audio = getAudio();
+            if (audio && audio.duration && Number.isFinite(audio.duration)) {
               navigator.mediaSession.setPositionState({
                 duration: audio.duration,
                 playbackRate: audio.playbackRate,
                 position: Math.min(audio.currentTime, audio.duration),
               });
-            } catch { /* ignore */ }
-          }
+              return;
+            }
+            const dur = durationRef.current;
+            const pos = usePlayer.getState().progressSeconds;
+            if (dur > 0 && Number.isFinite(dur)) {
+              navigator.mediaSession.setPositionState({
+                duration: dur,
+                playbackRate: 1,
+                position: Math.min(pos, dur),
+              });
+            }
+          } catch { /* ignore */ }
         };
         const audio = getAudio();
         audio?.addEventListener("timeupdate", updatePosition);
