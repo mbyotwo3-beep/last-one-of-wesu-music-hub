@@ -99,10 +99,16 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
  * caller must delete it via deleteNativeTempFile when the track changes.
  * Returns the file URI, or null when the Filesystem plugin is unavailable.
  *
+ * Large files are written in ~0.75MB base64 chunks: a single giant bridge
+ * call can stall or fail on low-end devices.
+ *
  * NOTE for the mobile build: register @capacitor/filesystem in the native
  * project (npx cap sync) or staging silently returns null and offline
  * playback falls back to an error prompting re-download.
  */
+const STAGE_DIR = "wesu-offline";
+const STAGE_CHUNK = 768 * 1024;
+
 export async function stageNativeOfflineFile(
   songId: string,
   bytes: ArrayBuffer,
@@ -111,18 +117,62 @@ export async function stageNativeOfflineFile(
   try {
     const Filesystem = filesystemPlugin();
     if (!Filesystem) return null;
-    const path = `wesu-offline/${songId}.${guessOfflineExt(mime)}`;
-    await Filesystem.writeFile({
-      path,
-      data: arrayBufferToBase64(bytes),
-      directory: "CACHE",
-      recursive: true,
-    });
+    const path = `${STAGE_DIR}/${songId}.${guessOfflineExt(mime)}`;
+    const b64 = arrayBufferToBase64(bytes);
+    if (typeof Filesystem.appendFile === "function" && b64.length > STAGE_CHUNK) {
+      // Start clean: never append onto a leftover partial file.
+      await Filesystem.deleteFile({ path, directory: "CACHE" }).catch(() => {});
+      await Filesystem.writeFile({
+        path,
+        data: b64.slice(0, STAGE_CHUNK),
+        directory: "CACHE",
+        recursive: true,
+      });
+      for (let i = STAGE_CHUNK; i < b64.length; i += STAGE_CHUNK) {
+        await Filesystem.appendFile({
+          path,
+          data: b64.slice(i, i + STAGE_CHUNK),
+          directory: "CACHE",
+        });
+      }
+    } else {
+      await Filesystem.writeFile({
+        path,
+        data: b64,
+        directory: "CACHE",
+        recursive: true,
+      });
+    }
     const { uri } = await Filesystem.getUri({ path, directory: "CACHE" });
     if (!uri) return null;
     return { uri, path };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Delete orphaned staged files (e.g. left by an app kill mid-track).
+ * Runs once at engine startup; the engine re-stages on demand, so wiping
+ * the whole staging dir is always safe. The cache dir is expendable.
+ */
+export async function cleanupStaleNativeTempFiles(): Promise<void> {
+  try {
+    const Filesystem = filesystemPlugin();
+    if (!Filesystem || typeof Filesystem.readdir !== "function") return;
+    const listing = await Filesystem.readdir({ path: STAGE_DIR, directory: "CACHE" });
+    const files: unknown[] = listing?.files ?? [];
+    await Promise.all(
+      files.map((f) => {
+        const name = typeof f === "string" ? f : (f as { name?: string })?.name;
+        if (!name) return Promise.resolve();
+        return Filesystem.deleteFile({ path: `${STAGE_DIR}/${name}`, directory: "CACHE" }).catch(
+          () => {},
+        );
+      }),
+    );
+  } catch {
+    /* ignore */
   }
 }
 

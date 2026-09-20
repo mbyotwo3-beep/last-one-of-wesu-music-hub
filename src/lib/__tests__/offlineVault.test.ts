@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
+import { mapDownloadError } from "@/components/DownloadButton";
 
 // ---------------------------------------------------------------------------
 // AES-GCM device-key round trip (real WebCrypto)
@@ -100,5 +101,41 @@ describe("Download routing", () => {
     expect(downloadDestination({ user: true, isNative: false, isMobile: false })).toBe("vault");
     expect(downloadDestination({ user: true, isNative: true, isMobile: true })).toBe("vault");
     expect(downloadDestination({ user: true, isNative: true, isMobile: false })).toBe("vault");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Download failure text (mirrors mapDownloadError in DownloadButton.tsx):
+// purchase blocks and offline become nudges, never raw errors or URLs.
+// ---------------------------------------------------------------------------
+
+describe("Download failure text", () => {
+  it("offline always explains connectivity first", () => {
+    expect(mapDownloadError(new Error("Failed to fetch"), false)).toBe(
+      "You're offline — connect to download songs",
+    );
+    expect(mapDownloadError(new Error("Purchase required"), false)).toBe(
+      "You're offline — connect to download songs",
+    );
+  });
+
+  it("purchase blocks become a Buy nudge", () => {
+    for (const msg of [
+      "Purchase required before downloading this song",
+      "402 Payment Required",
+      "403 Forbidden",
+      "entitlement check failed",
+    ]) {
+      expect(mapDownloadError(new Error(msg), true)).toBe(
+        "Available after purchase — buy this track to download it",
+      );
+    }
+  });
+
+  it("anything else passes through untouched (no URLs are ever minted here)", () => {
+    expect(mapDownloadError(new Error("Download failed (500)"), true)).toBe(
+      "Download failed (500)",
+    );
+    expect(mapDownloadError("weird", true)).toBe("Download failed");
   });
 });

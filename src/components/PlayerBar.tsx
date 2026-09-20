@@ -47,6 +47,7 @@ import {
   configureNativeAudio,
   prepareNativeOfflineTrack,
   deleteNativeTempFile,
+  cleanupStaleNativeTempFiles,
   seekNative,
   setNativeVolume,
   getNativeDuration,
@@ -141,6 +142,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const trackPrice: number = Number(meta?.price ?? 0);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
+
+  // One-time native hygiene: drop staged temp files orphaned by an app
+  // kill. The engine re-stages on demand, so this is always safe.
+  useEffect(() => {
+    if (!isNative) return;
+    cleanupStaleNativeTempFiles().catch(() => {});
+  }, [isNative]);
 
   // Load audio when the selection changes (or auth identity changes, or
   // the user manually retries a failed load).

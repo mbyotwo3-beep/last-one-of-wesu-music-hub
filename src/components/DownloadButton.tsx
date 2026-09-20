@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { getDownloadAudioUrl } from "@/lib/listener.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsNative, useIsMobile } from "@/hooks/use-platform";
+import { useSongEntitlement } from "@/hooks/use-song-entitlement";
+import { supabase } from "@/integrations/supabase/client";
 import {
   isTrackDownloaded,
   downloadSongToVault,
@@ -25,6 +27,20 @@ interface DownloadButtonProps {
 /** Refresh every download button after a vault change. */
 export function touchVaultQueries(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: ["vault-track"] });
+}
+
+/**
+ * User-facing download failure text. Pure (unit-tested): never surfaces raw
+ * errors or URLs — purchase blocks become a Buy nudge, offline becomes a
+ * connectivity nudge.
+ */
+export function mapDownloadError(raw: unknown, online: boolean): string {
+  if (!online) return "You're offline — connect to download songs";
+  const msg = raw instanceof Error ? raw.message : "Download failed";
+  if (/purchase|buy|entitl|unlock|payment|402|403/i.test(msg)) {
+    return "Available after purchase — buy this track to download it";
+  }
+  return msg;
 }
 
 export function useVaultDownloaded(songId: string | null | undefined) {
@@ -62,6 +78,27 @@ export function DownloadButton({
   const [progressBytes, setProgressBytes] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const { data: downloaded } = useVaultDownloaded(songId);
+  // Price comes from the row itself (no new props for 14 call sites): one
+  // tiny cached lookup per song, shared across every button for it.
+  const { data: songInfo } = useQuery({
+    queryKey: ["song-download-info", songId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("songs")
+        .select("price,album_id")
+        .eq("id", songId)
+        .maybeSingle();
+      return data as { price: number | null; album_id: string | null } | null;
+    },
+    enabled: !!songId && !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+  const price = Number(songInfo?.price ?? 0);
+  const { owned, loading: entLoading } = useSongEntitlement(
+    songId,
+    songInfo ? price : null,
+    songInfo?.album_id ?? null,
+  );
 
   // Downloads are an authenticated feature. Hide the control for anonymous
   // listeners instead of showing a button that can only fail with 401.
@@ -112,13 +149,8 @@ export function DownloadButton({
       await touchVaultQueries(qc);
       toast.success(`Downloaded "${title ?? "song"}" — plays offline, only in Wesu+`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Download failed";
-      // Unbought paid tracks fail server-side: say so instead of a raw error.
-      setError(
-        /purchase|buy|entitl|unlock|payment|402|403/i.test(msg)
-          ? "Available after purchase — buy this track to download it"
-          : msg,
-      );
+      const online = typeof navigator === "undefined" || navigator.onLine !== false;
+      setError(mapDownloadError(err, online));
     } finally {
       setProgress(null);
     }
@@ -157,6 +189,25 @@ export function DownloadButton({
           <Check className="size-3.5 text-primary" />
           Downloaded
         </button>
+      </span>
+    );
+  }
+
+  // Spotify-style: unbought paid tracks offer Buy, not a Download button
+  // that can only fail. Free/owned tracks fall through to Download.
+  if (!entLoading && price > 0 && !owned) {
+    return (
+      <span className="inline-flex flex-col items-end gap-1">
+        <Link
+          to="/checkout"
+          search={{ item: "song", id: songId }}
+          className={buttonClass}
+          aria-label={`Buy ${title ?? "song"}`}
+          title="Buy this track to download it"
+        >
+          <Download className="size-3.5" />
+          Buy K{price.toFixed(0)}
+        </Link>
       </span>
     );
   }
