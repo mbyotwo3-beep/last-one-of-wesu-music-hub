@@ -21,6 +21,12 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Android release signing — NEVER commit the keystore or its passwords.
+# Back them up privately; losing them means the app can never be updated.
+*.keystore
+*.jks
+keystore.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

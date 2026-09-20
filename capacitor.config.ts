@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
     // app, so there is no static index.html to bundle — the WebView loads
     // the live deployment, while audio/filesystem/splash/deep-links run
     // natively on device).
-    url: "https://www.wesuplus.com",
+    url: "https://www.wesuplusly.com/",
     // For live-reload during development, point url at your dev server
     // ('http://10.0.2.2:3000' for the emulator) instead.
     // cleartext: true,
