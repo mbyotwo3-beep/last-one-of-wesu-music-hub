@@ -26,6 +26,7 @@ import {
   getSignedAudioUrl,
   getPublicAudioUrl,
   getPreviewAudioUrl,
+  getDownloadAudioUrl,
   incrementPlayCount,
 } from "@/lib/listener.functions";
 import { recordPlay, updatePlayProgress } from "@/lib/play-history.functions";
@@ -64,6 +65,9 @@ import { resolveImageUrl } from "@/lib/storage-url";
 import {
   isTrackDownloaded,
   getOfflineObjectUrl,
+  isVaultLicenseStale,
+  VAULT_LICENSE_MAX_AGE_MS,
+  decideStaleVaultPlayback,
 } from "@/lib/offline-vault";
 import { supabase } from "@/integrations/supabase/client";
 import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/lib/audio";
@@ -102,6 +106,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const getSignedFn = useServerFn(getSignedAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
+  const probeDownloadFn = useServerFn(getDownloadAudioUrl);
   const incrementFn = useServerFn(incrementPlayCount);
   const recordPlayFn = useServerFn(recordPlay);
   const updatePlayProgressFn = useServerFn(updatePlayProgress);
@@ -276,6 +281,33 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           if (await isTrackDownloaded(track!.id)) {
             const obj = await getOfflineObjectUrl(track!.id);
             if (obj && isCurrentTrack()) {
+              // Spotify-style license check: copies older than 30 days
+              // revalidate purchase when online. Offline (or a probe that
+              // fails for non-purchase reasons) always plays — offline
+              // must work offline.
+              const stale = await isVaultLicenseStale(track!.id, VAULT_LICENSE_MAX_AGE_MS);
+              const online =
+                typeof navigator === "undefined" || navigator.onLine !== false;
+              let purchaseFailed = false;
+              if (stale && online && user) {
+                try {
+                  await probeDownloadFn({ data: { song_id: track!.id } });
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : "";
+                  purchaseFailed = /purchase|buy|entitl|unlock|payment|402|403/i.test(msg);
+                }
+                if (!isCurrentTrack()) return;
+              }
+              if (
+                decideStaleVaultPlayback({ stale, online, probePurchaseFailed: purchaseFailed }) ===
+                "blocked"
+              ) {
+                setLoading(false);
+                setAudioUrl(null);
+                setError("This download needs re-verifying — buy this track to keep it offline.");
+                if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+                return;
+              }
               url = obj;
               offline = true;
             }

@@ -15,6 +15,11 @@
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { mapDownloadError } from "@/components/DownloadButton";
+import {
+  decideStaleVaultPlayback,
+  isVaultLicenseStale,
+  VAULT_LICENSE_MAX_AGE_MS,
+} from "../offline-vault";
 
 // ---------------------------------------------------------------------------
 // AES-GCM device-key round trip (real WebCrypto)
@@ -137,5 +142,45 @@ describe("Download failure text", () => {
       "Download failed (500)",
     );
     expect(mapDownloadError("weird", true)).toBe("Download failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spotify-style license revalidation: fresh copies play, stale copies play
+// offline or on probe blips, and only a confirmed purchase failure blocks.
+// ---------------------------------------------------------------------------
+
+describe("Stale vault license decision", () => {
+  it("fresh copies always play", () => {
+    expect(
+      decideStaleVaultPlayback({ stale: false, online: true, probePurchaseFailed: true }),
+    ).toBe("play");
+    expect(
+      decideStaleVaultPlayback({ stale: false, online: false, probePurchaseFailed: false }),
+    ).toBe("play");
+  });
+
+  it("stale copies play offline and on non-purchase probe failures", () => {
+    expect(
+      decideStaleVaultPlayback({ stale: true, online: false, probePurchaseFailed: true }),
+    ).toBe("play");
+    expect(
+      decideStaleVaultPlayback({ stale: true, online: true, probePurchaseFailed: false }),
+    ).toBe("play");
+  });
+
+  it("only a confirmed purchase failure blocks a stale copy", () => {
+    expect(
+      decideStaleVaultPlayback({ stale: true, online: true, probePurchaseFailed: true }),
+    ).toBe("blocked");
+  });
+
+  it("unknown age fails open (plays) without IndexedDB", async () => {
+    // Node test env has no vault: getVaultDownloadedAt → null → not stale.
+    await expect(isVaultLicenseStale("any-song", VAULT_LICENSE_MAX_AGE_MS)).resolves.toBe(false);
+  });
+
+  it("the license window is 30 days", () => {
+    expect(VAULT_LICENSE_MAX_AGE_MS).toBe(30 * 24 * 60 * 60 * 1000);
   });
 });

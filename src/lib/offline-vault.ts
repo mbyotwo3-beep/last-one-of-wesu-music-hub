@@ -110,6 +110,48 @@ function randomIv(): Uint8Array {
   return window.crypto.getRandomValues(new Uint8Array(12));
 }
 
+/** When this copy was downloaded (ms epoch), or null when unknown. Never decrypts. */
+export async function getVaultDownloadedAt(songId: string): Promise<number | null> {
+  if (!supported() || !songId) return null;
+  try {
+    const rec = await tx<{ downloadedAt?: number } | undefined>(
+      TRACKS_STORE,
+      "readonly",
+      (s) => s.get(songId),
+    );
+    return typeof rec?.downloadedAt === "number" ? rec.downloadedAt : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Spotify-style license check: downloads older than maxAgeMs revalidate
+ * purchase when the device is online. Unknown age plays (fail-open).
+ */
+export async function isVaultLicenseStale(songId: string, maxAgeMs: number): Promise<boolean> {
+  const at = await getVaultDownloadedAt(songId);
+  if (at === null) return false;
+  return Date.now() - at > maxAgeMs;
+}
+
+export const VAULT_LICENSE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Pure playback decision for a stale vault copy. Offline (or a probe that
+ * failed for non-purchase reasons) always plays — offline must work
+ * offline. Only a confirmed purchase failure blocks.
+ */
+export function decideStaleVaultPlayback(args: {
+  stale: boolean;
+  online: boolean;
+  probePurchaseFailed: boolean;
+}): "play" | "blocked" {
+  if (!args.stale) return "play";
+  if (!args.online) return "play";
+  return args.probePurchaseFailed ? "blocked" : "play";
+}
+
 /** Cheap existence probe — reads the key only, never the audio bytes. */
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;
