@@ -11,6 +11,14 @@ import { acceptInvitation } from "@/lib/invitations.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 import { toast } from "sonner";
 import { useIsNative } from "@/hooks/use-platform";
+import {
+  stashPendingAction,
+  takePendingAction,
+  mergePendingAction,
+  hasPendingAction,
+  safeAppRedirect,
+  type PendingAction,
+} from "@/lib/post-auth-action";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -77,20 +85,20 @@ function AuthPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invite]);
 
-  // After an OAuth round-trip the page reloads with a session but without the
-  // original ?redirect — recover it from sessionStorage (written below).
+  // After an OAuth round-trip the page reloads with a session but without
+  // the original ?action — recover the stashed intent, replay it, and land
+  // back where the user started (Google-style continue flow).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (cancelled || !data.session || redirect) return;
-        const stored = sessionStorage.getItem("post_auth_redirect");
-        if (stored) {
-          sessionStorage.removeItem("post_auth_redirect");
-          const safe = stored.startsWith("/") && !stored.startsWith("//") ? stored : "/dashboard";
-          navigate({ to: safe as any });
-        }
+        if (cancelled || !data.session) return;
+        const params: PendingAction = { action, artistId, itemId, itemType, redirect, invite };
+        const merged = mergePendingAction(params, takePendingAction(sessionStorage));
+        if (cancelled || !hasPendingAction(merged)) return;
+        const dest = await runPostAuthAction(merged);
+        if (!cancelled) navigate({ to: dest as any });
       } catch {
         /* ignore */
       }
@@ -116,6 +124,9 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
+        // Email-confirmation round-trips wipe the query string — stash the
+        // intent so it replays after the user confirms and signs in.
+        stashPendingAction(sessionStorage, { action, artistId, itemId, itemType, redirect, invite });
         if (!agreedToTerms) {
           setError("You must agree to the Terms & Conditions to create an account.");
           setLoading(false);
@@ -169,45 +180,51 @@ function AuthPage() {
     }
   }
 
-  async function handlePostAuthAction() {
+  /**
+   * Complete the pending anonymous intent (like/follow/save/invite) and
+   * return the destination — the user lands back where they started with
+   * the action DONE, not just toasted. Shared by email, signup, and OAuth
+   * return paths.
+   */
+  async function runPostAuthAction(act: PendingAction): Promise<string> {
+    const dest = safeAppRedirect(act.redirect ?? safeRedirect);
     // Handle post-authentication actions like follow, save, like
-    if (action === "follow" && artistId) {
+    if (act.action === "follow" && act.artistId) {
       try {
-        const result = await toggleFollow({ data: { artist_id: artistId } });
+        const result = await toggleFollow({ data: { artist_id: act.artistId } });
         toast.success(result.action === "followed" ? "Following artist" : "Unfollowed artist");
       } catch (err) {
         console.error("Failed to execute follow action after auth:", err);
         toast.error("Failed to follow artist");
       }
-    } else if (action === "save" && itemId && itemType) {
+    } else if (act.action === "save" && act.itemId && act.itemType) {
       try {
-        if (itemType === "song") {
-          await saveTrack({ data: { song_id: itemId } });
+        if (act.itemType === "song") {
+          await saveTrack({ data: { song_id: act.itemId } });
           toast.success("Song saved to library");
-        } else if (itemType === "album") {
-          await saveAlbum({ data: { album_id: itemId } });
+        } else if (act.itemType === "album") {
+          await saveAlbum({ data: { album_id: act.itemId } });
           toast.success("Album saved to library");
         }
       } catch (err) {
         console.error("Failed to execute save action after auth:", err);
         toast.error("Failed to save item");
       }
-    } else if (action === "like" && itemId && itemType === "song") {
+    } else if (act.action === "like" && act.itemId && act.itemType === "song") {
       try {
-        await saveTrack({ data: { song_id: itemId } });
+        await saveTrack({ data: { song_id: act.itemId } });
         toast.success("Song liked");
       } catch (err) {
         console.error("Failed to execute like action after auth:", err);
         toast.error("Failed to like song");
       }
-    } else if (action === "addPlaylist" && itemId && itemType === "song") {
+    } else if (act.action === "addPlaylist" && act.itemId && act.itemType === "song") {
       // For add to playlist, we redirect back to the page and let the user add to playlist
       // since we need them to select which playlist
-      navigate({ to: (safeRedirect || "/dashboard") as any });
-      return;
-    } else if (invite || readPendingInvite()) {
+      return dest;
+    } else if (act.invite || readPendingInvite()) {
       // Collaboration / label invitation accepted right after sign-in/up.
-      const invitationId = invite ?? readPendingInvite();
+      const invitationId = act.invite ?? readPendingInvite();
       try {
         await acceptInviteFn({ data: { invitation_id: invitationId! } });
         clearPendingInvite();
@@ -219,8 +236,13 @@ function AuthPage() {
         );
       }
     }
+    return dest;
+  }
+
+  async function handlePostAuthAction() {
+    const dest = await runPostAuthAction({ action, artistId, itemId, itemType, redirect, invite });
     // Redirect to the original destination
-    navigate({ to: (safeRedirect || "/dashboard") as any });
+    navigate({ to: dest as any });
   }
 
   return (
@@ -360,6 +382,12 @@ function AuthPage() {
               } catch {
                 /* storage unavailable — the fallback below still navigates */
               }
+              // The OAuth round-trip wipes ?action — stash the full intent so
+              // it replays (like/follow/save completes) when the session lands.
+              stashPendingAction(
+                sessionStorage,
+                { action, artistId, itemId, itemType, redirect, invite },
+              );
               const result = await lovable.auth.signInWithOAuth("google", {
                 redirect_uri: window.location.origin,
               });
