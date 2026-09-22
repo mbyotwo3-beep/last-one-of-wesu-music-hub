@@ -17,6 +17,7 @@ import {
   Music,
   Mic2,
   Plus,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
@@ -339,6 +340,31 @@ export function BottomTabBar() {
                 <span className="text-sm font-medium">Create a playlist…</span>
               </button>
             ) : null}
+
+            {/* Legal Section */}
+            <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Legal
+            </h3>
+            <button
+              onClick={() => {
+                navigate({ to: "/terms" });
+                setMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              <Shield className="size-5" />
+              <span className="text-sm font-medium">Terms &amp; Conditions</span>
+            </button>
+            <button
+              onClick={() => {
+                navigate({ to: "/privacy" });
+                setMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              <Lock className="size-5" />
+              <span className="text-sm font-medium">Privacy Policy</span>
+            </button>
 
             {/* User Section */}
             {user && (

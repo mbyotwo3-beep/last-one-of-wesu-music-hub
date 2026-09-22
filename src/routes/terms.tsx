@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Music, Headphones, ChevronRight, Shield } from "lucide-react";
+import { Music, Headphones, ChevronRight, Shield, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
@@ -98,6 +98,23 @@ function TermsIndexPage() {
           </Link>{" "}
           — available 24 hours a day.
         </p>
+
+        {/* Privacy */}
+        <Link
+          to="/privacy"
+          className="mt-6 mx-auto flex max-w-xl items-center gap-4 bg-card border border-border rounded-2xl p-5 hover:border-primary/40 transition-all"
+        >
+          <div className="size-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <ShieldCheck className="size-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-semibold">Privacy Policy</p>
+            <p className="text-xs text-muted-foreground">
+              How we collect, use, and protect your information.
+            </p>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+        </Link>
       </div>
     </div>
   );

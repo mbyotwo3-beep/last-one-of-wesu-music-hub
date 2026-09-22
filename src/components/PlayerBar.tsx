@@ -138,6 +138,27 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // In-flight native stop from the track-change branch, awaited at the top
   // of loadUrl so a reselect can't unload the asset being preloaded.
   const pendingStopRef = useRef<Promise<void> | null>(null);
+  // Selections that already burned their one auto-retry after a native
+  // start failure (e.g. notification-STOP unloaded the asset).
+  const nativeRetryRef = useRef<number | null>(null);
+
+  /**
+   * The UI believes audio is playing but the native engine refused to
+   * start (returns false instead of throwing). Re-resolve once per
+   * selection for a fresh preload; if that also fails, park as paused
+   * with a retry message instead of showing playing-while-silent.
+   */
+  function noteNativeStartFailure() {
+    const sel = currentSelectionRef.current;
+    if (nativeRetryRef.current === sel) {
+      nativeRetryRef.current = null;
+      usePlayer.setState({ playing: false });
+      setError("Playback was interrupted. Tap play to try again.");
+    } else {
+      nativeRetryRef.current = sel;
+      setRetryNonce((n) => n + 1);
+    }
+  }
   // Latest known media duration for the lock-screen position state
   // (HTML element on web, native getDuration on device).
   const durationRef = useRef<number>(0);
@@ -474,7 +495,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               // For offline tracks the marker is the staged file URI.
               setAudioUrl(assetUrl);
               if (usePlayer.getState().playing) {
-                await playNative(track!.id);
+                const started = await playNative(track!.id).catch(() => false);
+                if (!started) noteNativeStartFailure();
+                else if (nativeRetryRef.current === currentSelectionRef.current) {
+                  nativeRetryRef.current = null;
+                }
               }
               setLoading(false);
               if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
@@ -711,8 +736,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (isNative && _nativeAvailable && nativeCleanupRef.current) {
         // Pause → play on a live native asset is a resume (play() would
         // restart it). Both stamp the command clock for the reconciler.
-        if (playing) await resumeNative(track.id).catch(() => {});
-        else await pauseNative(track.id).catch(() => {});
+        // A refused start (asset unloaded out-of-band) recovers via retry.
+        if (playing) {
+          const ok = await resumeNative(track.id).catch(() => false);
+          if (!ok) noteNativeStartFailure();
+        } else await pauseNative(track.id).catch(() => {});
         return;
       }
       if (playing && audio.paused && audio.src) {

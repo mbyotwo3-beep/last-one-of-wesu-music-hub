@@ -272,11 +272,20 @@ export async function seekNative(id: string, seconds: number): Promise<void> {
 export async function setNativeVolume(id: string, volume: number): Promise<void> {
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
-    const v = Math.max(0, Math.min(1, Number(volume) || 0));
+    // The plugin documents 0.1–1.0; a 0.01 floor keeps mute effectively
+    // silent without risking a range rejection that would leave audio loud.
+    const v = clampNativeVolume(volume);
     await NativeAudio.setVolume({ assetId: id, volume: v });
   } catch {
     /* ignore */
   }
+}
+
+/** Pure: clamp to the plugin's usable range (unit-tested). */
+export function clampNativeVolume(volume: number): number {
+  const v = Number(volume);
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(0.01, Math.min(1, v));
 }
 
 /** Duration in seconds, or null when unknown/unavailable. */

@@ -7,6 +7,7 @@ import {
   markNativeCommand,
   getLastNativeCommandAt,
   configureNativeAudio,
+  clampNativeVolume,
   __resetNativeAudioConfig,
   __resetNativeCommandClock,
 } from "../native-audio";
@@ -100,5 +101,31 @@ describe("native configure guard", () => {
     // Node test env has no Capacitor bridge: dynamic import fails → false.
     await expect(configureNativeAudio()).resolves.toBe(false);
     await expect(configureNativeAudio()).resolves.toBe(false);
+  });
+});
+
+describe("native volume clamp", () => {
+  it("keeps values in range with a non-zero floor for mute", () => {
+    expect(clampNativeVolume(0)).toBe(0.01);
+    expect(clampNativeVolume(-3)).toBe(0.01);
+    expect(clampNativeVolume(0.5)).toBe(0.5);
+    expect(clampNativeVolume(1)).toBe(1);
+    expect(clampNativeVolume(9)).toBe(1);
+    expect(clampNativeVolume(Number.NaN)).toBe(1);
+  });
+});
+
+describe("native start-failure recovery model", () => {
+  // Mirrors noteNativeStartFailure: first failure per selection re-resolves,
+  // a second failure parks as paused. Pure state machine for the test.
+  function next(sel: number | null, retried: number | null): "retry" | "park" {
+    return retried === sel ? "park" : "retry";
+  }
+
+  it("retries once per selection, then parks", () => {
+    expect(next(7, null)).toBe("retry");
+    expect(next(7, 7)).toBe("park");
+    // New selection gets a fresh retry.
+    expect(next(8, 7)).toBe("retry");
   });
 });

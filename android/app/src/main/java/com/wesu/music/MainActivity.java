@@ -1,7 +1,10 @@
 package com.wesu.music;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.net.http.SslError;
+import android.os.Build;
 import android.os.Bundle;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
@@ -27,6 +30,14 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Media (notification/lock-screen) controls need the runtime
+        // notification permission on Android 13+. Best-effort: lock-screen
+        // transport controls work regardless; the shade player needs the grant.
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+        }
         Bridge bridge = getBridge();
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebViewClient(new WesuWebViewClient(bridge));

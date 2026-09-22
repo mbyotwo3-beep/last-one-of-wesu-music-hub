@@ -20,6 +20,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as NowPlayingRouteImport } from './routes/now-playing'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -111,6 +112,11 @@ const QueueRoute = QueueRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
@@ -325,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
@@ -425,6 +433,7 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
   '/playlists': typeof PlaylistsRouteWithChildren
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/queue': typeof QueueRoute
   '/recently-added': typeof RecentlyAddedRoute
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/privacy'
     | '/profile'
     | '/queue'
     | '/recently-added'
@@ -526,6 +536,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/privacy'
     | '/profile'
     | '/queue'
     | '/recently-added'
@@ -576,6 +587,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/now-playing'
     | '/playlists'
+    | '/privacy'
     | '/profile'
     | '/queue'
     | '/recently-added'
@@ -627,6 +639,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   NowPlayingRoute: typeof NowPlayingRoute
   PlaylistsRoute: typeof PlaylistsRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   QueueRoute: typeof QueueRoute
   RecentlyAddedRoute: typeof RecentlyAddedRoute
@@ -723,6 +736,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playlists': {
@@ -1072,6 +1092,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   NowPlayingRoute: NowPlayingRoute,
   PlaylistsRoute: PlaylistsRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   QueueRoute: QueueRoute,
   RecentlyAddedRoute: RecentlyAddedRoute,
