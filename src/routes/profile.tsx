@@ -37,16 +37,19 @@ function Page() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({ full_name: "", bio: "", avatar_url: "", location: "" });
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     supabase
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
+        if (cancelled) return;
         if (data) {
           setForm({
             full_name: data.full_name ?? user.user_metadata?.full_name ?? "",
@@ -57,7 +60,13 @@ function Page() {
         } else if (user.user_metadata?.full_name) {
           setForm((prev) => ({ ...prev, full_name: user.user_metadata.full_name }));
         }
+      })
+      .catch(() => {
+        if (!cancelled) setProfileError("Couldn't load your profile — showing defaults.");
       });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const m = useMutation({
@@ -251,6 +260,12 @@ function Page() {
             <h1 className="text-xl font-bold">Edit Profile</h1>
           </div>
 
+          {profileError && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+              {profileError}
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -284,6 +299,14 @@ function Page() {
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f || !user) return;
+                      if (!f.type.startsWith("image/")) {
+                        toast.error("Avatar must be an image file (JPG, PNG or WEBP)");
+                        return;
+                      }
+                      if (f.size > 5 * 1024 * 1024) {
+                        toast.error("Avatar must be smaller than 5MB");
+                        return;
+                      }
                       setUploading(true);
                       try {
                         const path = await uploadFileToBucket("user-avatars", user.id, f);

@@ -51,14 +51,14 @@ function Page() {
   const { user } = useAuth();
   const followedFn = useServerFn(listFollowedPlaylists);
 
-  const { data: followedPlaylists, isLoading: followedLoading } = useQuery({
+  const { data: followedPlaylists, isLoading: followedLoading, isError: followedError, refetch: refetchFollowed } = useQuery({
     queryKey: ["followed-playlists", user?.id],
     queryFn: () => followedFn(),
     enabled: !!user?.id,
     staleTime: 30_000,
   });
 
-  const { data: userPlaylists, isLoading: playlistsLoading } = useQuery({
+  const { data: userPlaylists, isLoading: playlistsLoading, isError: playlistsError, refetch: refetchPlaylists } = useQuery({
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -75,7 +75,7 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: likedSongs, isLoading: likedLoading } = useQuery({
+  const { data: likedSongs, isLoading: likedLoading, isError: likedError, refetch: refetchLiked } = useQuery({
     queryKey: ["liked-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -90,7 +90,7 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: purchasedSongs, isLoading: purchasedLoading } = useQuery({
+  const { data: purchasedSongs, isLoading: purchasedLoading, isError: purchasedError, refetch: refetchPurchased } = useQuery({
     queryKey: ["purchased-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -107,7 +107,7 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading } = useQuery({
+  const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading, isError: purchasedAlbumsError, refetch: refetchPurchasedAlbums } = useQuery({
     queryKey: ["purchased-albums", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -124,7 +124,7 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: followedArtists, isLoading: followingLoading } = useQuery({
+  const { data: followedArtists, isLoading: followingLoading, isError: followingError, refetch: refetchFollowing } = useQuery({
     queryKey: ["followed-artists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -150,6 +150,19 @@ function Page() {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   }
 
+  // A failed section previously rendered as a false empty ("No purchased…").
+  // Surface one banner with a retry instead.
+  const sectionError =
+    playlistsError || likedError || purchasedError || purchasedAlbumsError || followingError || followedError;
+  const retryAll = () => {
+    refetchPlaylists();
+    refetchLiked();
+    refetchPurchased();
+    refetchPurchasedAlbums();
+    refetchFollowing();
+    refetchFollowed();
+  };
+
   // Relationships can be null when a referenced row was deleted or hidden by
   // RLS. Keep rendering defensive even if a cached query contains one.
   const safePlaylists = (userPlaylists ?? []).filter(hasId);
@@ -162,6 +175,18 @@ function Page() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
       <h1 className="text-3xl font-bold mb-6">My Library</h1>
+
+      {sectionError && (
+        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex flex-wrap items-center justify-between gap-3">
+          <span>Some sections couldn't load — your content may be incomplete.</span>
+          <button
+            onClick={retryAll}
+            className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <section className="mb-10">
         <div className="flex items-center gap-2 mb-4">
@@ -497,9 +522,7 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
             <Play className="size-4 fill-current" />
           )}
         </button>
-        {Number(song.price ?? 0) <= 0 && (
-          <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
-        )}
+        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
         {song.price && Number(song.price) > 0 && (
           <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
             ZMW {Number(song.price).toFixed(2)}
@@ -508,8 +531,9 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
         <button
           onClick={() => removeMutation.mutate()}
           disabled={removeMutation.isPending}
-          className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+          className="size-8 rounded-full hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
           title="Remove from liked songs"
+          aria-label="Remove from liked songs"
         >
           <X className="size-4" />
         </button>

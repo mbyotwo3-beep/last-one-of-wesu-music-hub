@@ -20,7 +20,7 @@ import {
   Play,
   Pause,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { usePlayer } from "@/stores/player";
@@ -49,6 +49,8 @@ import {
   reconcileAllTransactions,
   cancelStuckTransaction,
 } from "@/lib/reconcile.functions";
+import { markTransactionPaid } from "@/lib/superadmin.functions";
+import { useUserRoles } from "@/hooks/use-roles";
 import { deleteAlbum } from "@/lib/artist.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
@@ -121,20 +123,9 @@ function AdminPage() {
     retry: 1,
   });
 
-  const tabsError =
-    pendingSongsQ.error ||
-    pendingArtistsQ.error ||
-    pendingVerifsQ.error ||
-    pendingLabelsQ.error ||
-    pendingAlbumsQ.error;
-  if (tabsError) {
-    return (
-      <div className="text-destructive p-6">
-        Error loading pending counts: {(tabsError as Error).message}
-      </div>
-    );
-  }
-
+  // Per-badge errors must never blank the whole panel: a single failing
+  // count degrades to no badge (and a console entry) instead of locking
+  // staff out of every tab.
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "songs", label: "Songs", badge: pendingSongsQ.data?.length },
@@ -303,19 +294,15 @@ function Overview({
   return (
     <div className="space-y-8">
       {/* Live metrics */}
-      {statsQ.isLoading ? (
-        <div className="text-muted-foreground text-sm">Loading metrics…</div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {metricCards.map((c) => (
-            <div key={c.label} className="bg-card border border-border rounded-2xl p-5">
-              <c.icon className={`size-5 mb-3 ${c.color}`} />
-              <p className="text-2xl font-bold">{c.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{c.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {metricCards.map((c) => (
+          <div key={c.label} className="bg-card border border-border rounded-2xl p-5">
+            <c.icon className={`size-5 mb-3 ${c.color}`} />
+            <p className="text-2xl font-bold">{c.value}</p>
+            <p className="text-xs text-muted-foreground mt-1">{c.label}</p>
+          </div>
+        ))}
+      </div>
 
       <AnalyticsSection
         data={analyticsQ.data}
@@ -492,7 +479,11 @@ function AlbumMod() {
               <Check className="size-3" /> Approve
             </button>
             <button
-              onClick={() => modMutation.mutate({ data: { id: a.id, status: "rejected" } })}
+              onClick={() => {
+                if (window.confirm(`Reject album "${a.title}"? The artist will need to resubmit.`)) {
+                  modMutation.mutate({ data: { id: a.id, status: "rejected" } });
+                }
+              }}
               disabled={modMutation.isPending}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50 cursor-pointer"
             >
@@ -529,6 +520,12 @@ function SongMod() {
   const [subTab, setSubTab] = useState<"pending" | "all">("pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Debounced search: one server query per pause, not per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
   const [songToDelete, setSongToDelete] = useState<{
     id: string;
     title: string;
@@ -567,8 +564,8 @@ function SongMod() {
   });
 
   const allSongsQ = useQuery({
-    queryKey: ["all-platform-songs", statusFilter, searchTerm],
-    queryFn: () => listAll({ data: { status: statusFilter, search: searchTerm } }),
+    queryKey: ["all-platform-songs", statusFilter, debouncedSearch],
+    queryFn: () => listAll({ data: { status: statusFilter, search: debouncedSearch } }),
     enabled: subTab === "all",
     retry: false,
   });
@@ -729,7 +726,15 @@ function SongMod() {
                     </button>
                     <button
                       disabled={modMutation.isPending || deleteMutation.isPending}
-                      onClick={() => modMutation.mutate({ data: { id: s.id, status: "rejected" } })}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Reject "${s.title}"? The artist will need to fix and resubmit.`,
+                          )
+                        ) {
+                          modMutation.mutate({ data: { id: s.id, status: "rejected" } });
+                        }
+                      }}
                       className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold"
                     >
                       <X className="size-3" /> Reject
@@ -982,6 +987,7 @@ function ArtistMod() {
       );
       qc.invalidateQueries({ queryKey: ["pending-artists"] });
       qc.invalidateQueries({ queryKey: ["pending-artists-count"] });
+      qc.invalidateQueries({ queryKey: ["artist-diagnostics"] });
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
   });
@@ -1029,7 +1035,11 @@ function ArtistMod() {
                   </button>
                   <button
                     disabled={m.isPending}
-                    onClick={() => m.mutate({ data: { id: a.id, status: "rejected" } })}
+                    onClick={() => {
+                      if (window.confirm(`Reject ${a.name}'s artist application?`)) {
+                        m.mutate({ data: { id: a.id, status: "rejected" } });
+                      }
+                    }}
                     className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold"
                   >
                     <X className="size-3" /> Reject
@@ -1133,7 +1143,11 @@ function VerificationMod() {
                 </button>
                 <button
                   disabled={mVerif.isPending}
-                  onClick={() => mVerif.mutate({ data: { id: a.id, decision: "reject" } })}
+                  onClick={() => {
+                    if (window.confirm(`Reject verification for ${a.name}?`)) {
+                      mVerif.mutate({ data: { id: a.id, decision: "reject" } });
+                    }
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full bg-destructive/15 text-destructive font-semibold cursor-pointer hover:bg-destructive/25 transition-all"
                 >
                   <X className="size-3" /> Reject
@@ -1213,7 +1227,11 @@ function LabelMod() {
             </button>
             <button
               disabled={m.isPending}
-              onClick={() => m.mutate({ data: { id: l.id, status: "rejected" } })}
+              onClick={() => {
+                if (window.confirm(`Reject the "${l.name}" label application?`)) {
+                  m.mutate({ data: { id: l.id, status: "rejected" } });
+                }
+              }}
               className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold"
             >
               <X className="size-3" /> Reject
@@ -1482,6 +1500,8 @@ function PaymentsMod() {
   const recheckFn = useServerFn(reconcileTransaction);
   const recheckAllFn = useServerFn(reconcileAllTransactions);
   const cancelFn = useServerFn(cancelStuckTransaction);
+  const forceSettleFn = useServerFn(markTransactionPaid);
+  const { isSuperAdmin } = useUserRoles();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["stuck-transactions"],
@@ -1525,6 +1545,21 @@ function PaymentsMod() {
     mutationFn: (id: string) => cancelFn({ data: { transactionId: id } }),
     onSuccess: () => {
       toast.success("Marked as abandoned.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Manual recovery for rows the provider will never settle (e.g. cash
+  // received off-system). Superadmin-only server-side; settles idempotently.
+  const forceM = useMutation({
+    mutationFn: (id: string) => forceSettleFn({ data: { transaction_id: id } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        r?.result === "completed"
+          ? "Settled — buyer now has access."
+          : `Settle returned: ${r?.result ?? "unknown"}`,
+      );
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1607,6 +1642,23 @@ function PaymentsMod() {
                 >
                   Mark abandoned
                 </button>
+                {isSuperAdmin && t.status === "fulfillment_failed" && (
+                  <button
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Force-settle this transaction? Only use this when the money was actually received — it grants the buyer access.",
+                        )
+                      ) {
+                        forceM.mutate(t.id);
+                      }
+                    }}
+                    disabled={forceM.isPending}
+                    className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 disabled:opacity-50"
+                  >
+                    Force settle
+                  </button>
+                )}
               </div>
             </div>
           ))}

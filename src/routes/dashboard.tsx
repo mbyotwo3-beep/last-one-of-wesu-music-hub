@@ -68,7 +68,7 @@ function DashboardPage() {
       });
   }, [user, loading, navigate]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["my-overview", user?.id],
     queryFn: () => fetchOverview(),
     enabled: !!user,
@@ -81,6 +81,20 @@ function DashboardPage() {
   });
 
   if (loading || !user) return null;
+  if (isError)
+    return (
+      <div className="p-12 text-center">
+        <p className="text-destructive mb-2">
+          Couldn't load your library{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        >
+          Try again
+        </button>
+      </div>
+    );
   if (isLoading || !data)
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
 

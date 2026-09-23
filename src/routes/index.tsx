@@ -42,6 +42,19 @@ export const Route = createFileRoute("/")({
     context.queryClient.ensureQueryData(discoverQO);
   },
   component: IndexRoute,
+  errorComponent: ({ error, reset }) => (
+    <div className="p-12 text-center">
+      <p className="text-destructive mb-2">
+        Couldn't load the homepage{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+      </p>
+      <button
+        onClick={() => reset()}
+        className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+      >
+        Try again
+      </button>
+    </div>
+  ),
 });
 
 function IndexRoute() {

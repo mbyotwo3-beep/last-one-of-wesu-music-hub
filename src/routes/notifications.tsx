@@ -22,7 +22,7 @@ function Page() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: rows, isLoading } = useQuery({
+  const { data: rows, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["notifications", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -108,6 +108,11 @@ function Page() {
     }
   };
 
+  // Allowlist for notification deep links: songs, albums, artists,
+  // playlists. Anything else shows a toast instead of throwing or
+  // landing on a blank route.
+  const LINK_RE = /^\/(songs|albums|artists|playlists)(\/|$)/;
+
   const handleNotificationClick = (n: any) => {
     if (!n.read_at) {
       markRead.mutate(n.id);
@@ -116,15 +121,15 @@ function Page() {
       // SPA navigation for internal links — avoids full document reload
       // which wipes player queue / upload state.
       try {
-        if (n.link.startsWith("http")) {
-          window.open(n.link, "_blank", "noopener,noreferrer");
-        } else if (n.link.startsWith("/")) {
+        if (typeof n.link === "string" && LINK_RE.test(n.link)) {
           navigate({ to: n.link as any });
+        } else if (typeof n.link === "string" && n.link.startsWith("http")) {
+          window.open(n.link, "_blank", "noopener,noreferrer");
         } else {
-          window.location.href = n.link;
+          toast.info("That item is no longer available");
         }
       } catch {
-        window.location.href = n.link;
+        toast.info("That item is no longer available");
       }
     }
   };
@@ -148,6 +153,19 @@ function Page() {
       </div>
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
+      ) : isError ? (
+        <div className="text-center py-16">
+          <Bell className="size-12 mx-auto mb-4 opacity-40" />
+          <p className="text-destructive mb-2">
+            Couldn't load notifications{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            Try again
+          </button>
+        </div>
       ) : !rows || rows.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Bell className="size-12 mx-auto mb-4 opacity-40" />

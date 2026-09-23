@@ -1,12 +1,14 @@
 import { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, type FileRouteTypes } from "@tanstack/react-router";
+
+type AppRoute = FileRouteTypes["to"];
 
 interface HorizontalShelfProps {
   title: string;
   children: ReactNode;
   // Plain route path ("/hot-tracks"). For filtered destinations pass
   // showAllSearch instead — TanStack Link cannot parse "?genre=" strings.
-  showAllLink?: string;
+  showAllLink?: AppRoute;
   showAllSearch?: Record<string, string>;
 }
 
@@ -22,7 +24,7 @@ export function HorizontalShelf({
         <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
         {showAllLink && (
           <Link
-            to={showAllLink as any}
+            to={showAllLink}
             {...(showAllSearch ? { search: showAllSearch as any } : {})}
             className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
           >

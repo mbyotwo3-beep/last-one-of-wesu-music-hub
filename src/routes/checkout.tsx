@@ -183,11 +183,16 @@ function CheckoutPage() {
 
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
   const isCard = selectedMethod?.category === "card";
+  // Zambian mobile-money numbers: 10 digits starting 05/07/09 (spaces
+  // allowed). Invalid numbers burn a failed STK attempt server-side, so
+  // validate here with an inline hint.
+  const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
+  const phoneValid = /^0[579]\d{7}$/.test(normalizedPhone);
   const disabled =
     mutation.isPending ||
     !selectedMethodCode ||
     !itemId ||
-    (!isCard && !phoneNumber.trim()) ||
+    (!isCard && !phoneValid) ||
     isFree;
 
   return (
@@ -257,7 +262,9 @@ function CheckoutPage() {
                 className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
               />
               <p className="text-xs text-muted-foreground">
-                You'll receive a prompt on your phone to authorize this payment.
+                {phoneNumber.trim() && !phoneValid
+                  ? "Enter a 10-digit Zambian number starting 095, 096, 097, 075, 076 or 077."
+                  : "You'll receive a prompt on your phone to authorize this payment."}
               </p>
             </div>
           ) : (
@@ -281,7 +288,7 @@ function CheckoutPage() {
                 method_code: selectedMethodCode,
                 item_type: itemType,
                 item_id: itemId!,
-                phone: phoneNumber || undefined,
+                phone: normalizedPhone || undefined,
               },
             })
           }
@@ -398,8 +405,30 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
   const total = Number(bundle.total ?? 0);
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
   const isCard = selectedMethod?.category === "card";
+  const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
+  const phoneValid = /^0[579]\d{7}$/.test(normalizedPhone);
   const disabled =
-    mutation.isPending || !selectedMethodCode || (!isCard && !phoneNumber.trim());
+    mutation.isPending || !selectedMethodCode || (!isCard && !phoneValid);
+
+  if (missing.length === 0) {
+    return (
+      <div className="min-h-screen px-6 py-12">
+        <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+          <h1 className="text-xl font-semibold">Nothing to pay</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Every song in "{bundle.playlist_name}" is free or already yours.
+          </p>
+          <Link
+            to="/playlists/$id"
+            params={{ id: playlistId }}
+            className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+          >
+            Open playlist
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-24">
@@ -480,7 +509,9 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
                     className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
                   />
                   <p className="text-xs text-muted-foreground">
-                    You'll receive a prompt on your phone to authorize this payment.
+                    {phoneNumber.trim() && !phoneValid
+                      ? "Enter a 10-digit Zambian number starting 095, 096, 097, 075, 076 or 077."
+                      : "You'll receive a prompt on your phone to authorize this payment."}
                   </p>
                 </div>
               ) : (
@@ -506,7 +537,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
               data: {
                 method_code: selectedMethodCode,
                 playlist_id: playlistId,
-                phone: phoneNumber || undefined,
+                phone: normalizedPhone || undefined,
               },
             })
           }

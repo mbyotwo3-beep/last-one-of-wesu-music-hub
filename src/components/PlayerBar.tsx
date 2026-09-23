@@ -646,7 +646,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           if ((playErr as DOMException)?.name === "NotAllowedError") {
             // Keep playing: true! Do NOT kill playback state.
             // When user taps anywhere on the document or canplay arrives, it will immediately play.
-            console.warn("Autoplay deferred by browser policy, awaiting user interaction");
           } else {
             throw playErr;
           }
@@ -1170,8 +1169,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   />
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-                  <span>{fmt(progressSeconds)}</span>
-                  <span>{fmt(dur)}</span>
+                  <span>{dur > 0 ? fmt(progressSeconds) : "—:—"}</span>
+                  <span>{dur > 0 ? fmt(dur) : "—:—"}</span>
                 </div>
               </div>
               <div className="flex items-center justify-center gap-6">
@@ -1190,11 +1189,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   <SkipBack className="size-6" />
                 </button>
                 <button
-                  // Stays enabled on error: pressing play retries a failed
-                  // load (retryNonce) instead of sitting dead.
-                  onClick={() => !loading && togglePlay()}
-                  disabled={loading}
-                  className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                  // Never disabled: a stalled load would otherwise leave a
+                  // dead button. Tapping pauses a pending load, or retries a
+                  // failed one (retryNonce) via the play-state sync effect.
+                  onClick={() => togglePlay()}
+                  className="bg-foreground text-background p-4 rounded-full hover:scale-105 transition-transform"
                   aria-label={playing ? "Pause" : "Play"}
                   title={error ? "Retry" : undefined}
                 >
@@ -1435,10 +1434,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 <SkipBack className="size-4" />
               </button>
               <button
-                // Stays enabled on error: pressing play retries a failed load.
-                onClick={() => !loading && togglePlay()}
-                disabled={loading}
-                className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                // Never disabled: a stalled load would otherwise leave a
+                // dead button (tap pauses pending / retries failed).
+                onClick={() => togglePlay()}
+                className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform"
                 aria-label={playing ? "Pause" : "Play"}
                 title={error ? "Retry" : undefined}
               >

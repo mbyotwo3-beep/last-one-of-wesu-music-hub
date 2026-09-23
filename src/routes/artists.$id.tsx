@@ -418,15 +418,14 @@ function ArtistTopSongRow({
             <ShoppingBag className="size-4" />
           </Link>
         )}
-        {Number(s.price ?? 0) <= 0 && (
-          <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
-        )}
+        <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
         <button
           onClick={(e) => {
             e.stopPropagation();
             toggle();
           }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100 transition-opacity"
+          aria-label={isSaved ? "Unlike" : "Like"}
         >
           <Heart
             className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}

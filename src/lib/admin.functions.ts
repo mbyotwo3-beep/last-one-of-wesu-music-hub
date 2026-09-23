@@ -95,7 +95,7 @@ export const listPendingSongs = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("songs")
-      .select("id,title,created_at,status,price,genre,play_count,cover_url,audio_url,artist:artists(id,name)")
+      .select("id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)")
       .eq("status", "pending")
       .order("created_at", { ascending: false });
     return data ?? [];
@@ -110,7 +110,7 @@ export const listAllSongsAdmin = createServerFn({ method: "GET" })
 
     let query = supabaseAdmin
       .from("songs")
-      .select("id,title,created_at,status,price,genre,play_count,cover_url,audio_url,artist:artists(id,name)")
+      .select("id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)")
       .order("created_at", { ascending: false });
 
     if (data?.status && data.status !== "all") {
@@ -226,7 +226,8 @@ export const listPendingVerifications = createServerFn({ method: "GET" })
     const { data } = await supabaseAdmin
       .from("artists")
       .select("id, name, bio, genre, verified, verification_status, created_at, user_id")
-      .or("verification_status.eq.pending,and(verified.eq.false,verification_status.eq.pending)")
+      // Pending requests plus legacy rows that never got a status stamped.
+      .or("verification_status.eq.pending,and(verified.eq.false,verification_status.is.null)")
       .order("created_at", { ascending: false });
     return data ?? [];
   });

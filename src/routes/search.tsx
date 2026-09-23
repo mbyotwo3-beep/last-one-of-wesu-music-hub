@@ -41,7 +41,7 @@ function SearchPage() {
 
   useEffect(() => setTerm(q), [q]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["globalSearch", q],
     queryFn: () => searchFn({ data: { q, limit: 30 } }),
     enabled: !!q.trim(),
@@ -105,6 +105,18 @@ function SearchPage() {
         <p className="text-muted-foreground">Type a song, artist, or album to get started.</p>
       ) : isLoading ? (
         <p className="text-muted-foreground">Searching…</p>
+      ) : isError ? (
+        <div className="text-center py-10">
+          <p className="text-destructive mb-2">
+            Search failed{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            Try again
+          </button>
+        </div>
       ) : (
         <div className="space-y-10">
           {(tab === "all" || tab === "artists") && artists.length > 0 && (

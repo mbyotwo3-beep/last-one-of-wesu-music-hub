@@ -229,8 +229,52 @@ export const listPayouts = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("payouts")
-      .select("*, artist:artists(name)")
+      .select("*, artist:artists(name), label:labels(name)")
       .order("requested_at", { ascending: false });
+    return data ?? [];
+  });
+
+/**
+ * Staff reads that must see INACTIVE rows too (public site fns filter to
+ * active/enabled only, and RLS may hide the rest). One function per table
+ * so each tab keeps a stable query key.
+ */
+export const listAllPlansAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("subscription_plans")
+      .select("*")
+      .order("price_zmw");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const listAllPaymentMethodsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("payment_methods")
+      .select("*")
+      .order("sort_order");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const listAllLabelsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSuperadmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("labels")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
     return data ?? [];
   });
 

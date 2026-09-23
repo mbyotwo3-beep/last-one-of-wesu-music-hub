@@ -492,18 +492,29 @@ export function ShareMenu({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // Force copy to clipboard without using Web Share API
-                let url = window.location.origin;
-                if (type === "song" && songId) url += `/songs/${songId}`;
-                else if (type === "album" && albumId) url += `/albums/${albumId}`;
-                else if (type === "artist" && artistId) url += `/artists/${artistId}`;
-                else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
-
-                navigator.clipboard.writeText(url);
-                setCopied(true);
-                toast.success("Link copied to clipboard");
-                setTimeout(() => setCopied(false), 2000);
-                setIsOpen(false);
+                // Force copy to clipboard without using Web Share API.
+                // Guarded: clipboard is unavailable/denied in some WebViews.
+                (async () => {
+                  try {
+                    let url = window.location.origin;
+                    if (type === "song" && songId) url += `/songs/${songId}`;
+                    else if (type === "album" && albumId) url += `/albums/${albumId}`;
+                    else if (type === "artist" && artistId) url += `/artists/${artistId}`;
+                    else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
+                    if (!navigator.clipboard?.writeText) {
+                      toast.error("Copy isn't available on this device");
+                      return;
+                    }
+                    await navigator.clipboard.writeText(url);
+                    setCopied(true);
+                    toast.success("Link copied to clipboard");
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch {
+                    toast.error("Couldn't copy the link");
+                  } finally {
+                    setIsOpen(false);
+                  }
+                })();
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
             >

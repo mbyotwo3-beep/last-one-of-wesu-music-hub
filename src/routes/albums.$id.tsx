@@ -124,7 +124,7 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
             toggle();
           }}
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-            isSaved ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+            isSaved ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -140,7 +140,7 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
           artistId={artist?.id}
           artistName={artist?.name}
           type="song"
-          className="relative z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="relative z-20 opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-within:opacity-100 transition-opacity"
         />
       </div>
     </div>

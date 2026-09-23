@@ -498,6 +498,7 @@ function UploadWizard() {
     () => sessionStorage.getItem("upload-wizard-feeAgreed") === "true",
   );
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
@@ -556,6 +557,9 @@ function UploadWizard() {
   function clearPickedFeatureArtist() {
     setPickedFeatureArtist(null);
     sessionStorage.removeItem("upload-wizard-featureArtistId");
+    // The pick also wrote the display name — remove it so a stale name
+    // doesn't resurface in the email field later.
+    sessionStorage.removeItem("upload-wizard-featureName");
   }
 
   async function searchRegisteredLabels() {
@@ -589,6 +593,7 @@ function UploadWizard() {
   function clearPickedLabel() {
     setPickedLabel(null);
     sessionStorage.removeItem("upload-wizard-labelId");
+    sessionStorage.removeItem("upload-wizard-labelName");
   }
   const [cover, setCover] = useState<File | null>(() => uploadDraft.cover);
   const [tracks, setTracksState] = useState<TrackEntry[]>(() => uploadDraft.tracks);
@@ -819,6 +824,7 @@ function UploadWizard() {
 
   async function submit() {
     if (!user) return;
+    if (busyRef.current) return;
     const perr = validatePricing();
     if (perr) return setError(perr);
     if (!title.trim()) return setError("Title is required");
@@ -841,23 +847,30 @@ function UploadWizard() {
       Math.min(100, Number(sessionStorage.getItem("upload-wizard-featureSplit") || 0)),
     );
     const pickedLabelId = (sessionStorage.getItem("upload-wizard-labelId") ?? "").trim();
+    // Checked box + no artist/label picked or entered = user error. Block
+    // instead of silently downgrading to a solo upload the artist didn't ask for.
+    if (hasFeature && !featureEmail && !pickedFeatureArtistId) {
+      return setError("Feature is checked but no artist was picked or entered — search for a registered artist or enter their email.");
+    }
+    if (hasLabel && !labelEmail && !pickedLabelId) {
+      return setError("Label is checked but no label was picked or entered — search for a registered label or enter their email.");
+    }
     const doFeatureInvite = hasFeature && !!featureEmail;
     const doFeatureDirect = hasFeature && !!pickedFeatureArtistId;
-    if (hasFeature && !featureEmail && !pickedFeatureArtistId) {
-      toast.info("No feature artist picked — uploading without a feature.");
-    }
     // has_label uploads are rejected server-side unless signed to a label.
     // Never burn an upload on a flag that can't succeed.
     const doLabelInvite = hasLabel && !!labelEmail && !!signedLabelId;
     const doLabelRequest = hasLabel && !!pickedLabelId;
     if (hasLabel && !signedLabelId && !pickedLabelId) {
       toast.info("You're not signed to a label — uploading as an independent release.");
-    } else if (hasLabel && !labelEmail && !pickedLabelId) {
-      toast.info("No label picked — uploading without a label.");
     }
 
     setError(null);
     setBusy(true);
+    // Re-entrancy guard (set here, after validation): the button's disabled
+    // state lags a render behind, so double-Enter/double-tap would otherwise
+    // create duplicate albums, songs, and storage uploads.
+    busyRef.current = true;
 
     // Build the initial upload tracking list
     const items: Array<{
@@ -999,7 +1012,6 @@ function UploadWizard() {
               `Featured artist added with a ${featureSplitPct}% share — they'll confirm it in Collabs.`,
             );
           } catch (directError) {
-            console.error("Failed to add featured artist:", directError);
             toast.error(`Could not add featured artist: ${(directError as Error).message}`);
           }
         }
@@ -1023,7 +1035,6 @@ function UploadWizard() {
               );
             }
           } catch (inviteError) {
-            console.error("Failed to send feature invitation:", inviteError);
             toast.error(`Could not send feature invitation: ${(inviteError as Error).message}`);
           }
         }
@@ -1047,7 +1058,6 @@ function UploadWizard() {
               );
             }
           } catch (inviteError) {
-            console.error("Failed to send label invitation:", inviteError);
             toast.error(`Could not send label invitation: ${(inviteError as Error).message}`);
           }
         }
@@ -1062,7 +1072,6 @@ function UploadWizard() {
             });
             toast.success("Label request sent — they'll approve it in their dashboard.");
           } catch (requestError) {
-            console.error("Failed to request label:", requestError);
             toast.error(`Could not request label: ${(requestError as Error).message}`);
           }
         }
@@ -1236,6 +1245,7 @@ function UploadWizard() {
       );
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
   }
 
@@ -1460,7 +1470,6 @@ function UploadWizard() {
               Release Date <span className="font-normal text-muted-foreground">(optional)</span>
               <input
                 type="date"
-                min={new Date().toISOString().split("T")[0]}
                 className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
                 value={releaseDate}
                 onChange={(e) => setReleaseDate(e.target.value)}

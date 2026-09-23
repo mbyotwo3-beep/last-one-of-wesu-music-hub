@@ -34,7 +34,7 @@ function Page() {
   const [newPlaylist, setNewPlaylist] = useState({ name: "", description: "", make_public: false });
 
   // Fetch Playlists with songs for playback
-  const { data: playlists, isLoading } = useQuery({
+  const { data: playlists, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -124,6 +124,20 @@ function Page() {
   };
 
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
+  if (isError)
+    return (
+      <div className="p-12 text-center">
+        <p className="text-destructive mb-2">
+          Couldn't load playlists{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+        >
+          Try again
+        </button>
+      </div>
+    );
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -292,8 +306,15 @@ function Page() {
                   </button>
 
                   <button
-                    onClick={() => deleteM.mutate({ data: { id: playlist.id } })}
-                    className="text-destructive hover:text-destructive/80 p-2 hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (
+                        window.confirm(`Delete "${playlist.name}"? This can't be undone.`)
+                      ) {
+                        deleteM.mutate({ data: { id: playlist.id } });
+                      }
+                    }}
+                    disabled={deleteM.isPending}
+                    className="text-destructive hover:text-destructive/80 p-2 hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                     aria-label="Delete playlist"
                     title="Delete playlist"
                   >

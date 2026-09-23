@@ -31,7 +31,7 @@ function CheckoutSuccessPage() {
   const navigate = useNavigate();
   const verifyFn = useServerFn(verifyPayment);
 
-  const { data: transaction, isLoading } = useQuery({
+  const { data: transaction, isLoading, refetch: refetchTransaction } = useQuery({
     queryKey: ["transaction", ref],
     queryFn: async () => {
       if (!ref || !user) return null;
@@ -54,16 +54,19 @@ function CheckoutSuccessPage() {
       return data;
     },
     enabled: !!ref && !!user,
+    // Stop polling once settled. Cap at ~2 minutes: an unsettled Lenco
+    // transaction after that needs human eyes, not an infinite spinner.
     refetchInterval: (q) => {
       const status = (q.state.data as any)?.status;
       if (status === "completed" || status === "failed") return false;
+      const count = q.state.dataUpdateCount;
+      if (count * 3 >= 120) return false;
       return 3000;
     },
     refetchIntervalInBackground: true,
   });
 
-  const { data: receiptItem } = useQuery({
-    queryKey: ["receipt-item", transaction?.item_type, transaction?.item_id],
+  const { data: receiptItem } = useQuery({    queryKey: ["receipt-item", transaction?.item_type, transaction?.item_id],
     enabled: !!transaction?.item_id && !!transaction?.item_type,
     queryFn: async () => {
       const t = transaction as any;
@@ -110,9 +113,9 @@ function CheckoutSuccessPage() {
     try {
       const t = transaction as any;
       if (t?.item_type === "song" && t?.item_id) {
-        import("@/lib/audio").then(({ evictCachedAudioUrl }) =>
-          evictCachedAudioUrl(t.item_id),
-        );
+        import("@/lib/audio")
+          .then(({ evictCachedAudioUrl }) => evictCachedAudioUrl(t.item_id))
+          .catch(() => {});
       }
     } catch {
       /* ignore */
@@ -198,6 +201,8 @@ function CheckoutSuccessPage() {
       navigate({ to: "/checkout", search: { item: "song", id: tx.item_id } });
     } else if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/checkout", search: { item: "album", id: tx.item_id } });
+    } else if (tx?.item_type === "playlist" && tx?.item_id) {
+      navigate({ to: "/checkout", search: { item: "playlist", id: tx.item_id } });
     } else {
       navigate({ to: "/library" });
     }
@@ -274,6 +279,21 @@ function CheckoutSuccessPage() {
                 prompt on your phone.
                 {pollElapsed > 0 && ` (${pollElapsed}s)`}
               </p>
+              {pollElapsed >= 120 && (
+                <div className="mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">
+                  Still not confirmed after 2 minutes. If money left your account, contact
+                  support with the transaction ID below — otherwise check again.
+                  <button
+                    onClick={() => {
+                      setPollElapsed(0);
+                      refetchTransaction();
+                    }}
+                    className="mt-3 block mx-auto px-5 py-2 rounded-full bg-primary text-obsidian text-sm font-semibold"
+                  >
+                    Check again
+                  </button>
+                </div>
+              )}
               <Receipt />
               <button
                 onClick={() => navigate({ to: "/dashboard" })}

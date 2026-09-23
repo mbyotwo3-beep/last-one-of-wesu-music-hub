@@ -27,6 +27,9 @@ import {
   listPayouts,
   decidePayout,
   getSettings,
+  listAllLabelsAdmin,
+  listAllPlansAdmin,
+  listAllPaymentMethodsAdmin,
 } from "@/lib/superadmin.functions";
 import { moderateLabel } from "@/lib/labels.functions";
 import { initializePlatformSettings } from "@/lib/pricing.functions";
@@ -38,7 +41,6 @@ import {
   upsertFeaturedSlot,
   removeFeaturedSlot,
 } from "@/lib/features.functions";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/superadmin")({
   head: () => ({ meta: [{ title: "Superadmin — Wesu+" }] }),
@@ -125,22 +127,19 @@ function SuperadminPage() {
 function LabelsTab() {
   const qc = useQueryClient();
   const moderateFn = useServerFn(moderateLabel);
+  const listLabelsFn = useServerFn(listAllLabelsAdmin);
   const { data: rows = [], error: queryError } = useQuery({
     queryKey: ["super-labels"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("labels")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
+    // Staff server read: sees non-approved labels too (public reads + RLS hide them).
+    queryFn: () => listLabelsFn(),
   });
   const error = queryError ? (queryError as Error).message : null;
   const modM = useMutation({
     mutationFn: moderateFn,
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["super-labels"] });
+      qc.invalidateQueries({ queryKey: ["pending-labels"] });
+      qc.invalidateQueries({ queryKey: ["pending-labels-count"] });
       toast.success(`Label ${variables.data.decision}`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -182,7 +181,11 @@ function LabelsTab() {
                       </button>
                       <button
                         disabled={modM.isPending}
-                        onClick={() => modM.mutate({ data: { id: l.id, decision: "rejected" } })}
+                        onClick={() => {
+                          if (window.confirm(`Reject the "${l.name}" label application?`)) {
+                            modM.mutate({ data: { id: l.id, decision: "rejected" } });
+                          }
+                        }}
                         className="text-xs px-2 py-1 rounded-md bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 disabled:opacity-50"
                       >
                         Reject
@@ -219,15 +222,8 @@ function FeaturedTab() {
     retry: 1,
   });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading featured slots…</div>;
-  if (error)
-    return (
-      <div className="text-destructive">
-        Error loading featured slots: {(error as Error).message}
-      </div>
-    );
-  if (!data) return <div className="text-muted-foreground">No featured slots found</div>;
-
+  // Hooks must run before any early return (Rules of Hooks) — the loading
+  // and error branches below would otherwise change the hook count.
   const upsertM = useMutation({
     mutationFn: upsertFn,
     onSuccess: () => {
@@ -260,6 +256,16 @@ function FeaturedTab() {
     subtitle: "",
     image_url: "",
   });
+
+  if (isLoading) return <div className="text-muted-foreground">Loading featured slots…</div>;
+  if (error)
+    return (
+      <div className="text-destructive">
+        Error loading featured slots: {(error as Error).message}
+      </div>
+    );
+  if (!data) return <div className="text-muted-foreground">No featured slots found</div>;
+
   const targetIdValid = UUID_RE.test(form.target_id.trim());
   return (
     <div className="space-y-4">
@@ -480,7 +486,12 @@ function OverviewTab() {
                 key={p.id}
                 className="flex items-center justify-between bg-card/60 rounded-lg px-4 py-2"
               >
-                <span className="text-sm font-medium">{p.artist?.name ?? "—"}</span>
+                <span className="text-sm font-medium">
+                  {(p as any).label?.name ?? p.artist?.name ?? "—"}
+                  {(p as any).label ? (
+                    <span className="ml-1 text-[10px] uppercase text-muted-foreground">label</span>
+                  ) : null}
+                </span>
                 <span className="text-sm font-bold text-primary">
                   ZMW {Number(p.amount).toFixed(2)}
                 </span>
@@ -585,11 +596,19 @@ function UsersTab() {
                       <button
                         key={r}
                         disabled={grantM.isPending || revokeM.isPending}
-                        onClick={() =>
-                          has
+                        onClick={() => {
+                          if (
+                            has &&
+                            !window.confirm(
+                              `Revoke the ${r} role from this user? They lose access immediately.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          return has
                             ? revokeM.mutate({ data: { user_id: u.user_id, role: r } })
-                            : grantM.mutate({ data: { user_id: u.user_id, role: r } })
-                        }
+                            : grantM.mutate({ data: { user_id: u.user_id, role: r } });
+                        }}
                         className={`text-xs px-2 py-1 rounded-md border cursor-pointer transition-colors ${
                           has
                             ? "border-destructive/40 text-destructive hover:bg-destructive/10"
@@ -613,20 +632,15 @@ function UsersTab() {
 function PlansTab() {
   const qc = useQueryClient();
   const upsert = useServerFn(upsertPlan);
+  const listPlansFn = useServerFn(listAllPlansAdmin);
   const {
     data: plans = [],
     error: queryError,
     isFetching,
   } = useQuery({
     queryKey: ["super-plans"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("*")
-        .order("price_zmw");
-      if (error) throw error;
-      return data ?? [];
-    },
+    // Staff server read: sees inactive plans too (public reads + RLS hide them).
+    queryFn: () => listPlansFn(),
   });
   const error = queryError ? (queryError as Error).message : null;
   const upsertM = useMutation({
@@ -685,14 +699,34 @@ function PlansTab() {
               <th className="text-left p-3">Name</th>
               <th className="text-left p-3">Price</th>
               <th className="text-left p-3">Active</th>
+              <th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {plans.map((p) => (
               <tr key={p.id} className="border-t border-border">
                 <td className="p-3 font-medium">{p.name}</td>
-                <td className="p-3">ZMW {Number(p.price_zmw).toFixed(2)}</td>
+                <td className="p-3">ZMW {Number(p.price_zmw ?? 0).toFixed(2)}</td>
                 <td className="p-3">{p.is_active ? "Yes" : "No"}</td>
+                <td className="p-3">
+                  <button
+                    disabled={upsertM.isPending}
+                    onClick={() =>
+                      upsertM.mutate({
+                        data: {
+                          id: p.id,
+                          name: p.name,
+                          price_zmw: Number(p.price_zmw ?? 0),
+                          description: p.description ?? "",
+                          is_active: !p.is_active,
+                        },
+                      })
+                    }
+                    className="text-xs px-3 py-1 rounded-full bg-secondary border border-border disabled:opacity-50"
+                  >
+                    {p.is_active ? "Disable" : "Enable"}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -705,16 +739,11 @@ function PlansTab() {
 function PaymentsTab() {
   const qc = useQueryClient();
   const toggle = useServerFn(togglePaymentMethod);
+  const listMethodsFn = useServerFn(listAllPaymentMethodsAdmin);
   const { data: methods = [], error: queryError } = useQuery({
     queryKey: ["super-methods"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payment_methods")
-        .select("*")
-        .order("sort_order");
-      if (error) throw error;
-      return data ?? [];
-    },
+    // Staff server read: sees disabled methods too (public reads + RLS hide them).
+    queryFn: () => listMethodsFn(),
   });
   const error = queryError ? (queryError as Error).message : null;
   const m = useMutation({
@@ -748,7 +777,17 @@ function PaymentsTab() {
                 <td className="p-3">
                   <button
                     disabled={m.isPending}
-                    onClick={() => m.mutate({ data: { code: p.code, is_enabled: !p.is_enabled } })}
+                    onClick={() => {
+                      if (
+                        p.is_enabled &&
+                        !window.confirm(
+                          `Disable ${p.label}? This removes it from checkout immediately.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      m.mutate({ data: { code: p.code, is_enabled: !p.is_enabled } });
+                    }}
                     className={`text-xs px-3 py-1 rounded-full cursor-pointer transition-colors ${p.is_enabled ? "bg-primary/15 text-primary hover:bg-primary/25" : "bg-muted text-muted-foreground hover:bg-accent"}`}
                   >
                     {p.is_enabled ? "Enabled" : "Disabled"}
@@ -793,6 +832,12 @@ function PayoutsTab() {
     ) {
       return;
     }
+    if (
+      decision === "rejected" &&
+      !window.confirm("Reject this payout? The artist will need to request again.")
+    ) {
+      return;
+    }
     m.mutate({ data: { id, decision } });
   };
 
@@ -817,7 +862,12 @@ function PayoutsTab() {
         <tbody>
           {data.map((p: any) => (
             <tr key={p.id} className="border-t border-border">
-              <td className="p-3">{p.artist?.name ?? "—"}</td>
+              <td className="p-3">
+                {(p as any).label?.name ?? p.artist?.name ?? "—"}
+                {(p as any).label ? (
+                  <span className="ml-1 text-[10px] uppercase text-muted-foreground">label</span>
+                ) : null}
+              </td>
               <td className="p-3">ZMW {Number(p.amount).toFixed(2)}</td>
               <td className="p-3 text-muted-foreground">
                 {p.method_code} → {p.destination}
@@ -877,6 +927,7 @@ function SettingsTab() {
       qc.invalidateQueries({ queryKey: ["pricing-config"] });
       qc.invalidateQueries({ queryKey: ["verification-config"] });
       qc.invalidateQueries({ queryKey: ["withdrawal-config"] });
+      qc.invalidateQueries({ queryKey: ["site-config"] });
       toast.success("Settings saved");
     },
     onError: (e) => toast.error(`Failed to save: ${(e as Error).message}`),
@@ -896,30 +947,34 @@ function SettingsTab() {
   const [verification, setVerification] = useState<any>(null);
   const [withdrawal, setWithdrawal] = useState<any>(null);
 
+  function applyServerData(d: any) {
+    setSite(d.site ?? {});
+    setPay(d.payments ?? {});
+    setPricing(
+      d.pricing ?? {
+        song_min: 10,
+        song_max: 100,
+        album_min: 150,
+        album_max: 250,
+        free_song_fee: 100,
+      },
+    );
+    setVerification(
+      d.verification ?? {
+        min_followers: 100,
+        min_earnings: 500,
+      },
+    );
+    setWithdrawal(
+      d.withdrawal ?? {
+        min_amount: 500,
+      },
+    );
+  }
+
   useEffect(() => {
     if (data && site === null) {
-      setSite(data.site ?? {});
-      setPay(data.payments ?? {});
-      setPricing(
-        data.pricing ?? {
-          song_min: 10,
-          song_max: 100,
-          album_min: 150,
-          album_max: 250,
-          free_song_fee: 100,
-        },
-      );
-      setVerification(
-        data.verification ?? {
-          min_followers: 100,
-          min_earnings: 500,
-        },
-      );
-      setWithdrawal(
-        data.withdrawal ?? {
-          min_amount: 500,
-        },
-      );
+      applyServerData(data);
     }
   }, [data, site]);
 
@@ -932,21 +987,33 @@ function SettingsTab() {
     return <div className="text-muted-foreground">No settings available</div>;
   return (
     <div className="space-y-4 max-w-2xl">
-      <button
-        onClick={() => {
-          if (
-            window.confirm(
-              "Re-initialize platform settings with defaults? This overwrites site/pricing values.",
-            )
-          ) {
-            initM.mutate({});
-          }
-        }}
-        disabled={initM.isPending}
-        className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
-      >
-        Initialize Platform Settings
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => {
+            if (
+              window.confirm(
+                "Re-initialize platform settings with defaults? This overwrites site/pricing values.",
+              )
+            ) {
+              initM.mutate({});
+            }
+          }}
+          disabled={initM.isPending}
+          className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
+        >
+          Initialize Platform Settings
+        </button>
+        <button
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ["super-settings"] });
+            applyServerData(data);
+            toast.info("Reloaded saved values — unsaved edits discarded.");
+          }}
+          className="mb-4 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-accent transition-colors"
+        >
+          Reload saved values
+        </button>
+      </div>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
         <h3 className="font-semibold">Site</h3>
         <label className="block text-sm">
@@ -999,10 +1066,11 @@ function SettingsTab() {
           Leave blank to show a "coming soon" note instead.
         </p>
         <button
+          disabled={m.isPending}
           onClick={() => m.mutate({ data: { key: "site", value: site } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
-          Save site
+          {m.isPending ? "Saving…" : "Save site"}
         </button>
       </div>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
@@ -1019,10 +1087,11 @@ function SettingsTab() {
           </select>
         </label>
         <button
+          disabled={m.isPending}
           onClick={() => m.mutate({ data: { key: "payments", value: pay } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
-          Save payments
+          {m.isPending ? "Saving…" : "Save payments"}
         </button>
       </div>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
@@ -1083,10 +1152,11 @@ function SettingsTab() {
           </label>
         </div>
         <button
+          disabled={m.isPending}
           onClick={() => m.mutate({ data: { key: "pricing", value: pricing } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
-          Save pricing
+          {m.isPending ? "Saving…" : "Save pricing"}
         </button>
       </div>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
@@ -1121,10 +1191,11 @@ function SettingsTab() {
           </label>
         </div>
         <button
+          disabled={m.isPending}
           onClick={() => m.mutate({ data: { key: "verification", value: verification } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
-          Save verification
+          {m.isPending ? "Saving…" : "Save verification"}
         </button>
       </div>
       <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
@@ -1143,10 +1214,11 @@ function SettingsTab() {
           />
         </label>
         <button
+          disabled={m.isPending}
           onClick={() => m.mutate({ data: { key: "withdrawal", value: withdrawal } })}
-          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform disabled:opacity-50"
         >
-          Save withdrawal
+          {m.isPending ? "Saving…" : "Save withdrawal"}
         </button>
       </div>
     </div>
