@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch splash: cream background with the Wesu+ logo centered at its
+     natural aspect ratio. Never use a scaled-to-fill bitmap here — the wide
+     logo stretched badly with CENTER_CROP. The <bitmap> centers without
+     scaling, and density-specific wesu_logo.png files keep it crisp. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/wesuCream" />
+    <item
+        android:drawable="@drawable/wesu_logo"
+        android:gravity="center" />
+</layer-list>
