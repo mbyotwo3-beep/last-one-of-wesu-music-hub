@@ -52,6 +52,7 @@ import {
 import { markTransactionPaid } from "@/lib/superadmin.functions";
 import { useUserRoles } from "@/hooks/use-roles";
 import { deleteAlbum } from "@/lib/artist.functions";
+import { listSupportMessages, resolveSupportMessage } from "@/lib/contact.functions";
 import { getPlatformAnalytics } from "@/lib/analytics.functions";
 import { getVerificationConfig } from "@/lib/pricing.functions";
 import { CarouselBuilder } from "@/components/CarouselBuilder";
@@ -83,6 +84,7 @@ type Tab =
   | "labels"
   | "payouts"
   | "payments"
+  | "support"
   | "carousels"
   | "hero-carousel"
   | "media-gallery"
@@ -122,6 +124,12 @@ function AdminPage() {
     queryFn: () => listAlbumsFn(),
     retry: 1,
   });
+  const supportListFn = useServerFn(listSupportMessages);
+  const openSupportQ = useQuery({
+    queryKey: ["support-open-count"],
+    queryFn: () => supportListFn(),
+    retry: 1,
+  });
 
   // Per-badge errors must never blank the whole panel: a single failing
   // count degrades to no badge (and a console entry) instead of locking
@@ -135,6 +143,11 @@ function AdminPage() {
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
     { id: "payouts", label: "Payouts" },
     { id: "payments", label: "Transaction Reconciliation" },
+    {
+      id: "support",
+      label: "Support",
+      badge: openSupportQ.data?.filter((m: any) => m.status === "open").length || undefined,
+    },
     { id: "carousels", label: "Carousels" },
     { id: "hero-carousel", label: "Hero Carousel" },
     { id: "media-gallery", label: "Media Gallery" },
@@ -188,6 +201,7 @@ function AdminPage() {
         {tab === "labels" && <LabelMod />}
         {tab === "payouts" && <PayoutMod />}
         {tab === "payments" && <PaymentsMod />}
+        {tab === "support" && <SupportMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "hero-carousel" && <HeroCarouselBuilder />}
         {tab === "media-gallery" && <MediaGallery />}
@@ -1660,6 +1674,109 @@ function PaymentsMod() {
                   </button>
                 )}
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Support inbox — messages from /contact, owned by staff (no mailbox)
+// ─────────────────────────────────────────────────────────────
+function SupportMod() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listSupportMessages);
+  const resolveFn = useServerFn(resolveSupportMessage);
+  const [filter, setFilter] = useState<"open" | "all">("open");
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["support-messages"],
+    queryFn: () => listFn(),
+    retry: 1,
+  });
+
+  const m = useMutation({
+    mutationFn: (id: string) => resolveFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["support-messages"] });
+      qc.invalidateQueries({ queryKey: ["support-open-count"] });
+      toast.success("Marked as resolved.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-muted-foreground">Loading messages…</div>;
+  if (error)
+    return <div className="text-destructive">Error loading messages: {(error as Error).message}</div>;
+
+  const rows: any[] = data ?? [];
+  const visible = filter === "open" ? rows.filter((r) => r.status === "open") : rows;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold">Support inbox</h2>
+          <p className="text-sm text-muted-foreground">
+            Messages from the contact page. Reply by email, then mark resolved.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {(["open", "all"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-xs px-3 py-1.5 rounded-full capitalize ${
+                filter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">
+          {filter === "open" ? "Inbox zero — nothing waiting." : "No messages yet."}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((msg) => (
+            <div key={msg.id} className="bg-card border border-border rounded-2xl p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {msg.subject || "No subject"}{" "}
+                    <span
+                      className={`ml-1 text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                        msg.status === "open"
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : "bg-primary/15 text-primary"
+                      }`}
+                    >
+                      {msg.status}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {msg.name} · {msg.email} · {new Date(msg.created_at).toLocaleString()}
+                  </p>
+                </div>
+                {msg.status === "open" && (
+                  <button
+                    onClick={() => m.mutate(msg.id)}
+                    disabled={m.isPending}
+                    className="text-xs px-3 py-1.5 rounded-full bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 shrink-0"
+                  >
+                    Mark resolved
+                  </button>
+                )}
+              </div>
+              <p className="mt-3 text-sm whitespace-pre-wrap">{msg.message}</p>
             </div>
           ))}
         </div>
