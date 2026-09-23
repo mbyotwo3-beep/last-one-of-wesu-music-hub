@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Building2, Users, DollarSign, Wallet, Camera } from "lucide-react";
+import { Building2, Users, DollarSign, Wallet, Camera, Inbox } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ import {
   requestLabelPayout,
   getLabelPayoutBalance,
   updateLabel,
+  listLabelReleaseRequests,
+  respondToLabelReleaseRequest,
 } from "@/lib/labels.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -34,7 +36,7 @@ export const Route = createFileRoute("/label-dashboard")({
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
-type Tab = "overview" | "roster" | "revenue" | "payouts" | "settings";
+type Tab = "overview" | "roster" | "requests" | "revenue" | "payouts" | "settings";
 
 function Page() {
   const { user } = useAuth();
@@ -92,6 +94,7 @@ function Page() {
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: Building2 },
     { id: "roster", label: "Roster", icon: Users },
+    { id: "requests", label: "Requests", icon: Inbox },
     { id: "revenue", label: "Revenue", icon: DollarSign },
     { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "settings", label: "Settings", icon: Building2 },
@@ -125,6 +128,7 @@ function Page() {
       </div>
       {tab === "overview" && <Overview labelId={(label as any).id} />}
       {tab === "roster" && <Roster labelId={(label as any).id} />}
+      {tab === "requests" && <ReleaseRequests labelId={(label as any).id} />}
       {tab === "revenue" && <Revenue labelId={(label as any).id} />}
       {tab === "payouts" && <Payouts labelId={(label as any).id} />}
       {tab === "settings" && <Settings label={label as any} />}
@@ -168,6 +172,82 @@ function Overview({ labelId }: { labelId: string }) {
         </div>
       </div>
       <AnalyticsSection data={analytics} scope="label" title="Roster audience analytics" />
+    </div>
+  );
+}
+
+/**
+ * Releases artists asked to put under this label (searched by name, no
+ * email). Accepting attaches songs.label_id — money only routes after
+ * this explicit consent.
+ */
+function ReleaseRequests({ labelId }: { labelId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listLabelReleaseRequests);
+  const respondFn = useServerFn(respondToLabelReleaseRequest);
+  const { data, isLoading } = useQuery({
+    queryKey: ["label-release-requests", labelId],
+    queryFn: () => listFn({ data: { label_id: labelId } }),
+    retry: false,
+  });
+  const m = useMutation({
+    mutationFn: respondFn,
+    onSuccess: (_res, vars: any) => {
+      qc.invalidateQueries({ queryKey: ["label-release-requests", labelId] });
+      toast.success(vars?.data?.accept ? "Release attached to your label" : "Request declined");
+    },
+    onError: (error) => {
+      toast.error(`Failed: ${(error as Error).message}`);
+    },
+  });
+
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading requests…</div>;
+  const rows: any[] = (data as any[]) ?? [];
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <h3 className="font-semibold mb-1">Release requests</h3>
+      <p className="text-sm text-muted-foreground mb-4">
+        Artists who want this label on their song or album. Accepting attaches the label —
+        revenue splits route to you from that point on.
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No pending requests.</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li
+              key={r.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {r.release_title}{" "}
+                  <span className="text-muted-foreground font-normal">
+                    ({r.album_id ? "album" : "song"})
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">by {r.artist_name}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => m.mutate({ data: { invitation_id: r.id, accept: true } })}
+                  disabled={m.isPending}
+                  className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => m.mutate({ data: { invitation_id: r.id, accept: false } })}
+                  disabled={m.isPending}
+                  className="text-xs px-3 py-1.5 rounded-full bg-secondary border border-border disabled:opacity-50"
+                >
+                  Decline
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

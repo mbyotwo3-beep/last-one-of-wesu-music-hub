@@ -162,7 +162,9 @@ export function NowPlayingSheet() {
         style={{
           background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)",
           borderRadius: "24px 24px 0 0",
-          maxHeight: "100dvh",
+          // 100vh (not dvh): pre-2022 WebViews drop unknown units, which
+          // would leave the sheet unclamped and overflowing the screen.
+          maxHeight: "100vh",
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
         }}

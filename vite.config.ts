@@ -20,6 +20,11 @@ export default defineConfig({
   },
   vite: {
     build: {
+      // ES2019 syntax target: most listeners are on old Android phones
+      // whose frozen WebViews choke on modern syntax (?. ?? logical
+      // assignment, etc.). esbuild transpiles it all down; runtime APIs
+      // used by the app (all ES2019 or older) need no polyfills.
+      target: "es2019",
       rollupOptions: {
         external: ['crypto', 'node:crypto'],
         output: {

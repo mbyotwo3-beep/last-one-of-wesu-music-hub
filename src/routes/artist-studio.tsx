@@ -42,7 +42,7 @@ import {
 } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
-import { respondToLabelInvite } from "@/lib/labels.functions";
+import { respondToLabelInvite, requestLabelForRelease } from "@/lib/labels.functions";
 import { inviteArtistForFeature, inviteLabelForRelease } from "@/lib/invitations.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { getPricingConfig, DEFAULT_PRICING, getWithdrawalConfig } from "@/lib/pricing.functions";
@@ -167,7 +167,7 @@ function CollabsTab() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Invite collaborators to one of your songs and assign a revenue split. Total splits cannot
-        exceed 100%.
+        exceed 100%. Registered artists get an in-app invite — no email needed.
       </p>
       <form
         onSubmit={(e) => {
@@ -445,6 +445,8 @@ function UploadWizard() {
   const overviewFn = useServerFn(getMyArtistOverview);
   const inviteFeatureFn = useServerFn(inviteArtistForFeature);
   const inviteLabelFn = useServerFn(inviteLabelForRelease);
+  const directCollabFn = useServerFn(inviteCollaborator);
+  const labelRequestFn = useServerFn(requestLabelForRelease);
 
   const { data: pricing = DEFAULT_PRICING } = useQuery({
     queryKey: ["pricing-config"],
@@ -500,6 +502,94 @@ function UploadWizard() {
   const [done, setDone] = useState<string | null>(null);
   const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
   const [labelInviteLink, setLabelInviteLink] = useState<string | null>(null);
+  // Registered-artist/label pickers: search by name and attach directly —
+  // no email needed. Persisted in sessionStorage like the email fields.
+  const [artistSearch, setArtistSearch] = useState("");
+  const [artistResults, setArtistResults] = useState<any[]>([]);
+  const [pickedFeatureArtist, setPickedFeatureArtist] = useState<{
+    id: string;
+    name: string;
+  } | null>(() => {
+    const id = sessionStorage.getItem("upload-wizard-featureArtistId");
+    if (!id) return null;
+    return { id, name: sessionStorage.getItem("upload-wizard-featureName") || "Picked artist" };
+  });
+  const [featureSplit, setFeatureSplit] = useState<number>(() =>
+    Math.max(0, Math.min(100, Number(sessionStorage.getItem("upload-wizard-featureSplit") || 0))),
+  );
+  const [labelSearch, setLabelSearch] = useState("");
+  const [labelResults, setLabelResults] = useState<any[]>([]);
+  const [pickedLabel, setPickedLabel] = useState<{ id: string; name: string } | null>(() => {
+    const id = sessionStorage.getItem("upload-wizard-labelId");
+    if (!id) return null;
+    return { id, name: sessionStorage.getItem("upload-wizard-labelName") || "Picked label" };
+  });
+
+  async function searchRegisteredArtists() {
+    if (!artistSearch.trim()) {
+      toast.error("Type an artist name to search");
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("id, name")
+        .ilike("name", `%${artistSearch.trim()}%`)
+        .eq("status", "approved")
+        .limit(8);
+      if (error) throw error;
+      setArtistResults(data ?? []);
+      if ((data ?? []).length === 0) toast.info("No registered artists found — use email below");
+    } catch (err) {
+      toast.error(`Artist search failed: ${(err as Error).message}`);
+    }
+  }
+
+  function pickFeatureArtist(a: any) {
+    setPickedFeatureArtist({ id: a.id, name: a.name });
+    sessionStorage.setItem("upload-wizard-featureArtistId", a.id);
+    sessionStorage.setItem("upload-wizard-featureName", a.name);
+    setArtistResults([]);
+    setArtistSearch("");
+  }
+
+  function clearPickedFeatureArtist() {
+    setPickedFeatureArtist(null);
+    sessionStorage.removeItem("upload-wizard-featureArtistId");
+  }
+
+  async function searchRegisteredLabels() {
+    if (!labelSearch.trim()) {
+      toast.error("Type a label name to search");
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("labels")
+        .select("id, name")
+        .ilike("name", `%${labelSearch.trim()}%`)
+        .eq("status", "approved")
+        .limit(8);
+      if (error) throw error;
+      setLabelResults(data ?? []);
+      if ((data ?? []).length === 0) toast.info("No registered labels found — use email below");
+    } catch (err) {
+      toast.error(`Label search failed: ${(err as Error).message}`);
+    }
+  }
+
+  function pickLabel(l: any) {
+    setPickedLabel({ id: l.id, name: l.name });
+    sessionStorage.setItem("upload-wizard-labelId", l.id);
+    sessionStorage.setItem("upload-wizard-labelName", l.name);
+    setLabelResults([]);
+    setLabelSearch("");
+  }
+
+  function clearPickedLabel() {
+    setPickedLabel(null);
+    sessionStorage.removeItem("upload-wizard-labelId");
+  }
   const [cover, setCover] = useState<File | null>(() => uploadDraft.cover);
   const [tracks, setTracksState] = useState<TrackEntry[]>(() => uploadDraft.tracks);
   // Sync every staged change to the module draft so back-navigation restores files.
@@ -599,8 +689,11 @@ function UploadWizard() {
     sessionStorage.removeItem("upload-wizard-feeAgreed");
     sessionStorage.removeItem("upload-wizard-featureEmail");
     sessionStorage.removeItem("upload-wizard-featureName");
+    sessionStorage.removeItem("upload-wizard-featureArtistId");
+    sessionStorage.removeItem("upload-wizard-featureSplit");
     sessionStorage.removeItem("upload-wizard-labelEmail");
     sessionStorage.removeItem("upload-wizard-labelName");
+    sessionStorage.removeItem("upload-wizard-labelId");
   };
 
   const SINGLE_MIN = pricing.song_min;
@@ -739,17 +832,28 @@ function UploadWizard() {
     const featureName = sessionStorage.getItem("upload-wizard-featureName") ?? "";
     const labelEmail = (sessionStorage.getItem("upload-wizard-labelEmail") ?? "").trim();
     const labelName = sessionStorage.getItem("upload-wizard-labelName") ?? "";
+    // Registered picks: searched by name, attached directly — no email.
+    const pickedFeatureArtistId = (
+      sessionStorage.getItem("upload-wizard-featureArtistId") ?? ""
+    ).trim();
+    const featureSplitPct = Math.max(
+      0,
+      Math.min(100, Number(sessionStorage.getItem("upload-wizard-featureSplit") || 0)),
+    );
+    const pickedLabelId = (sessionStorage.getItem("upload-wizard-labelId") ?? "").trim();
     const doFeatureInvite = hasFeature && !!featureEmail;
-    if (hasFeature && !featureEmail) {
-      toast.info("No feature email entered — uploading without a feature invite.");
+    const doFeatureDirect = hasFeature && !!pickedFeatureArtistId;
+    if (hasFeature && !featureEmail && !pickedFeatureArtistId) {
+      toast.info("No feature artist picked — uploading without a feature.");
     }
     // has_label uploads are rejected server-side unless signed to a label.
     // Never burn an upload on a flag that can't succeed.
     const doLabelInvite = hasLabel && !!labelEmail && !!signedLabelId;
-    if (hasLabel && !signedLabelId) {
+    const doLabelRequest = hasLabel && !!pickedLabelId;
+    if (hasLabel && !signedLabelId && !pickedLabelId) {
       toast.info("You're not signed to a label — uploading as an independent release.");
-    } else if (hasLabel && !labelEmail) {
-      toast.info("No label email entered — uploading without a label invite.");
+    } else if (hasLabel && !labelEmail && !pickedLabelId) {
+      toast.info("No label picked — uploading without a label.");
     }
 
     setError(null);
@@ -861,7 +965,7 @@ function UploadWizard() {
             price: tier === "free" ? 0 : price,
             album_id: null,
             release_date: releaseDate || undefined,
-            has_feature: doFeatureInvite,
+            has_feature: doFeatureInvite || doFeatureDirect,
             has_label: doLabelInvite,
             // Server requires this for free (price 0) releases.
             fee_acknowledged: feeAgreed,
@@ -878,6 +982,27 @@ function UploadWizard() {
         // Handle feature artist invitation (locals — state setters are async).
         let newFeatureLink: string | null = null;
         let newLabelLink: string | null = null;
+        // Registered artist picked by search: attach directly with the chosen
+        // split — no email. They confirm in their Collabs inbox (payment
+        // consent), exactly like the Collaborators tab.
+        if (doFeatureDirect) {
+          try {
+            await directCollabFn({
+              data: {
+                song_id: (res as any).id,
+                artist_id: pickedFeatureArtistId,
+                role: "featured",
+                split_pct: featureSplitPct,
+              },
+            });
+            toast.success(
+              `Featured artist added with a ${featureSplitPct}% share — they'll confirm it in Collabs.`,
+            );
+          } catch (directError) {
+            console.error("Failed to add featured artist:", directError);
+            toast.error(`Could not add featured artist: ${(directError as Error).message}`);
+          }
+        }
         if (doFeatureInvite) {
           try {
             const inviteRes = await inviteFeatureFn({
@@ -924,6 +1049,21 @@ function UploadWizard() {
           } catch (inviteError) {
             console.error("Failed to send label invitation:", inviteError);
             toast.error(`Could not send label invitation: ${(inviteError as Error).message}`);
+          }
+        }
+
+        // Registered label picked by search: request it — no email. The label
+        // approves in its dashboard, which attaches it (money only routes
+        // after their approval).
+        if (doLabelRequest) {
+          try {
+            await labelRequestFn({
+              data: { song_id: (res as any).id, label_id: pickedLabelId },
+            });
+            toast.success("Label request sent — they'll approve it in their dashboard.");
+          } catch (requestError) {
+            console.error("Failed to request label:", requestError);
+            toast.error(`Could not request label: ${(requestError as Error).message}`);
           }
         }
 
@@ -1046,6 +1186,20 @@ function UploadWizard() {
         } catch (inviteError) {
           console.error("Failed to send label invitation:", inviteError);
           toast.error(`Could not send label invitation: ${(inviteError as Error).message}`);
+        }
+      }
+
+      // Registered label picked by search: one request covers the whole
+      // album (attaches every track on approval) — no email.
+      if (doLabelRequest) {
+        try {
+          await labelRequestFn({
+            data: { album_id: album.id, label_id: pickedLabelId },
+          });
+          toast.success("Label request sent — they'll approve it in their dashboard.");
+        } catch (requestError) {
+          console.error("Failed to request label:", requestError);
+          toast.error(`Could not request label: ${(requestError as Error).message}`);
         }
       }
 
@@ -1174,10 +1328,20 @@ function UploadWizard() {
               setOverallProgress(0);
               setCurrentStageText("");
               dragSrcIndex.current = null;
+              setArtistSearch("");
+              setArtistResults([]);
+              setPickedFeatureArtist(null);
+              setFeatureSplit(0);
+              setLabelSearch("");
+              setLabelResults([]);
+              setPickedLabel(null);
               sessionStorage.removeItem("upload-wizard-featureEmail");
               sessionStorage.removeItem("upload-wizard-featureName");
+              sessionStorage.removeItem("upload-wizard-featureArtistId");
+              sessionStorage.removeItem("upload-wizard-featureSplit");
               sessionStorage.removeItem("upload-wizard-labelEmail");
               sessionStorage.removeItem("upload-wizard-labelName");
+              sessionStorage.removeItem("upload-wizard-labelId");
             }}
             className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold cursor-pointer"
           >
@@ -1341,8 +1505,86 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Feature Artist Details</p>
               <p className="text-xs text-muted-foreground">
+                Already on Wesu? Search and add them directly — no email needed. They
+                confirm the split in their Collabs inbox.
+              </p>
+              {pickedFeatureArtist ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
+                  <span className="text-sm font-medium truncate">{pickedFeatureArtist.name}</span>
+                  <button
+                    type="button"
+                    onClick={clearPickedFeatureArtist}
+                    className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search registered artist by name"
+                      className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                      value={artistSearch}
+                      onChange={(e) => setArtistSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void searchRegisteredArtists();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void searchRegisteredArtists()}
+                      className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+                    >
+                      Search
+                    </button>
+                  </div>
+                  {artistResults.length > 0 && (
+                    <ul className="space-y-1">
+                      {artistResults.map((a) => (
+                        <li
+                          key={a.id}
+                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-white/5 text-sm"
+                        >
+                          <span className="truncate">{a.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => pickFeatureArtist(a)}
+                            className="text-xs px-3 py-1 rounded-full bg-primary text-primary-foreground shrink-0"
+                          >
+                            Add
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">
+                  Their payment share (% of this song)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="0"
+                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                  value={featureSplit}
+                  onChange={(e) => {
+                    const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                    setFeatureSplit(v);
+                    sessionStorage.setItem("upload-wizard-featureSplit", String(v));
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
                 If the featured artist is not yet registered on Wesu, enter their email to send them
-                a registration link.
+                a registration link instead.
               </p>
               <input
                 type="email"
@@ -1371,8 +1613,68 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Label Details</p>
               <p className="text-xs text-muted-foreground">
+                Already on Wesu? Search and pick the label — they approve the release in
+                their dashboard (money only routes after their approval).
+              </p>
+              {pickedLabel ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
+                  <span className="text-sm font-medium truncate">{pickedLabel.name}</span>
+                  <button
+                    type="button"
+                    onClick={clearPickedLabel}
+                    className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search registered label by name"
+                      className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                      value={labelSearch}
+                      onChange={(e) => setLabelSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void searchRegisteredLabels();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void searchRegisteredLabels()}
+                      className="px-4 py-2 rounded-full bg-secondary border border-border text-sm"
+                    >
+                      Search
+                    </button>
+                  </div>
+                  {labelResults.length > 0 && (
+                    <ul className="space-y-1">
+                      {labelResults.map((l) => (
+                        <li
+                          key={l.id}
+                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-white/5 text-sm"
+                        >
+                          <span className="truncate">{l.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => pickLabel(l)}
+                            className="text-xs px-3 py-1 rounded-full bg-primary text-primary-foreground shrink-0"
+                          >
+                            Add
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+              <p className="text-xs text-muted-foreground">
                 If the label is not yet registered on Wesu, enter their email to send them a
-                registration link.
+                registration link instead.
               </p>
               <input
                 type="email"

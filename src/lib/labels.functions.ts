@@ -484,3 +484,218 @@ export const requestLabelPayout = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/**
+ * Pure: a label release request targets exactly one release (song XOR album).
+ * Exported for unit tests (server fns need a DB).
+ */
+export function validateLabelReleaseTarget(d: {
+  song_id?: string | null;
+  album_id?: string | null;
+}): "song" | "album" {
+  const hasSong = !!d.song_id;
+  const hasAlbum = !!d.album_id;
+  if (hasSong === hasAlbum) throw new Error("Provide exactly one of song_id or album_id");
+  return hasSong ? "song" : "album";
+}
+
+/**
+ * Request an EXISTING approved label for a release — no email needed.
+ * The artist searches the label by name and picks it; the label manager
+ * approves in the label dashboard, which attaches songs.label_id (money
+ * only routes to the label after its own explicit consent).
+ */
+export const requestLabelForRelease = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { song_id?: string; album_id?: string; label_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const kind = validateLabelReleaseTarget(data);
+    if (!data.label_id) throw new Error("Pick a label first");
+
+    const { data: artist } = await supabase
+      .from("artists")
+      .select("id, name")
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (!artist) throw new Error("You must be an approved artist to request a label release");
+
+    if (kind === "song") {
+      const { data: song } = await supabase
+        .from("songs")
+        .select("id, title, artist_id, label_id")
+        .eq("id", data.song_id!)
+        .eq("artist_id", (artist as any).id)
+        .maybeSingle();
+      if (!song) throw new Error("Song not found or you don't have permission");
+      if ((song as any).label_id) throw new Error("This song already has a label");
+    } else {
+      const { data: album } = await supabase
+        .from("albums")
+        .select("id, title, artist_id")
+        .eq("id", data.album_id!)
+        .eq("artist_id", (artist as any).id)
+        .maybeSingle();
+      if (!album) throw new Error("Album not found or you don't have permission");
+    }
+
+    const { data: label } = await supabaseAdmin
+      .from("labels")
+      .select("id, name, status")
+      .eq("id", data.label_id)
+      .maybeSingle();
+    if (!label || (label as any).status !== "approved") {
+      throw new Error("That label is not available");
+    }
+
+    const payloadKey = kind === "song" ? "song_id" : "album_id";
+    const payloadVal = (kind === "song" ? data.song_id : data.album_id)!;
+    const { data: dup } = await supabaseAdmin
+      .from("invitations")
+      .select("id")
+      .eq("status", "pending")
+      .eq("kind", "label_release_request")
+      .filter(`payload->>${payloadKey}`, "eq", payloadVal)
+      .filter("payload->>label_id", "eq", data.label_id)
+      .maybeSingle();
+    if (dup) throw new Error("A request for this release is already pending with this label");
+
+    const { data: invitation, error } = await supabaseAdmin
+      .from("invitations")
+      .insert({
+        kind: "label_release_request",
+        from_user_id: userId,
+        to_email: null,
+        payload: {
+          song_id: data.song_id ?? null,
+          album_id: data.album_id ?? null,
+          label_id: data.label_id,
+          artist_id: (artist as any).id,
+          artist_name: (artist as any).name,
+        },
+        status: "pending",
+      } as any)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    await audit(userId, "label.release.request", "invitation", (invitation as any).id, {
+      label_id: data.label_id,
+      song_id: data.song_id ?? null,
+      album_id: data.album_id ?? null,
+    });
+    return { ok: true, invitation_id: (invitation as any).id };
+  });
+
+/** Pending release requests for one label (manager view). */
+export const listLabelReleaseRequests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { label_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertLabelManager(context.supabase, context.userId, data.label_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("invitations")
+      .select("id, payload, created_at, from_user_id")
+      .eq("status", "pending")
+      .eq("kind", "label_release_request")
+      .filter("payload->>label_id", "eq", data.label_id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    // Resolve release titles for display.
+    const payloads = (rows ?? []).map((r: any) => r.payload ?? {});
+    const songIds = payloads.map((p: any) => p.song_id).filter(Boolean);
+    const albumIds = payloads.map((p: any) => p.album_id).filter(Boolean);
+    const [{ data: songs }, { data: albums }] = await Promise.all([
+      songIds.length
+        ? supabaseAdmin.from("songs").select("id, title").in("id", songIds)
+        : Promise.resolve({ data: [] }),
+      albumIds.length
+        ? supabaseAdmin.from("albums").select("id, title").in("id", albumIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const songTitle = new Map(((songs ?? []) as any[]).map((s) => [s.id, s.title]));
+    const albumTitle = new Map(((albums ?? []) as any[]).map((a) => [a.id, a.title]));
+    return (rows ?? []).map((r: any) => ({
+      id: r.id,
+      created_at: r.created_at,
+      song_id: r.payload?.song_id ?? null,
+      album_id: r.payload?.album_id ?? null,
+      artist_id: r.payload?.artist_id ?? null,
+      artist_name: r.payload?.artist_name ?? "Unknown artist",
+      release_title:
+        (r.payload?.song_id && songTitle.get(r.payload.song_id)) ||
+        (r.payload?.album_id && albumTitle.get(r.payload.album_id)) ||
+        "Deleted release",
+    }));
+  });
+
+/**
+ * Accept (attach label_id → money routes only after this consent) or
+ * decline a release request. Manager-only.
+ */
+export const respondToLabelReleaseRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { invitation_id: string; accept: boolean }) => d)
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: invitation } = await supabaseAdmin
+      .from("invitations")
+      .select("*")
+      .eq("id", data.invitation_id)
+      .eq("status", "pending")
+      .eq("kind", "label_release_request")
+      .maybeSingle();
+    if (!invitation) throw new Error("Request not found or already handled");
+    const payload = (invitation as any).payload ?? {};
+    await assertLabelManager(supabase, userId, payload.label_id);
+
+    if (data.accept) {
+      if (payload.song_id) {
+        const { data: song } = await supabaseAdmin
+          .from("songs")
+          .select("id, label_id")
+          .eq("id", payload.song_id)
+          .maybeSingle();
+        if (!song) throw new Error("Song no longer exists");
+        if ((song as any).label_id) throw new Error("Song already has a label");
+        const { error } = await supabaseAdmin
+          .from("songs")
+          .update({ label_id: payload.label_id } as any)
+          .eq("id", payload.song_id);
+        if (error) throw new Error(error.message);
+      } else if (payload.album_id) {
+        const { data: tracks } = await supabaseAdmin
+          .from("songs")
+          .select("id")
+          .eq("album_id", payload.album_id);
+        if (!tracks || tracks.length === 0) throw new Error("Album has no songs");
+        const { error } = await supabaseAdmin
+          .from("songs")
+          .update({ label_id: payload.label_id } as any)
+          .eq("album_id", payload.album_id)
+          .is("label_id", null);
+        if (error) throw new Error(error.message);
+      } else {
+        throw new Error("Request has no release attached");
+      }
+      await supabaseAdmin
+        .from("invitations")
+        .update({ status: "accepted", responded_at: new Date().toISOString() } as any)
+        .eq("id", data.invitation_id);
+      await audit(userId, "label.release.accept", "invitation", data.invitation_id, {
+        label_id: payload.label_id,
+      });
+    } else {
+      await supabaseAdmin
+        .from("invitations")
+        .update({ status: "declined", responded_at: new Date().toISOString() } as any)
+        .eq("id", data.invitation_id);
+      await audit(userId, "label.release.decline", "invitation", data.invitation_id, {
+        label_id: payload.label_id,
+      });
+    }
+    return { ok: true };
+  });
