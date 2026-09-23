@@ -1,5 +1,20 @@
 -- Support inbox owned by superadmin/admin users (no external mailbox).
 -- Visitors submit from /contact; staff read + resolve from the admin panel.
+--
+-- NOTE: the staff check uses private.is_staff (the canonical helper — the
+-- public.is_staff copy was dropped by earlier migrations). It is
+-- re-declared here with CREATE OR REPLACE so this file runs cleanly
+-- regardless of which historical migrations have been applied.
+create schema if not exists private;
+grant usage on schema private to anon, authenticated, service_role;
+
+create or replace function private.is_staff(_user_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_roles where user_id = _user_id and role in ('admin','superadmin'))
+$$;
+
+grant execute on function private.is_staff(uuid) to anon, authenticated, service_role;
+
 create table if not exists public.support_messages (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -25,11 +40,11 @@ drop policy if exists "Staff can read support messages" on public.support_messag
 create policy "Staff can read support messages"
   on public.support_messages for select
   to authenticated
-  using (public.is_staff(auth.uid()));
+  using (private.is_staff(auth.uid()));
 
 drop policy if exists "Staff can resolve support messages" on public.support_messages;
 create policy "Staff can resolve support messages"
   on public.support_messages for update
   to authenticated
-  using (public.is_staff(auth.uid()))
-  with check (public.is_staff(auth.uid()));
+  using (private.is_staff(auth.uid()))
+  with check (private.is_staff(auth.uid()));
