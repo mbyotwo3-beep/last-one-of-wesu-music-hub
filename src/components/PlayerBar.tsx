@@ -814,6 +814,40 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, isPreview]);
 
+  // External interruption sync: phone calls, other apps, and the OS pause
+  // the element WITHOUT going through the store. Adopt that truth so the
+  // UI never shows playing-while-silent (or vice versa). Guards exclude
+  // every engine-initiated transition: the engine always flips the store
+  // synchronously before touching the element, and always clears src when
+  // killing a track — so a pause event with playing=true and a real src
+  // can only come from outside.
+  useEffect(() => {
+    const audio = getAudio();
+    // Real media attached (not the silent unlock placeholder). Blob URLs
+    // count — that's offline vault playback. Empty on the native path,
+    // which has its own reconciler.
+    const hasRealSrc = () => !!audio.src && !audio.src.startsWith("data:");
+    const onExternalPause = () => {
+      const st = usePlayer.getState();
+      if (st.playing && hasRealSrc() && !audio.ended) {
+        usePlayer.setState({ playing: false, progressSeconds: Math.floor(audio.currentTime || 0) });
+      }
+    };
+    const onExternalPlay = () => {
+      const st = usePlayer.getState();
+      if (!st.playing && hasRealSrc() && currentTrackIdRef.current === st.track?.id) {
+        usePlayer.setState({ playing: true });
+      }
+    };
+    audio.addEventListener("pause", onExternalPause);
+    audio.addEventListener("play", onExternalPlay);
+    return () => {
+      audio.removeEventListener("pause", onExternalPause);
+      audio.removeEventListener("play", onExternalPlay);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Volume
   useEffect(() => {
     getAudio().volume = muted ? 0 : volume;
@@ -1011,6 +1045,34 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     return () => {
       window.removeEventListener("pointerdown", handleGestureResume);
     };
+  }, []);
+
+  // Tab-switch / lock / minimize resync: background throttling freezes
+  // timeupdate (progress UI goes stale) and some browsers suspend the
+  // element. On return, snap progress to the element and restart playback
+  // the store still believes in.
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const st = usePlayer.getState();
+      const audio = getAudio();
+      if (!audio || !audio.src || audio.src.startsWith("data:")) return;
+      try {
+        st.setProgress(Math.floor(audio.currentTime || 0));
+      } catch {
+        /* ignore */
+      }
+      if (st.playing && audio.paused && !audio.ended && currentTrackIdRef.current) {
+        audio.play().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("focus", handleVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("focus", handleVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cleanup on unmount

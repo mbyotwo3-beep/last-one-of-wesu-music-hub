@@ -243,7 +243,77 @@ describe("Sync guard never touches the element while resolving", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Preview URLs must never carry into a new selection: they are short,
+// External interruption sync: the OS (calls, other apps, focus loss) pauses
+// the element without touching the store. The engine always flips the store
+// synchronously before touching the element and clears src when killing a
+// track — so pause + playing + real src + not ended can only be external.
+// Mirrors the pause/play listeners in PlayerBar.tsx.
+// ---------------------------------------------------------------------------
+
+function shouldAdoptExternalPause(args: {
+  storePlaying: boolean;
+  hasRealSrc: boolean;
+  ended: boolean;
+}): boolean {
+  return args.storePlaying && args.hasRealSrc && !args.ended;
+}
+
+function shouldAdoptExternalPlay(args: {
+  storePlaying: boolean;
+  hasRealSrc: boolean;
+  idMatches: boolean;
+}): boolean {
+  return !args.storePlaying && args.hasRealSrc && args.idMatches;
+}
+
+describe("External interruption sync", () => {
+  it("adopts OS pauses, ignores engine transitions", () => {
+    // Genuine interruption: store says playing, real src, not ended.
+    expect(shouldAdoptExternalPause({ storePlaying: true, hasRealSrc: true, ended: false })).toBe(
+      true,
+    );
+    // Engine paused it (store already false).
+    expect(shouldAdoptExternalPause({ storePlaying: false, hasRealSrc: true, ended: false })).toBe(
+      false,
+    );
+    // Track kill (src cleared) or natural end: not external.
+    expect(shouldAdoptExternalPause({ storePlaying: true, hasRealSrc: false, ended: false })).toBe(
+      false,
+    );
+    expect(shouldAdoptExternalPause({ storePlaying: true, hasRealSrc: true, ended: true })).toBe(
+      false,
+    );
+  });
+
+  it("adopts external resumes only for the current track", () => {
+    expect(
+      shouldAdoptExternalPlay({ storePlaying: false, hasRealSrc: true, idMatches: true }),
+    ).toBe(true);
+    expect(
+      shouldAdoptExternalPlay({ storePlaying: true, hasRealSrc: true, idMatches: true }),
+    ).toBe(false);
+    expect(
+      shouldAdoptExternalPlay({ storePlaying: false, hasRealSrc: true, idMatches: false }),
+    ).toBe(false);
+    expect(
+      shouldAdoptExternalPlay({ storePlaying: false, hasRealSrc: false, idMatches: true }),
+    ).toBe(false);
+  });
+
+  it("never flaps for any input combination", () => {
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), fc.boolean(), (a, b, c) => {
+        expect(typeof shouldAdoptExternalPause({ storePlaying: a, hasRealSrc: b, ended: c })).toBe(
+          "boolean",
+        );
+        expect(typeof shouldAdoptExternalPlay({ storePlaying: a, hasRealSrc: b, idMatches: c })).toBe(
+          "boolean",
+        );
+      }),
+      { numRuns: 50 },
+    );
+  });
+});
 // expiring, and the engine would briefly play the stale preview while
 // re-resolving. Mirrors preserveResolvedAudioUrl in stores/player.ts.
 // ---------------------------------------------------------------------------
