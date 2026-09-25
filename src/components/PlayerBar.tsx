@@ -160,7 +160,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }
   }
   // Latest known media duration for the lock-screen position state
-  // (HTML element on web, native getDuration on device).
+  // (HTML element on web, native getDuration on device). Seeded from the
+  // track row: the plugin's getDuration always resolves 0 (it posts to the
+  // UI thread and returns before the value lands), so without this the
+  // lock-screen progress stays frozen on native.
   const durationRef = useRef<number>(0);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
@@ -321,6 +324,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     currentSelectionRef.current = selectionId;
     appliedRetryRef.current = retryNonce;
     currentTrackIdRef.current = track.id;
+    // Seed lock-screen duration from the row immediately (see ref note).
+    durationRef.current = track.durationSeconds ?? 0;
     resolvedForUserRef.current = user?.id ?? null;
     trackedHistoryTrackRef.current = null;
     setError(null);
@@ -579,14 +584,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 const previewSelection = selectionId;
                 previewTimerRef.current = setTimeout(() => {
                   // Stale timer (track changed) or paused meanwhile: a
-                  // preview must never cut off another selection or error
-                  // while paused.
+                  // preview must never cut off another selection, and ended
+                  // previews flow onward like Spotify (repeat-one replays).
                   if (currentSelectionRef.current !== previewSelection) return;
                   const st = usePlayer.getState();
                   if (!st.playing) return;
-                  stopNative(track!.id).catch(() => {});
-                  st.togglePlay();
-                  setError("Preview ended. Buy this track for full access.");
+                  if (st.repeat === "one") {
+                    seekNative(track!.id, 0).catch(() => {});
+                    return;
+                  }
+                  st.skipNext();
                 }, 15000);
               }
               const cleanup = await onNativeComplete(track!.id, () => {
@@ -620,13 +627,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 if (currentTrackIdRef.current !== track!.id) return;
                 const st = usePlayer.getState();
                 if (st.isPreview && seconds >= 15) {
-                  // Backstop for the wall-clock timer: a preview must never
-                  // play past 15s even if the timer misfires (entitlement).
-                  stopNative(track!.id).catch(() => {});
-                  if (st.playing) {
-                    usePlayer.setState({ playing: false, progressSeconds: 0 });
+                  // Backstop for the wall-clock timer: previews flow onward,
+                  // never stop on an error (repeat-one replays).
+                  if (st.repeat === "one") {
+                    seekNative(track!.id, 0).catch(() => {});
+                    return;
                   }
-                  setError("Preview ended. Buy this track for full access.");
+                  st.skipNext();
                   return;
                 }
                 setProgress(Math.floor(seconds));
@@ -835,10 +842,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     const onTimeUpdate = () => {
       const current = audio.currentTime || 0;
       if (usePlayer.getState().isPreview && current >= 15) {
-        audio.pause();
-        audio.currentTime = 0;
-        setProgress(0);
-        usePlayer.setState({ playing: false, progressSeconds: 0 });
+        // Previews flow into the next track like Spotify — never stop on
+        // an error. Repeat-one replays the same preview.
+        const st = usePlayer.getState();
+        if (st.repeat === "one") {
+          audio.currentTime = 0;
+          setProgress(0);
+          return;
+        }
+        st.skipNext();
         return;
       }
       setProgress(Math.floor(current));

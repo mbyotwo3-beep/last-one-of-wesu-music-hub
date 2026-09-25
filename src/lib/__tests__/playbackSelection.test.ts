@@ -373,7 +373,22 @@ describe("Preview URLs never carry into a new selection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Next-track prefetch: warms the signed-URL cache ~1.5s after the current
+// Preview expiry: previews flow into the next track like Spotify (repeat-one
+// replays) — they never stop on an error. Mirrors the expiry handlers in
+// PlayerBar.tsx (HTML timeupdate, native timeupdate, wall-clock timer).
+// ---------------------------------------------------------------------------
+
+function previewEndAction(repeat: "off" | "all" | "one"): "restart" | "advance" {
+  return repeat === "one" ? "restart" : "advance";
+}
+
+describe("Preview expiry flows onward", () => {
+  it("advances except on repeat-one", () => {
+    expect(previewEndAction("off")).toBe("advance");
+    expect(previewEndAction("all")).toBe("advance");
+    expect(previewEndAction("one")).toBe("restart");
+  });
+});
 // track starts so skips begin instantly. Pure index selection mirrored
 // from the PlayerBar prefetch effect.
 // ---------------------------------------------------------------------------
