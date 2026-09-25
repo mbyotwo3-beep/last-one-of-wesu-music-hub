@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ─── Types ───────────────────────────────────────────────────
+export type HeroLinkTarget = "_self" | "_blank";
+
+export function normalizeLinkTarget(v: unknown): HeroLinkTarget {
+  return v === "_blank" ? "_blank" : "_self";
+}
+
 export interface HeroCarouselSlide {
   id: string;
   title: string;
@@ -11,6 +17,7 @@ export interface HeroCarouselSlide {
   cta_text: string;
   cta_link: string;
   cta_external: boolean;
+  link_target: HeroLinkTarget;
   position: number;
   active: boolean;
   created_at: string;
@@ -65,6 +72,7 @@ export const createHeroSlide = createServerFn({ method: "POST" })
       cta_text: string;
       cta_link: string;
       cta_external?: boolean;
+      link_target?: string;
       position?: number;
     }) => d,
   )
@@ -89,6 +97,7 @@ export const createHeroSlide = createServerFn({ method: "POST" })
         cta_text: data.cta_text,
         cta_link: data.cta_link,
         cta_external: data.cta_external ?? false,
+        link_target: normalizeLinkTarget(data.link_target),
         position: pos,
         active: true,
       })
@@ -111,6 +120,7 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
       cta_text?: string;
       cta_link?: string;
       cta_external?: boolean;
+      link_target?: string;
       position?: number;
       active?: boolean;
     }) => d,
@@ -130,6 +140,7 @@ export const updateHeroSlide = createServerFn({ method: "POST" })
     nonEmpty(data.cta_text, "cta_text");
     nonEmpty(data.cta_link, "cta_link");
     if (data.cta_external !== undefined) patch.cta_external = data.cta_external;
+    if (data.link_target !== undefined) patch.link_target = normalizeLinkTarget(data.link_target);
     if (data.position !== undefined) patch.position = data.position;
     if (data.active !== undefined) patch.active = data.active;
     const { error } = await (supabaseAdmin as any)

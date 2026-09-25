@@ -183,6 +183,7 @@ function HeroSlideCard({
     cta_text: slide.cta_text,
     cta_link: slide.cta_link,
     cta_external: slide.cta_external ?? false,
+    link_target: (slide as any).link_target ?? "_self",
   });
 
   const handleSave = () => {
@@ -194,6 +195,7 @@ function HeroSlideCard({
       cta_text: formData.cta_text,
       cta_link: formData.cta_link,
       cta_external: formData.cta_external,
+      link_target: formData.link_target,
     });
     setEditing(false);
   };
@@ -281,18 +283,19 @@ function HeroSlideCard({
                 onUpdate(data);
                 setEditing(false);
               }}
-              onCancel={() => {
-                setEditing(false);
-                setFormData({
-                  title: slide.title,
-                  description: slide.description,
-                  image_url: slide.image_url,
-                  video_url: slide.video_url ?? "",
-                  cta_text: slide.cta_text,
-                  cta_link: slide.cta_link,
-                  cta_external: slide.cta_external ?? false,
-                });
-              }}
+                onCancel={() => {
+                  setEditing(false);
+                  setFormData({
+                    title: slide.title,
+                    description: slide.description,
+                    image_url: slide.image_url,
+                    video_url: slide.video_url ?? "",
+                    cta_text: slide.cta_text,
+                    cta_link: slide.cta_link,
+                    cta_external: slide.cta_external ?? false,
+                    link_target: (slide as any).link_target ?? "_self",
+                  });
+                }}
               isPending={isPending}
             />
           ) : (
@@ -319,6 +322,7 @@ function HeroSlideCard({
                     <span className="text-xs text-muted-foreground">CTA:</span>
                     <p className="text-sm font-medium">
                       {slide.cta_text} → {slide.cta_link}
+                      {(slide as any).link_target === "_blank" ? " (new tab)" : ""}
                     </p>
                     {slide.cta_external && (
                       <p className="text-xs text-muted-foreground">Opens in new tab</p>
@@ -365,6 +369,7 @@ function HeroSlideForm({
     cta_text: string;
     cta_link: string;
     cta_external: boolean;
+    link_target?: string;
   };
   onSave: (data: any) => void;
   onCancel: () => void;
@@ -379,6 +384,7 @@ function HeroSlideForm({
       cta_text: "",
       cta_link: "",
       cta_external: false,
+      link_target: "_self",
     },
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -468,6 +474,7 @@ function HeroSlideForm({
       cta_text: formData.cta_text.trim(),
       cta_link: formData.cta_link.trim(),
       cta_external: formData.cta_external,
+      link_target: (formData as any).link_target === "_blank" ? "_blank" : "_self",
     });
   };
 
@@ -590,8 +597,23 @@ function HeroSlideForm({
           className="w-4 h-4 rounded border-border bg-secondary text-primary focus:ring-primary"
         />
         <label htmlFor="cta-external" className="text-sm text-muted-foreground">
-          Open link in new tab (external site)
+          External site link
         </label>
+      </div>
+
+      {/* Link target: same tab, or new tab on web / in-app browser on native */}
+      <div>
+        <label className="block text-xs text-muted-foreground mb-2">
+          Link opens in
+        </label>
+        <select
+          value={(formData as any).link_target ?? "_self"}
+          onChange={(e) => setFormData({ ...formData, link_target: e.target.value } as any)}
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+        >
+          <option value="_self">Same tab</option>
+          <option value="_blank">New tab (in-app browser on mobile)</option>
+        </select>
       </div>
 
       <div className="flex gap-2 pt-2">

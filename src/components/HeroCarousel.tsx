@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Play, Pause, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { resolveImageUrl, peekImageUrl, invalidateImageUrl } from "@/lib/storage-url";
+import { useIsNative } from "@/hooks/use-platform";
+import { toast } from "sonner";
 
 export interface HeroSlide {
   id: string;
@@ -12,7 +14,34 @@ export interface HeroSlide {
   ctaText: string;
   ctaLink: string;
   ctaExternal?: boolean;
+  /** Admin-chosen target: "_self" (same tab) or "_blank" (new tab / in-app). */
+  ctaTarget?: string;
   gradient?: string;
+}
+
+export type HeroCtaMode = "spa" | "same-tab" | "new-tab" | "in-app";
+
+/**
+ * Pure routing decision for a hero CTA (unit-tested).
+ * - Internal app paths always use SPA navigation on web; on native they
+ *   stay in the WebView either way (no tabs exist).
+ * - External links honor the admin's target on web (same tab vs new tab).
+ * - External links on native ALWAYS open the in-app browser overlay
+ *   (Facebook-Lite style): never strand the user in the system browser,
+ *   regardless of the admin's tab choice.
+ */
+export function resolveHeroCta(args: {
+  link: string;
+  external: boolean;
+  target?: string | null;
+  isNative: boolean;
+}): { mode: HeroCtaMode; url: string } {
+  const url = args.link || "/";
+  const isExternal =
+    args.external === true || /^https?:\/\//i.test(url) || !url.startsWith("/");
+  if (!isExternal) return { mode: "spa", url };
+  if (args.isNative) return { mode: "in-app", url };
+  return { mode: args.target === "_blank" ? "new-tab" : "same-tab", url };
 }
 
 interface HeroCarouselProps {
@@ -26,6 +55,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
+  // Native apps have no tabs: external "new tab" links open in-app instead.
+  const isNative = useIsNative();
 
   // Only auto-rotate if there are 2 or more slides
   const shouldAutoRotate = slides.length >= 2;
@@ -157,8 +188,21 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   // CMS links are free text — anything that isn't a plain internal path
   // ("/albums/...") falls back to <a> so a bad value can't crash the router.
   const ctaLink = currentSlide.ctaLink || "/";
-  const isExternalLink =
-    currentSlide.ctaExternal === true || /^https?:\/\//i.test(ctaLink) || !ctaLink.startsWith("/");
+  const cta = resolveHeroCta({
+    link: ctaLink,
+    external: currentSlide.ctaExternal === true,
+    target: currentSlide.ctaTarget,
+    isNative,
+  });
+
+  async function openInApp(url: string) {
+    try {
+      const { Browser } = await import("@capacitor/browser");
+      await Browser.open({ url });
+    } catch {
+      toast.error("Couldn't open the link");
+    }
+  }
 
   return (
     <div
@@ -203,24 +247,32 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           <p className="text-sm md:text-lg lg:text-xl text-zinc-300 mb-6 md:mb-8 line-clamp-2">
             {currentSlide.description}
           </p>
-          {isExternalLink ? (
-            <a
-              href={ctaLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {currentSlide.ctaText}
-              <ExternalLink className="size-4" />
-            </a>
-          ) : (
+          {cta.mode === "spa" ? (
             <Link
-              to={ctaLink as any}
+              to={cta.url as any}
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
             >
               {currentSlide.ctaText}
               <Play className="size-4 fill-primary-foreground" />
             </Link>
+          ) : cta.mode === "in-app" ? (
+            <button
+              type="button"
+              onClick={() => void openInApp(cta.url)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
+            >
+              {currentSlide.ctaText}
+              <ExternalLink className="size-4" />
+            </button>
+          ) : (
+            <a
+              href={cta.url}
+              {...(cta.mode === "new-tab" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
+            >
+              {currentSlide.ctaText}
+              <ExternalLink className="size-4" />
+            </a>
           )}
         </div>
       </div>

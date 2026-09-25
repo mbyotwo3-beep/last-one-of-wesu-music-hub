@@ -134,6 +134,7 @@ function HomePage() {
                   ctaText: slide.cta_text,
                   ctaLink: slide.cta_link,
                   ctaExternal: slide.cta_external,
+                  ctaTarget: (slide as any).link_target ?? "_self",
                 }))}
               />
             ) : (
