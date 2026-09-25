@@ -27,6 +27,13 @@ dist-ssr
 *.jks
 keystore.properties
 
+# iOS build artifacts (regenerated on the Mac via cap sync + pod install).
+ios/App/App/public/
+ios/App/Pods/
+ios/App/*.xcworkspace
+*.xcuserdata/
+DerivedData/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

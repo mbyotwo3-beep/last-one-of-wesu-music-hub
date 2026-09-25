@@ -116,10 +116,23 @@ Release signing: `android/app/wesu-release.keystore` (gitignored) +
 means the app can never be updated. Rebuild with:
 `npx cap sync android && gradlew bundleRelease assembleRelease`.
 
-## iOS (later, needs Xcode on macOS)
+## iOS (build on a Mac with Xcode)
 
-No `ios/` platform in this repo yet — add it there with `npx cap add ios`.
-Code-level iOS readiness is done: platform branching is native-vs-web
-(`usePlatform`), splash/status-bar config has an `ios` section, downloads
-use the cross-platform Filesystem bridge, and `@capgo/native-audio`
-supports iOS background + Control Center with the same JS API.
+The `ios/` platform is in the repo and pre-configured: bundle id `com.wesu.music`,
+display name Wesu+, branded AppIcon + cream launch screen with centered logo,
+`UIBackgroundModes: audio` (background playback), `com.wesu.music://` URL scheme
+(login-callback deep links), splash/status-bar brand colors.
+
+On the Mac, from the repo root:
+1. `npm install` (or current equivalent — then `npx cap sync ios`)
+2. Open `ios/App/App.xcworkspace` in Xcode (NOT the .xcodeproj)
+3. Signing & Capabilities → pick your Team, set Bundle Identifier to
+   `com.wesu.music` (unique per developer account if taken)
+4. Accept the notification-permission prompt on first run (Android asks
+   in-app; iOS prompts automatically)
+5. Run on simulator/device, then Product → Archive for TestFlight/App Store
+
+First `pod install` happens automatically with `npx cap sync ios`. The web
+code is shared — no iOS-specific app code was needed (platform branching is
+native-vs-web, volume UI already hides on native, Filesystem bridge and
+native-audio support iOS through the same JS API).
