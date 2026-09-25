@@ -25,6 +25,7 @@ import {
   Clock,
 } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
+import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
 import { toast } from "sonner";
@@ -1459,12 +1460,7 @@ function UploadWizard() {
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium">
               Genre <span className="font-normal text-muted-foreground">(optional)</span>
-              <input
-                placeholder="Afrobeats, Hip-Hop…"
-                className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-              />
+              <GenreSelect value={genre} onChange={(v) => setGenre(v)} />
             </label>
             <label className="block text-sm font-medium">
               Release Date <span className="font-normal text-muted-foreground">(optional)</span>

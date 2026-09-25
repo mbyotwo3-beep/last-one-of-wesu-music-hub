@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
+import { normalizeGenre } from "./genres";
 
 export const getFollowState = createServerFn({ method: "GET" })
   .validator((d: { artist_id: string; user_id?: string | null }) => d)
@@ -76,7 +77,7 @@ export const getSimilarArtists = createServerFn({ method: "GET" })
       .neq("id", data.artist_id)
       .order("monthly_listeners", { ascending: false })
       .limit(8);
-    if (src?.genre) q = q.eq("genre", src.genre);
+    if (src?.genre) q = q.eq("genre", normalizeGenre(src.genre) || src.genre);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];

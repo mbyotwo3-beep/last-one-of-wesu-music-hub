@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mic2, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
+import { GenreSelect } from "@/components/GenreSelect";
 import { applyAsArtist } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { useAuth } from "@/hooks/use-auth";
@@ -145,11 +146,9 @@ function Page() {
         </label>
         <label className="block text-sm">
           Genre
-          <input
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          <GenreSelect
             value={form.genre}
-            onChange={(e) => setForm({ ...form, genre: e.target.value })}
-            placeholder="Afrobeats, Hip-Hop…"
+            onChange={(v) => setForm({ ...form, genre: v })}
           />
         </label>
         <label className="block text-sm">

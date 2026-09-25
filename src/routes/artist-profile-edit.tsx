@@ -21,6 +21,7 @@ import { getMyArtistProfile } from "@/lib/user.functions";
 import { updateArtistProfile } from "@/lib/artist.functions";
 import { uploadFileToBucket } from "@/lib/storage";
 import { RoleGate } from "@/components/RoleGate";
+import { GenreSelect } from "@/components/GenreSelect";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/artist-profile-edit")({
@@ -338,13 +339,11 @@ function ArtistProfileEditPage() {
             <label htmlFor="genre" className="block text-sm font-medium mb-2">
               Genre
             </label>
-            <input
+            <GenreSelect
               id="genre"
-              type="text"
               value={formData.genre}
-              onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, genre: v })}
               className="w-full px-4 py-3 rounded-lg bg-card border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors"
-              placeholder="e.g., Hip Hop, Afrobeat, R&B"
             />
           </div>
 

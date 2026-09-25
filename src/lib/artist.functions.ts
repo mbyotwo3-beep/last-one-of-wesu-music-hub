@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isStaffUser } from "./roles";
+import { normalizeGenre } from "./genres";
 
 // Best-effort audit; RLS may block insert for regular users — never fail the
 // user's action because of this. SUPABASE_SERVICE_ROLE_KEY is not available on
@@ -95,7 +96,7 @@ export const applyAsArtist = createServerFn({ method: "POST" })
         .update({
           name: data.name,
           bio: data.bio ?? null,
-          genre: data.genre ?? null,
+          genre: normalizeGenre(data.genre) || null,
           status: "pending",
         } as any)
         .eq("id", existing.id)
@@ -115,7 +116,7 @@ export const applyAsArtist = createServerFn({ method: "POST" })
         user_id: userId,
         name: data.name,
         bio: data.bio ?? null,
-        genre: data.genre ?? null,
+        genre: normalizeGenre(data.genre) || null,
         status: "pending",
       } as any)
       .select("id, status")
@@ -181,6 +182,8 @@ export const updateArtistProfile = createServerFn({ method: "POST" })
     for (const k of ["name", "bio", "genre", "avatar_url", "cover_url"] as const) {
       if (data[k] !== undefined) patch[k] = data[k];
     }
+    // Fold free-text genres into the canonical category list.
+    if (patch.genre !== undefined) patch.genre = normalizeGenre(patch.genre) || null;
     if (data.social_links) patch.social_links = data.social_links;
     const { error } = await supabase.from("artists").update(patch).eq("user_id", userId);
     if (error) throw new Error(error.message);
@@ -263,7 +266,7 @@ export const uploadSong = createServerFn({ method: "POST" })
         audio_url: data.audio_url,
         cover_url: data.cover_url ?? null,
         duration: data.duration ?? null,
-        genre: data.genre ?? null,
+        genre: normalizeGenre(data.genre) || null,
         price,
         album_id: data.album_id ?? null,
         artist_id: (artist as any).id,
@@ -430,7 +433,7 @@ export const createAlbum = createServerFn({ method: "POST" })
         title,
         cover_url: data.cover_url ?? null,
         release_date: data.release_date ?? null,
-        genre: data.genre ?? null,
+        genre: normalizeGenre(data.genre) || null,
         description: data.description ?? null,
         price,
         artist_id: (artist as any).id,
@@ -873,7 +876,7 @@ export const updateAlbum = createServerFn({ method: "POST" })
       updateData.title = t;
     }
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.genre !== undefined) updateData.genre = data.genre;
+    if (data.genre !== undefined) updateData.genre = normalizeGenre(data.genre) || null;
     if (data.cover_url !== undefined) {
       assertOwnStoragePath("cover", data.cover_url, userId, staff);
       updateData.cover_url = data.cover_url;
@@ -990,7 +993,7 @@ export const updateSong = createServerFn({ method: "POST" })
       assertOwnStoragePath("cover", data.cover_url, userId, staff);
       updateData.cover_url = data.cover_url;
     }
-    if (data.genre !== undefined) updateData.genre = data.genre;
+    if (data.genre !== undefined) updateData.genre = normalizeGenre(data.genre) || null;
     if (data.price !== undefined) {
       const { getPricingConfig } = await import("@/lib/pricing.functions");
       const pricing = await getPricingConfig();

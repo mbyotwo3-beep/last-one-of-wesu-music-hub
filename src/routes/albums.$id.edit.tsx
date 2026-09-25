@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
+import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { Play, Pause, ArrowLeft, Save, Upload, X, ChevronUp, ChevronDown, GripVertical, CheckCircle2, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -375,12 +376,7 @@ function AlbumEditPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Genre</label>
-                <input
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                  placeholder="Afrobeats, Hip-Hop..."
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-                />
+                <GenreSelect value={genre} onChange={setGenre} />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Release Date</label>

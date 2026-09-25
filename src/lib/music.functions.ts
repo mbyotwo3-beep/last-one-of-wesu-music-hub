@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
+import { normalizeGenre } from "./genres";
 
 // ---------- Featured / Trending / New releases ----------
 
@@ -54,7 +55,7 @@ export const searchSongs = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(50);
     if (data.q) q = q.ilike("title", `%${data.q}%`);
-    if (data.genre) q = q.eq("genre", data.genre);
+    if (data.genre) q = q.eq("genre", normalizeGenre(data.genre) || data.genre);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -320,7 +321,7 @@ export const getGenres = createServerFn({ method: "GET" }).handler(async () => {
   if (error) throw new Error(error.message);
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
-    const g = (row as { genre: string | null }).genre;
+    const g = normalizeGenre((row as { genre: string | null }).genre);
     if (!g) continue;
     counts.set(g, (counts.get(g) ?? 0) + 1);
   }
@@ -336,10 +337,11 @@ export const getSongsByGenre = createServerFn({ method: "GET" })
   .validator((d: { genre: string; limit?: number }) => d)
   .handler(async ({ data }) => {
     const supabase = getPublicSupabase();
+    const genre = normalizeGenre(data.genre) || data.genre;
     const { data: rows, error } = await supabase
       .from("songs")
       .select("id,title,duration,price,cover_url,play_count,artist:artists(id,name)")
-      .eq("genre", data.genre)
+      .eq("genre", genre)
       .eq("status", "approved")
       .order("play_count", { ascending: false })
       .limit(data.limit ?? 12);
@@ -367,7 +369,7 @@ export const getTopSongsByGenres = createServerFn({ method: "GET" }).handler(asy
 
   const counts = new Map<string, number>();
   for (const row of genreRows ?? []) {
-    const g = (row as { genre: string | null }).genre;
+    const g = normalizeGenre((row as { genre: string | null }).genre);
     if (!g) continue;
     counts.set(g, (counts.get(g) ?? 0) + 1);
   }
@@ -446,7 +448,7 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
 
   const counts = new Map<string, number>();
   for (const row of genreRows.data ?? []) {
-    const g = (row as { genre: string | null }).genre;
+    const g = normalizeGenre((row as { genre: string | null }).genre);
     if (g) counts.set(g, (counts.get(g) ?? 0) + 1);
   }
   const topGenres = Array.from(counts.entries())
@@ -514,7 +516,7 @@ export const getForYou = createServerFn({ method: "GET" })
     const genreCounts = new Map<string, number>();
     const artistCounts = new Map<string, { count: number; artist: any }>();
     for (const row of seedSongs ?? []) {
-      const g = (row as any).genre as string | null;
+      const g = normalizeGenre((row as any).genre as string | null);
       if (g) genreCounts.set(g, (genreCounts.get(g) ?? 0) + 1);
       const aid = (row as any).artist_id as string | null;
       const a = (row as any).artist;
