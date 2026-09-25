@@ -72,7 +72,7 @@ export function ShareMenu({
   const appendToQueue = usePlayer((s) => s.addToQueue);
   const { isSaved, toggle } = useSavedTrack(songId);
 
-  const { data: playlists } = useQuery({
+  const { data: playlists, error: playlistsError } = useQuery({
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -137,6 +137,13 @@ export function ShareMenu({
   const handleAddToPlaylistClick = () => {
     if (!user) {
       const currentPath = window.location.pathname + window.location.search;
+      // Remember the intent: after sign-in the menu auto-opens the playlist
+      // picker so the flow actually completes (Google-style continue).
+      try {
+        if (songId) sessionStorage.setItem("pending_add_playlist", songId);
+      } catch {
+        /* ignore */
+      }
       navigate({
         to: "/auth",
         search: { redirect: currentPath, action: "addPlaylist", itemId: songId, itemType: "song" },
@@ -147,6 +154,19 @@ export function ShareMenu({
     setShowPlaylistModal(true);
     setIsOpen(false);
   };
+
+  // Post-auth continuation: open the picker for the stashed song.
+  useEffect(() => {
+    if (!user || type !== "song" || !songId) return;
+    try {
+      if (sessionStorage.getItem("pending_add_playlist") === songId) {
+        sessionStorage.removeItem("pending_add_playlist");
+        setShowPlaylistModal(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user, type, songId]);
 
   const handleAddToPlaylist = (playlistId: string) => {
     if (songId) {
@@ -540,6 +560,11 @@ export function ShareMenu({
               </div>
 
               <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
+                {playlistsError && (
+                  <p className="text-sm text-destructive px-4 py-2">
+                    Couldn't load playlists{(playlistsError as Error)?.message ? `: ${(playlistsError as Error).message}` : ""}.
+                  </p>
+                )}
                 {playlists?.map((p: any) => (
                   <button
                     key={p.id}

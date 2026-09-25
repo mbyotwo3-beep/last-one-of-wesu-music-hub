@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -168,6 +169,24 @@ function RootComponent() {
       return cleanup;
     }
   }, [platform]);
+
+  // Password-recovery deep links (native): route to the reset form once the
+  // session lands. The flag backs navigation if the event fires early.
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (platform !== "native") return;
+    const goReset = () => navigate({ to: "/reset-password" });
+    window.addEventListener("wesu:recovery", goReset);
+    try {
+      if (sessionStorage.getItem("recovery_pending") === "1") {
+        sessionStorage.removeItem("recovery_pending");
+        goReset();
+      }
+    } catch {
+      /* ignore */
+    }
+    return () => window.removeEventListener("wesu:recovery", goReset);
+  }, [platform, navigate]);
 
   // STABILITY: single stable tree — Outlet + audio engine never unmount on
   // resize/rotate. Responsive switching is CSS-only (hidden lg:*) so upload

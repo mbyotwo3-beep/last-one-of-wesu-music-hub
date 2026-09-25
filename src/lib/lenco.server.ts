@@ -239,11 +239,22 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
 
 // ---------- Utilities ----------
 
-/** Normalize +260 / 0XX / XX numbers to 260XXXXXXXXX. */
+/**
+ * Normalize +260 / 0XX / XX numbers to 260XXXXXXXXX (12 digits).
+ * Throws on anything else — the client validates first, this is the
+ * server backstop so junk never burns a provider STK attempt.
+ */
 export function normalizeZmPhone(input: string): string {
   const digits = input.replace(/[^\d]/g, "");
-  if (digits.startsWith("260")) return digits;
-  if (digits.startsWith("0")) return `260${digits.slice(1)}`;
-  if (digits.length === 9) return `260${digits}`;
-  return digits;
+  const normalized = digits.startsWith("260")
+    ? digits
+    : digits.startsWith("0")
+      ? `260${digits.slice(1)}`
+      : digits.length === 9
+        ? `260${digits}`
+        : digits;
+  if (!/^260[579]\d{8}$/.test(normalized)) {
+    throw new Error("Enter a valid 10-digit Zambian mobile number");
+  }
+  return normalized;
 }

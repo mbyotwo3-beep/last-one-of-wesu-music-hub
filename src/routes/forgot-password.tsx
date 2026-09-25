@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, ArrowRight, Music } from "lucide-react";
+import { useIsNative } from "@/hooks/use-platform";
 
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
@@ -18,6 +19,11 @@ function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Native apps can't receive https recovery links in the WebView — point
+  // the email at the app scheme so the OS opens the app (the deep-link
+  // handler completes recovery there). Requires the scheme in Supabase
+  // dashboard redirect URLs.
+  const isNative = useIsNative();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +31,9 @@ function ForgotPasswordPage() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: isNative
+          ? "com.wesu.music://login-callback?type=recovery"
+          : `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
       setSent(true);
@@ -52,6 +60,7 @@ function ForgotPasswordPage() {
         {sent ? (
           <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-sm text-center">
             Check <span className="font-semibold">{email}</span> for a password reset link.
+            {isNative && " Tap it on this device — it opens right back in the app."}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

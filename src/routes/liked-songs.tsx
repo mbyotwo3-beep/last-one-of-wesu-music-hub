@@ -53,7 +53,7 @@ function Page() {
   const navigate = useNavigate();
   const player = usePlayer();
 
-  const { data: likedSongs, isLoading } = useQuery({
+  const { data: likedSongs, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["liked-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -203,7 +203,21 @@ function Page() {
           </div>
 
           {/* Tracklist Rows */}
-          {safeLikedSongs.length === 0 ? (
+          {isError ? (
+            <div className="text-center py-20 bg-card/40 border border-dashed border-border rounded-2xl">
+              <Heart className="size-12 text-muted-foreground mx-auto mb-4" />
+              <h2 className="text-lg font-semibold mb-1">Couldn't load liked songs</h2>
+              <p className="text-xs text-muted-foreground mb-6">
+                {(error as Error)?.message ?? "Something went wrong."}
+              </p>
+              <button
+                onClick={() => refetch()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-full hover:brightness-110 transition-all cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          ) : safeLikedSongs.length === 0 ? (
             <div className="text-center py-20 bg-card/40 border border-dashed border-border rounded-2xl">
               <Heart className="size-12 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-1">No liked songs yet</h2>

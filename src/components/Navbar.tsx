@@ -47,6 +47,11 @@ const NavbarComponent = function Navbar() {
   });
 
   const isAuth = useRouterState({ select: (s) => s.location.pathname }) === "/auth";
+  // Preserve the full destination (path + query) so post-login return
+  // lands exactly where the user was (Google-style continue flow).
+  const returnTo = useRouterState({
+    select: (s) => s.location.pathname + (s.location.searchStr ?? ""),
+  });
   const isLoading = authLoading || rolesLoading;
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -236,6 +241,7 @@ const NavbarComponent = function Navbar() {
           ) : !isAuth ? (
             <Link
               to="/auth"
+              search={{ redirect: returnTo }}
               className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
             >
               Sign In

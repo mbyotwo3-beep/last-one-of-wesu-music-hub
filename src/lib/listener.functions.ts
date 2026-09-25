@@ -241,12 +241,16 @@ export const deletePlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { id: string }) => d)
   .handler(async ({ context, data }) => {
-    const { error } = await context.supabase
+    const { data: deleted, error } = await context.supabase
       .from("playlists")
       .delete()
       .eq("id", data.id)
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .select("id");
     if (error) throw new Error(error.message);
+    // Report no-ops instead of a false success (e.g. already deleted,
+    // or another user's playlist).
+    if (!deleted || deleted.length === 0) throw new Error("Playlist not found");
     return { ok: true };
   });
 

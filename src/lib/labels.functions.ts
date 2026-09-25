@@ -102,11 +102,18 @@ export const applyForLabel = createServerFn({ method: "POST" })
       .eq("owner_user_id", userId)
       .maybeSingle();
     if (existing) {
-      throw new Error(
-        existing.status === "rejected"
-          ? "Your label application was rejected. Contact support before applying again."
-          : "You already have a label application.",
-      );
+      if (existing.status === "rejected") {
+        // Rejected labels may reapply like rejected artists: reset to
+        // pending instead of a support dead-end.
+        const { error: reapplyError } = await supabaseAdmin
+          .from("labels")
+          .update({ status: "pending" } as any)
+          .eq("id", (existing as any).id);
+        if (reapplyError) throw new Error(reapplyError.message);
+        await audit(userId, "label.reapply", "label", (existing as any).id);
+        return { ok: true, reapplied: true } as any;
+      }
+      throw new Error("You already have a label application.");
     }
     const slug = slugify(name) + "-" + Math.random().toString(36).slice(2, 6);
     const { data: row, error } = await supabase

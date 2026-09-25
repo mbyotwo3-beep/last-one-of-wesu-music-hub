@@ -375,13 +375,6 @@ function AuthPage() {
             }
             setLoading(true);
             try {
-              // Keep the intended destination out of the OAuth redirect URI:
-              // it must be a public same-origin URL, so stash the path locally.
-              try {
-                sessionStorage.setItem("post_auth_redirect", safeRedirect || "/dashboard");
-              } catch {
-                /* storage unavailable — the fallback below still navigates */
-              }
               // The OAuth round-trip wipes ?action — stash the full intent so
               // it replays (like/follow/save completes) when the session lands.
               stashPendingAction(

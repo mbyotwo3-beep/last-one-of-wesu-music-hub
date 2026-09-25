@@ -177,8 +177,16 @@ function Page() {
             <li
               key={n.id}
               onClick={() => handleNotificationClick(n)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all hover:bg-accent/50 ${
-                n.read_at ? "bg-card border-border" : "bg-primary/5 border-primary/20"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleNotificationClick(n);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className={`p-4 rounded-xl border cursor-pointer transition-all hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-primary ${
+                n.read_at ? "bg-card border-border" : "bg-primary/10 border-primary/20"
               }`}
             >
               <div className="flex items-start gap-4">

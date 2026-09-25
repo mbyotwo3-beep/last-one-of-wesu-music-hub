@@ -27,11 +27,20 @@ function ResetPasswordPage() {
   // Supabase parses the recovery token from the URL hash and fires
   // PASSWORD_RECOVERY. Only that event unlocks the form — a plain SIGNED_IN
   // or an existing session must NOT (otherwise any logged-in visitor, with no
-  // recovery link at all, gets a password form).
+  // recovery link at all, gets a password form). Native code-exchange links
+  // surface SIGNED_IN instead, so they set a one-time recovery_pending flag.
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setReady(true);
     });
+    try {
+      if (sessionStorage.getItem("recovery_pending") === "1") {
+        sessionStorage.removeItem("recovery_pending");
+        setReady(true);
+      }
+    } catch {
+      /* ignore */
+    }
     // Expired/used links never fire — stop hanging on "Verifying…" forever.
     const t = setTimeout(() => {
       setReady((r) => {

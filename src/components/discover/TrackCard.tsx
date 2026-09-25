@@ -103,16 +103,15 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         </div>
       </div>
 
-      {user && (
-        <button
-          type="button"
-          onClick={handleSave}
-          aria-label={isSaved ? "Unsave track" : "Save track"}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer z-10"
-        >
-          <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleSave}
+        aria-label={isSaved ? "Unsave track" : "Save track"}
+        title={user ? undefined : "Sign in to save tracks"}
+        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 max-sm:opacity-100 transition-opacity hover:scale-110 cursor-pointer z-10"
+      >
+        <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
+      </button>
 
       <div className="flex items-center justify-between gap-2 mt-2">
         <div className="flex-1 min-w-0">
@@ -141,7 +140,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0 relative z-10">
-          {user && Number(song.price ?? 0) <= 0 && (
+          {user && (
             <DownloadButton
               songId={song.id}
               label="Download"
@@ -207,20 +206,19 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
         </p>
       </Link>
       <div className="absolute top-2 right-2 flex gap-1">
-        {user && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleSave(e);
-            }}
-            aria-label={isSaved ? "Unsave album" : "Save album"}
-            className="p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
-          >
-            <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSave(e);
+          }}
+          aria-label={isSaved ? "Unsave album" : "Save album"}
+          title={user ? undefined : "Sign in to save albums"}
+          className="p-1.5 rounded-full bg-black/50 backdrop-blur opacity-0 group-hover:opacity-100 focus:opacity-100 max-sm:opacity-100 transition-opacity hover:scale-110 cursor-pointer"
+        >
+          <Heart className={`size-4 ${isSaved ? "fill-primary text-primary" : "text-white"}`} />
+        </button>
         <ShareMenu
           albumId={album.id}
           albumTitle={album.title}

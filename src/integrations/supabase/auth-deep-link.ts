@@ -1,9 +1,12 @@
 /**
  * Deep link auth handler for Capacitor Android.
  * Listens for appUrlOpen events and completes the Supabase auth flow
- * when a magic-link or OAuth redirect URL is opened.
+ * when a magic-link, OAuth, or password-recovery redirect URL is opened.
  *
  * URL scheme: com.wesu.music://login-callback?access_token=...&refresh_token=...
+ * Recovery: com.wesu.music://login-callback?type=recovery&... — after the
+ * session is set, a `wesu:recovery` window event fires so the app can route
+ * to /reset-password (a `recovery_pending` sessionStorage flag backs it).
  *
  * Feature: wesu-plus-completion
  * Validates: Requirements 18.3, 18.4
@@ -36,10 +39,23 @@ export function registerDeepLinkHandler(): () => void {
 
     const access_token = params.get("access_token");
     const refresh_token = params.get("refresh_token");
+    const isRecovery = params.get("type") === "recovery";
+
+    const finishRecovery = () => {
+      // Code-exchange links surface SIGNED_IN, not PASSWORD_RECOVERY, so the
+      // reset page couldn't tell a recovery session apart. Flag + event it.
+      try {
+        sessionStorage.setItem("recovery_pending", "1");
+        window.dispatchEvent(new CustomEvent("wesu:recovery"));
+      } catch {
+        /* ignore */
+      }
+    };
 
     if (access_token && refresh_token) {
       try {
         await supabase.auth.setSession({ access_token, refresh_token });
+        if (isRecovery) finishRecovery();
       } catch (err) {
         console.error("[auth-deep-link] Failed to set session:", err);
       }
@@ -53,6 +69,7 @@ export function registerDeepLinkHandler(): () => void {
       try {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) console.error("[auth-deep-link] Code exchange failed:", error.message);
+        else if (isRecovery) finishRecovery();
       } catch (err) {
         console.error("[auth-deep-link] Code exchange failed:", err);
       }

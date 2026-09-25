@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Users, Check, X } from "lucide-react";
+import { Users, Check, X, Trash2 } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
-import { listMyCollabInvites, respondToCollabInvite } from "@/lib/collabs.functions";
+import {
+  listMyCollabInvites,
+  respondToCollabInvite,
+  removeCollaborator,
+} from "@/lib/collabs.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/collabs")({
@@ -37,6 +41,17 @@ function Page() {
     },
     onError: (error) => {
       toast.error(`Failed to respond: ${error.message}`);
+    },
+  });
+  const removeFn = useServerFn(removeCollaborator);
+  const rm = useMutation({
+    mutationFn: removeFn,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-collabs"] });
+      toast.success("Collaborator removed");
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove: ${error.message}`);
     },
   });
 
@@ -100,8 +115,29 @@ function Page() {
                 <span>
                   {c.songs?.title} → {c.artists?.name} ({c.split_pct}%)
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {c.accepted ? "accepted" : "pending"}
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {c.accepted ? "accepted" : "pending"}
+                  </span>
+                  <button
+                    disabled={rm.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          c.accepted
+                            ? `Remove ${c.artists?.name} from "${c.songs?.title}"? Their split ends.`
+                            : `Cancel the invite to ${c.artists?.name}?`,
+                        )
+                      ) {
+                        rm.mutate({ data: { id: c.id } });
+                      }
+                    }}
+                    className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                    aria-label={c.accepted ? "Remove collaborator" : "Cancel invite"}
+                  >
+                    <Trash2 className="size-3" />
+                    {c.accepted ? "Remove" : "Cancel"}
+                  </button>
                 </span>
               </div>
             ))}

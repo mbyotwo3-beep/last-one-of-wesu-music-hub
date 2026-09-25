@@ -110,11 +110,33 @@ function CheckoutSuccessPage() {
     });
     // Drop any cached preview URL for the purchased song — otherwise the
     // next play serves the stale 15s preview instead of the unlocked track.
+    // Albums and playlist bundles unlock many songs: evict every member id
+    // so none of them replays a cached preview.
     try {
       const t = transaction as any;
-      if (t?.item_type === "song" && t?.item_id) {
-        import("@/lib/audio")
-          .then(({ evictCachedAudioUrl }) => evictCachedAudioUrl(t.item_id))
+      const ids: string[] = [];
+      if (t?.item_type === "song" && t?.item_id) ids.push(t.item_id);
+      const evict = (id: string) =>
+        import("@/lib/audio").then(({ evictCachedAudioUrl }) => evictCachedAudioUrl(id));
+      if (ids.length > 0) {
+        void Promise.all(ids.map((id) => evict(id).catch(() => {})));
+      } else if (t?.item_type === "album" && t?.item_id) {
+        supabase
+          .from("songs")
+          .select("id")
+          .eq("album_id", t.item_id)
+          .then(({ data }) =>
+            Promise.all(((data ?? []) as any[]).map((s) => evict(s.id).catch(() => {}))),
+          )
+          .catch(() => {});
+      } else if (t?.item_type === "playlist" && t?.item_id) {
+        supabase
+          .from("playlist_songs")
+          .select("song_id")
+          .eq("playlist_id", t.item_id)
+          .then(({ data }) =>
+            Promise.all(((data ?? []) as any[]).map((s) => evict(s.song_id).catch(() => {}))),
+          )
           .catch(() => {});
       }
     } catch {

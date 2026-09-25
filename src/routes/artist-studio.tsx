@@ -502,7 +502,7 @@ function UploadWizard() {
   const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const [featureInviteLink, setFeatureInviteLink] = useState<string | null>(null);
+  const [featureInviteLink, setFeatureInviteLink] = useState<string[]>([]);
   const [labelInviteLink, setLabelInviteLink] = useState<string | null>(null);
   // Registered-artist/label pickers: search by name and attach directly —
   // no email needed. Persisted in sessionStorage like the email fields.
@@ -521,6 +521,20 @@ function UploadWizard() {
   );
   const [labelSearch, setLabelSearch] = useState("");
   const [labelResults, setLabelResults] = useState<any[]>([]);
+  // Email fallback fields are controlled (defaultValue + sessionStorage went
+  // stale after "Upload another" resets).
+  const [featureEmail, setFeatureEmail] = useState(
+    () => sessionStorage.getItem("upload-wizard-featureEmail") || "",
+  );
+  const [featureNameInput, setFeatureNameInput] = useState(
+    () => sessionStorage.getItem("upload-wizard-featureName") || "",
+  );
+  const [labelEmailInput, setLabelEmailInput] = useState(
+    () => sessionStorage.getItem("upload-wizard-labelEmail") || "",
+  );
+  const [labelNameInput, setLabelNameInput] = useState(
+    () => sessionStorage.getItem("upload-wizard-labelName") || "",
+  );
   const [pickedLabel, setPickedLabel] = useState<{ id: string; name: string } | null>(() => {
     const id = sessionStorage.getItem("upload-wizard-labelId");
     if (!id) return null;
@@ -816,8 +830,14 @@ function UploadWizard() {
         return `Song price must be between K${SINGLE_MIN} and K${SINGLE_MAX}`;
       }
     } else {
-      if (!Number.isFinite(price) || price < ALBUM_MIN || price > ALBUM_MAX) {
-        return `Album price must be between K${ALBUM_MIN} and K${ALBUM_MAX}`;
+      if (!Number.isFinite(price) || price < 0 || price > ALBUM_MAX) {
+        return `Album price must be between 0 and K${ALBUM_MAX}`;
+      }
+      if (price === 0 && !feeAgreed) {
+        return `Free albums require acknowledging the K${FREE_SONG_FEE} maintenance fee per track`;
+      }
+      if (price > 0 && price < ALBUM_MIN) {
+        return `Album price must be 0 or between K${ALBUM_MIN} and K${ALBUM_MAX}`;
       }
     }
     return null;
@@ -855,6 +875,13 @@ function UploadWizard() {
     }
     if (hasLabel && !labelEmail && !pickedLabelId) {
       return setError("Label is checked but no label was picked or entered — search for a registered label or enter their email.");
+    }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (featureEmail && !emailRe.test(featureEmail)) {
+      return setError("The feature email address doesn't look valid.");
+    }
+    if (labelEmail && !emailRe.test(labelEmail)) {
+      return setError("The label email address doesn't look valid.");
     }
     const doFeatureInvite = hasFeature && !!featureEmail;
     const doFeatureDirect = hasFeature && !!pickedFeatureArtistId;
@@ -1029,7 +1056,7 @@ function UploadWizard() {
             });
             if ((inviteRes as any).registration_link) {
               newFeatureLink = (inviteRes as any).registration_link;
-              setFeatureInviteLink(newFeatureLink);
+              setFeatureInviteLink(newFeatureLink ? [newFeatureLink] : []);
             } else if ((inviteRes as any).existingUser) {
               toast.success(
                 `🎵 Song "${title}" uploaded! Featured artist already registered. Collaborator invite sent.`,
@@ -1126,6 +1153,7 @@ function UploadWizard() {
       calcOverall(0);
 
       // Upload each song sequentially in the exact ordered arrangement chosen by the artist
+      const createdTrackIds: string[] = [];
       for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
         const entry = tracks[trackIdx];
         const trackTitle = entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, "");
@@ -1155,13 +1183,15 @@ function UploadWizard() {
             cover_url,
             price,
             album_id: album.id,
-            has_feature: doFeatureInvite,
+            has_feature: doFeatureInvite || doFeatureDirect,
             has_label: doLabelInvite,
             track_number: trackIdx + 1,
             status: "draft",
             // Server requires this when the album itself is free (price 0).
             fee_acknowledged: feeAgreed,
           },
+        }).then((r: any) => {
+          if (r?.id) createdTrackIds.push(r.id);
         });
 
         setUploadStates((prev) =>
@@ -1173,6 +1203,61 @@ function UploadWizard() {
 
       setOverallProgress(100);
       setCurrentStageText("All tracks uploaded and processed successfully! ✓");
+
+      // Features attach per track (the collab model is per-song). Registered
+      // artists get a direct in-app invite; email produces one link per track.
+      const albumFeatureLinks: string[] = [];
+      if ((doFeatureDirect || doFeatureInvite) && createdTrackIds.length > 0) {
+        let attached = 0;
+        for (const songId of createdTrackIds) {
+          try {
+            if (doFeatureDirect) {
+              await directCollabFn({
+                data: {
+                  song_id: songId,
+                  artist_id: pickedFeatureArtistId,
+                  role: "featured",
+                  split_pct: featureSplitPct,
+                },
+              });
+              attached += 1;
+            } else {
+              const inviteRes = await inviteFeatureFn({
+                data: {
+                  song_id: songId,
+                  email: featureEmail,
+                  artist_name: featureName || undefined,
+                  role: "featured",
+                  split_pct: 0,
+                },
+              });
+              if ((inviteRes as any).registration_link) {
+                albumFeatureLinks.push((inviteRes as any).registration_link);
+                attached += 1;
+              }
+            }
+          } catch {
+            // Counted below — one bad track never aborts the rest.
+          }
+        }
+        if (attached === createdTrackIds.length && attached > 0) {
+          if (doFeatureDirect) {
+            toast.success(
+              `Featured artist added to ${attached} track${attached === 1 ? "" : "s"} with a ${featureSplitPct}% share — they'll confirm in Collabs.`,
+            );
+          } else {
+            setFeatureInviteLink(albumFeatureLinks);
+            toast.success(`Feature invitations created for ${attached} tracks.`);
+          }
+        } else if (attached > 0) {
+          if (!doFeatureDirect) setFeatureInviteLink(albumFeatureLinks);
+          toast.error(
+            `Feature attached to ${attached} of ${createdTrackIds.length} tracks — retry the rest from the Collaborators tab.`,
+          );
+        } else {
+          toast.error("Could not attach the featured artist to any track.");
+        }
+      }
 
       // Handle label invitation for album (locals — state setters are async).
       let albumLabelLink: string | null = null;
@@ -1250,35 +1335,37 @@ function UploadWizard() {
     }
   }
 
-  if (done || featureInviteLink || labelInviteLink) {
+  if (done || featureInviteLink.length > 0 || labelInviteLink) {
     return (
       <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-6">
         <p className="text-lg font-semibold">✓ {done || "Upload Complete!"}</p>
 
-        {featureInviteLink && (
+        {featureInviteLink.length > 0 && (
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
-            <p className="text-sm font-medium">🎤 Featured Artist Invitation</p>
+            <p className="text-sm font-medium">🎤 Featured Artist Invitation{featureInviteLink.length > 1 ? "s" : ""}</p>
             <p className="text-xs text-muted-foreground">
-              Copy this registration link and send it to the featured artist via email or messaging
+              Copy {featureInviteLink.length > 1 ? "these registration links" : "this registration link"} and send {featureInviteLink.length > 1 ? "them" : "it"} to the featured artist via email or messaging
               app.
             </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={featureInviteLink}
-                className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
-              />
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(featureInviteLink);
-                  toast.success("Link copied to clipboard!");
-                }}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
-              >
-                <Copy className="size-4" /> Copy
-              </button>
-            </div>
+            {featureInviteLink.map((link) => (
+              <div key={link} className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={link}
+                  className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(link);
+                    toast.success("Link copied to clipboard!");
+                  }}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
+                >
+                  <Copy className="size-4" /> Copy
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1318,7 +1405,7 @@ function UploadWizard() {
           <button
             onClick={() => {
               setDone(null);
-              setFeatureInviteLink(null);
+              setFeatureInviteLink([]);
               setLabelInviteLink(null);
               clearSessionStorage();
               setStep(1);
@@ -1328,6 +1415,10 @@ function UploadWizard() {
               setReleaseDate("");
               setHasFeature(false);
               setHasLabel(false);
+              setFeatureEmail("");
+              setFeatureNameInput("");
+              setLabelEmailInput("");
+              setLabelNameInput("");
               setCoverSync(null);
               setTracks([]);
               setTier("paid");
@@ -1595,21 +1686,21 @@ function UploadWizard() {
                 type="email"
                 placeholder="Featured artist's email (if not registered)"
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={featureEmail}
                 onChange={(e) => {
-                  const featureEmail = e.target.value;
-                  sessionStorage.setItem("upload-wizard-featureEmail", featureEmail);
+                  setFeatureEmail(e.target.value);
+                  sessionStorage.setItem("upload-wizard-featureEmail", e.target.value);
                 }}
-                defaultValue={sessionStorage.getItem("upload-wizard-featureEmail") || ""}
               />
               <input
                 type="text"
                 placeholder="Featured artist's name (optional)"
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={featureNameInput}
                 onChange={(e) => {
-                  const featureName = e.target.value;
-                  sessionStorage.setItem("upload-wizard-featureName", featureName);
+                  setFeatureNameInput(e.target.value);
+                  sessionStorage.setItem("upload-wizard-featureName", e.target.value);
                 }}
-                defaultValue={sessionStorage.getItem("upload-wizard-featureName") || ""}
               />
             </div>
           )}
@@ -1685,21 +1776,21 @@ function UploadWizard() {
                 type="email"
                 placeholder="Label's email (if not registered)"
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={labelEmailInput}
                 onChange={(e) => {
-                  const labelEmail = e.target.value;
-                  sessionStorage.setItem("upload-wizard-labelEmail", labelEmail);
+                  setLabelEmailInput(e.target.value);
+                  sessionStorage.setItem("upload-wizard-labelEmail", e.target.value);
                 }}
-                defaultValue={sessionStorage.getItem("upload-wizard-labelEmail") || ""}
               />
               <input
                 type="text"
                 placeholder="Label's name (optional)"
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+                value={labelNameInput}
                 onChange={(e) => {
-                  const labelName = e.target.value;
-                  sessionStorage.setItem("upload-wizard-labelName", labelName);
+                  setLabelNameInput(e.target.value);
+                  sessionStorage.setItem("upload-wizard-labelName", e.target.value);
                 }}
-                defaultValue={sessionStorage.getItem("upload-wizard-labelName") || ""}
               />
             </div>
           )}
@@ -2057,21 +2148,37 @@ function UploadWizard() {
               )}
             </>
           ) : (
-            <label className="block text-sm">
-              Album price (ZMW)
-              <input
-                type="number"
-                min={ALBUM_MIN}
-                max={ALBUM_MAX}
-                step="1"
-                className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-                value={price}
-                onChange={(e) => setPrice(Number(e.target.value))}
-              />
-              <span className="text-xs text-muted-foreground">
-                Must be K{ALBUM_MIN}–K{ALBUM_MAX}. Each track inherits this price.
-              </span>
-            </label>
+            <>
+              <label className="block text-sm">
+                Album price (ZMW)
+                <input
+                  type="number"
+                  min={0}
+                  max={ALBUM_MAX}
+                  step="1"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                />
+                <span className="text-xs text-muted-foreground">
+                  0 for free, or K{ALBUM_MIN}–K{ALBUM_MAX}. Each track inherits this price.
+                </span>
+              </label>
+              {price === 0 && (
+                <label className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={feeAgreed}
+                    onChange={(e) => setFeeAgreed(e.target.checked)}
+                  />
+                  <span>
+                    I agree to pay the <strong>K{FREE_SONG_FEE}</strong> maintenance fee per
+                    track when this free album is approved. You'll be billed via the Payouts tab.
+                  </span>
+                </label>
+              )}
+            </>
           )}
 
           {/* Active Upload Progress Panel */}

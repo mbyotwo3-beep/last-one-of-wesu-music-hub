@@ -675,6 +675,16 @@ function Page() {
                 {bulkProgress !== null ? `Downloading ${bulkProgress}…` : "Download all"}
               </button>
             )}
+            {!!user && isMobileWeb && (
+              <Link
+                to="/get-app"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold hover:bg-accent transition-colors cursor-pointer"
+                title="Bulk downloads live in the Wesu+ app"
+              >
+                <Download className="size-4" />
+                Download all
+              </Link>
+            )}
           </div>
         </div>
 

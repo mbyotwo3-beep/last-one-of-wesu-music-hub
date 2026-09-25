@@ -233,11 +233,15 @@ export const uploadSong = createServerFn({ method: "POST" })
     const { getPricingConfig } = await import("@/lib/pricing.functions");
     const pricing = await getPricingConfig();
     const price = Number(data.price ?? 0);
-    if (!Number.isFinite(price) || price < 0 || price > pricing.song_max) {
-      throw new Error(`Song price must be between 0 and ${pricing.song_max}`);
+    // Album-bound tracks carry the album's price (up to album_max) — they
+    // sell as part of the album, so the single-song cap doesn't apply.
+    const maxPrice = data.album_id ? pricing.album_max : pricing.song_max;
+    const minPrice = data.album_id ? 0 : pricing.song_min;
+    if (!Number.isFinite(price) || price < 0 || price > maxPrice) {
+      throw new Error(`Song price must be between 0 and ${maxPrice}`);
     }
-    if (price > 0 && price < pricing.song_min) {
-      throw new Error(`Paid songs must cost at least K${pricing.song_min}`);
+    if (price > 0 && price < minPrice) {
+      throw new Error(`Paid songs must cost at least K${minPrice}`);
     }
     // Free releases require acknowledging the maintenance fee (the client
     // checkbox alone is bypassable).

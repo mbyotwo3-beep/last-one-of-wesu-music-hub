@@ -30,6 +30,10 @@ export async function signOutEverywhere(qc?: QueryClient | null): Promise<boolea
   try {
     sessionStorage.removeItem("post_auth_redirect");
     sessionStorage.removeItem("pending_invite");
+    // Pending intents belong to the signed-out account — never replay them
+    // as the next user on a shared device.
+    sessionStorage.removeItem("pending_post_auth_action");
+    sessionStorage.removeItem("pending_add_playlist");
   } catch {
     /* ignore */
   }

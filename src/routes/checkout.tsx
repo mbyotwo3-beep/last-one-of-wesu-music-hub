@@ -183,11 +183,11 @@ function CheckoutPage() {
 
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
   const isCard = selectedMethod?.category === "card";
-  // Zambian mobile-money numbers: 10 digits starting 05/07/09 (spaces
-  // allowed). Invalid numbers burn a failed STK attempt server-side, so
-  // validate here with an inline hint.
+  // Zambian mobile-money numbers: exactly 10 digits starting 05/07/09
+  // (spaces/dashes allowed). Invalid numbers burn a failed STK attempt
+  // server-side, so validate here with an inline hint.
   const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
-  const phoneValid = /^0[579]\d{7}$/.test(normalizedPhone);
+  const phoneValid = /^0[579]\d{8}$/.test(normalizedPhone);
   const disabled =
     mutation.isPending ||
     !selectedMethodCode ||
@@ -406,7 +406,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
   const selectedMethod = methods.find((m) => m.code === selectedMethodCode);
   const isCard = selectedMethod?.category === "card";
   const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
-  const phoneValid = /^0[579]\d{7}$/.test(normalizedPhone);
+  const phoneValid = /^0[579]\d{8}$/.test(normalizedPhone);
   const disabled =
     mutation.isPending || !selectedMethodCode || (!isCard && !phoneValid);
 

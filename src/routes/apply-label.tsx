@@ -22,8 +22,12 @@ function Page() {
   const fn = useServerFn(applyForLabel);
   const m = useMutation({
     mutationFn: fn,
-    onSuccess: () => {
-      toast.success("Label application submitted successfully!");
+    onSuccess: (res: any) => {
+      toast.success(
+        res?.reapplied
+          ? "Application resubmitted — an admin will review it again."
+          : "Label application submitted successfully!",
+      );
       nav({ to: "/label-dashboard" });
     },
     onError: (error) => {

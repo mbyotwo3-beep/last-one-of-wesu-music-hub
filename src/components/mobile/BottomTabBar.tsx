@@ -79,6 +79,7 @@ export function BottomTabBar() {
   const { isArtist, isAdmin, isSuperAdmin } = useUserRoles();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState<{ id: string; name: string }[]>([]);
@@ -101,7 +102,7 @@ export function BottomTabBar() {
 
   function handleTab(tab: Tab) {
     if (tab.requireAuth && !user) {
-      navigate({ to: "/auth", search: { redirect: pathname } });
+      navigate({ to: "/auth", search: { redirect: pathname + searchStr } });
     } else {
       navigate({ to: tab.to as any });
     }
