@@ -371,3 +371,55 @@ describe("Preview URLs never carry into a new selection", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Next-track prefetch: warms the signed-URL cache ~1.5s after the current
+// track starts so skips begin instantly. Pure index selection mirrored
+// from the PlayerBar prefetch effect.
+// ---------------------------------------------------------------------------
+
+function prefetchTargetIndex(args: {
+  queueIndex: number;
+  length: number;
+  repeat: "off" | "all" | "one";
+}): number | null {
+  const { queueIndex, length, repeat } = args;
+  if (length < 2) return null;
+  let next = queueIndex + 1;
+  if (next >= length) {
+    if (repeat !== "all") return null;
+    next = 0;
+  }
+  return next;
+}
+
+describe("Next-track prefetch target", () => {
+  it("picks the following index, wraps only on repeat-all", () => {
+    expect(prefetchTargetIndex({ queueIndex: 0, length: 5, repeat: "off" })).toBe(1);
+    expect(prefetchTargetIndex({ queueIndex: 4, length: 5, repeat: "off" })).toBeNull();
+    expect(prefetchTargetIndex({ queueIndex: 4, length: 5, repeat: "all" })).toBe(0);
+    expect(prefetchTargetIndex({ queueIndex: 2, length: 5, repeat: "one" })).toBe(3);
+    expect(prefetchTargetIndex({ queueIndex: 0, length: 1, repeat: "all" })).toBeNull();
+    expect(prefetchTargetIndex({ queueIndex: 0, length: 0, repeat: "off" })).toBeNull();
+  });
+
+  it("never points outside the queue for any inputs", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 20 }),
+        fc.integer({ min: 0, max: 20 }),
+        fc.constantFrom("off", "all", "one") as fc.Arbitrary<"off" | "all" | "one">,
+        (index, length, repeat) => {
+          const next = prefetchTargetIndex({ queueIndex: index, length, repeat });
+          if (next !== null) {
+            expect(next).toBeGreaterThanOrEqual(0);
+            expect(next).toBeLessThan(length);
+          } else {
+            expect(length < 2 || index + 1 >= length || repeat !== "all").toBe(true);
+          }
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+});

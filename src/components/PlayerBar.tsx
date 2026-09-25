@@ -176,6 +176,75 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     cleanupStaleNativeTempFiles().catch(() => {});
   }, [isNative]);
 
+  // Next-track URL prefetch: resolve the upcoming track's signed URL ~1.5s
+  // after the current one starts, so skips start instantly (Spotify-like).
+  // Only warms the signed-URL cache — no audio is preloaded, entitlements
+  // don't change, previews expire in 40s, and anything stale re-resolves.
+  useEffect(() => {
+    if (!track || !playing) return;
+    const sel = selectionId;
+    const myIndex = queueIndex;
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          if (currentSelectionRef.current !== sel) return;
+          const st = usePlayer.getState();
+          const q = st.queue;
+          if (q.length < 2) return;
+          let next = myIndex + 1;
+          if (next >= q.length) {
+            if (st.repeat !== "all") return;
+            next = 0;
+          }
+          const target = q[next];
+          if (!target || target.id === track.id) return;
+          const uid = user?.id ?? null;
+          if (getCachedAudioUrl(target.id, uid)) return;
+          // Vault copies play instantly anyway — nothing to warm.
+          if (await isTrackDownloaded(target.id).catch(() => false)) return;
+          if (currentSelectionRef.current !== sel) return;
+          const { data: sess } = await supabase.auth.getSession().catch(() => ({ data: null as any }));
+          const accessToken = (sess as any)?.session?.access_token ?? null;
+          if (user) {
+            let signed: { url: string; requiresPurchase?: boolean } | null = null;
+            try {
+              signed = await getSignedFn({ data: { song_id: target.id } });
+            } catch {
+              signed = null;
+            }
+            if (currentSelectionRef.current !== sel) return;
+            if (signed && signed.url && !signed.requiresPurchase) {
+              setCachedAudioUrl(target.id, user.id, signed.url, false);
+              return;
+            }
+            const res = await getPreviewFn({ data: { song_id: target.id, access_token: accessToken } });
+            if (currentSelectionRef.current !== sel) return;
+            if (res?.url) setCachedAudioUrl(target.id, user.id, res.url, true);
+          } else {
+            let publicRes: { url: string } | null = null;
+            try {
+              publicRes = await getPublicFn({ data: { song_id: target.id } });
+            } catch {
+              publicRes = null;
+            }
+            if (currentSelectionRef.current !== sel) return;
+            if (publicRes && publicRes.url) {
+              setCachedAudioUrl(target.id, null, publicRes.url, false);
+              return;
+            }
+            const res = await getPreviewFn({ data: { song_id: target.id, access_token: accessToken } });
+            if (currentSelectionRef.current !== sel) return;
+            if (res?.url) setCachedAudioUrl(target.id, null, res.url, true);
+          }
+        } catch {
+          /* best effort only — skips just resolve normally */
+        }
+      })();
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id, selectionId, playing, queueIndex, repeat, user?.id]);
+
   // Load audio when the selection changes (or auth identity changes, or
   // the user manually retries a failed load).
   useEffect(() => {
