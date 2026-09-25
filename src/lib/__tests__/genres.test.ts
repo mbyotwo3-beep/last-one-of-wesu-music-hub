@@ -19,8 +19,9 @@ describe("canonical genre list", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("includes Gospel exactly once", () => {
+  it("includes Gospel and Afro Pop exactly once each", () => {
     expect(MUSIC_GENRES.filter((g) => g.toLowerCase() === "gospel")).toEqual(["Gospel"]);
+    expect(MUSIC_GENRES.filter((g) => g.toLowerCase() === "afro pop")).toEqual(["Afro Pop"]);
   });
 });
 
@@ -37,6 +38,16 @@ describe("normalizeGenre", () => {
       ["R N B", "R&B"],
       ["kwasa-kwasa", "Kwasa Kwasa"],
       ["  afro   beats  ", "Afrobeat"],
+      ["afropop", "Afro Pop"],
+      ["AFRO POP", "Afro Pop"],
+      ["drill", "Drill"],
+      ["TRAP", "Trap"],
+      ["lofi", "Lo-Fi"],
+      ["alt", "Alternative"],
+      ["electronic", "EDM"],
+      ["gqom", "Gqom"],
+      ["bongoflava", "Bongo Flava"],
+      ["zamrock", "Zamrock"],
     ] as const) {
       expect(normalizeGenre(raw)).toBe(expected);
     }
