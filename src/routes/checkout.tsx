@@ -8,6 +8,7 @@ import { getPaymentMethods, getPurchasableItem } from "@/lib/music.functions";
 import { initiatePayment, getPlaylistCheckout, initiatePlaylistUnlock } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
+import { useCurrency } from "@/stores/currency";
 import { StorageImage } from "@/components/StorageImage";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
@@ -60,6 +61,27 @@ function CheckoutRoute() {
   if (!search.item || !search.id) return <MissingCheckout />;
   if (search.item === "playlist") return <PlaylistCheckoutPage playlistId={search.id} />;
   return <CheckoutPage />;
+}
+
+/**
+ * Kwacha is the only settlement currency — but a listener browsing in USD
+ * mode sees the live-rate equivalent next to every total so the price is
+ * never a surprise. Per-line items stay in Kwacha (the charged amounts).
+ */
+function KwachaPrice({ zmw, className }: { zmw: number; className?: string }) {
+  const currency = useCurrency((s) => s.currency);
+  const zmwPerUsd = useCurrency((s) => s.zmwPerUsd);
+  return (
+    <span className={className}>
+      ZMW {zmw.toFixed(2)}
+      {currency === "USD" && zmw > 0 && (
+        <span className="font-normal text-muted-foreground">
+          {" "}
+          (≈ ${(zmw / zmwPerUsd).toFixed(2)})
+        </span>
+      )}
+    </span>
+  );
 }
 
 function MissingCheckout() {
@@ -214,11 +236,11 @@ function CheckoutPage() {
           <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
           <div className="flex justify-between items-center py-3 border-b border-white/5">
             <span className="text-muted-foreground">{lineName}</span>
-            <span className="font-semibold">ZMW {linePrice.toFixed(2)}</span>
+            <KwachaPrice zmw={linePrice} className="font-semibold" />
           </div>
           <div className="flex justify-between items-center py-3">
             <span className="font-semibold">Total</span>
-            <span className="text-xl font-bold text-primary">ZMW {linePrice.toFixed(2)}</span>
+            <KwachaPrice zmw={linePrice} className="text-xl font-bold text-primary" />
           </div>
         </div>
 
@@ -308,7 +330,7 @@ function CheckoutPage() {
           ) : (
             <Check className="size-4" />
           )}
-          Pay ZMW {linePrice.toFixed(2)}
+          Pay <KwachaPrice zmw={linePrice} />
         </button>
       </div>
     </div>
@@ -478,7 +500,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
           </div>
           <div className="flex justify-between items-center py-3 mt-2 border-t border-white/5">
             <span className="font-semibold">Total</span>
-            <span className="text-xl font-bold text-primary">ZMW {total.toFixed(2)}</span>
+            <KwachaPrice zmw={total} className="text-xl font-bold text-primary" />
           </div>
         </div>
 
@@ -562,7 +584,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
           ) : (
             <Check className="size-4" />
           )}
-          Pay ZMW {total.toFixed(2)}
+          Pay <KwachaPrice zmw={total} />
         </button>
       </div>
     </div>

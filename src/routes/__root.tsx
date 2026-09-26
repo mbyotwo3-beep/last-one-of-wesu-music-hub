@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -25,6 +25,33 @@ import { StatusBarInit } from "../components/mobile/StatusBarInit";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { registerDeepLinkHandler } from "../integrations/supabase/auth-deep-link";
 import { usePlayer } from "../stores/player";
+import { useCurrency } from "../stores/currency";
+import { useServerFn } from "@tanstack/react-start";
+import { FX_STALE_MS, getFxRate } from "../lib/fx.functions";
+
+/**
+ * Hydrates the currency store with the live USD→ZMW rate once per session.
+ * USD stays display-only — every charge settles in Kwacha; this only keeps
+ * the "$x.xx" estimates at the real market rate instead of a stale guess.
+ */
+function FxRateHydrator() {
+  const fxFn = useServerFn(getFxRate);
+  const setZmwPerUsd = useCurrency((s) => s.setZmwPerUsd);
+  const { data } = useQuery({
+    queryKey: ["fx-rate"],
+    queryFn: () => fxFn(),
+    staleTime: FX_STALE_MS,
+    gcTime: FX_STALE_MS,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+  useEffect(() => {
+    if (data && typeof data.zmwPerUsd === "number") {
+      setZmwPerUsd(data.zmwPerUsd);
+    }
+  }, [data, setZmwPerUsd]);
+  return null;
+}
 
 function NotFoundComponent() {
   return (
@@ -195,6 +222,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <StatusBarInit />
+        <FxRateHydrator />
         <div className="flex min-h-screen">
           <div className="hidden lg:block shrink-0">
             <AppleMusicSidebar />

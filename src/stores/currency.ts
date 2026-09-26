@@ -18,6 +18,8 @@ interface CurrencyState {
   zmwPerUsd: number;
   setCurrency: (currency: Currency) => void;
   toggleCurrency: () => void;
+  /** Hydrated from the live FX feed at boot; 27 until then. */
+  setZmwPerUsd: (rate: number) => void;
   formatPrice: (priceInZmw: number | null | undefined) => string;
 }
 
@@ -38,6 +40,12 @@ export const useCurrency = create<CurrencyState>((set, get) => ({
       localStorage.setItem("wesu_currency", next);
     }
     set({ currency: next });
+  },
+
+  setZmwPerUsd: (rate) => {
+    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+      set({ zmwPerUsd: rate });
+    }
   },
 
   formatPrice: (priceInZmw) => {
