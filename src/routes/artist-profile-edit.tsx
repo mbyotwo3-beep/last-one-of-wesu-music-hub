@@ -23,6 +23,7 @@ import { uploadFileToBucket } from "@/lib/storage";
 import { RoleGate } from "@/components/RoleGate";
 import { GenreSelect } from "@/components/GenreSelect";
 import { toast } from "sonner";
+import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 
 export const Route = createFileRoute("/artist-profile-edit")({
   head: () => ({
@@ -445,6 +446,12 @@ function ArtistProfileEditPage() {
                           href={fullLink}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => {
+                            if (isNativeShell()) {
+                              e.preventDefault();
+                              void openExternalUrl(fullLink);
+                            }
+                          }}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 transition-colors"
                           aria-label={`Open ${social.label} link`}
                         >

@@ -1,5 +1,6 @@
 import { ExternalLink, Facebook, Instagram, Music2, Youtube, type LucideIcon } from "lucide-react";
 import { collectSocialLinks, type SocialLinkKey } from "@/lib/social-links";
+import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 
 const socialIcons: Record<SocialLinkKey, LucideIcon> = {
   instagram: Instagram,
@@ -24,6 +25,14 @@ export function SocialLinks({ links }: { links: unknown }) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => {
+              // WebView ignores target="_blank" (no tab support) — route
+              // external links through the in-app browser sheet instead.
+              if (isNativeShell()) {
+                e.preventDefault();
+                void openExternalUrl(url);
+              }
+            }}
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
             aria-label={`${label} (opens in a new tab)`}
           >

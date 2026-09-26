@@ -21,6 +21,7 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
 import { addToPlaylist, createPlaylist } from "@/lib/listener.functions";
 import { getSongArtists } from "@/lib/music.functions";
+import { copyTextToClipboard } from "@/lib/external-url";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ShareMenuProps {
@@ -293,17 +294,12 @@ export function ShareMenu({
     // Copy helper: clipboard is unavailable/denied in some WebViews —
     // never let a share attempt throw an unhandled rejection.
     const copyLink = async () => {
-      try {
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(url);
-          setCopied(true);
-          toast.success("Link copied to clipboard");
-          setTimeout(() => setCopied(false), 2000);
-        } else {
-          toast.error("Sharing isn't available on this device");
-        }
-      } catch {
-        toast.error("Couldn't copy the link");
+      if (await copyTextToClipboard(url)) {
+        setCopied(true);
+        toast.success("Link copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        toast.error("Sharing isn't available on this device");
       }
     };
 
@@ -521,16 +517,13 @@ export function ShareMenu({
                     else if (type === "album" && albumId) url += `/albums/${albumId}`;
                     else if (type === "artist" && artistId) url += `/artists/${artistId}`;
                     else if (type === "playlist" && playlistId) url += `/playlists/${playlistId}`;
-                    if (!navigator.clipboard?.writeText) {
+                    if (await copyTextToClipboard(url)) {
+                      setCopied(true);
+                      toast.success("Link copied to clipboard");
+                      setTimeout(() => setCopied(false), 2000);
+                    } else {
                       toast.error("Copy isn't available on this device");
-                      return;
                     }
-                    await navigator.clipboard.writeText(url);
-                    setCopied(true);
-                    toast.success("Link copied to clipboard");
-                    setTimeout(() => setCopied(false), 2000);
-                  } catch {
-                    toast.error("Couldn't copy the link");
                   } finally {
                     setIsOpen(false);
                   }

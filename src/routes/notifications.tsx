@@ -5,6 +5,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { openExternalUrl } from "@/lib/external-url";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/notifications")({
@@ -124,7 +125,7 @@ function Page() {
         if (typeof n.link === "string" && LINK_RE.test(n.link)) {
           navigate({ to: n.link as any });
         } else if (typeof n.link === "string" && n.link.startsWith("http")) {
-          window.open(n.link, "_blank", "noopener,noreferrer");
+          void openExternalUrl(n.link);
         } else {
           toast.info("That item is no longer available");
         }

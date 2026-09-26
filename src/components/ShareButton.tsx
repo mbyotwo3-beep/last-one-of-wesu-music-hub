@@ -1,5 +1,6 @@
 import { Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { copyTextToClipboard } from "@/lib/external-url";
 
 type Props = {
   path: string;
@@ -12,12 +13,15 @@ export function ShareButton({ path, title, text, className }: Props) {
   const share = async () => {
     const url = new URL(path, window.location.origin).toString();
     try {
-      if (navigator.share) {
+      if (typeof navigator.share === "function") {
         await navigator.share({ title, text, url });
         return;
       }
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied");
+      if (await copyTextToClipboard(url)) {
+        toast.success("Link copied");
+      } else {
+        toast.error("Sharing isn't available on this device");
+      }
     } catch (error) {
       // Dismissing the native share sheet is not an error the listener needs
       // to see. Surface only failures that prevented copying a usable link.

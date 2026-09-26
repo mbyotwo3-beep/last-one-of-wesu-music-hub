@@ -58,7 +58,6 @@ import {
   shouldSyncPlaying,
   getLastNativeCommandAt,
   markNativeCommand,
-  seekNative,
   buildNotificationMetadata,
 } from "@/lib/native-audio";
 import { resolveImageUrl } from "@/lib/storage-url";

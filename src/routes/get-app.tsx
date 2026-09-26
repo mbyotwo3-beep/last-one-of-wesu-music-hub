@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { Smartphone, Download, ArrowLeft, Music2, WifiOff } from "lucide-react";
 import { getSiteConfig } from "@/lib/pricing.functions";
+import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 
 const siteQO = queryOptions({
   queryKey: ["site-config"],
@@ -87,6 +88,12 @@ function GetAppPage() {
               href={androidUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => {
+                if (isNativeShell()) {
+                  e.preventDefault();
+                  void openExternalUrl(androidUrl);
+                }
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-4 font-bold text-primary-foreground hover:brightness-110 transition-all"
             >
               <Smartphone className="size-5" /> Download for Android
@@ -97,6 +104,12 @@ function GetAppPage() {
               href={iosUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => {
+                if (isNativeShell()) {
+                  e.preventDefault();
+                  void openExternalUrl(iosUrl);
+                }
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-secondary px-6 py-4 font-bold hover:bg-accent transition-all"
             >
               <Smartphone className="size-5" /> Download for iPhone

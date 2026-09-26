@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getPaymentMethods, getPurchasableItem } from "@/lib/music.functions";
 import { initiatePayment, getPlaylistCheckout, initiatePlaylistUnlock } from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import { StorageImage } from "@/components/StorageImage";
 
 const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
@@ -109,7 +110,15 @@ function CheckoutPage() {
     mutationFn: payFn,
     onSuccess: (res: any) => {
       if (res?.paymentUrl) {
-        // Card / hosted checkout — redirect to Lenco
+        // Card / hosted checkout — redirect to Lenco.
+        // Native: open Lenco in the in-app browser sheet (a WebView redirect
+        // would strand the app on a foreign origin) and keep this app on the
+        // success page, which polls the transaction like mobile money does.
+        if (isNativeShell()) {
+          void openExternalUrl(res.paymentUrl);
+          navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
+          return;
+        }
         window.location.href = res.paymentUrl;
         return;
       }
@@ -340,6 +349,11 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
     mutationFn: unlockFn,
     onSuccess: (res: any) => {
       if (res?.paymentUrl) {
+        if (isNativeShell()) {
+          void openExternalUrl(res.paymentUrl);
+          navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
+          return;
+        }
         window.location.href = res.paymentUrl;
         return;
       }

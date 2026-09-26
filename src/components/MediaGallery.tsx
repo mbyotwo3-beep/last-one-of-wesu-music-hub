@@ -6,6 +6,7 @@ import {
   HardDrive, AlertTriangle, RefreshCw, X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { openExternalUrl } from "@/lib/external-url";
 import { RoleGate } from "@/components/RoleGate";
 import {
   listStorageFiles,
@@ -85,7 +86,7 @@ export function MediaGallery() {
     const { data } = supabase.storage
       .from(selectedBucket)
       .getPublicUrl(selectedFile.name);
-    window.open(data.publicUrl, '_blank');
+    void openExternalUrl(data.publicUrl);
   };
 
   return (

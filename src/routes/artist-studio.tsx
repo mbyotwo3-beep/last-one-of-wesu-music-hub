@@ -28,6 +28,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
+import { copyTextToClipboard } from "@/lib/external-url";
 import { toast } from "sonner";
 import {
   uploadSong,
@@ -1356,9 +1357,12 @@ function UploadWizard() {
                   className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
                 />
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(link);
-                    toast.success("Link copied to clipboard!");
+                  onClick={async () => {
+                    if (await copyTextToClipboard(link)) {
+                      toast.success("Link copied to clipboard!");
+                    } else {
+                      toast.error("Copy isn't available on this device");
+                    }
                   }}
                   className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
                 >
@@ -1383,9 +1387,12 @@ function UploadWizard() {
                 className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
               />
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(labelInviteLink);
-                  toast.success("Link copied to clipboard!");
+                onClick={async () => {
+                  if (await copyTextToClipboard(labelInviteLink)) {
+                    toast.success("Link copied to clipboard!");
+                  } else {
+                    toast.error("Copy isn't available on this device");
+                  }
                 }}
                 className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:brightness-110 transition flex items-center gap-2"
               >

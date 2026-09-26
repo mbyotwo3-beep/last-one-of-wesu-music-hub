@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import type { Carousel } from "@/lib/carousel.functions";
 
 // CMS links are free text: internal paths ("/albums/...") must use SPA Link
@@ -84,6 +85,12 @@ export function CarouselShelf({ carousel }: Props) {
                 href={carousel.show_all_link}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (isNativeShell()) {
+                    e.preventDefault();
+                    void openExternalUrl(carousel.show_all_link!);
+                  }
+                }}
                 className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 See All
@@ -122,6 +129,12 @@ export function CarouselShelf({ carousel }: Props) {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (isNativeShell()) {
+                    e.preventDefault();
+                    void openExternalUrl(href);
+                  }
+                }}
                 className={cardClass}
                 aria-label={item.title}
               >
