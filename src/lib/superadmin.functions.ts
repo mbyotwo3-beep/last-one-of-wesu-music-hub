@@ -196,6 +196,11 @@ export const updateSettings = createServerFn({ method: "POST" })
   .validator((d: { key: string; value: Record<string, unknown> }) => d)
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
+    // A bad URL or price cap here breaks payments/uploads globally — reject
+    // it with a message instead of persisting it.
+    const { validateSettingsValue } = await import("@/lib/settings-validation");
+    const invalid = validateSettingsValue(data.key, data.value);
+    if (invalid) throw new Error(invalid);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("platform_settings").upsert({
       key: data.key,
@@ -384,6 +389,9 @@ export const setPlatformCommission = createServerFn({ method: "POST" })
   .validator((d: { pct: number }) => d)
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context.supabase, context.userId);
+    const { validateCommissionPct } = await import("@/lib/settings-validation");
+    const invalid = validateCommissionPct(data.pct);
+    if (invalid) throw new Error(invalid);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
       .from("platform_settings")

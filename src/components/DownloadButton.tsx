@@ -212,6 +212,20 @@ export function DownloadButton({
     );
   }
 
+  // While the price/entitlement is still loading we don't know whether
+  // this should be Buy or Download — show an inert button instead of a
+  // Download that can only fail with a purchase error.
+  if (songInfo === undefined || entLoading) {
+    return (
+      <span className="inline-flex flex-col items-end gap-1">
+        <button type="button" disabled className={buttonClass} aria-label={`${label} song`}>
+          <Loader2 className="size-3.5 animate-spin" />
+          {label}
+        </button>
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex flex-col items-end gap-1">
       <button
