@@ -109,6 +109,18 @@ function AuthPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // After a native email-confirm round-trip the session lands via the
+  // app deep link (no page reload — the WebView never left). Run the
+  // stashed intent so invites/likes complete instead of idling.
+  useEffect(() => {
+    const onSignedIn = () => {
+      void handlePostAuthAction();
+    };
+    window.addEventListener("wesu:signed-in", onSignedIn);
+    return () => window.removeEventListener("wesu:signed-in", onSignedIn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -126,7 +138,14 @@ function AuthPage() {
       if (mode === "signup") {
         // Email-confirmation round-trips wipe the query string — stash the
         // intent so it replays after the user confirms and signs in.
-        stashPendingAction(sessionStorage, { action, artistId, itemId, itemType, redirect, invite });
+        stashPendingAction(sessionStorage, {
+          action,
+          artistId,
+          itemId,
+          itemType,
+          redirect,
+          invite,
+        });
         if (!agreedToTerms) {
           setError("You must agree to the Terms & Conditions to create an account.");
           setLoading(false);
@@ -142,12 +161,23 @@ function AuthPage() {
               terms_accepted_at: new Date().toISOString(),
               terms_version: "2025-08-01",
             },
-            emailRedirectTo: `${window.location.origin}${safeRedirect || "/dashboard"}`,
+            // Native: the confirm link must open back in the APP (the
+            // login-callback scheme), not the site in a system browser —
+            // otherwise the session lands in Chrome and the app stays
+            // logged out. The deep-link handler exchanges the code and
+            // fires wesu:signed-in, which replays the stashed intent.
+            emailRedirectTo: isNative
+              ? "com.wesu.music://login-callback"
+              : `${window.location.origin}${safeRedirect || "/dashboard"}`,
           },
         });
         if (error) throw error;
         if (!data.session) {
-          setNotice("Account created. Check your email to confirm your address, then sign in.");
+          setNotice(
+            isNative
+              ? "Account created. Check your email and tap the confirm link on this device — it opens right back in the app, signed in."
+              : "Account created. Check your email to confirm your address, then sign in.",
+          );
           setMode("signin");
         } else {
           await handlePostAuthAction();
@@ -232,7 +262,9 @@ function AuthPage() {
       } catch (err) {
         console.error("Failed to accept invitation after auth:", err);
         toast.error(
-          err instanceof Error ? err.message : "Signed in, but the invitation could not be accepted",
+          err instanceof Error
+            ? err.message
+            : "Signed in, but the invitation could not be accepted",
         );
       }
     }
@@ -351,79 +383,85 @@ function AuthPage() {
         </form>
 
         {!isNative && (
-        <>
-        <div className="mt-6 relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wider">
-            <span className="bg-obsidian px-2 text-muted-foreground">Or</span>
-          </div>
-        </div>
+          <>
+            <div className="mt-6 relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                <span className="bg-obsidian px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
 
-        <button
-          type="button"
-          onClick={async () => {
-            // OAuth can create a brand-new account even when the page is still
-            // in sign-in mode, so it must not bypass the terms acknowledgement.
-            if (!agreedToTerms) {
-              setMode("signup");
-              setError(
-                "Review and agree to the Listener Terms & Conditions before continuing with Google.",
-              );
-              return;
-            }
-            setLoading(true);
-            try {
-              // The OAuth round-trip wipes ?action — stash the full intent so
-              // it replays (like/follow/save completes) when the session lands.
-              stashPendingAction(
-                sessionStorage,
-                { action, artistId, itemId, itemType, redirect, invite },
-              );
-              const result = await lovable.auth.signInWithOAuth("google", {
-                redirect_uri: window.location.origin,
-              });
-              if (result.error) {
-                setError(
-                  result.error instanceof Error ? result.error.message : "Google sign-in failed",
-                );
-              }
-              if (!result.redirected && !result.error) {
-                navigate({ to: (safeRedirect || "/dashboard") as any });
-              }
-            } catch (err) {
-              // A thrown SDK/network error previously left an unhandled
-              // rejection and a permanently stuck "Loading…" button.
-              setError(err instanceof Error ? err.message : "Google sign-in failed");
-            } finally {
-              setLoading(false);
-            }
-          }}
-          disabled={loading}
-          className="w-full mt-6 py-3 bg-card border border-white/10 rounded-xl font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
-        >
-          <svg className="size-4" viewBox="0 0 24 24">
-            <path
-              fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.19 3.33v2.77h3.55c2.08-1.92 3.28-4.74 3.28-8.11z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.55-2.77c-.98.66-2.23 1.06-3.73 1.06-2.87 0-5.3-1.94-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.86-2.59 3.29-4.53 6.16-4.53z"
-            />
-          </svg>
-          Continue with Google
-        </button>
-        </>
+            <button
+              type="button"
+              onClick={async () => {
+                // OAuth can create a brand-new account even when the page is still
+                // in sign-in mode, so it must not bypass the terms acknowledgement.
+                if (!agreedToTerms) {
+                  setMode("signup");
+                  setError(
+                    "Review and agree to the Listener Terms & Conditions before continuing with Google.",
+                  );
+                  return;
+                }
+                setLoading(true);
+                try {
+                  // The OAuth round-trip wipes ?action — stash the full intent so
+                  // it replays (like/follow/save completes) when the session lands.
+                  stashPendingAction(sessionStorage, {
+                    action,
+                    artistId,
+                    itemId,
+                    itemType,
+                    redirect,
+                    invite,
+                  });
+                  const result = await lovable.auth.signInWithOAuth("google", {
+                    redirect_uri: window.location.origin,
+                  });
+                  if (result.error) {
+                    setError(
+                      result.error instanceof Error
+                        ? result.error.message
+                        : "Google sign-in failed",
+                    );
+                  }
+                  if (!result.redirected && !result.error) {
+                    navigate({ to: (safeRedirect || "/dashboard") as any });
+                  }
+                } catch (err) {
+                  // A thrown SDK/network error previously left an unhandled
+                  // rejection and a permanently stuck "Loading…" button.
+                  setError(err instanceof Error ? err.message : "Google sign-in failed");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="w-full mt-6 py-3 bg-card border border-white/10 rounded-xl font-semibold hover:bg-white/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:scale-105"
+            >
+              <svg className="size-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.19 3.33v2.77h3.55c2.08-1.92 3.28-4.74 3.28-8.11z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.55-2.77c-.98.66-2.23 1.06-3.73 1.06-2.87 0-5.3-1.94-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.86-2.59 3.29-4.53 6.16-4.53z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+          </>
         )}
         {isNative && (
           <p className="mt-6 text-center text-xs text-muted-foreground">

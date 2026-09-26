@@ -8,6 +8,7 @@ import {
   getLastNativeCommandAt,
   configureNativeAudio,
   clampNativeVolume,
+  shouldRetryNativePlay,
   __resetNativeAudioConfig,
   __resetNativeCommandClock,
 } from "../native-audio";
@@ -112,6 +113,27 @@ describe("native volume clamp", () => {
     expect(clampNativeVolume(1)).toBe(1);
     expect(clampNativeVolume(9)).toBe(1);
     expect(clampNativeVolume(Number.NaN)).toBe(1);
+  });
+});
+
+describe("native play retry across async ExoPlayer construction", () => {
+  // The plugin builds remote-URL ExoPlayers on the UI thread, so a
+  // same-tick play() throws "No ExoPlayer available" — while file://
+  // assets (synchronous path) always work. Only that failure retries.
+  it("retries the missing-player race, fails fast on anything else", () => {
+    expect(shouldRetryNativePlay(new Error("No ExoPlayer available"), 0)).toBe(true);
+    expect(shouldRetryNativePlay(new Error("no exoPlayer available for asset"), 3)).toBe(true);
+    expect(shouldRetryNativePlay(new Error("asset not found"), 0)).toBe(false);
+    expect(shouldRetryNativePlay(new Error("Player has been released"), 0)).toBe(false);
+    expect(shouldRetryNativePlay("No ExoPlayer available", 0)).toBe(true);
+    expect(shouldRetryNativePlay(null, 0)).toBe(false);
+  });
+
+  it("gives up after the attempt budget", () => {
+    const err = new Error("No ExoPlayer available");
+    expect(shouldRetryNativePlay(err, 6)).toBe(true);
+    expect(shouldRetryNativePlay(err, 7)).toBe(false);
+    expect(shouldRetryNativePlay(err, 99)).toBe(false);
   });
 });
 

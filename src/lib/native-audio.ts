@@ -216,14 +216,47 @@ export async function deleteNativeTempFile(path: string | null): Promise<void> {
 
 /**
  * Play a preloaded native audio asset.
- * Returns true on success, false if plugin is unavailable or asset not loaded.
+ *
+ * The plugin constructs its ExoPlayer asynchronously on the UI thread, so a
+ * play() issued on the same tick as preload() can arrive first and throw
+ * "No ExoPlayer available" — while file:// assets (synchronous MediaPlayer
+ * path) always work. That race is exactly "streaming never starts but
+ * downloads play". Retry that specific failure briefly; every other error
+ * (missing asset, torn-down engine) still fails fast.
+ *
+ * Returns true on success, false if the plugin is unavailable or the asset
+ * genuinely can't start.
  */
+const NATIVE_PLAY_ATTEMPTS = 8;
+const NATIVE_PLAY_RETRY_MS = 250;
+
+/** Pure: should this play failure be retried? (unit-tested) */
+export function shouldRetryNativePlay(
+  rawError: unknown,
+  attempt: number,
+  maxAttempts = NATIVE_PLAY_ATTEMPTS,
+): boolean {
+  if (attempt >= maxAttempts - 1) return false;
+  const msg = rawError instanceof Error ? rawError.message : String(rawError ?? "");
+  return /no exoplayer available/i.test(msg);
+}
+
 export async function playNative(id: string): Promise<boolean> {
-  markNativeCommand();
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
-    await NativeAudio.play({ assetId: id });
-    return true;
+    for (let attempt = 0; ; attempt++) {
+      // Re-stamp every attempt: retries can span the reconciler's grace
+      // window, and the store must not mistake "still starting" for a
+      // lock-screen pause mid-retry.
+      markNativeCommand();
+      try {
+        await NativeAudio.play({ assetId: id });
+        return true;
+      } catch (e) {
+        if (!shouldRetryNativePlay(e, attempt)) return false;
+        await new Promise((r) => setTimeout(r, NATIVE_PLAY_RETRY_MS));
+      }
+    }
   } catch {
     return false;
   }

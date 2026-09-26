@@ -227,6 +227,20 @@ export function BottomTabBar() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {/* Anonymous users get a prominent sign-in entry — otherwise
+                the menu offers no path to authentication at all. */}
+            {!user && (
+              <button
+                onClick={() => {
+                  navigate({ to: "/auth", search: { redirect: pathname + searchStr } });
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:brightness-110 transition-all mb-2"
+              >
+                <User className="size-5" />
+                <span>Sign In / Create Account</span>
+              </button>
+            )}
             {/* Wesu+ Music Section */}
             <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Wesu+ Music

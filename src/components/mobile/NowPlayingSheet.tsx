@@ -16,10 +16,8 @@ import {
 import { useRef, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
-import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { useTrackMeta } from "@/hooks/use-track-meta";
-import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useIsNative } from "@/hooks/use-platform";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -49,13 +47,11 @@ export function NowPlayingSheet() {
   const closeNowPlaying = usePlayer((s) => s.closeNowPlaying);
   const isPreview = usePlayer((s) => s.isPreview);
 
-  const { user } = useAuth();
   const isNative = useIsNative();
   const { data: meta } = useTrackMeta(track?.id);
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
   const price: number = Number(meta?.price ?? 0);
-  const { owned: entitled } = useSongEntitlement(track?.id, price, albumId);
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
   const shuffle = usePlayer((s) => s.shuffle);
@@ -230,29 +226,29 @@ export function NowPlayingSheet() {
         {/* Album Art — large, with drop shadow. Hidden in queue mode so
             the list gets the space (the header toggle is exclusive). */}
         {!showQueue && (
-        <div className="flex-1 flex items-center justify-center px-8 py-4 min-h-0">
-          <div
-            className="w-full max-w-xs aspect-square rounded-2xl overflow-hidden bg-[#2c2c2e]"
-            style={{
-              boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.5)",
-              transform: playing ? "scale(1.04)" : "scale(0.94)",
-              transition: "transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-            }}
-          >
-            {track.coverUrl ? (
-              <StorageImage
-                bucket="album-art"
-                path={track.coverUrl}
-                alt={track.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Music2 className="size-24 text-white/20" />
-              </div>
-            )}
+          <div className="flex-1 flex items-center justify-center px-8 py-4 min-h-0">
+            <div
+              className="w-full max-w-xs aspect-square rounded-2xl overflow-hidden bg-[#2c2c2e]"
+              style={{
+                boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.5)",
+                transform: playing ? "scale(1.04)" : "scale(0.94)",
+                transition: "transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
+              }}
+            >
+              {track.coverUrl ? (
+                <StorageImage
+                  bucket="album-art"
+                  path={track.coverUrl}
+                  alt={track.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Music2 className="size-24 text-white/20" />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Track info + Like */}
@@ -304,7 +300,10 @@ export function NowPlayingSheet() {
             />
           </button>
         </div>
-        {user && meta && (price <= 0 || entitled) && (
+        {/* Download / Buy: the button itself resolves bought→download,
+            unbought→checkout, anonymous→sign-in — always visible so the
+            flow is one tap, like Spotify. */}
+        {track && (
           <div className="px-6 mb-4">
             <DownloadButton
               songId={track.id}
@@ -400,21 +399,21 @@ export function NowPlayingSheet() {
         {/* Volume — hidden on native: devices use hardware buttons (and
             the slider is a no-op on iOS). */}
         {!isNative && (
-        <div className="flex items-center gap-3 px-6 mb-6 shrink-0">
-          <Volume2 className="size-4 text-white/40 shrink-0" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={muted ? 0 : volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            className="flex-1 accent-white h-1"
-            aria-label="Volume"
-            style={{ accentColor: "white" }}
-          />
-          <Volume2 className="size-5 text-white/70 shrink-0" />
-        </div>
+          <div className="flex items-center gap-3 px-6 mb-6 shrink-0">
+            <Volume2 className="size-4 text-white/40 shrink-0" />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={muted ? 0 : volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              className="flex-1 accent-white h-1"
+              aria-label="Volume"
+              style={{ accentColor: "white" }}
+            />
+            <Volume2 className="size-5 text-white/70 shrink-0" />
+          </div>
         )}
 
         {/* Queue Display */}

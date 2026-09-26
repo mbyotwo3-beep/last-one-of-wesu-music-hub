@@ -5,12 +5,10 @@ import { useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlayer } from "@/stores/player";
-import { useTrackMeta } from "@/hooks/use-track-meta";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { StorageImage } from "@/components/StorageImage";
-import { useSongEntitlement } from "@/hooks/use-song-entitlement";
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -37,9 +35,6 @@ export function NowPlayingScreen() {
   const skipPrev = usePlayer((s) => s.skipPrev);
   const seekTo = usePlayer((s) => s.seekTo);
   const isPreview = usePlayer((s) => s.isPreview);
-  const { data: meta } = useTrackMeta(track?.id);
-  const trackPrice = meta ? Number(meta.price ?? 0) : null;
-  const { owned } = useSongEntitlement(track?.id, trackPrice, (meta as any)?.album_id);
   const { isSaved, toggle: toggleSaved } = useSavedTrack(track?.id);
 
   if (!track) return null;
@@ -153,17 +148,18 @@ export function NowPlayingScreen() {
           />
         </div>
       </div>
-      {user && (trackPrice === null || owned) && (
-        <div className="mb-4">
-          <DownloadButton
-            songId={track.id}
-            label="Download"
-            title={track.title}
-            artistName={track.artistName}
-            coverUrl={track.coverUrl}
-          />
-        </div>
-      )}
+      {/* Download / Buy: the button itself resolves bought→download,
+          unbought→checkout, anonymous→sign-in — always visible so the
+          flow is one tap, like Spotify. */}
+      <div className="mb-4">
+        <DownloadButton
+          songId={track.id}
+          label="Download"
+          title={track.title}
+          artistName={track.artistName}
+          coverUrl={track.coverUrl}
+        />
+      </div>
 
       {/* Seek slider */}
       <div className="mb-2">

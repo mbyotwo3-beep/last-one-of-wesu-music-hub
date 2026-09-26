@@ -140,6 +140,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Selections that already burned their one auto-retry after a native
   // start failure (e.g. notification-STOP unloaded the asset).
   const nativeRetryRef = useRef<number | null>(null);
+  // Reconciler start-window: timestamp the selection started loading + the
+  // selection native last reported playing for. Slow networks can buffer
+  // several seconds after resolve — "paused" must not be adopted until
+  // we've either seen playing or the start window elapsed.
+  const loadStartedAtRef = useRef(0);
+  const nativeSeenPlayingRef = useRef<number | null>(null);
 
   /**
    * The UI believes audio is playing but the native engine refused to
@@ -205,7 +211,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           // Vault copies play instantly anyway — nothing to warm.
           if (await isTrackDownloaded(target.id).catch(() => false)) return;
           if (currentSelectionRef.current !== sel) return;
-          const { data: sess } = await supabase.auth.getSession().catch(() => ({ data: null as any }));
+          const { data: sess } = await supabase.auth
+            .getSession()
+            .catch(() => ({ data: null as any }));
           const accessToken = (sess as any)?.session?.access_token ?? null;
           if (user) {
             let signed: { url: string; requiresPurchase?: boolean } | null = null;
@@ -219,7 +227,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               setCachedAudioUrl(target.id, user.id, signed.url, false);
               return;
             }
-            const res = await getPreviewFn({ data: { song_id: target.id, access_token: accessToken } });
+            const res = await getPreviewFn({
+              data: { song_id: target.id, access_token: accessToken },
+            });
             if (currentSelectionRef.current !== sel) return;
             if (res?.url) setCachedAudioUrl(target.id, user.id, res.url, true);
           } else {
@@ -234,7 +244,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               setCachedAudioUrl(target.id, null, publicRes.url, false);
               return;
             }
-            const res = await getPreviewFn({ data: { song_id: target.id, access_token: accessToken } });
+            const res = await getPreviewFn({
+              data: { song_id: target.id, access_token: accessToken },
+            });
             if (currentSelectionRef.current !== sel) return;
             if (res?.url) setCachedAudioUrl(target.id, null, res.url, true);
           }
@@ -329,6 +341,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     trackedHistoryTrackRef.current = null;
     setError(null);
     setLoading(true);
+    loadStartedAtRef.current = Date.now();
     // Stamp the command clock: the reconciler must not mistake slow
     // buffering for a lock-screen pause while this selection loads.
     markNativeCommand();
@@ -380,8 +393,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               // fails for non-purchase reasons) always plays — offline
               // must work offline.
               const stale = await isVaultLicenseStale(track!.id, VAULT_LICENSE_MAX_AGE_MS);
-              const online =
-                typeof navigator === "undefined" || navigator.onLine !== false;
+              const online = typeof navigator === "undefined" || navigator.onLine !== false;
               let purchaseFailed = false;
               if (stale && online && user) {
                 try {
@@ -472,7 +484,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           }
         }
 
-
         // A newer selection may have replaced this request while it was
         // resolving. Never publish or play an old track's URL on the new one.
         if (!isCurrentTrack()) return;
@@ -481,8 +492,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // the network); remote URLs must be absolute HTTPS/HTTP so the
         // browser can't resolve a bare filename against the current origin
         // (which caused the OpaqueResponseBlocking errors on wesuplusly.com).
-        const isUsableUrl =
-          !!url && (offline || /^https?:\/\//i.test(url) || /^blob:/i.test(url));
+        const isUsableUrl = !!url && (offline || /^https?:\/\//i.test(url) || /^blob:/i.test(url));
         if (!isUsableUrl) {
           throw new Error("Audio unavailable (invalid URL)");
         }
@@ -531,126 +541,128 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             if (!nativeViable) {
               // Skip the native block without touching availability flags.
             } else {
-            // Resolve cover art to a renderable URL for the notification /
-            // lock screen. Raw DB storage paths are not playable artwork —
-            // covers are decorative, so failures never break playback.
-            let artworkUrl: string | undefined;
-            try {
-              const resolved = await resolveImageUrl("album-art", track!.coverUrl);
-              if (resolved) artworkUrl = resolved;
-            } catch {
-              /* ignore */
-            }
-            if (!isCurrentTrack()) return;
-            const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
-            const preloaded = await preloadNative(
-              track!.id,
-              assetUrl,
-              assetIsUrl,
-              buildNotificationMetadata({
-                title: track!.title,
-                artistName: track!.artistName,
-                albumTitle: typeof albumTitle === "string" ? albumTitle : null,
-                artworkUrl: artworkUrl ?? null,
-              }),
-            );
-            if (!preloaded) {
-              // Transient failure (or late plugin registration): re-probe
-              // next selection, play via HTML below right now.
-              _nativeAvailable = null;
-            }
-            if (preloaded) {
-              if (!isCurrentTrack()) {
-                await stopNative(track!.id).catch(() => {});
-                return;
+              // Resolve cover art to a renderable URL for the notification /
+              // lock screen. Raw DB storage paths are not playable artwork —
+              // covers are decorative, so failures never break playback.
+              let artworkUrl: string | undefined;
+              try {
+                const resolved = await resolveImageUrl("album-art", track!.coverUrl);
+                if (resolved) artworkUrl = resolved;
+              } catch {
+                /* ignore */
               }
-              // Native playback is ready only after preload succeeds.
-              // For offline tracks the marker is the staged file URI.
-              setAudioUrl(assetUrl);
-              if (usePlayer.getState().playing) {
-                const started = await playNative(track!.id).catch(() => false);
-                if (!started) noteNativeStartFailure();
-                else if (nativeRetryRef.current === currentSelectionRef.current) {
-                  nativeRetryRef.current = null;
+              if (!isCurrentTrack()) return;
+              const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
+              const preloaded = await preloadNative(
+                track!.id,
+                assetUrl,
+                assetIsUrl,
+                buildNotificationMetadata({
+                  title: track!.title,
+                  artistName: track!.artistName,
+                  albumTitle: typeof albumTitle === "string" ? albumTitle : null,
+                  artworkUrl: artworkUrl ?? null,
+                }),
+              );
+              if (!preloaded) {
+                // Transient failure (or late plugin registration): re-probe
+                // next selection, play via HTML below right now.
+                _nativeAvailable = null;
+              }
+              if (preloaded) {
+                if (!isCurrentTrack()) {
+                  await stopNative(track!.id).catch(() => {});
+                  return;
                 }
-              }
-              setLoading(false);
-              if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
-                trackedHistoryTrackRef.current = track!.id;
-                recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(() => {});
-              }
-              if (previewMode) {
-                const previewSelection = selectionId;
-                previewTimerRef.current = setTimeout(() => {
-                  // Stale timer (track changed) or paused meanwhile: a
-                  // preview must never cut off another selection, and ended
-                  // previews flow onward like Spotify (repeat-one replays).
-                  if (currentSelectionRef.current !== previewSelection) return;
+                // Native playback is ready only after preload succeeds.
+                // For offline tracks the marker is the staged file URI.
+                setAudioUrl(assetUrl);
+                if (usePlayer.getState().playing) {
+                  const started = await playNative(track!.id).catch(() => false);
+                  if (!started) noteNativeStartFailure();
+                  else if (nativeRetryRef.current === currentSelectionRef.current) {
+                    nativeRetryRef.current = null;
+                  }
+                }
+                setLoading(false);
+                if (user && !previewMode && trackedHistoryTrackRef.current !== track!.id) {
+                  trackedHistoryTrackRef.current = track!.id;
+                  recordPlayFn({ data: { song_id: track!.id, progress_seconds: 0 } }).catch(
+                    () => {},
+                  );
+                }
+                if (previewMode) {
+                  const previewSelection = selectionId;
+                  previewTimerRef.current = setTimeout(() => {
+                    // Stale timer (track changed) or paused meanwhile: a
+                    // preview must never cut off another selection, and ended
+                    // previews flow onward like Spotify (repeat-one replays).
+                    if (currentSelectionRef.current !== previewSelection) return;
+                    const st = usePlayer.getState();
+                    if (!st.playing) return;
+                    if (st.repeat === "one") {
+                      seekNative(track!.id, 0).catch(() => {});
+                      return;
+                    }
+                    st.skipNext();
+                  }, 15000);
+                }
+                const cleanup = await onNativeComplete(track!.id, () => {
+                  if (usePlayer.getState().repeat === "one") {
+                    // Restart from 0 — replaying a completed asset directly
+                    // is plugin-dependent.
+                    seekNative(track!.id, 0).catch(() => {});
+                    playNative(track!.id).catch(() => {});
+                    return;
+                  }
+                  usePlayer.getState().skipNext();
+                  if (track && user && !previewMode) {
+                    updatePlayProgressFn({
+                      data: {
+                        song_id: track!.id,
+                        progress_seconds: Math.floor(track.durationSeconds ?? 0),
+                      },
+                    }).catch(() => {});
+                    incrementFn({ data: { song_id: track!.id } }).catch(() => {});
+                  }
+                });
+                if (!isCurrentTrack()) {
+                  cleanup();
+                  await stopNative(track!.id).catch(() => {});
+                  return;
+                }
+                // Native engine drives position now (the HTML element has no
+                // src on this path): mirror position + duration into the store
+                // so progress bars, seek, and previews keep working.
+                const timeCleanup = await onNativeTimeUpdate(track!.id, (seconds) => {
+                  if (currentTrackIdRef.current !== track!.id) return;
                   const st = usePlayer.getState();
-                  if (!st.playing) return;
-                  if (st.repeat === "one") {
-                    seekNative(track!.id, 0).catch(() => {});
+                  if (st.isPreview && seconds >= 15) {
+                    // Backstop for the wall-clock timer: previews flow onward,
+                    // never stop on an error (repeat-one replays).
+                    if (st.repeat === "one") {
+                      seekNative(track!.id, 0).catch(() => {});
+                      return;
+                    }
+                    st.skipNext();
                     return;
                   }
-                  st.skipNext();
-                }, 15000);
-              }
-              const cleanup = await onNativeComplete(track!.id, () => {
-                if (usePlayer.getState().repeat === "one") {
-                  // Restart from 0 — replaying a completed asset directly
-                  // is plugin-dependent.
-                  seekNative(track!.id, 0).catch(() => {});
-                  playNative(track!.id).catch(() => {});
-                  return;
-                }
-                usePlayer.getState().skipNext();
-                if (track && user && !previewMode) {
-                  updatePlayProgressFn({
-                    data: {
-                      song_id: track!.id,
-                      progress_seconds: Math.floor(track.durationSeconds ?? 0),
-                    },
-                  }).catch(() => {});
-                  incrementFn({ data: { song_id: track!.id } }).catch(() => {});
-                }
-              });
-              if (!isCurrentTrack()) {
-                cleanup();
-                await stopNative(track!.id).catch(() => {});
+                  setProgress(Math.floor(seconds));
+                });
+                getNativeDuration(track!.id)
+                  .then((d) => {
+                    if (d && currentTrackIdRef.current === track!.id) {
+                      setAudioDuration(d);
+                      durationRef.current = d;
+                      usePlayer.getState().setTrackDuration(d);
+                    }
+                  })
+                  .catch(() => {});
+                nativeCleanupRef.current = () => {
+                  cleanup();
+                  timeCleanup();
+                };
                 return;
-              }
-              // Native engine drives position now (the HTML element has no
-              // src on this path): mirror position + duration into the store
-              // so progress bars, seek, and previews keep working.
-              const timeCleanup = await onNativeTimeUpdate(track!.id, (seconds) => {
-                if (currentTrackIdRef.current !== track!.id) return;
-                const st = usePlayer.getState();
-                if (st.isPreview && seconds >= 15) {
-                  // Backstop for the wall-clock timer: previews flow onward,
-                  // never stop on an error (repeat-one replays).
-                  if (st.repeat === "one") {
-                    seekNative(track!.id, 0).catch(() => {});
-                    return;
-                  }
-                  st.skipNext();
-                  return;
-                }
-                setProgress(Math.floor(seconds));
-              });
-              getNativeDuration(track!.id)
-                .then((d) => {
-                  if (d && currentTrackIdRef.current === track!.id) {
-                    setAudioDuration(d);
-                    durationRef.current = d;
-                    usePlayer.getState().setTrackDuration(d);
-                  }
-                })
-                .catch(() => {});
-              nativeCleanupRef.current = () => {
-                cleanup();
-                timeCleanup();
-              };
-              return;
               } // preloaded
             } // nativeViable
           } // _nativeAvailable
@@ -952,6 +964,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Remote-control reconciler: notification / lock-screen buttons drive the
   // native player directly, bypassing the store. Poll the native truth and
   // adopt it — so the in-app UI never disagrees with what's audible.
+  // 1s cadence: a shade tap must reflect in-app almost instantly
+  // (Spotify-like); our own commands re-stamp the clock (including every
+  // play-retry attempt), so the 1.5s grace still can't flap the UI.
   useEffect(() => {
     if (!isNative || !track) return;
     const timer = setInterval(async () => {
@@ -963,22 +978,32 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         if (!nativeCleanupRef.current) return;
         const st = usePlayer.getState();
         const nativePlaying = await isNativePlaying(id);
-        // Generous grace: slow networks can still be buffering several
-        // seconds after resolve. A false sync self-heals on the next tick
-        // (native truth wins both directions).
-        if (shouldSyncPlaying(st.playing, nativePlaying, Date.now(), getLastNativeCommandAt(), 4000)) {
+        if (nativePlaying === true) nativeSeenPlayingRef.current = selectionId;
+        // Still buffering on a slow network (never seen playing, inside the
+        // start window): skip this tick rather than flapping to paused.
+        // Shade pauses during the window apply once it elapses.
+        if (
+          nativePlaying === false &&
+          nativeSeenPlayingRef.current !== selectionId &&
+          Date.now() - loadStartedAtRef.current < 10000
+        ) {
+          return;
+        }
+        if (
+          shouldSyncPlaying(st.playing, nativePlaying, Date.now(), getLastNativeCommandAt(), 1500)
+        ) {
           usePlayer.setState({ playing: !!nativePlaying });
-          if (nativePlaying) {
-            const pos = await getNativeCurrentTime(id);
-            if (pos !== null && currentTrackIdRef.current === id) {
-              st.setProgress(Math.floor(pos));
-            }
+          // Adopt position on both transitions: without it a shade-pause
+          // freezes the progress bar at a stale value.
+          const pos = await getNativeCurrentTime(id);
+          if (pos !== null && currentTrackIdRef.current === id) {
+            st.setProgress(Math.floor(pos));
           }
         }
       } catch {
         /* never break playback for telemetry */
       }
-    }, 3000);
+    }, 1000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNative, track?.id, selectionId]);
@@ -1079,7 +1104,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 position: Math.min(pos, dur),
               });
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         };
         const audio = getAudio();
         audio?.addEventListener("timeupdate", updatePosition);
@@ -1463,226 +1490,230 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
       {/* Desktop floating glass bar */}
       <div className="fixed bottom-3 inset-x-3 z-50">
-      <div className="bg-obsidian/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_-2px_24px_rgba(0,0,0,0.5)] overflow-hidden">
-        {isPreview && (
-          <div className="flex items-center justify-between px-6 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs">
-            <span className="flex items-center gap-1.5 text-amber-400">
-              <Radio className="size-3" /> 15-second preview
-            </span>
-            <div className="flex items-center gap-3">
-              {trackPrice > 0 && (
-                <Link
-                  to="/checkout"
-                  search={{ item: "song", id: track.id }}
-                  className="font-semibold text-amber-400 hover:underline"
-                >
-                  Buy this track — ZMW {trackPrice.toFixed(2)}
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="h-20 px-4 grid grid-cols-3 items-center gap-4">
-          {/* Left: Track info */}
-          <div className="flex items-center gap-3 min-w-0">
-            <StorageImage
-              bucket="album-art"
-              path={track.coverUrl}
-              alt={track.title}
-              className="size-14 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 object-cover cursor-pointer"
-              onClick={() => setIsExpanded(true)}
-            />
-            <div className="min-w-0 overflow-hidden">
-              {albumId ? (
-                <Link
-                  to="/albums/$id"
-                  params={{ id: albumId }}
-                  className="text-sm font-medium text-white truncate hover:underline block"
-                >
-                  {track.title}
-                </Link>
-              ) : artistId ? (
-                <Link
-                  to="/artists/$id"
-                  params={{ id: artistId }}
-                  className="text-sm font-medium text-white truncate hover:underline block"
-                >
-                  {track.title}
-                </Link>
-              ) : (
-                <p
-                  className="text-sm font-medium text-white truncate hover:underline cursor-pointer"
-                  onClick={() => setIsExpanded(true)}
-                >
-                  {track.title}
-                </p>
-              )}
-
-              {artistId ? (
-                <Link
-                  to="/artists/$id"
-                  params={{ id: artistId }}
-                  className="text-xs text-gray-300 truncate hover:text-white hover:underline block"
-                >
-                  {track.artistName}
-                </Link>
-              ) : (
-                <p className="text-xs text-gray-300 truncate">{track.artistName}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 relative z-10">
-              {user && (
-                <button
-                  onClick={toggleLike}
-                  className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
-                  aria-label={liked ? "Unlike" : "Like"}
-                >
-                  <Heart
-                    className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`}
-                  />
-                </button>
-              )}
-              <ShareMenu
-                songId={track.id}
-                songTitle={track.title}
-                coverUrl={track.coverUrl}
-                artistId={artistId}
-                artistName={track.artistName}
-                albumId={albumId}
-                type="song"
-                className="relative z-20"
-              />
-            </div>
-          </div>
-
-          {/* Center: Controls + progress */}
-          <div className="flex flex-col items-center gap-1.5 w-full">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleShuffle}
-                className={`transition-colors ${shuffle ? "text-primary" : "text-gray-300 hover:text-white"}`}
-                aria-label="Shuffle"
-                title="Shuffle"
-              >
-                <Shuffle className="size-4" />
-              </button>
-              <button
-                onClick={skipPrev}
-                className="text-gray-300 hover:text-white"
-                aria-label="Previous"
-                title="Previous"
-              >
-                <SkipBack className="size-4" />
-              </button>
-              <button
-                // Never disabled: a stalled load would otherwise leave a
-                // dead button (tap pauses pending / retries failed).
-                onClick={() => togglePlay()}
-                className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform"
-                aria-label={playing ? "Pause" : "Play"}
-                title={error ? "Retry" : undefined}
-              >
-                {playing ? (
-                  <Pause className="size-4" />
-                ) : loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Play className="size-4 ml-0.5" />
-                )}
-              </button>
-              <button
-                onClick={skipNext}
-                className="text-gray-300 hover:text-white"
-                aria-label="Next"
-                title="Next"
-              >
-                <SkipForward className="size-4" />
-              </button>
-              <button
-                onClick={cycleRepeat}
-                className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-gray-300 hover:text-white"}`}
-                aria-label="Repeat"
-                title={`Repeat: ${repeat}`}
-              >
-                {repeat === "one" ? <Repeat1 className="size-4" /> : <Repeat className="size-4" />}
-              </button>
-            </div>
-            <div className="w-full flex items-center gap-2">
-              <span className="text-[10px] text-gray-300 tabular-nums w-8 text-right">
-                {fmt(progressSeconds)}
+        <div className="bg-obsidian/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_-2px_24px_rgba(0,0,0,0.5)] overflow-hidden">
+          {isPreview && (
+            <div className="flex items-center justify-between px-6 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs">
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <Radio className="size-3" /> 15-second preview
               </span>
-              <div
-                className="flex-1 h-1 bg-gray-600 rounded-full relative overflow-hidden cursor-pointer group"
-                onClick={seek}
-                role="slider"
-                aria-valuemin={0}
-                aria-valuemax={dur}
-                aria-valuenow={progressSeconds}
-                aria-label="Seek"
-              >
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-white group-hover:bg-primary transition-colors"
-                  style={{ width: `${progressPct}%` }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: `calc(${progressPct}% - 6px)` }}
+              <div className="flex items-center gap-3">
+                {trackPrice > 0 && (
+                  <Link
+                    to="/checkout"
+                    search={{ item: "song", id: track.id }}
+                    className="font-semibold text-amber-400 hover:underline"
+                  >
+                    Buy this track — ZMW {trackPrice.toFixed(2)}
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="h-20 px-4 grid grid-cols-3 items-center gap-4">
+            {/* Left: Track info */}
+            <div className="flex items-center gap-3 min-w-0">
+              <StorageImage
+                bucket="album-art"
+                path={track.coverUrl}
+                alt={track.title}
+                className="size-14 rounded-md overflow-hidden bg-card shrink-0 ring-1 ring-white/10 object-cover cursor-pointer"
+                onClick={() => setIsExpanded(true)}
+              />
+              <div className="min-w-0 overflow-hidden">
+                {albumId ? (
+                  <Link
+                    to="/albums/$id"
+                    params={{ id: albumId }}
+                    className="text-sm font-medium text-white truncate hover:underline block"
+                  >
+                    {track.title}
+                  </Link>
+                ) : artistId ? (
+                  <Link
+                    to="/artists/$id"
+                    params={{ id: artistId }}
+                    className="text-sm font-medium text-white truncate hover:underline block"
+                  >
+                    {track.title}
+                  </Link>
+                ) : (
+                  <p
+                    className="text-sm font-medium text-white truncate hover:underline cursor-pointer"
+                    onClick={() => setIsExpanded(true)}
+                  >
+                    {track.title}
+                  </p>
+                )}
+
+                {artistId ? (
+                  <Link
+                    to="/artists/$id"
+                    params={{ id: artistId }}
+                    className="text-xs text-gray-300 truncate hover:text-white hover:underline block"
+                  >
+                    {track.artistName}
+                  </Link>
+                ) : (
+                  <p className="text-xs text-gray-300 truncate">{track.artistName}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 relative z-10">
+                {user && (
+                  <button
+                    onClick={toggleLike}
+                    className="shrink-0 p-1.5 rounded-full hover:bg-white/10"
+                    aria-label={liked ? "Unlike" : "Like"}
+                  >
+                    <Heart
+                      className={`size-4 ${liked ? "fill-primary text-primary" : "text-gray-300 hover:text-white"}`}
+                    />
+                  </button>
+                )}
+                <ShareMenu
+                  songId={track.id}
+                  songTitle={track.title}
+                  coverUrl={track.coverUrl}
+                  artistId={artistId}
+                  artistName={track.artistName}
+                  albumId={albumId}
+                  type="song"
+                  className="relative z-20"
                 />
               </div>
-              <span className="text-[10px] text-gray-300 tabular-nums w-8">{fmt(dur)}</span>
             </div>
-            {error && <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>}
-          </div>
 
-          {/* Right: Queue, volume, expand */}
-          <div className="flex items-center justify-end gap-3">
-            <Link
-              to="/queue"
-              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
-              aria-label="Queue"
-              title="Queue"
-            >
-              <ListMusic className="size-4" />
-            </Link>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleMute}
-                className="text-gray-300 hover:text-white"
-                aria-label="Mute"
-              >
-                <VolIcon className="size-4" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.02}
-                value={muted ? 0 : volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="w-24 accent-white"
-                aria-label="Volume"
-              />
+            {/* Center: Controls + progress */}
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={toggleShuffle}
+                  className={`transition-colors ${shuffle ? "text-primary" : "text-gray-300 hover:text-white"}`}
+                  aria-label="Shuffle"
+                  title="Shuffle"
+                >
+                  <Shuffle className="size-4" />
+                </button>
+                <button
+                  onClick={skipPrev}
+                  className="text-gray-300 hover:text-white"
+                  aria-label="Previous"
+                  title="Previous"
+                >
+                  <SkipBack className="size-4" />
+                </button>
+                <button
+                  // Never disabled: a stalled load would otherwise leave a
+                  // dead button (tap pauses pending / retries failed).
+                  onClick={() => togglePlay()}
+                  className="bg-white text-black p-2 rounded-full hover:scale-105 transition-transform"
+                  aria-label={playing ? "Pause" : "Play"}
+                  title={error ? "Retry" : undefined}
+                >
+                  {playing ? (
+                    <Pause className="size-4" />
+                  ) : loading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Play className="size-4 ml-0.5" />
+                  )}
+                </button>
+                <button
+                  onClick={skipNext}
+                  className="text-gray-300 hover:text-white"
+                  aria-label="Next"
+                  title="Next"
+                >
+                  <SkipForward className="size-4" />
+                </button>
+                <button
+                  onClick={cycleRepeat}
+                  className={`transition-colors ${repeat !== "off" ? "text-primary" : "text-gray-300 hover:text-white"}`}
+                  aria-label="Repeat"
+                  title={`Repeat: ${repeat}`}
+                >
+                  {repeat === "one" ? (
+                    <Repeat1 className="size-4" />
+                  ) : (
+                    <Repeat className="size-4" />
+                  )}
+                </button>
+              </div>
+              <div className="w-full flex items-center gap-2">
+                <span className="text-[10px] text-gray-300 tabular-nums w-8 text-right">
+                  {fmt(progressSeconds)}
+                </span>
+                <div
+                  className="flex-1 h-1 bg-gray-600 rounded-full relative overflow-hidden cursor-pointer group"
+                  onClick={seek}
+                  role="slider"
+                  aria-valuemin={0}
+                  aria-valuemax={dur}
+                  aria-valuenow={progressSeconds}
+                  aria-label="Seek"
+                >
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full bg-white group-hover:bg-primary transition-colors"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ left: `calc(${progressPct}% - 6px)` }}
+                  />
+                </div>
+                <span className="text-[10px] text-gray-300 tabular-nums w-8">{fmt(dur)}</span>
+              </div>
+              {error && <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>}
             </div>
-            <button
-              onClick={() => setIsExpanded(true)}
-              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
-              aria-label="Expand"
-              title="Now playing"
-            >
-              <Maximize2 className="size-4" />
-            </button>
-            <button
-              onClick={() => usePlayer.getState().exitSong()}
-              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
-              aria-label="Close"
-              title="Close player"
-            >
-              <X className="size-4" />
-            </button>
+
+            {/* Right: Queue, volume, expand */}
+            <div className="flex items-center justify-end gap-3">
+              <Link
+                to="/queue"
+                className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
+                aria-label="Queue"
+                title="Queue"
+              >
+                <ListMusic className="size-4" />
+              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleMute}
+                  className="text-gray-300 hover:text-white"
+                  aria-label="Mute"
+                >
+                  <VolIcon className="size-4" />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.02}
+                  value={muted ? 0 : volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="w-24 accent-white"
+                  aria-label="Volume"
+                />
+              </div>
+              <button
+                onClick={() => setIsExpanded(true)}
+                className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
+                aria-label="Expand"
+                title="Now playing"
+              >
+                <Maximize2 className="size-4" />
+              </button>
+              <button
+                onClick={() => usePlayer.getState().exitSong()}
+                className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-white/10"
+                aria-label="Close"
+                title="Close player"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </>
   );

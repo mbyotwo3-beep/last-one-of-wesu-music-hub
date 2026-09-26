@@ -1,6 +1,6 @@
 import { Download, Loader2, Check } from "lucide-react";
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -53,11 +53,12 @@ export function useVaultDownloaded(songId: string | null | undefined) {
 }
 
 /**
- * Offline download control.
+ * Offline download control — icon-only (Spotify-style compact rows).
  *
- * - Desktop browser / native app → downloads into the encrypted on-device
- *   vault (AES-GCM, device-bound key). Files are never saved as playable
- *   audio and can only be played back inside this app.
+ * - Bought / free / staff / owner-artist → tap downloads into the encrypted
+ *   on-device vault (AES-GCM, device-bound key). Files are never saved as
+ *   playable audio and only play inside this app.
+ * - Not bought → tap goes straight to checkout to buy it.
  * - Mobile browser → routes to /get-app instead (offline listening lives
  *   in the native app; the admin configures the store links in Settings).
  * - Tapping a downloaded track removes it from this device.
@@ -72,10 +73,11 @@ export function DownloadButton({
   const { user } = useAuth();
   const isNative = useIsNative();
   const isMobile = useIsMobile();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const downloadFn = useServerFn(getDownloadAudioUrl);
   const qc = useQueryClient();
   const [progress, setProgress] = useState<number | null>(null);
-  const [progressBytes, setProgressBytes] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const { data: downloaded } = useVaultDownloaded(songId);
   // Price comes from the row itself (no new props for 14 call sites): one
@@ -100,12 +102,30 @@ export function DownloadButton({
     songInfo?.album_id ?? null,
   );
 
-  // Downloads are an authenticated feature. Hide the control for anonymous
-  // listeners instead of showing a button that can only fail with 401.
-  if (!user) return null;
-
+  // Icon-only control: the text pill pushed row content around and hid
+  // metadata on small screens. Unbought tracks lead to checkout, where
+  // the price is shown before anything is charged.
   const buttonClass =
-    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-semibold hover:bg-accent transition-colors disabled:opacity-50";
+    "inline-flex items-center justify-center size-9 shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
+  const iconClass = "size-4";
+
+  // Anonymous listeners get a download icon that leads to sign-in (with a
+  // post-login return) — never a dead button, and never a 401 failure.
+  if (!user) {
+    return (
+      <span className="inline-flex flex-col items-end gap-1">
+        <Link
+          to="/auth"
+          search={{ redirect: pathname + searchStr }}
+          className={buttonClass}
+          aria-label="Sign in to download"
+          title="Sign in to download"
+        >
+          <Download className={iconClass} />
+        </Link>
+      </span>
+    );
+  }
 
   // Mobile browsers can't hold offline vaults reliably and shouldn't juggle
   // large files — send them to the native app instead.
@@ -117,8 +137,7 @@ export function DownloadButton({
         aria-label={`${label} — get the Wesu+ app`}
         title="Downloads live in the Wesu+ app"
       >
-        <Download className="size-3.5" />
-        {label}
+        <Download className={iconClass} />
       </Link>
     );
   }
@@ -128,7 +147,6 @@ export function DownloadButton({
   async function download() {
     if (progress !== null) return;
     setProgress(0);
-    setProgressBytes(0);
     setError(null);
     try {
       // Entitlement (purchase / free / staff / owner-artist) is enforced
@@ -139,9 +157,8 @@ export function DownloadButton({
           return { url: result.url, filename: result.filename };
         },
         { songId, title, artistName, coverUrl },
-        (pct, bytes) => {
+        (pct) => {
           setProgress(pct);
-          if (typeof bytes === "number") setProgressBytes(bytes);
         },
       );
       // Invalidate first so the button flips to Downloaded only when the
@@ -186,15 +203,14 @@ export function DownloadButton({
           aria-label="Remove download"
           title="Downloaded — tap to remove from this device"
         >
-          <Check className="size-3.5 text-primary" />
-          Downloaded
+          <Check className={`${iconClass} text-primary`} />
         </button>
       </span>
     );
   }
 
   // Spotify-style: unbought paid tracks offer Buy, not a Download button
-  // that can only fail. Free/owned tracks fall through to Download.
+  // that can only fail. The icon leads straight to checkout.
   if (!entLoading && price > 0 && !owned) {
     return (
       <span className="inline-flex flex-col items-end gap-1">
@@ -202,11 +218,10 @@ export function DownloadButton({
           to="/checkout"
           search={{ item: "song", id: songId }}
           className={buttonClass}
-          aria-label={`Buy ${title ?? "song"}`}
-          title="Buy this track to download it"
+          aria-label={`Buy ${title ?? "song"} for K${price.toFixed(0)}`}
+          title={`Buy for K${price.toFixed(0)} to download it`}
         >
-          <Download className="size-3.5" />
-          Buy K{price.toFixed(0)}
+          <Download className={iconClass} />
         </Link>
       </span>
     );
@@ -219,8 +234,7 @@ export function DownloadButton({
     return (
       <span className="inline-flex flex-col items-end gap-1">
         <button type="button" disabled className={buttonClass} aria-label={`${label} song`}>
-          <Loader2 className="size-3.5 animate-spin" />
-          {label}
+          <Loader2 className={`${iconClass} animate-spin`} />
         </button>
       </span>
     );
@@ -234,19 +248,13 @@ export function DownloadButton({
         disabled={progress !== null}
         className={buttonClass}
         aria-label={`${label} song`}
+        title={label}
       >
         {progress !== null ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader2 className={`${iconClass} animate-spin`} />
         ) : (
-          <Download className="size-3.5" />
+          <Download className={iconClass} />
         )}
-        {progress !== null
-          ? progress > 0
-            ? `${progress}%`
-            : progressBytes > 0
-              ? `${(progressBytes / 1048576).toFixed(1)} MB`
-              : "Preparing…"
-          : label}
       </button>
       {error && <span className="text-[10px] text-destructive max-w-40 text-right">{error}</span>}
     </span>

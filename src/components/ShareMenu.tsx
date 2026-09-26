@@ -371,8 +371,15 @@ export function ShareMenu({
         createPortal(
           <div
             ref={menuRef}
-            className="fixed w-52 bg-card rounded-lg shadow-2xl z-[99999] overflow-hidden border border-border"
-            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed w-52 bg-card rounded-lg shadow-2xl z-[99999] overflow-y-auto border border-border"
+            style={{
+              top: `${menuPosition.top}px`,
+              left: `${menuPosition.left}px`,
+              // The item list grows with collaborating artists — never let
+              // the sheet extend past the viewport (unreachable items look
+              // exactly like "buttons not responding").
+              maxHeight: "calc(100dvh - 32px)",
+            }}
           >
             {type === "song" && (
               <>
@@ -555,7 +562,11 @@ export function ShareMenu({
               <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
                 {playlistsError && (
                   <p className="text-sm text-destructive px-4 py-2">
-                    Couldn't load playlists{(playlistsError as Error)?.message ? `: ${(playlistsError as Error).message}` : ""}.
+                    Couldn't load playlists
+                    {(playlistsError as Error)?.message
+                      ? `: ${(playlistsError as Error).message}`
+                      : ""}
+                    .
                   </p>
                 )}
                 {playlists?.map((p: any) => (
