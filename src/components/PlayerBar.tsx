@@ -365,7 +365,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // otherwise a same-id reselect kills the new playback.
         await pendingStopRef.current;
         pendingStopRef.current = null;
-        let url: string;
+        let url = "";
         let previewMode = false;
         // Encrypted on-device copy wins over streaming (instant, works
         // offline). Vault tracks only ever land there after a server-side

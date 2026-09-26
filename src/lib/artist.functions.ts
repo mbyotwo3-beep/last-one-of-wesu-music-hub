@@ -816,7 +816,7 @@ export const updateAlbum = createServerFn({ method: "POST" })
       description?: string;
       genre?: string;
       cover_url?: string;
-      release_date?: string;
+      release_date?: string | null;
       price?: number;
       status?: "draft" | "pending" | "approved" | "rejected";
     }) => d,

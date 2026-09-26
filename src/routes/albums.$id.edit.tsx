@@ -169,7 +169,7 @@ function AlbumEditPage() {
           title: title.trim(),
           description,
           genre,
-          release_date,
+          release_date: releaseDate || null,
           price,
         },
       });
