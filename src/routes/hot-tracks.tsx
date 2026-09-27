@@ -71,9 +71,12 @@ function Page() {
                 </div>
                 <Play className="size-4 text-muted-foreground" />
               </button>
-              {Number(s.price ?? 0) <= 0 && (
-                <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
-              )}
+              <DownloadButton
+                songId={s.id}
+                title={s.title}
+                artistName={s.artist?.name}
+                coverUrl={s.cover_url}
+              />
             </div>
           ))}
         </div>

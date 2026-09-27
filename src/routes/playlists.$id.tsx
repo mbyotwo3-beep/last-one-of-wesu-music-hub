@@ -2,7 +2,26 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { Play, Pause, Shuffle, Trash2, ListMusic, ArrowLeft, Lock, Heart, Clock, LockKeyhole, ChevronUp, ChevronDown, Download, Loader2, Pencil, Plus, Check, Globe } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Shuffle,
+  Trash2,
+  ListMusic,
+  ArrowLeft,
+  Lock,
+  Heart,
+  Clock,
+  LockKeyhole,
+  ChevronUp,
+  ChevronDown,
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  Check,
+  Globe,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlaylistWithSongs,
@@ -65,7 +84,18 @@ interface SongRowProps {
   isLast?: boolean;
 }
 
-function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, onRemove, onMove, isFirst, isLast }: SongRowProps) {
+function SongRow({
+  song: s,
+  index: i,
+  isOwner,
+  currentTrackId,
+  playing,
+  onPlay,
+  onRemove,
+  onMove,
+  isFirst,
+  isLast,
+}: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -89,7 +119,9 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
           <Play className="size-4 fill-current text-primary" />
         ) : (
           <>
-            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">{i + 1}</span>
+            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">
+              {i + 1}
+            </span>
             <Play className="size-4 fill-current hidden group-hover:block text-foreground" />
           </>
         )}
@@ -105,7 +137,9 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
 
       {/* Title & Artist */}
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}>
+        <p
+          className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}
+        >
           {s.title}
         </p>
         {s.artist?.id ? (
@@ -131,9 +165,12 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
 
       {/* Action buttons */}
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {Number(s.price ?? 0) <= 0 && (
-          <DownloadButton songId={s.id} title={s.title} artistName={s.artist?.name} coverUrl={s.cover_url} />
-        )}
+        <DownloadButton
+          songId={s.id}
+          title={s.title}
+          artistName={s.artist?.name}
+          coverUrl={s.cover_url}
+        />
 
         <button
           onClick={(e) => {
@@ -141,7 +178,9 @@ function SongRow({ song: s, index: i, isOwner, currentTrackId, playing, onPlay, 
             toggle();
           }}
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-            isSaved ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+            isSaved
+              ? "text-red-500 hover:text-red-600"
+              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -236,7 +275,9 @@ function Page() {
       // 2. Fallback to client query
       const { data: pl } = await supabase
         .from("playlists")
-        .select("*, playlist_songs(position, song_id, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))")
+        .select(
+          "*, playlist_songs(position, song_id, song:songs(id,title,duration,price,cover_url,artist:artists(id,name)))",
+        )
         .eq("id", id)
         .maybeSingle();
 
@@ -293,7 +334,7 @@ function Page() {
     },
   });
 
-  const songs = (((data as any)?.songs) ?? []) as any[];
+  const songs = ((data as any)?.songs ?? []) as any[];
   const isOwner = (data as any)?.user_id === user?.id;
   const isPublic = (data as any)?.is_public === true;
 
@@ -486,7 +527,8 @@ function Page() {
         onClick={() => navigate({ to: "/playlists" })}
         className="text-sm font-medium text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 cursor-pointer transition-colors group"
       >
-        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to Playlists
+        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to
+        Playlists
       </button>
 
       {/* Apple Music 2-Column Layout on Desktop */}
@@ -513,9 +555,7 @@ function Page() {
 
           {/* Badge & Title (+ owner edit) */}
           <div className="w-full flex items-center justify-center lg:justify-start gap-2 mb-1.5">
-            <p className="text-xs uppercase tracking-widest font-bold text-primary">
-              Playlist
-            </p>
+            <p className="text-xs uppercase tracking-widest font-bold text-primary">Playlist</p>
             {isOwner && !editing && (
               <button
                 onClick={() => {
@@ -595,10 +635,14 @@ function Page() {
 
           {/* Metadata */}
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-xs text-muted-foreground font-medium mb-6">
-            <span>{songs.length} {songs.length === 1 ? "song" : "songs"}</span>
+            <span>
+              {songs.length} {songs.length === 1 ? "song" : "songs"}
+            </span>
             {totalDuration > 0 && <span>• {formatTotalRuntime(totalDuration)}</span>}
             {(followerCount?.count ?? 0) > 0 && (
-              <span>• {followerCount!.count} follower{followerCount!.count === 1 ? "" : "s"}</span>
+              <span>
+                • {followerCount!.count} follower{followerCount!.count === 1 ? "" : "s"}
+              </span>
             )}
             {!isPublic ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-secondary px-2 py-0.5 rounded-full">
@@ -620,9 +664,13 @@ function Page() {
               className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-[0.98] transition-all shadow-md cursor-pointer disabled:opacity-40"
             >
               {isPlaylistActive ? (
-                <><Pause className="size-4 fill-current" /> Pause</>
+                <>
+                  <Pause className="size-4 fill-current" /> Pause
+                </>
               ) : (
-                <><Play className="size-4 fill-current ml-0.5" /> Play</>
+                <>
+                  <Play className="size-4 fill-current ml-0.5" /> Play
+                </>
               )}
             </button>
 
@@ -701,8 +749,8 @@ function Page() {
               <p className="text-sm text-muted-foreground mb-4">
                 {access!.missing.length} song{access!.missing.length === 1 ? "" : "s"} in this
                 playlist {access!.missing.length === 1 ? "isn't" : "aren't"} in your library yet.
-                Pay once below — free songs and tracks you already own are never charged —
-                then play everything in full.
+                Pay once below — free songs and tracks you already own are never charged — then play
+                everything in full.
               </p>
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1 mb-4">
                 {access!.missing.map((m: any) => (
@@ -754,7 +802,9 @@ function Page() {
             <div className="text-center py-16 text-muted-foreground bg-card/40 border border-dashed border-border rounded-2xl">
               <ListMusic className="size-10 mx-auto mb-3 text-muted-foreground/60" />
               <p className="text-sm font-medium">No songs in this playlist yet.</p>
-              <p className="text-xs text-muted-foreground/80 mt-1">Add songs from any track or album page.</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">
+                Add songs from any track or album page.
+              </p>
             </div>
           ) : (
             <IncrementalList
@@ -770,11 +820,15 @@ function Page() {
                   currentTrackId={currentTrackId}
                   playing={playing}
                   onPlay={playSong}
-                  onRemove={(songId) => remove.mutate({ data: { playlist_id: id, song_id: songId } })}
+                  onRemove={(songId) =>
+                    remove.mutate({ data: { playlist_id: id, song_id: songId } })
+                  }
                   onMove={
                     isOwner
                       ? (songId, dir) =>
-                          moveM.mutate({ data: { playlist_id: id, song_id: songId, direction: dir } })
+                          moveM.mutate({
+                            data: { playlist_id: id, song_id: songId, direction: dir },
+                          })
                       : undefined
                   }
                   isFirst={i === 0}

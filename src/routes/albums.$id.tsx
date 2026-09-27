@@ -26,7 +26,10 @@ export const Route = createFileRoute("/albums/$id")({
   head: ({ loaderData }) => ({
     meta: [
       { title: `${loaderData?.album?.title ?? "Album"} — Wesu+` },
-      { name: "description", content: `Listen to ${loaderData?.album?.title ?? "this album"} on Wesu+.` },
+      {
+        name: "description",
+        content: `Listen to ${loaderData?.album?.title ?? "this album"} on Wesu+.`,
+      },
     ],
   }),
   component: AlbumPage,
@@ -61,7 +64,17 @@ interface SongRowProps {
   onPlaySong: (song: any, index: number) => void;
 }
 
-function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId, coverUrl, currentTrackId, playing, onPlaySong }: SongRowProps) {
+function SongRow({
+  song: s,
+  index: i,
+  artist,
+  albumTracks: _albumTracks,
+  albumId,
+  coverUrl,
+  currentTrackId,
+  playing,
+  onPlaySong,
+}: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -85,7 +98,9 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
           <Play className="size-4 fill-current text-primary" />
         ) : (
           <>
-            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">{i + 1}</span>
+            <span className="text-xs font-semibold text-muted-foreground group-hover:hidden">
+              {i + 1}
+            </span>
             <Play className="size-4 fill-current hidden group-hover:block text-foreground" />
           </>
         )}
@@ -93,7 +108,9 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
 
       {/* Song title & Artist name */}
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}>
+        <p
+          className={`font-semibold text-sm truncate ${isCurrentTrack ? "text-primary" : "text-foreground"}`}
+        >
           {s.title}
         </p>
         {artist && (
@@ -114,9 +131,12 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
           </span>
         )}
 
-        {Number(s.price ?? 0) <= 0 && (
-          <DownloadButton songId={s.id} title={s.title} artistName={artist?.name} coverUrl={coverUrl} />
-        )}
+        <DownloadButton
+          songId={s.id}
+          title={s.title}
+          artistName={artist?.name}
+          coverUrl={coverUrl}
+        />
 
         <button
           onClick={(e) => {
@@ -124,7 +144,9 @@ function SongRow({ song: s, index: i, artist, albumTracks: _albumTracks, albumId
             toggle();
           }}
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-            isSaved ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
+            isSaved
+              ? "text-red-500 hover:text-red-600"
+              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -156,7 +178,9 @@ function AlbumPage() {
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const album = data.album!;
-  const artist = (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null }).artist ?? null;
+  const artist =
+    (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null })
+      .artist ?? null;
 
   const albumTracks = data.songs.map((s) => ({
     id: s.id,
@@ -209,7 +233,8 @@ function AlbumPage() {
         onClick={() => navigate({ to: "/albums" })}
         className="text-sm font-medium text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 cursor-pointer transition-colors group"
       >
-        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to Albums
+        <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" /> Back to
+        Albums
       </button>
 
       {/* Apple Music 2-Column Layout on Desktop */}
@@ -227,9 +252,7 @@ function AlbumPage() {
           </div>
 
           {/* Badge & Title */}
-          <p className="text-xs uppercase tracking-widest font-bold text-primary mb-1.5">
-            Album
-          </p>
+          <p className="text-xs uppercase tracking-widest font-bold text-primary mb-1.5">Album</p>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-foreground tracking-tight mb-2 break-words leading-tight">
             {album.title}
           </h1>
@@ -262,9 +285,13 @@ function AlbumPage() {
                 className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-[0.98] transition-all shadow-md cursor-pointer disabled:opacity-40"
               >
                 {isAlbumPlaying ? (
-                  <><Pause className="size-4 fill-current" /> Pause</>
+                  <>
+                    <Pause className="size-4 fill-current" /> Pause
+                  </>
                 ) : (
-                  <><Play className="size-4 fill-current ml-0.5" /> Play</>
+                  <>
+                    <Play className="size-4 fill-current ml-0.5" /> Play
+                  </>
                 )}
               </button>
 
