@@ -45,6 +45,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Background-playback survival (Spotify-style): holds process
+             priority while audio plays so swiping the app away doesn't kill
+             music on strict phones. The audio + transport buttons stay owned
+             by the native-audio plugin; this service only guards the process
+             and self-stops ~15s after playback goes quiet. -->
+        <service
+            android:name=".WesuPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 
     <!-- Permissions -->
@@ -52,4 +62,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Media (notification/lock-screen) playback controls on Android 13+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Foreground-service hold for background playback (normal permissions,
+         no runtime grant needed). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 </manifest>

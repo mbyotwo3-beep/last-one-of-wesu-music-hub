@@ -202,6 +202,47 @@ function filesystemPlugin(): any | null {
   return (window as any).Capacitor?.Plugins?.Filesystem ?? null;
 }
 
+/**
+ * The WesuPlayback foreground service via the runtime bridge (no npm import,
+ * same pattern as the Filesystem access — it only exists in our native
+ * shell). Null on web / old installs without the service.
+ */
+function playbackPlugin(): any | null {
+  if (typeof window === "undefined") return null;
+  return (window as any).Capacitor?.Plugins?.WesuPlayback ?? null;
+}
+
+/**
+ * Pure: should the background-playback service be held? Active only while a
+ * track is loaded AND playing AND the app isn't in the foreground (up front
+ * the player notification suffices — no duplicate). Unknown app state
+ * (null) holds: err toward survival, the watchdog bounds mistakes.
+ * (unit-tested)
+ */
+export function shouldRunPlaybackService(
+  playing: boolean,
+  hasTrack: boolean,
+  appActive: boolean | null,
+): boolean {
+  return hasTrack && playing && appActive !== true;
+}
+
+/**
+ * Hold/release background-playback priority (Spotify-style swipe-away
+ * survival). Best-effort: resolves silently when the service is missing
+ * (web, old APKs) so playback never depends on it.
+ */
+export async function setPlaybackServiceActive(active: boolean): Promise<void> {
+  try {
+    const plugin = playbackPlugin();
+    if (!plugin) return;
+    if (active) await plugin.start?.();
+    else await plugin.stop?.();
+  } catch {
+    /* never break playback for process priority */
+  }
+}
+
 /** Delete a staged temp file (best effort — the cache dir is expendable). */
 export async function deleteNativeTempFile(path: string | null): Promise<void> {
   if (!path) return;

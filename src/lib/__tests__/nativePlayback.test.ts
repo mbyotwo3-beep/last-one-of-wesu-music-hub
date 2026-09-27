@@ -9,6 +9,8 @@ import {
   configureNativeAudio,
   clampNativeVolume,
   shouldRetryNativePlay,
+  shouldRunPlaybackService,
+  setPlaybackServiceActive,
   __resetNativeAudioConfig,
   __resetNativeCommandClock,
 } from "../native-audio";
@@ -134,6 +136,26 @@ describe("native play retry across async ExoPlayer construction", () => {
     expect(shouldRetryNativePlay(err, 6)).toBe(true);
     expect(shouldRetryNativePlay(err, 7)).toBe(false);
     expect(shouldRetryNativePlay(err, 99)).toBe(false);
+  });
+});
+
+describe("background-playback service hold decision", () => {
+  // Held only while a track plays off-foreground: up front the player
+  // notification suffices, on pause/exit it releases, null app state holds
+  // (err toward survival — the native watchdog bounds mistakes).
+  it("holds exactly while playing off-foreground", () => {
+    expect(shouldRunPlaybackService(true, true, false)).toBe(true);
+    expect(shouldRunPlaybackService(true, true, null)).toBe(true);
+    expect(shouldRunPlaybackService(true, true, true)).toBe(false);
+    expect(shouldRunPlaybackService(false, true, false)).toBe(false);
+    expect(shouldRunPlaybackService(true, false, false)).toBe(false);
+    expect(shouldRunPlaybackService(false, false, true)).toBe(false);
+  });
+
+  it("setPlaybackServiceActive never throws without the native shell", async () => {
+    // Node test env: no Capacitor bridge — must resolve silently.
+    await expect(setPlaybackServiceActive(true)).resolves.toBeUndefined();
+    await expect(setPlaybackServiceActive(false)).resolves.toBeUndefined();
   });
 });
 

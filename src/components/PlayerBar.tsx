@@ -59,6 +59,8 @@ import {
   getLastNativeCommandAt,
   markNativeCommand,
   buildNotificationMetadata,
+  setPlaybackServiceActive,
+  shouldRunPlaybackService,
 } from "@/lib/native-audio";
 import { resolveImageUrl } from "@/lib/storage-url";
 import {
@@ -960,6 +962,40 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     });
     return () => setNativeSeekHook(null);
   }, [isNative]);
+
+  // Background-playback survival (Spotify-style): while a track plays and
+  // the app is backgrounded, hold the foreground service so swiping away
+  // doesn't kill music on strict phones. Up front the player notification
+  // suffices (no duplicate); on pause/exit the service is released, and a
+  // native watchdog self-stops it if the WebView dies mid-session.
+  useEffect(() => {
+    if (!isNative) return;
+    let cancelled = false;
+    let appActive: boolean | null = true;
+    const sync = () => {
+      if (cancelled) return;
+      const st = usePlayer.getState();
+      void setPlaybackServiceActive(shouldRunPlaybackService(st.playing, !!st.track, appActive));
+    };
+    sync();
+    let removeListener: (() => void) | undefined;
+    (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        const handle = await App.addListener("appStateChange", ({ isActive }) => {
+          appActive = isActive;
+          sync();
+        });
+        removeListener = () => handle.remove();
+      } catch {
+        /* web fallback: not native, already returned */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      removeListener?.();
+    };
+  }, [isNative, track?.id, playing]);
 
   // Remote-control reconciler: notification / lock-screen buttons drive the
   // native player directly, bypassing the store. Poll the native truth and
