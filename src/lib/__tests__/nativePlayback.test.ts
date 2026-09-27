@@ -10,6 +10,7 @@ import {
   clampNativeVolume,
   shouldRetryNativePlay,
   shouldRunPlaybackService,
+  shouldAdoptNullAsPaused,
   setPlaybackServiceActive,
   __resetNativeAudioConfig,
   __resetNativeCommandClock,
@@ -156,6 +157,22 @@ describe("background-playback service hold decision", () => {
     // Node test env: no Capacitor bridge — must resolve silently.
     await expect(setPlaybackServiceActive(true)).resolves.toBeUndefined();
     await expect(setPlaybackServiceActive(false)).resolves.toBeUndefined();
+  });
+});
+
+describe("notification-STOP null-streak adoption", () => {
+  // Dismissing the shade notification unloads the asset with no event
+  // (isPlaying throws → null). Adopt paused only on persistent nulls.
+  const base = { storePlaying: true, sinceCommandMs: 60_000, sinceLoadMs: 60_000 };
+  it("adopts paused after enough consecutive nulls", () => {
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 3 })).toBe(false);
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 4 })).toBe(true);
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 10 })).toBe(true);
+  });
+  it("never false-pauses: idle store, fresh load, or recent command", () => {
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 10, storePlaying: false })).toBe(false);
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 10, sinceLoadMs: 2_000 })).toBe(false);
+    expect(shouldAdoptNullAsPaused({ ...base, nullStreak: 10, sinceCommandMs: 500 })).toBe(false);
   });
 });
 

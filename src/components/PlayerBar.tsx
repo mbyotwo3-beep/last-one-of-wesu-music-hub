@@ -61,6 +61,7 @@ import {
   buildNotificationMetadata,
   setPlaybackServiceActive,
   shouldRunPlaybackService,
+  shouldAdoptNullAsPaused,
 } from "@/lib/native-audio";
 import { resolveImageUrl } from "@/lib/storage-url";
 import {
@@ -142,6 +143,9 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Selections that already burned their one auto-retry after a native
   // start failure (e.g. notification-STOP unloaded the asset).
   const nativeRetryRef = useRef<number | null>(null);
+  // Consecutive "unknown" polls for the current selection (plugin emits no
+  // event on notification-STOP/dismiss — the asset just vanishes).
+  const nativeNullStreakRef = useRef<{ sel: number | null; n: number }>({ sel: null, n: 0 });
   // Reconciler start-window: timestamp the selection started loading + the
   // selection native last reported playing for. Slow networks can buffer
   // several seconds after resolve — "paused" must not be adopted until
@@ -1015,6 +1019,31 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const st = usePlayer.getState();
         const nativePlaying = await isNativePlaying(id);
         if (nativePlaying === true) nativeSeenPlayingRef.current = selectionId;
+        if (nativePlaying === null) {
+          // Unknown (bridge hiccup — or the asset vanished via
+          // notification-STOP/dismiss, which emits no event). Count
+          // consecutive nulls per selection and adopt paused only when
+          // persistence proves it isn't transient.
+          const streak = nativeNullStreakRef.current;
+          if (streak.sel !== selectionId) {
+            streak.sel = selectionId;
+            streak.n = 0;
+          }
+          streak.n += 1;
+          if (
+            shouldAdoptNullAsPaused({
+              nullStreak: streak.n,
+              storePlaying: st.playing,
+              sinceCommandMs: Date.now() - getLastNativeCommandAt(),
+              sinceLoadMs: Date.now() - loadStartedAtRef.current,
+            })
+          ) {
+            usePlayer.setState({ playing: false });
+            streak.n = 0;
+          }
+          return;
+        }
+        nativeNullStreakRef.current = { sel: selectionId, n: 0 };
         // Still buffering on a slow network (never seen playing, inside the
         // start window): skip this tick rather than flapping to paused.
         // Shade pauses during the window apply once it elapses.
@@ -1044,7 +1073,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNative, track?.id, selectionId]);
 
-  // MediaSession — lock-screen / notification controls (web + webview).
+  // MediaSession — lock-screen / notification controls for WEB.
+  // On native the @capgo/native-audio plugin owns the shade with real
+  // transport buttons (play/pause/stop wired in Java, working even with a
+  // dead WebView). A second WebView MediaSession would ALSO post controls —
+  // but its handlers are JS, so backgrounded/throttled they silently eat
+  // taps and feel exactly like "notification buttons not working". Skip it
+  // whenever the native engine is available (or not yet probed — it ships
+  // in our APK); the HTML fallback path (plugin provably absent) still
+  // gets MediaSession.
   // Artwork must be a renderable URL: raw DB storage paths are not, so the
   // cover is resolved exactly like <StorageImage> does. Without this the
   // lock screen shows controls with no art.
@@ -1053,6 +1090,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     (async () => {
       try {
         if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+        if (isNative && _nativeAvailable !== false) return;
         if (!track) {
           // No track: clear stale handlers so lock-screen buttons can't
           // resurrect playback after exit.

@@ -278,8 +278,11 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex justify-center px-6 py-12">
+      {/* my-auto (not parent items-center): centers short forms but lets
+          tall/keyboard-shrunk forms scroll naturally from the top instead
+          of clipping the top fields or leaving dead space. */}
+      <div className="w-full max-w-md my-auto">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-primary/10 mb-4">
             <Music className="size-6 text-primary" />

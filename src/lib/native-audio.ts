@@ -527,6 +527,39 @@ export function shouldSyncPlaying(
   return nowMs - commandAt >= graceMs;
 }
 
+/**
+ * Pure: should persistent "unknown" native state be adopted as paused?
+ * The plugin emits no event when its notification is STOPPED/dismissed (the
+ * asset vanishes: isPlaying throws → null). Adopt paused only after several
+ * consecutive nulls AND past both the command grace and the load window, so
+ * bridge hiccups and fresh-track buffering can never false-pause.
+ * (unit-tested)
+ */
+export function shouldAdoptNullAsPaused(args: {
+  nullStreak: number;
+  storePlaying: boolean;
+  sinceCommandMs: number;
+  sinceLoadMs: number;
+  requiredStreak?: number;
+  graceMs?: number;
+  loadWindowMs?: number;
+}): boolean {
+  const {
+    nullStreak,
+    storePlaying,
+    sinceCommandMs,
+    sinceLoadMs,
+    requiredStreak = 4,
+    graceMs = 1500,
+    loadWindowMs = 10000,
+  } = args;
+  if (!storePlaying) return false;
+  if (nullStreak < requiredStreak) return false;
+  if (sinceCommandMs < graceMs) return false;
+  if (sinceLoadMs < loadWindowMs) return false;
+  return true;
+}
+
 /** Build lock-screen/notification metadata from a player track. */
 export function buildNotificationMetadata(track: {
   title: string;
