@@ -111,6 +111,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
   const { user } = useAuth();
   const isNative = useIsNative();
+  // Live platform flag: the hook reports "web" on first render and flips
+  // after mount. Async load flows must read the ref (never a stale closure)
+  // or cold-started tracks resolve through the wrong engine permanently.
+  const isNativeRef = useRef(isNative);
+  isNativeRef.current = isNative;
+  // Previous render's flag — detects the web→native flip to re-resolve.
+  const prevIsNativeRef = useRef(isNative);
   const getSignedFn = useServerFn(getSignedAudioUrl);
   const getPublicFn = useServerFn(getPublicAudioUrl);
   const getPreviewFn = useServerFn(getPreviewAudioUrl);
@@ -239,7 +246,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     forSelection: number,
   ): Promise<void> {
     try {
-      if (!isNative || !_nativeAvailable) return;
+      if (!isNativeRef.current || !_nativeAvailable) return;
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       if (currentSelectionRef.current !== forSelection) return;
       if (warmedAssetRef.current?.id === target.id) return;
@@ -353,11 +360,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     }, 1500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id, selectionId, playing, queueIndex, repeat, user?.id]);
+  }, [track?.id, selectionId, playing, queueIndex, repeat, user?.id, isNative]);
 
   // Load audio when the selection changes (or auth identity changes, or
   // the user manually retries a failed load).
   useEffect(() => {
+    // Platform flip first (before the !track return): the hook reports
+    // "web" on first render, so a cold-started (persisted) track initially
+    // resolves through the HTML engine on native — re-resolve below.
+    const flippedToNative = prevIsNativeRef.current === false && isNative === true;
+    prevIsNativeRef.current = isNative;
     if (!track) {
       const previousId = currentTrackIdRef.current;
       const previousProgress = usePlayer.getState().progressSeconds;
@@ -402,10 +414,17 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     if (isSameSelection) {
       // Same selection, but auth identity changed (login/logout/purchase)
       // while in preview mode → re-resolve entitlement instead of staying
-      // stuck. Otherwise there is nothing new to load.
+      // stuck. Cold-start platform flip with an already-resolved track →
+      // re-resolve through the (now native) engine so notifications and
+      // background playback exist. Otherwise nothing new to load.
       if (resolvedForUserRef.current !== (user?.id ?? null) && usePlayer.getState().isPreview) {
         // fall through to re-resolve
-      } else {
+      } else if (!(
+        flippedToNative &&
+        currentTrackIdRef.current &&
+        track.audioUrl !== undefined &&
+        track.audioUrl !== null
+      )) {
         return;
       }
     }
@@ -603,7 +622,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
         setIsPreview(previewMode);
 
-        if (isNative) {
+        if (isNativeRef.current) {
           if (_nativeAvailable === null) {
             _nativeAvailable = await isNativeAudioAvailable();
           }
@@ -908,8 +927,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     loadUrl();
     // selectionId (not the track id) drives reloads so same-song
     // re-selections can't be swallowed by the "same id" early-return.
+    // isNative included: the web→native cold-start flip re-resolves an
+    // HTML-loaded track through the native engine (notification +
+    // background), guarded by the flip check above so steady state never
+    // reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id, selectionId, retryNonce, user?.id]);
+  }, [track?.id, selectionId, retryNonce, user?.id, isNative]);
 
   // Backfill missing cover art for the current track + queue. Not every
   // play entry point builds a complete track object, so some queue rows
@@ -1234,10 +1257,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     (async () => {
       try {
         if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-        if (isNative && _nativeAvailable !== false) return;
-        if (!track) {
+        if (!track || (isNative && _nativeAvailable !== false)) {
           // No track: clear stale handlers so lock-screen buttons can't
-          // resurrect playback after exit.
+          // resurrect playback after exit. Native: the plugin owns the
+          // shade — clear anything a pre-flip (web-assumed) run installed,
+          // so throttled-JS duplicates can never exist (the old deps lacked
+          // isNative, so every app cold start kept them for the track).
           try {
             for (const action of [
               "play",
@@ -1250,6 +1275,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             ] as const) {
               navigator.mediaSession.setActionHandler(action, null);
             }
+            navigator.mediaSession.metadata = null;
           } catch {
             /* ignore */
           }
@@ -1341,12 +1367,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       trackSessionDetachRef.current?.();
       trackSessionDetachRef.current = null;
     };
-  }, [track?.id, track?.title, track?.artistName, track?.coverUrl]);
+  }, [track?.id, track?.title, track?.artistName, track?.coverUrl, isNative]);
 
-  // Keep the lock-screen play/pause glyph in sync with the store.
+  // Keep the lock-screen play/pause glyph in sync with the store (web only —
+  // native glyphs are owned by the plugin notification).
   useEffect(() => {
     try {
       if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+      if (isNative && _nativeAvailable !== false) return;
       (navigator.mediaSession as any).playbackState = !track
         ? "none"
         : playing
@@ -1355,7 +1383,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     } catch {
       /* ignore — unsupported browsers */
     }
-  }, [playing, track?.id]);
+  }, [playing, track?.id, isNative]);
 
   // Resume playback on user gesture if browser deferred autoplay
   useEffect(() => {
