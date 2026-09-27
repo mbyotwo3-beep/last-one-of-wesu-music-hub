@@ -129,6 +129,16 @@ function AuthPage() {
     }
   };
 
+  // Keyboard-open viewports (and adjustPan shells) can leave the focused
+  // field under the keyboard — bring it into view on every focus.
+  const focusFieldIntoView = (e: React.FocusEvent<HTMLElement>) => {
+    try {
+      e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch {
+      /* ignore */
+    }
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -317,6 +327,7 @@ function AuthPage() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onFocus={focusFieldIntoView}
                   required
                   placeholder="Your name"
                   className="w-full bg-card border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground"
@@ -332,6 +343,7 @@ function AuthPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={focusFieldIntoView}
                 required
                 placeholder="you@example.com"
                 className="w-full bg-card border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground"
@@ -346,6 +358,7 @@ function AuthPage() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={focusFieldIntoView}
                 required
                 placeholder="Min 6 characters"
                 minLength={6}

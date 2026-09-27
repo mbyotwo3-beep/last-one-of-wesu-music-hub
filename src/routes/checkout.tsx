@@ -289,6 +289,13 @@ function CheckoutPage() {
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
+                onFocus={(e) => {
+                  try {
+                    e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                  } catch {
+                    /* ignore */
+                  }
+                }}
                 placeholder="e.g. 0977 123 456"
                 className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
               />
@@ -540,6 +547,13 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
+                    onFocus={(e) => {
+                      try {
+                        e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
                     placeholder="e.g. 0977 123 456"
                     className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
                   />

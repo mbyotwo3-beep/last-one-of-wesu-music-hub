@@ -172,10 +172,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Selections that already burned their one auto-retry after a native
   // start failure (e.g. notification-STOP unloaded the asset).
   const nativeRetryRef = useRef<number | null>(null);
-  // Native pre-warm of the upcoming track: { forSelection, id } of the one
-  // warmed asset, if any. Consumed (not re-preloaded) when the selection
-  // advances to it; unloaded when the selection moves elsewhere.
-  const warmedAssetRef = useRef<{ forSelection: number; id: string } | null>(null);
+  // Native pre-warm of the upcoming track. Consumed (not re-preloaded)
+  // when the selection advances to it; unloaded when the selection moves
+  // elsewhere. The warmed URL travels along: entitlements can change between
+  // warm and advance (preview→full after purchase), and a stale URL must
+  // reload, never replay.
+  const warmedAssetRef = useRef<{ id: string; url: string } | null>(null);
   // Consecutive "unknown" polls for the current selection (plugin emits no
   // event on notification-STOP/dismiss — the asset just vanishes).
   const nativeNullStreakRef = useRef<{ sel: number | null; n: number }>({ sel: null, n: 0 });
@@ -240,7 +242,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (!isNative || !_nativeAvailable) return;
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       if (currentSelectionRef.current !== forSelection) return;
-      if (warmedAssetRef.current?.forSelection === forSelection) return;
+      if (warmedAssetRef.current?.id === target.id) return;
       if (await isTrackDownloaded(target.id).catch(() => false)) return;
       let artworkUrl: string | undefined;
       try {
@@ -267,7 +269,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         return;
       }
       const prev = warmedAssetRef.current;
-      warmedAssetRef.current = { forSelection, id: target.id };
+      warmedAssetRef.current = { id: target.id, url };
       if (prev && prev.id !== target.id) {
         await stopNative(prev.id).catch(() => {});
       }
@@ -668,17 +670,22 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               if (!isCurrentTrack()) return;
               const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
               // Pre-warmed by the prefetch below: never preload twice (the
-              // plugin rejects duplicate asset ids). Ownership transfers to
-              // the live selection here.
+              // plugin rejects duplicate asset ids, which used to knock the
+              // engine onto the fallback path and kill follow-on previews).
+              // Consume only when the warmed URL is still the resolved one —
+              // entitlements can flip preview→full between warm and advance.
+              // A loaded-but-stale asset (expired URL, failed retry) unloads
+              // first so the fresh URL preloads cleanly.
               let preloaded: boolean;
-              if (
-                warmedAssetRef.current?.forSelection === selectionId &&
-                warmedAssetRef.current.id === track!.id &&
-                (await isNativePreloaded(track!.id).catch(() => false))
-              ) {
+              const warmed = warmedAssetRef.current;
+              const alreadyLoaded = await isNativePreloaded(track!.id).catch(() => false);
+              if (alreadyLoaded && warmed?.id === track!.id && warmed.url === assetUrl) {
                 warmedAssetRef.current = null;
                 preloaded = true;
               } else {
+                if (alreadyLoaded) {
+                  await stopNative(track!.id).catch(() => {});
+                }
                 preloaded = await preloadNative(
                   track!.id,
                   assetUrl,
