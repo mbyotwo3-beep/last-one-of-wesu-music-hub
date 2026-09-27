@@ -128,19 +128,22 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                     }
                 }
             } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                // Stop playback - permanent loss
+                // WESU PATCH: another media app took over (YouTube, TikTok…).
+                // Pause — don't stop — and stay in the focus stack so its end
+                // hands focus back to us (Spotify rules: the active media app
+                // has priority, and we resume when it releases). Abandoning
+                // here would strand us paused forever.
                 for (AudioAsset audio : audioAssetList.values()) {
-                    audio.stop();
-                }
-                // WESU PATCH: a stopped asset must never resume on a later
-                // focus gain.
-                try {
-                    if (focusResumeList != null) {
-                        focusResumeList.clear();
+                    try {
+                        if (audio.isPlaying()) {
+                            audio.pause();
+                            if (focusResumeList != null) {
+                                focusResumeList.add(audio);
+                            }
+                        }
+                    } catch (Exception ignored) {
                     }
-                } catch (Exception ignored) {
                 }
-                audioManager.abandonAudioFocus(this);
             }
         } catch (Exception ex) {
             Log.e(TAG, "Error handling audio focus change", ex);
@@ -229,12 +232,14 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
 
         try {
             if (focus) {
-                // Request audio focus for playback with ducking
+                // WESU PATCH: permanent gain (not MAY_DUCK) — when we start,
+                // the other app must yield, exactly like Spotify taking over.
+                // Mixing quietly underneath it would play two songs at once.
                 int result = this.audioManager.requestAudioFocus(
                     this,
                     AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-                ); // Allow other audio to play quietly
+                    AudioManager.AUDIOFOCUS_GAIN
+                );
                 audioFocusRequested = true;
             } else if (audioFocusRequested) {
                 this.audioManager.abandonAudioFocus(this);
