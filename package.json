@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "node scripts/apply-native-audio-patch.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

@@ -178,16 +178,57 @@ export async function cleanupStaleNativeTempFiles(): Promise<void> {
 
 /**
  * Read one vault track and stage it for the native plugin in a single step.
- * Returns null when nothing is downloaded (or the copy is corrupt).
+ * Returns null when nothing is downloaded (or the copy is corrupt). The
+ * cover is staged alongside the audio so the lock-screen/shade player shows
+ * artwork with zero network — the plugin decodes the file directly.
  */
-export async function prepareNativeOfflineTrack(
-  songId: string,
-): Promise<{ uri: string; path: string } | null> {
+export interface StagedNativeTrack {
+  uri: string;
+  path: string;
+  coverUri?: string | null;
+  coverPath?: string | null;
+}
+
+export async function prepareNativeOfflineTrack(songId: string): Promise<StagedNativeTrack | null> {
   try {
     const { readVaultTrack } = await import("./offline-vault");
     const track = await readVaultTrack(songId);
     if (!track) return null;
-    return await stageNativeOfflineFile(songId, track.bytes, track.mime);
+    const staged = await stageNativeOfflineFile(songId, track.bytes, track.mime);
+    if (!staged) return null;
+    const out: StagedNativeTrack = { uri: staged.uri, path: staged.path };
+    const art = track.meta.artwork;
+    if (art && art.byteLength > 0) {
+      const cover = await stageNativeCoverFile(songId, art);
+      if (cover) {
+        out.coverUri = cover.uri;
+        out.coverPath = cover.path;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** Stage small cover bytes for notification artwork (single write). */
+async function stageNativeCoverFile(
+  songId: string,
+  bytes: ArrayBuffer,
+): Promise<{ uri: string; path: string } | null> {
+  try {
+    const Filesystem = filesystemPlugin();
+    if (!Filesystem) return null;
+    const path = `${STAGE_DIR}/${songId}.cover.jpg`;
+    await Filesystem.writeFile({
+      path,
+      data: arrayBufferToBase64(bytes),
+      directory: "CACHE",
+      recursive: true,
+    });
+    const { uri } = await Filesystem.getUri({ path, directory: "CACHE" });
+    if (!uri) return null;
+    return { uri, path };
   } catch {
     return null;
   }
@@ -428,6 +469,42 @@ export async function stopNative(id: string): Promise<void> {
   } catch {
     // Silently ignore
   }
+}
+
+/**
+ * Subscribe to lock-screen/shade skip buttons. Stock 7.11.2 only wires
+ * play/pause/stop — our re-applyable patch (see
+ * android/patches/capgo-native-audio-7.11.2) adds "skipNext"/"skipPrevious"
+ * events carrying the asset id. Unpatched builds simply never fire.
+ */
+export async function onNativeSkip(
+  assetId: string,
+  callback: (direction: "next" | "prev") => void,
+): Promise<() => void> {
+  const cleanups: Array<() => void> = [];
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const match = (event: any) =>
+      !event || event.assetId === undefined || event.assetId === assetId;
+    const remove = (handle: any) => () => {
+      try {
+        handle.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+    const next = await (NativeAudio as any).addListener("skipNext", (event: any) => {
+      if (match(event)) callback("next");
+    });
+    cleanups.push(remove(next));
+    const prev = await (NativeAudio as any).addListener("skipPrevious", (event: any) => {
+      if (match(event)) callback("prev");
+    });
+    cleanups.push(remove(prev));
+  } catch {
+    /* stock plugin / web: no skip events */
+  }
+  return () => cleanups.forEach((fn) => fn());
 }
 
 /**

@@ -29,6 +29,12 @@ export interface VaultTrackMeta {
   mime: string;
   size: number;
   downloadedAt: number;
+  /**
+   * Plaintext cover bytes (decorative, not sensitive) fetched at download
+   * time so the lock-screen/shade player shows artwork with zero network —
+   * Spotify-style offline. Old rows lack it: callers fall back to coverUrl.
+   */
+  artwork?: ArrayBuffer | null;
 }
 
 interface VaultRecord extends VaultTrackMeta {
@@ -38,9 +44,7 @@ interface VaultRecord extends VaultTrackMeta {
 
 function supported(): boolean {
   return (
-    typeof window !== "undefined" &&
-    typeof indexedDB !== "undefined" &&
-    !!window.crypto?.subtle
+    typeof window !== "undefined" && typeof indexedDB !== "undefined" && !!window.crypto?.subtle
   );
 }
 
@@ -74,7 +78,11 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+function tx<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  run: (s: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
@@ -114,10 +122,8 @@ function randomIv(): Uint8Array {
 export async function getVaultDownloadedAt(songId: string): Promise<number | null> {
   if (!supported() || !songId) return null;
   try {
-    const rec = await tx<{ downloadedAt?: number } | undefined>(
-      TRACKS_STORE,
-      "readonly",
-      (s) => s.get(songId),
+    const rec = await tx<{ downloadedAt?: number } | undefined>(TRACKS_STORE, "readonly", (s) =>
+      s.get(songId),
     );
     return typeof rec?.downloadedAt === "number" ? rec.downloadedAt : null;
   } catch {
@@ -221,7 +227,11 @@ export async function saveTrackToVault(
   const iv = randomIv();
   let ciphertext: ArrayBuffer;
   try {
-    ciphertext = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as Uint8Array<ArrayBuffer> }, key, plaintext);
+    ciphertext = await window.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: iv as Uint8Array<ArrayBuffer> },
+      key,
+      plaintext,
+    );
   } catch {
     throw new Error("Could not secure this download on your device");
   }
@@ -231,10 +241,11 @@ export async function saveTrackToVault(
     artistName: meta.artistName,
     coverUrl: meta.coverUrl,
     mime: meta.mime,
-    size: plaintext.byteLength,
+    size: plaintext.byteLength + (meta.artwork?.byteLength ?? 0),
     downloadedAt: Date.now(),
     iv: Array.from(iv),
     data: ciphertext,
+    artwork: meta.artwork ?? null,
   };
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.put(record));
@@ -245,8 +256,8 @@ export async function saveTrackToVault(
     throw new Error("Could not save this download");
   }
   revokeOfflineObjectUrl(meta.songId);
-  const { songId, title, artistName, coverUrl, mime, size, downloadedAt } = record;
-  return { songId, title, artistName, coverUrl, mime, size, downloadedAt };
+  const { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork } = record;
+  return { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork };
 }
 
 export async function removeTrackFromVault(songId: string): Promise<void> {
@@ -307,6 +318,26 @@ export async function downloadSongToVault(
   }
   const mime = response.headers.get("content-type") || "audio/mpeg";
   const buf = await new Blob(chunks as BlobPart[], { type: mime }).arrayBuffer();
+  // Cover bytes for offline shade art (best-effort — never fail the music
+  // for a picture). Resolved the same way <StorageImage> does.
+  let artwork: ArrayBuffer | null = null;
+  if (meta.coverUrl) {
+    try {
+      const { resolveImageUrl } = await import("./storage-url");
+      const artUrl = await resolveImageUrl("album-art", meta.coverUrl);
+      if (artUrl) {
+        const artRes = await fetch(artUrl, { credentials: "omit" });
+        if (artRes.ok) {
+          const artBuf = await artRes.arrayBuffer();
+          if (artBuf.byteLength > 0 && artBuf.byteLength <= 2 * 1024 * 1024) {
+            artwork = artBuf;
+          }
+        }
+      }
+    } catch {
+      /* offline art unavailable — playback unaffected */
+    }
+  }
   await saveTrackToVault(
     {
       songId: meta.songId,
@@ -314,6 +345,7 @@ export async function downloadSongToVault(
       artistName: meta.artistName ?? "Unknown artist",
       coverUrl: meta.coverUrl ?? null,
       mime,
+      artwork,
     },
     buf,
   );
@@ -337,7 +369,20 @@ export async function readVaultTrack(
       rec.data,
     );
     const { songId: id, title, artistName, coverUrl, mime, size, downloadedAt } = rec;
-    return { bytes, mime, meta: { songId: id, title, artistName, coverUrl, mime, size, downloadedAt } };
+    return {
+      bytes,
+      mime,
+      meta: {
+        songId: id,
+        title,
+        artistName,
+        coverUrl,
+        mime,
+        size,
+        downloadedAt,
+        artwork: rec.artwork ?? null,
+      },
+    };
   } catch {
     throw new Error("This download is corrupted — remove it and download again");
   }

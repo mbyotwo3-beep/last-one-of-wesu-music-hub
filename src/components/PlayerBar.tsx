@@ -44,6 +44,7 @@ import {
   stopNative,
   onNativeComplete,
   onNativeTimeUpdate,
+  onNativeSkip,
   isNativeAudioAvailable,
   configureNativeAudio,
   prepareNativeOfflineTrack,
@@ -132,6 +133,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const currentTrackIdRef = useRef<string | null>(null);
   // App-private staged file for native offline playback (deleted on change).
   const nativeTempPathRef = useRef<string | null>(null);
+  // Staged cover art beside it (deleted together).
+  const nativeTempArtPathRef = useRef<string | null>(null);
+  /** Drop both staged temp files (app-private cache — always safe). */
+  const dropNativeTempFiles = () => {
+    deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
+    nativeTempPathRef.current = null;
+    deleteNativeTempFile(nativeTempArtPathRef.current).catch(() => {});
+    nativeTempArtPathRef.current = null;
+  };
   const trackedHistoryTrackRef = useRef<string | null>(null);
   const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
@@ -281,8 +291,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
-      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
-      nativeTempPathRef.current = null;
+      dropNativeTempFiles();
       getAudio().pause();
       // Clear stale lock-screen / notification controls on exit.
       try {
@@ -333,9 +342,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
-      // Drop the previous track's staged offline file (app-private cache).
-      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
-      nativeTempPathRef.current = null;
+      // Drop the previous track's staged offline files (app-private cache).
+      dropNativeTempFiles();
     }
 
     currentSelectionRef.current = selectionId;
@@ -521,22 +529,28 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             // file:// (and content://) URIs count as URLs per plugin docs.
             const assetIsUrl = true;
             let nativeViable = true;
+            let stagedCoverUri: string | null = null;
             if (offline) {
               const staged = await prepareNativeOfflineTrack(track!.id);
               if (!isCurrentTrack()) {
                 // Superseded while staging: drop the orphan instead of
                 // leaking it in the cache dir.
-                if (staged) await deleteNativeTempFile(staged.path);
+                if (staged) {
+                  await deleteNativeTempFile(staged.path);
+                  await deleteNativeTempFile(staged.coverPath ?? null);
+                }
                 return;
               }
               if (staged) {
-                // Same-song reselect stages the identical path — never
-                // delete the file we just wrote.
+                // Same-song reselect stages the identical paths — never
+                // delete the files we just wrote.
                 if (nativeTempPathRef.current !== staged.path) {
                   await deleteNativeTempFile(nativeTempPathRef.current);
                 }
                 nativeTempPathRef.current = staged.path;
+                nativeTempArtPathRef.current = staged.coverPath ?? null;
                 assetUrl = staged.uri;
+                stagedCoverUri = staged.coverUri ?? null;
               } else {
                 // Staging unavailable (no Filesystem plugin / corrupt
                 // vault) — fall through to the HTML path below, which
@@ -548,14 +562,20 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               // Skip the native block without touching availability flags.
             } else {
               // Resolve cover art to a renderable URL for the notification /
-              // lock screen. Raw DB storage paths are not playable artwork —
-              // covers are decorative, so failures never break playback.
+              // lock screen. Offline: prefer the vault-staged file (zero
+              // network — the remote URL can't load without signal). Raw DB
+              // storage paths are not playable artwork — covers are
+              // decorative, so failures never break playback.
               let artworkUrl: string | undefined;
-              try {
-                const resolved = await resolveImageUrl("album-art", track!.coverUrl);
-                if (resolved) artworkUrl = resolved;
-              } catch {
-                /* ignore */
+              if (offline && stagedCoverUri) {
+                artworkUrl = stagedCoverUri;
+              } else {
+                try {
+                  const resolved = await resolveImageUrl("album-art", track!.coverUrl);
+                  if (resolved) artworkUrl = resolved;
+                } catch {
+                  /* ignore */
+                }
               }
               if (!isCurrentTrack()) return;
               const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
@@ -637,6 +657,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   await stopNative(track!.id).catch(() => {});
                   return;
                 }
+                // Lock-screen/shade skip buttons (patched plugin event —
+                // stock builds never fire). Guarded to the live asset so a
+                // late event can't skip a newer selection.
+                const skipCleanup = await onNativeSkip(track!.id, (direction) => {
+                  if (currentTrackIdRef.current !== track!.id) return;
+                  const st = usePlayer.getState();
+                  if (direction === "next") st.skipNext();
+                  else st.skipPrev();
+                });
+                if (!isCurrentTrack()) {
+                  cleanup();
+                  skipCleanup();
+                  await stopNative(track!.id).catch(() => {});
+                  return;
+                }
                 // Native engine drives position now (the HTML element has no
                 // src on this path): mirror position + duration into the store
                 // so progress bars, seek, and previews keep working.
@@ -666,6 +701,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   .catch(() => {});
                 nativeCleanupRef.current = () => {
                   cleanup();
+                  skipCleanup();
                   timeCleanup();
                 };
                 return;
@@ -1264,8 +1300,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
       audioEventsCleanupRef.current?.();
       nativeCleanupRef.current?.();
-      deleteNativeTempFile(nativeTempPathRef.current).catch(() => {});
-      nativeTempPathRef.current = null;
+      dropNativeTempFiles();
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
       }
