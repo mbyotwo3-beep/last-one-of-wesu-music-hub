@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { PlaylistCover } from "@/components/PlaylistCover";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareMenu } from "@/components/ShareMenu";
 import { IncrementalList } from "@/components/IncrementalList";
 import { listFollowedPlaylists } from "@/lib/listener.functions";
 
@@ -51,14 +52,24 @@ function Page() {
   const { user } = useAuth();
   const followedFn = useServerFn(listFollowedPlaylists);
 
-  const { data: followedPlaylists, isLoading: followedLoading, isError: followedError, refetch: refetchFollowed } = useQuery({
+  const {
+    data: followedPlaylists,
+    isLoading: followedLoading,
+    isError: followedError,
+    refetch: refetchFollowed,
+  } = useQuery({
     queryKey: ["followed-playlists", user?.id],
     queryFn: () => followedFn(),
     enabled: !!user?.id,
     staleTime: 30_000,
   });
 
-  const { data: userPlaylists, isLoading: playlistsLoading, isError: playlistsError, refetch: refetchPlaylists } = useQuery({
+  const {
+    data: userPlaylists,
+    isLoading: playlistsLoading,
+    isError: playlistsError,
+    refetch: refetchPlaylists,
+  } = useQuery({
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -75,7 +86,12 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: likedSongs, isLoading: likedLoading, isError: likedError, refetch: refetchLiked } = useQuery({
+  const {
+    data: likedSongs,
+    isLoading: likedLoading,
+    isError: likedError,
+    refetch: refetchLiked,
+  } = useQuery({
     queryKey: ["liked-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -90,7 +106,12 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: purchasedSongs, isLoading: purchasedLoading, isError: purchasedError, refetch: refetchPurchased } = useQuery({
+  const {
+    data: purchasedSongs,
+    isLoading: purchasedLoading,
+    isError: purchasedError,
+    refetch: refetchPurchased,
+  } = useQuery({
     queryKey: ["purchased-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -107,7 +128,12 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: purchasedAlbums, isLoading: purchasedAlbumsLoading, isError: purchasedAlbumsError, refetch: refetchPurchasedAlbums } = useQuery({
+  const {
+    data: purchasedAlbums,
+    isLoading: purchasedAlbumsLoading,
+    isError: purchasedAlbumsError,
+    refetch: refetchPurchasedAlbums,
+  } = useQuery({
     queryKey: ["purchased-albums", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -124,7 +150,12 @@ function Page() {
     staleTime: 30_000,
   });
 
-  const { data: followedArtists, isLoading: followingLoading, isError: followingError, refetch: refetchFollowing } = useQuery({
+  const {
+    data: followedArtists,
+    isLoading: followingLoading,
+    isError: followingError,
+    refetch: refetchFollowing,
+  } = useQuery({
     queryKey: ["followed-artists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -153,7 +184,12 @@ function Page() {
   // A failed section previously rendered as a false empty ("No purchased…").
   // Surface one banner with a retry instead.
   const sectionError =
-    playlistsError || likedError || purchasedError || purchasedAlbumsError || followingError || followedError;
+    playlistsError ||
+    likedError ||
+    purchasedError ||
+    purchasedAlbumsError ||
+    followingError ||
+    followedError;
   const retryAll = () => {
     refetchPlaylists();
     refetchLiked();
@@ -281,9 +317,7 @@ function Page() {
             items={safePurchasedSongs}
             className="space-y-2"
             keyFor={(song: any) => song.id}
-            renderItem={(song: any) => (
-              <PurchasedSongCard song={song} userId={user?.id ?? null} />
-            )}
+            renderItem={(song: any) => <PurchasedSongCard song={song} userId={user?.id ?? null} />}
           />
         )}
       </section>
@@ -523,6 +557,13 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
           )}
         </button>
         <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        <ShareMenu
+          songId={song.id}
+          songTitle={song.title}
+          coverUrl={song.cover_url}
+          artistName={song.artists?.name}
+          type="song"
+        />
         {song.price && Number(song.price) > 0 && (
           <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
             ZMW {Number(song.price).toFixed(2)}
@@ -616,6 +657,13 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
           )}
         </button>
         <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        <ShareMenu
+          songId={song.id}
+          songTitle={song.title}
+          coverUrl={song.cover_url}
+          artistName={song.artists?.name}
+          type="song"
+        />
         <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">
           Owned
         </span>
@@ -641,7 +689,7 @@ function PlaylistCard({ playlist }: { playlist: any }) {
       if (!s || !s.id) return null;
       let art = s.artist ?? s.artists;
       if (Array.isArray(art)) art = art[0];
-      return { ...s, artist: art ? { id: art.id, name: art.name } : s.artist ?? null };
+      return { ...s, artist: art ? { id: art.id, name: art.name } : (s.artist ?? null) };
     })
     .filter(Boolean);
 
@@ -681,9 +729,7 @@ function PlaylistCard({ playlist }: { playlist: any }) {
     >
       <Link to="/playlists/$id" params={{ id: playlist.id }} className="relative shrink-0">
         <PlaylistCover
-          covers={
-            playlist.cover_url ? [playlist.cover_url] : songs.map((s: any) => s?.cover_url)
-          }
+          covers={playlist.cover_url ? [playlist.cover_url] : songs.map((s: any) => s?.cover_url)}
           alt={playlist.name}
           className="size-14 rounded-lg"
         />

@@ -5,6 +5,7 @@ import { getTrendingSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 export const Route = createFileRoute("/hot-tracks")({
   head: () => ({ meta: [{ title: "Hot Tracks — Wesu+" }] }),
@@ -76,6 +77,14 @@ function Page() {
                 title={s.title}
                 artistName={s.artist?.name}
                 coverUrl={s.cover_url}
+              />
+              <ShareMenu
+                songId={s.id}
+                songTitle={s.title}
+                coverUrl={s.cover_url}
+                artistId={s.artist?.id}
+                artistName={s.artist?.name}
+                type="song"
               />
             </div>
           ))}

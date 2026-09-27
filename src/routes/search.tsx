@@ -8,6 +8,7 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { Music, Disc3, Mic2 } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -174,6 +175,13 @@ function SearchPage() {
                       title={s.title}
                       artistName={(s.artist as { name?: string } | null)?.name}
                       coverUrl={s.cover_url}
+                    />
+                    <ShareMenu
+                      songId={s.id}
+                      songTitle={s.title}
+                      coverUrl={s.cover_url}
+                      artistName={(s.artist as { name?: string } | null)?.name}
+                      type="song"
                     />
                   </div>
                 ))}

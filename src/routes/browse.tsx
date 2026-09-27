@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRecentlyPlayed } from "@/lib/play-history.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { DownloadButton } from "@/components/DownloadButton";
+import { ShareMenu } from "@/components/ShareMenu";
 
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
@@ -422,6 +423,14 @@ function TrackListRow({
         {(song.play_count ?? 0).toLocaleString()} plays
       </span>
       <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+      <ShareMenu
+        songId={song.id}
+        songTitle={song.title}
+        coverUrl={song.cover_url}
+        artistId={song.artist?.id}
+        artistName={song.artist?.name}
+        type="song"
+      />
     </div>
   );
 }
