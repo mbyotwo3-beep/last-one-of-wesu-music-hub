@@ -31,6 +31,11 @@ const config: CapacitorConfig = {
     backgroundColor: "#fbf7ee",
   },
   plugins: {
+    // Our streams are progressive MP3 files, never HLS — keep the
+    // media3-exoplayer-hls extension out (~4MB APK saving for low-end).
+    NativeAudio: {
+      hls: false,
+    },
     SplashScreen: {
       launchShowDuration: 1500,
       launchAutoHide: true,
