@@ -78,6 +78,13 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
 
     // Notification center support
     private boolean showNotification = false;
+    // WESU PATCH (not upstream — reapply after reinstall, see
+    // android/patches/capgo-native-audio-7.11.2): music-app background mode.
+    private boolean backgroundPlayback = false;
+    // WESU PATCH: assets paused by transient focus loss (calls, alerts) resume
+    // on focus gain — tracked separately so user-paused assets in resumeList
+    // can never restart by themselves.
+    private static ArrayList<AudioAsset> focusResumeList;
     private Map<String, Map<String, String>> notificationMetadataMap = new HashMap<>();
     private MediaSessionCompat mediaSession;
     private String currentlyPlayingAssetId;
@@ -106,14 +113,17 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                 for (AudioAsset audio : audioAssetList.values()) {
                     if (audio.isPlaying()) {
                         audio.pause();
-                        resumeList.add(audio);
+                        // WESU PATCH: track focus-paused assets separately (see
+                        // field declaration) so focus gain below can never
+                        // restart user-paused music.
+                        focusResumeList.add(audio);
                     }
                 }
             } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
                 // Resume playback
-                if (resumeList != null) {
-                    while (!resumeList.isEmpty()) {
-                        AudioAsset audio = resumeList.remove(0);
+                if (focusResumeList != null) {
+                    while (!focusResumeList.isEmpty()) {
+                        AudioAsset audio = focusResumeList.remove(0);
                         audio.resume();
                     }
                 }
@@ -121,6 +131,14 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                 // Stop playback - permanent loss
                 for (AudioAsset audio : audioAssetList.values()) {
                     audio.stop();
+                }
+                // WESU PATCH: a stopped asset must never resume on a later
+                // focus gain.
+                try {
+                    if (focusResumeList != null) {
+                        focusResumeList.clear();
+                    }
+                } catch (Exception ignored) {
                 }
                 audioManager.abandonAudioFocus(this);
             }
@@ -133,6 +151,13 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     protected void handleOnPause() {
         super.handleOnPause();
 
+        // WESU PATCH: in background-playback mode this app is a music player —
+        // leaving it must NOT pause audio (that cut/resume cycle is the #1
+        // background complaint). The JS store stays the single source of
+        // truth for play/pause.
+        if (backgroundPlayback) {
+            return;
+        }
         try {
             if (audioAssetList != null) {
                 for (HashMap.Entry<String, AudioAsset> entry : audioAssetList.entrySet()) {
@@ -156,6 +181,18 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     protected void handleOnResume() {
         super.handleOnResume();
 
+        // WESU PATCH: we never auto-paused above, so anything queued here came
+        // from explicit pause() calls (user intent) — resuming it would restart
+        // user-paused music every time the app returns. Drop it.
+        if (backgroundPlayback) {
+            try {
+                if (resumeList != null) {
+                    resumeList.clear();
+                }
+            } catch (Exception ignored) {
+            }
+            return;
+        }
         try {
             if (resumeList != null) {
                 while (!resumeList.isEmpty()) {
@@ -210,6 +247,8 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
             } else {
                 this.audioManager.setMode(AudioManager.MODE_NORMAL);
             }
+            // WESU PATCH: remember background mode for the lifecycle hooks above.
+            this.backgroundPlayback = background;
 
             if (this.showNotification) {
                 setupMediaSession();
@@ -804,6 +843,11 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
 
         if (resumeList == null) {
             resumeList = new ArrayList<>();
+        }
+
+        // WESU PATCH: see field declaration above.
+        if (focusResumeList == null) {
+            focusResumeList = new ArrayList<>();
         }
     }
 
