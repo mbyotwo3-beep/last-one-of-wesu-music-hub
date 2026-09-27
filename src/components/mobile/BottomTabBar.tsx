@@ -74,6 +74,37 @@ export function computeTabs(): Tab[] {
   ].filter((t) => t.show);
 }
 
+/**
+ * Version stamp at the bottom of the Menu sheet (native: store version +
+ * build code, web: "Web"). Every complaint can now arrive with the exact
+ * build attached — no more guessing whether a phone runs stale code.
+ */
+function AppVersionFooter() {
+  const [label, setLabel] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const w = window as unknown as {
+          Capacitor?: { isNativePlatform?: () => boolean };
+        };
+        if (w.Capacitor?.isNativePlatform?.()) {
+          const { App } = await import("@capacitor/app");
+          const info = await App.getInfo();
+          setLabel(`v${info.version} (build ${info.build})`);
+          return;
+        }
+      } catch {
+        /* fall through to the web label */
+      }
+      setLabel("Web");
+    })();
+  }, []);
+  if (!label) return null;
+  return (
+    <p className="px-4 pt-2 pb-1 text-center text-[11px] text-muted-foreground">Wesu+ {label}</p>
+  );
+}
+
 export function BottomTabBar() {
   const { user } = useAuth();
   const { isArtist, isAdmin, isSuperAdmin } = useUserRoles();
@@ -474,6 +505,7 @@ export function BottomTabBar() {
                 </button>
               </>
             )}
+            <AppVersionFooter />
           </div>
           {/* Pinned bottom: Become an Artist (signed-in non-artists only —
               anonymous users land on a RoleGate dead end otherwise). */}
