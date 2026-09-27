@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -23,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { PlaylistCover } from "@/components/PlaylistCover";
 import { DownloadButton } from "@/components/DownloadButton";
+import { DownloadsSection } from "@/components/DownloadsSection";
 import { ShareMenu } from "@/components/ShareMenu";
 import { IncrementalList } from "@/components/IncrementalList";
 import { listFollowedPlaylists } from "@/lib/listener.functions";
@@ -51,6 +53,17 @@ function hasId(value: unknown): value is { id: string } {
 function Page() {
   const { user } = useAuth();
   const followedFn = useServerFn(listFollowedPlaylists);
+
+  // Deep link from the offline playback notice (/library#downloads).
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#downloads") {
+      // Let the section mount first (vault read is async).
+      const t = setTimeout(() => {
+        document.getElementById("downloads")?.scrollIntoView({ behavior: "smooth" });
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   const {
     data: followedPlaylists,
@@ -211,6 +224,8 @@ function Page() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
       <h1 className="text-3xl font-bold mb-6">My Library</h1>
+
+      <DownloadsSection />
 
       {sectionError && (
         <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex flex-wrap items-center justify-between gap-3">

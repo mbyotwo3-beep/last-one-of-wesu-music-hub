@@ -30,7 +30,8 @@ import {
   incrementPlayCount,
 } from "@/lib/listener.functions";
 import { recordPlay, updatePlayProgress } from "@/lib/play-history.functions";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useIsNative } from "@/hooks/use-platform";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
@@ -77,6 +78,9 @@ import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/li
 
 let _nativeAvailable: boolean | null = null;
 
+/** Offline dead-end message — always paired with a way into downloads. */
+export const OFFLINE_PLAY_MESSAGE = "You're offline — your downloaded songs still play.";
+
 function fmt(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -116,6 +120,20 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  /** Offline dead-end with a way out: tapping it opens the downloads list. */
+  const showOfflineNotice = () => {
+    setError(OFFLINE_PLAY_MESSAGE);
+    toast.error("You're offline", {
+      description: "Your downloaded songs still play.",
+      action: {
+        label: "My downloads",
+        onClick: () => navigate({ to: "/library", hash: "downloads" }),
+      },
+      duration: 6000,
+    });
+  };
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const isPreview = usePlayer((s) => s.isPreview);
@@ -443,7 +461,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           // an unreachable network before showing the same message.
           setLoading(false);
           setAudioUrl(null);
-          setError("You're offline — play a downloaded song or reconnect.");
+          showOfflineNotice();
           if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
           return;
         }
@@ -1590,8 +1608,17 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             </div>
           </div>
           {error && (
-            <div className="p-4 text-sm text-destructive text-center border-t border-border">
-              {error}
+            <div className="p-4 text-sm text-center border-t border-border">
+              <p className="text-destructive">{error}</p>
+              {error === OFFLINE_PLAY_MESSAGE && (
+                <Link
+                  to="/library"
+                  hash="downloads"
+                  className="mt-2 inline-block px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  My downloads
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -1772,7 +1799,20 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 </div>
                 <span className="text-[10px] text-gray-300 tabular-nums w-8">{fmt(dur)}</span>
               </div>
-              {error && <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>}
+              {error && (
+                <div className="w-full">
+                  <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>
+                  {error === OFFLINE_PLAY_MESSAGE && (
+                    <Link
+                      to="/library"
+                      hash="downloads"
+                      className="text-[10px] font-semibold text-primary hover:underline"
+                    >
+                      My downloads
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right: Queue, volume, expand */}

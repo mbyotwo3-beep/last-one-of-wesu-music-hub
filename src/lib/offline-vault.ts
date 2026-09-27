@@ -158,6 +158,27 @@ export function decideStaleVaultPlayback(args: {
   return args.probePurchaseFailed ? "blocked" : "play";
 }
 
+/** List downloaded tracks (metadata only — never decrypts audio). */
+export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
+  if (!supported()) return [];
+  try {
+    const recs = await tx<VaultRecord[]>(TRACKS_STORE, "readonly", (s) => s.getAll());
+    return recs
+      .map((r) => ({
+        songId: r.songId,
+        title: r.title,
+        artistName: r.artistName,
+        coverUrl: r.coverUrl,
+        mime: r.mime,
+        size: r.size ?? 0,
+        downloadedAt: r.downloadedAt ?? 0,
+      }))
+      .sort((a, b) => b.downloadedAt - a.downloadedAt);
+  } catch {
+    return [];
+  }
+}
+
 /** Cheap existence probe — reads the key only, never the audio bytes. */
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;

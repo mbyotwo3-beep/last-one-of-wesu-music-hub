@@ -1,0 +1,143 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, Play, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { StorageImage } from "@/components/StorageImage";
+import { usePlayer } from "@/stores/player";
+import {
+  getVaultUsage,
+  isVaultSupported,
+  listVaultMeta,
+  removeTrackFromVault,
+} from "@/lib/offline-vault";
+
+/**
+ * Offline downloads living in the encrypted on-device vault. Fully usable
+ * with zero connectivity (metadata + audio + covers are all local) — this
+ * is the "offline mode" destination the player links to when streaming is
+ * unavailable.
+ */
+export function DownloadsSection() {
+  const qc = useQueryClient();
+  const setQueue = usePlayer((s) => s.setQueue);
+
+  const { data: tracks } = useQuery({
+    // Prefix-matched by touchVaultQueries(["vault-track"]) so every
+    // download/remove anywhere refreshes this list.
+    queryKey: ["vault-track", "meta-list"],
+    queryFn: () => listVaultMeta(),
+    staleTime: 30_000,
+  });
+  const { data: usage } = useQuery({
+    queryKey: ["vault-track", "usage"],
+    queryFn: () => getVaultUsage(),
+    staleTime: 30_000,
+  });
+
+  if (!isVaultSupported()) return null;
+  const list = tracks ?? [];
+  const mb = ((usage?.bytes ?? 0) / 1048576).toFixed(1);
+
+  const playAll = () => {
+    if (list.length === 0) return;
+    setQueue(
+      list.map((t) => ({
+        id: t.songId,
+        title: t.title,
+        artistName: t.artistName,
+        coverUrl: t.coverUrl,
+      })),
+      0,
+    );
+  };
+
+  const remove = async (songId: string, title: string) => {
+    try {
+      await removeTrackFromVault(songId);
+      await qc.invalidateQueries({ queryKey: ["vault-track"] });
+      toast.success(`Removed "${title}" from this device`);
+    } catch {
+      toast.error("Could not remove this download");
+    }
+  };
+
+  return (
+    <section id="downloads" className="mb-10 scroll-mt-24">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Download className="size-5 text-primary" />
+          <h2 className="text-xl font-semibold">Downloads on this device</h2>
+        </div>
+        {list.length > 0 && (
+          <button
+            type="button"
+            onClick={playAll}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            <Play className="size-4 fill-current" /> Play all
+          </button>
+        )}
+      </div>
+      {list.length === 0 ? (
+        <p className="text-muted-foreground">
+          No downloads yet — tap the download icon on any bought or free song and it plays here with
+          no internet.
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground mb-3">
+            {list.length} song{list.length === 1 ? "" : "s"} · {mb} MB · encrypted, plays only in
+            Wesu+
+          </p>
+          <div className="space-y-2">
+            {list.map((t) => (
+              <div
+                key={t.songId}
+                className="flex items-center gap-3 p-2 rounded-xl bg-card border border-border"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQueue(
+                      [
+                        {
+                          id: t.songId,
+                          title: t.title,
+                          artistName: t.artistName,
+                          coverUrl: t.coverUrl,
+                        },
+                      ],
+                      0,
+                    )
+                  }
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                  aria-label={`Play ${t.title} offline`}
+                >
+                  <StorageImage
+                    bucket="album-art"
+                    path={t.coverUrl}
+                    alt={t.title}
+                    className="size-11 rounded-md overflow-hidden bg-secondary shrink-0 object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{t.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{t.artistName}</p>
+                  </div>
+                  <Play className="size-4 text-muted-foreground shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(t.songId, t.title)}
+                  className="p-2 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                  aria-label={`Remove ${t.title} from this device`}
+                  title="Remove from this device"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
