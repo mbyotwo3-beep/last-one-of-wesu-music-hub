@@ -33,8 +33,7 @@ const clauses = [
     icon: User,
     number: 1,
     title: "Personal Use",
-    content:
-      "Music streamed or purchased on Wesu+ is for your personal, non-commercial use only.",
+    content: "Music streamed or purchased on Wesu+ is for your personal, non-commercial use only.",
   },
   {
     id: "account-security",
@@ -49,8 +48,7 @@ const clauses = [
     icon: CreditCard,
     number: 3,
     title: "Payments",
-    content:
-      "All purchases and subscription payments are final unless otherwise required by law.",
+    content: "All song and album purchases are final unless otherwise required by law.",
   },
   {
     id: "copyright",
@@ -121,13 +119,11 @@ function ListenerTermsPage() {
             Listener Terms &amp; Conditions
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            Welcome to Wesu+. By creating an account or using our platform, you
-            agree to the following terms.
+            Welcome to Wesu+. By creating an account or using our platform, you agree to the
+            following terms.
           </p>
 
-          <p className="mt-6 text-xs text-muted-foreground/60">
-            Last updated: August 2025
-          </p>
+          <p className="mt-6 text-xs text-muted-foreground/60">Last updated: August 2025</p>
         </div>
       </div>
 
@@ -153,12 +149,8 @@ function ListenerTermsPage() {
                 </div>
 
                 <div className="flex-1 min-w-0 pt-1">
-                  <h2 className="text-base font-semibold mb-1.5">
-                    {clause.title}
-                  </h2>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
-                    {clause.content}
-                  </p>
+                  <h2 className="text-base font-semibold mb-1.5">{clause.title}</h2>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{clause.content}</p>
                 </div>
               </div>
             );
@@ -168,11 +160,9 @@ function ListenerTermsPage() {
         {/* Agreement notice */}
         <div className="mt-8 rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border p-6">
           <p className="text-sm text-muted-foreground leading-relaxed text-center">
-            By using{" "}
-            <strong className="text-primary">Wesu+</strong>, you acknowledge
-            that you have{" "}
-            <strong className="text-foreground">read, understood, and agreed</strong>{" "}
-            to these Terms &amp; Conditions.
+            By using <strong className="text-primary">Wesu+</strong>, you acknowledge that you have{" "}
+            <strong className="text-foreground">read, understood, and agreed</strong> to these Terms
+            &amp; Conditions.
           </p>
         </div>
 

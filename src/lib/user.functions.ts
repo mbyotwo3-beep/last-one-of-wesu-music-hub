@@ -7,7 +7,7 @@ export const getMyOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const [playlists, purchases, subscription, profile, saved] = await Promise.all([
+    const [playlists, purchases, profile, saved] = await Promise.all([
       supabase
         .from("playlists")
         .select("id,name,cover_url,is_public,created_at")
@@ -20,12 +20,6 @@ export const getMyOverview = createServerFn({ method: "GET" })
         .eq("status", "completed")
         .order("created_at", { ascending: false })
         .limit(10),
-      supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .maybeSingle(),
       supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabase
         .from("saved_tracks")
@@ -40,7 +34,6 @@ export const getMyOverview = createServerFn({ method: "GET" })
     return {
       playlists: playlists.data ?? [],
       recentPurchases: purchases.data ?? [],
-      subscription: subscription.data,
       profile: profile.data,
       savedTracks: saved.data ?? [],
       stats: {

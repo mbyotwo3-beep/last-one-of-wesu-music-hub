@@ -5,7 +5,11 @@ import { useState, useEffect } from "react";
 import { CreditCard, Smartphone, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getPaymentMethods, getPurchasableItem } from "@/lib/music.functions";
-import { initiatePayment, getPlaylistCheckout, initiatePlaylistUnlock } from "@/lib/payments.functions";
+import {
+  initiatePayment,
+  getPlaylistCheckout,
+  initiatePlaylistUnlock,
+} from "@/lib/payments.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import { useCurrency } from "@/stores/currency";
@@ -26,7 +30,8 @@ export const Route = createFileRoute("/checkout")({
     ],
   }),
   validateSearch: (s: Record<string, unknown>): CheckoutSearch => {
-    const item = s.item === "song" || s.item === "album" || s.item === "playlist" ? s.item : undefined;
+    const item =
+      s.item === "song" || s.item === "album" || s.item === "playlist" ? s.item : undefined;
     const out: CheckoutSearch = {};
     if (item) out.item = item;
     if (typeof s.id === "string") out.id = s.id;
@@ -55,7 +60,7 @@ function CheckoutRoute() {
   // Render it before checking the checkout item's query parameters.
   if (isStatusPage) return <Outlet />;
 
-  // Subscriptions are temporarily disabled — only track/album purchases are supported.
+  // Wesu+ sells individual songs and albums only (no subscriptions).
   // Keep every hook above this guard so hydration cannot change hook order.
   if (!isMounted) return null;
   if (!search.item || !search.id) return <MissingCheckout />;
@@ -220,11 +225,7 @@ function CheckoutPage() {
   const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
   const phoneValid = /^0[579]\d{8}$/.test(normalizedPhone);
   const disabled =
-    mutation.isPending ||
-    !selectedMethodCode ||
-    !itemId ||
-    (!isCard && !phoneValid) ||
-    isFree;
+    mutation.isPending || !selectedMethodCode || !itemId || (!isCard && !phoneValid) || isFree;
 
   return (
     <div className="min-h-screen pb-24">
@@ -246,8 +247,7 @@ function CheckoutPage() {
 
         {methods.length === 0 && (
           <div className="bg-card border border-amber-500/30 rounded-2xl p-6 mb-8 text-sm text-amber-300">
-            No payment methods are available right now. Please try again later or contact
-            support.
+            No payment methods are available right now. Please try again later or contact support.
           </div>
         )}
 
@@ -443,8 +443,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
   const isCard = selectedMethod?.category === "card";
   const normalizedPhone = phoneNumber.replace(/[\s-]/g, "");
   const phoneValid = /^0[579]\d{8}$/.test(normalizedPhone);
-  const disabled =
-    mutation.isPending || !selectedMethodCode || (!isCard && !phoneValid);
+  const disabled = mutation.isPending || !selectedMethodCode || (!isCard && !phoneValid);
 
   if (missing.length === 0) {
     return (
@@ -471,8 +470,8 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
       <div className="max-w-3xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2">Unlock playlist</h1>
         <p className="text-muted-foreground mb-8">
-          One payment unlocks every song below in "{bundle.playlist_name}" — free songs and
-          tracks you already own are never charged.
+          One payment unlocks every song below in "{bundle.playlist_name}" — free songs and tracks
+          you already own are never charged.
         </p>
 
         <div className="bg-card border border-white/5 rounded-2xl p-6 mb-8">

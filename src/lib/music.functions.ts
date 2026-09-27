@@ -244,18 +244,7 @@ export const getPurchasableItem = createServerFn({ method: "GET" })
     return row;
   });
 
-// ---------- Subscription Plans & Payment Methods ----------
-
-export const getSubscriptionPlans = createServerFn({ method: "GET" }).handler(async () => {
-  const supabase = getPublicSupabase();
-  const { data, error } = await supabase
-    .from("subscription_plans")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
+// ---------- Payment Methods ----------
 
 export const getPaymentMethods = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();

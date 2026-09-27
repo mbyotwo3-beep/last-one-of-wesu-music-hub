@@ -126,54 +126,6 @@ export const revokeRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const upsertPlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator(
-    (d: {
-      id?: string;
-      code?: string;
-      name: string;
-      price_zmw: number;
-      description?: string;
-      interval?: string;
-      sort_order?: number;
-      is_active?: boolean;
-    }) => d,
-  )
-  .handler(async ({ context, data }) => {
-    await assertSuperadmin(context.supabase, context.userId);
-    if (!data.name?.trim()) throw new Error("Plan name is required");
-    if (!Number.isFinite(data.price_zmw) || data.price_zmw < 0) {
-      throw new Error("Plan price must be a non-negative number");
-    }
-    // `code` is NOT NULL in the DB — inserts without it fail. Updates keep
-    // their existing code; new plans derive one from the name.
-    const code =
-      data.code?.trim() ||
-      data.name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 60);
-    if (!code) throw new Error("Plan code is required");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const row: any = {
-      name: data.name,
-      price_zmw: data.price_zmw,
-      description: data.description ?? null,
-      is_active: data.is_active ?? true,
-    };
-    if (!data.id) row.code = code;
-    if (data.interval !== undefined) row.interval = data.interval;
-    if (data.sort_order !== undefined) row.sort_order = data.sort_order;
-    if (data.id) row.id = data.id;
-    const { error } = await supabaseAdmin.from("subscription_plans").upsert(row);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "plan.upsert", "plan", data.id ?? "new", { name: data.name });
-    return { ok: true };
-  });
-
 export const togglePaymentMethod = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { code: string; is_enabled: boolean }) => d)
@@ -244,19 +196,6 @@ export const listPayouts = createServerFn({ method: "GET" })
  * active/enabled only, and RLS may hide the rest). One function per table
  * so each tab keeps a stable query key.
  */
-export const listAllPlansAdmin = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertSuperadmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("subscription_plans")
-      .select("*")
-      .order("price_zmw");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
-
 export const listAllPaymentMethodsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -312,12 +251,23 @@ export const decidePayout = createServerFn({ method: "POST" })
       const { data: splits } = await supabaseAdmin
         .from("revenue_splits")
         .select("amount")
-        .eq((row as any)?.label_id ? "label_id" : "artist_id", (row as any)?.label_id ?? (row as any)?.artist_id)
+        .eq(
+          (row as any)?.label_id ? "label_id" : "artist_id",
+          (row as any)?.label_id ?? (row as any)?.artist_id,
+        )
         .eq("payee_role", (row as any)?.label_id ? "label" : "artist");
       const earned = (splits ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
-      const ownerFilter = (row as any)?.label_id ? { label_id: (row as any).label_id } : { artist_id: (row as any)?.artist_id };
+      const ownerFilter = (row as any)?.label_id
+        ? { label_id: (row as any).label_id }
+        : { artist_id: (row as any)?.artist_id };
       let committedQ = supabaseAdmin.from("payouts").select("amount").match(ownerFilter);
-      committedQ = committedQ.in("status", ["pending", "approved", "processing", "paid", "completed"]);
+      committedQ = committedQ.in("status", [
+        "pending",
+        "approved",
+        "processing",
+        "paid",
+        "completed",
+      ]);
       const { data: committed } = await committedQ;
       const spent = (committed ?? []).reduce((s, r: any) => s + Number(r.amount || 0), 0);
       // Exclude this very row (still pending) from the committed total.

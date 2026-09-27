@@ -263,7 +263,7 @@ describe("Property 5: Auth-required routes redirect unauthenticated users (Req 3
   });
 
   it("public routes never trigger auth redirect", () => {
-    const publicRoutes = ["/", "/browse", "/artists", "/albums", "/subscriptions", "/auth"];
+    const publicRoutes = ["/", "/browse", "/artists", "/albums", "/auth"];
     fc.assert(
       fc.property(fc.constantFrom(...publicRoutes), fc.boolean(), (route, isAuth) => {
         expect(requiresAuthRedirect(route, isAuth)).toBe(false);

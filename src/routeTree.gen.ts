@@ -13,7 +13,6 @@ import { Route as TermsListenerRouteImport } from './routes/terms-listener'
 import { Route as TermsArtistRouteImport } from './routes/terms-artist'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
-import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SongsRouteImport } from './routes/songs'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -77,11 +76,6 @@ const TermsRoute = TermsRouteImport.update({
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SubscriptionsRoute = SubscriptionsRouteImport.update({
-  id: '/subscriptions',
-  path: '/subscriptions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SongsRoute = SongsRouteImport.update({
@@ -338,7 +332,6 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/songs': typeof SongsRouteWithChildren
-  '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
@@ -388,7 +381,6 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/songs': typeof SongsRouteWithChildren
-  '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
@@ -440,7 +432,6 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/songs': typeof SongsRouteWithChildren
-  '/subscriptions': typeof SubscriptionsRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
   '/terms-artist': typeof TermsArtistRoute
@@ -493,7 +484,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/songs'
-    | '/subscriptions'
     | '/superadmin'
     | '/terms'
     | '/terms-artist'
@@ -543,7 +533,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/songs'
-    | '/subscriptions'
     | '/superadmin'
     | '/terms'
     | '/terms-artist'
@@ -594,7 +583,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/songs'
-    | '/subscriptions'
     | '/superadmin'
     | '/terms'
     | '/terms-artist'
@@ -646,7 +634,6 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SearchRoute: typeof SearchRoute
   SongsRoute: typeof SongsRouteWithChildren
-  SubscriptionsRoute: typeof SubscriptionsRoute
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
   TermsArtistRoute: typeof TermsArtistRoute
@@ -687,13 +674,6 @@ declare module '@tanstack/react-router' {
       path: '/superadmin'
       fullPath: '/superadmin'
       preLoaderRoute: typeof SuperadminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/subscriptions': {
-      id: '/subscriptions'
-      path: '/subscriptions'
-      fullPath: '/subscriptions'
-      preLoaderRoute: typeof SubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/songs': {
@@ -1099,7 +1079,6 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SearchRoute: SearchRoute,
   SongsRoute: SongsRouteWithChildren,
-  SubscriptionsRoute: SubscriptionsRoute,
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
   TermsArtistRoute: TermsArtistRoute,

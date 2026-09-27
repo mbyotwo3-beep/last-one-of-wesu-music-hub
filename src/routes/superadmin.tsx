@@ -20,7 +20,6 @@ import {
   listUsers,
   grantRole,
   revokeRole,
-  upsertPlan,
   togglePaymentMethod,
   updateSettings,
   listAudit,
@@ -28,7 +27,6 @@ import {
   decidePayout,
   getSettings,
   listAllLabelsAdmin,
-  listAllPlansAdmin,
   listAllPaymentMethodsAdmin,
 } from "@/lib/superadmin.functions";
 import { moderateLabel } from "@/lib/labels.functions";
@@ -58,22 +56,13 @@ function SuperadminRoute() {
 }
 
 type Tab =
-  | "overview"
-  | "users"
-  | "plans"
-  | "payments"
-  | "settings"
-  | "payouts"
-  | "labels"
-  | "featured"
-  | "audit";
+  "overview" | "users" | "payments" | "settings" | "payouts" | "labels" | "featured" | "audit";
 
 function SuperadminPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: Shield },
     { id: "users", label: "Users & Roles", icon: Users },
-    { id: "plans", label: "Plans", icon: CreditCard },
     { id: "payments", label: "Payment Methods", icon: CreditCard },
     { id: "payouts", label: "Payout Decisions", icon: Wallet },
     { id: "labels", label: "Labels", icon: Building2 },
@@ -90,7 +79,6 @@ function SuperadminPage() {
             <Shield className="size-6 text-primary" />
             <h1 className="text-3xl font-bold">Superadmin</h1>
           </div>
-
         </div>
 
         <div className="flex flex-wrap gap-2 mb-8 border-b border-border pb-3">
@@ -112,7 +100,6 @@ function SuperadminPage() {
 
         {tab === "overview" && <OverviewTab />}
         {tab === "users" && <UsersTab />}
-        {tab === "plans" && <PlansTab />}
         {tab === "payments" && <PaymentsTab />}
         {tab === "payouts" && <PayoutsTab />}
         {tab === "labels" && <LabelsTab />}
@@ -629,113 +616,6 @@ function UsersTab() {
   );
 }
 
-function PlansTab() {
-  const qc = useQueryClient();
-  const upsert = useServerFn(upsertPlan);
-  const listPlansFn = useServerFn(listAllPlansAdmin);
-  const {
-    data: plans = [],
-    error: queryError,
-    isFetching,
-  } = useQuery({
-    queryKey: ["super-plans"],
-    // Staff server read: sees inactive plans too (public reads + RLS hide them).
-    queryFn: () => listPlansFn(),
-  });
-  const error = queryError ? (queryError as Error).message : null;
-  const upsertM = useMutation({
-    mutationFn: upsert,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["super-plans"] });
-      toast.success("Subscription plan saved successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to save plan: ${error.message}`);
-    },
-  });
-
-  const [draft, setDraft] = useState({ name: "", price_zmw: 0, description: "" });
-
-  return (
-    <div className="space-y-6">
-      {error && <div className="text-destructive text-sm">Error: {error}</div>}
-      <div className="bg-card border border-border rounded-2xl p-6">
-        <h3 className="font-semibold mb-3">New plan</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input
-            className="px-3 py-2 rounded-lg bg-secondary border border-border"
-            placeholder="Name"
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          />
-          <input
-            type="number"
-            className="px-3 py-2 rounded-lg bg-secondary border border-border"
-            placeholder="Price ZMW"
-            value={draft.price_zmw}
-            onChange={(e) => setDraft({ ...draft, price_zmw: Number(e.target.value) })}
-          />
-          <input
-            className="px-3 py-2 rounded-lg bg-secondary border border-border md:col-span-2"
-            placeholder="Description"
-            value={draft.description}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          />
-        </div>
-        <button
-          disabled={!draft.name || upsertM.isPending}
-          onClick={() => upsertM.mutate({ data: draft })}
-          className="mt-3 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:scale-105 transition-transform"
-        >
-          Create plan
-        </button>
-      </div>
-
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        {isFetching && <p className="p-4 text-muted-foreground text-sm">Loading…</p>}
-        <table className="w-full text-sm">
-          <thead className="bg-secondary text-muted-foreground">
-            <tr>
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">Price</th>
-              <th className="text-left p-3">Active</th>
-              <th className="text-left p-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plans.map((p) => (
-              <tr key={p.id} className="border-t border-border">
-                <td className="p-3 font-medium">{p.name}</td>
-                <td className="p-3">ZMW {Number(p.price_zmw ?? 0).toFixed(2)}</td>
-                <td className="p-3">{p.is_active ? "Yes" : "No"}</td>
-                <td className="p-3">
-                  <button
-                    disabled={upsertM.isPending}
-                    onClick={() =>
-                      upsertM.mutate({
-                        data: {
-                          id: p.id,
-                          name: p.name,
-                          price_zmw: Number(p.price_zmw ?? 0),
-                          description: p.description ?? "",
-                          is_active: !p.is_active,
-                        },
-                      })
-                    }
-                    className="text-xs px-3 py-1 rounded-full bg-secondary border border-border disabled:opacity-50"
-                  >
-                    {p.is_active ? "Disable" : "Enable"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function PaymentsTab() {
   const qc = useQueryClient();
   const toggle = useServerFn(togglePaymentMethod);
@@ -1062,8 +942,8 @@ function SettingsTab() {
           />
         </label>
         <p className="text-xs text-muted-foreground">
-          Mobile browsers that tap Download are sent to /get-app, which shows these links.
-          Leave blank to show a "coming soon" note instead.
+          Mobile browsers that tap Download are sent to /get-app, which shows these links. Leave
+          blank to show a "coming soon" note instead.
         </p>
         <button
           disabled={m.isPending}
