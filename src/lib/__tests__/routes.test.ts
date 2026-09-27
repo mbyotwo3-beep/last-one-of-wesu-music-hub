@@ -18,6 +18,7 @@ import { computeTabs } from "@/components/mobile/BottomTabBar";
 const WEB_ROUTES = [
   "/",
   "/browse",
+  "/library",
   "/artists",
   "/albums",
   "/dashboard",
