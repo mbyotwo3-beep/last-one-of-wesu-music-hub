@@ -47,6 +47,7 @@ import {
   onNativeTimeUpdate,
   onNativeSkip,
   isNativeAudioAvailable,
+  isNativePreloaded,
   configureNativeAudio,
   prepareNativeOfflineTrack,
   deleteNativeTempFile,
@@ -171,6 +172,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Selections that already burned their one auto-retry after a native
   // start failure (e.g. notification-STOP unloaded the asset).
   const nativeRetryRef = useRef<number | null>(null);
+  // Native pre-warm of the upcoming track: { forSelection, id } of the one
+  // warmed asset, if any. Consumed (not re-preloaded) when the selection
+  // advances to it; unloaded when the selection moves elsewhere.
+  const warmedAssetRef = useRef<{ forSelection: number; id: string } | null>(null);
   // Consecutive "unknown" polls for the current selection (plugin emits no
   // event on notification-STOP/dismiss — the asset just vanishes).
   const nativeNullStreakRef = useRef<{ sel: number | null; n: number }>({ sel: null, n: 0 });
@@ -222,6 +227,54 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // after the current one starts, so skips start instantly (Spotify-like).
   // Only warms the signed-URL cache — no audio is preloaded, entitlements
   // don't change, previews expire in 40s, and anything stale re-resolves.
+  // Natively the warmed URL is ALSO preloaded into ExoPlayer (see
+  // warmNextTrack): advancing later is then a single play() instead of a
+  // resolve→preload→play chain, which stalls when backgrounded WebViews
+  // throttle JS. At most one warmed asset; vault copies skip warming.
+  async function warmNextTrack(
+    target: { id: string; title: string; artistName: string; coverUrl?: string | null },
+    url: string,
+    forSelection: number,
+  ): Promise<void> {
+    try {
+      if (!isNative || !_nativeAvailable) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (currentSelectionRef.current !== forSelection) return;
+      if (warmedAssetRef.current?.forSelection === forSelection) return;
+      if (await isTrackDownloaded(target.id).catch(() => false)) return;
+      let artworkUrl: string | undefined;
+      try {
+        const resolved = await resolveImageUrl("album-art", target.coverUrl);
+        if (resolved) artworkUrl = resolved;
+      } catch {
+        /* decorative */
+      }
+      if (currentSelectionRef.current !== forSelection) return;
+      const ok = await preloadNative(
+        target.id,
+        url,
+        true,
+        buildNotificationMetadata({
+          title: target.title,
+          artistName: target.artistName,
+          artworkUrl: artworkUrl ?? null,
+        }),
+      );
+      if (!ok) return;
+      if (currentSelectionRef.current !== forSelection) {
+        // Warmed for a dead selection — drop it, never leak an asset.
+        await stopNative(target.id).catch(() => {});
+        return;
+      }
+      const prev = warmedAssetRef.current;
+      warmedAssetRef.current = { forSelection, id: target.id };
+      if (prev && prev.id !== target.id) {
+        await stopNative(prev.id).catch(() => {});
+      }
+    } catch {
+      /* best effort only — advances just resolve normally */
+    }
+  }
   useEffect(() => {
     if (!track || !playing) return;
     const sel = selectionId;
@@ -284,6 +337,13 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             if (currentSelectionRef.current !== sel) return;
             if (res?.url) setCachedAudioUrl(target.id, null, res.url, true);
           }
+          // Engine pre-warm for the advance (single play() later instead of
+          // a full resolve chain under throttled background JS).
+          if (currentSelectionRef.current !== sel) return;
+          const warmed = getCachedAudioUrl(target.id, user?.id ?? null);
+          if (warmed?.url) {
+            await warmNextTrack(target, warmed.url, sel);
+          }
         } catch {
           /* best effort only — skips just resolve normally */
         }
@@ -305,6 +365,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         }).catch(() => {});
       }
       if (currentTrackIdRef.current) stopNative(currentTrackIdRef.current).catch(() => {});
+      if (warmedAssetRef.current) {
+        stopNative(warmedAssetRef.current.id).catch(() => {});
+        warmedAssetRef.current = null;
+      }
       nativeCleanupRef.current?.();
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
@@ -362,6 +426,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       audioEventsCleanupRef.current = null;
       // Drop the previous track's staged offline files (app-private cache).
       dropNativeTempFiles();
+      // Drop a pre-warmed next asset that never got played (selection moved
+      // elsewhere). A warm for the NEW track is consumed below instead.
+      if (warmedAssetRef.current && warmedAssetRef.current.id !== track.id) {
+        stopNative(warmedAssetRef.current.id).catch(() => {});
+        warmedAssetRef.current = null;
+      }
     }
 
     currentSelectionRef.current = selectionId;
@@ -597,17 +667,30 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               }
               if (!isCurrentTrack()) return;
               const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
-              const preloaded = await preloadNative(
-                track!.id,
-                assetUrl,
-                assetIsUrl,
-                buildNotificationMetadata({
-                  title: track!.title,
-                  artistName: track!.artistName,
-                  albumTitle: typeof albumTitle === "string" ? albumTitle : null,
-                  artworkUrl: artworkUrl ?? null,
-                }),
-              );
+              // Pre-warmed by the prefetch below: never preload twice (the
+              // plugin rejects duplicate asset ids). Ownership transfers to
+              // the live selection here.
+              let preloaded: boolean;
+              if (
+                warmedAssetRef.current?.forSelection === selectionId &&
+                warmedAssetRef.current.id === track!.id &&
+                (await isNativePreloaded(track!.id).catch(() => false))
+              ) {
+                warmedAssetRef.current = null;
+                preloaded = true;
+              } else {
+                preloaded = await preloadNative(
+                  track!.id,
+                  assetUrl,
+                  assetIsUrl,
+                  buildNotificationMetadata({
+                    title: track!.title,
+                    artistName: track!.artistName,
+                    albumTitle: typeof albumTitle === "string" ? albumTitle : null,
+                    artworkUrl: artworkUrl ?? null,
+                  }),
+                );
+              }
               if (!preloaded) {
                 // Transient failure (or late plugin registration): re-probe
                 // next selection, play via HTML below right now.

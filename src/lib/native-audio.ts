@@ -45,6 +45,17 @@ export async function preloadNative(
   }
 }
 
+/** Whether an asset id is already loaded natively (pre-warmed or current). */
+export async function isNativePreloaded(id: string): Promise<boolean> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const { found } = await (NativeAudio as any).isPreloaded({ assetId: id });
+    return found === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * One-time plugin setup for music-app behavior: background playback,
  * notification / lock-screen controls, and audio-focus handling.
