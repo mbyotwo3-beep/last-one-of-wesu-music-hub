@@ -143,7 +143,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       description: "Your downloaded songs still play.",
       action: {
         label: "My downloads",
-        onClick: () => navigate({ to: "/library", hash: "downloads" }),
+        onClick: () => navigate({ to: "/downloads" }),
       },
       duration: 6000,
     });
@@ -1745,8 +1745,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
               <p className="text-destructive">{error}</p>
               {error === OFFLINE_PLAY_MESSAGE && (
                 <Link
-                  to="/library"
-                  hash="downloads"
+                  to="/downloads"
                   className="mt-2 inline-block px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
                 >
                   My downloads
@@ -1937,8 +1936,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   <p className="text-[10px] text-destructive truncate max-w-md">{error}</p>
                   {error === OFFLINE_PLAY_MESSAGE && (
                     <Link
-                      to="/library"
-                      hash="downloads"
+                      to="/downloads"
                       className="text-[10px] font-semibold text-primary hover:underline"
                     >
                       My downloads

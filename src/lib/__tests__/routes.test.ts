@@ -19,6 +19,7 @@ const WEB_ROUTES = [
   "/",
   "/browse",
   "/library",
+  "/downloads",
   "/artists",
   "/albums",
   "/dashboard",
@@ -62,6 +63,7 @@ const MENU_ROUTES: Route[] = ["/profile", "/artist-studio", "/admin", "/superadm
 const CONTEXTUAL_ROUTES: Route[] = [
   "/artists",
   "/albums",
+  "/downloads",
   "/dashboard",
   "/artist-dashboard",
   "/collabs",

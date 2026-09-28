@@ -31,6 +31,7 @@ import { Route as LabelDashboardRouteImport } from './routes/label-dashboard'
 import { Route as HotTracksRouteImport } from './routes/hot-tracks'
 import { Route as GetAppRouteImport } from './routes/get-app'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CollabsRouteImport } from './routes/collabs'
@@ -166,6 +167,11 @@ const GetAppRoute = GetAppRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadsRoute = DownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -314,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/collabs': typeof CollabsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/downloads': typeof DownloadsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/get-app': typeof GetAppRoute
   '/hot-tracks': typeof HotTracksRoute
@@ -363,6 +370,7 @@ export interface FileRoutesByTo {
   '/collabs': typeof CollabsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/downloads': typeof DownloadsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/get-app': typeof GetAppRoute
   '/hot-tracks': typeof HotTracksRoute
@@ -414,6 +422,7 @@ export interface FileRoutesById {
   '/collabs': typeof CollabsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/downloads': typeof DownloadsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/get-app': typeof GetAppRoute
   '/hot-tracks': typeof HotTracksRoute
@@ -466,6 +475,7 @@ export interface FileRouteTypes {
     | '/collabs'
     | '/contact'
     | '/dashboard'
+    | '/downloads'
     | '/forgot-password'
     | '/get-app'
     | '/hot-tracks'
@@ -515,6 +525,7 @@ export interface FileRouteTypes {
     | '/collabs'
     | '/contact'
     | '/dashboard'
+    | '/downloads'
     | '/forgot-password'
     | '/get-app'
     | '/hot-tracks'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/collabs'
     | '/contact'
     | '/dashboard'
+    | '/downloads'
     | '/forgot-password'
     | '/get-app'
     | '/hot-tracks'
@@ -616,6 +628,7 @@ export interface RootRouteChildren {
   CollabsRoute: typeof CollabsRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  DownloadsRoute: typeof DownloadsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   GetAppRoute: typeof GetAppRoute
   HotTracksRoute: typeof HotTracksRoute
@@ -800,6 +813,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/downloads': {
+      id: '/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof DownloadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -1061,6 +1081,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollabsRoute: CollabsRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  DownloadsRoute: DownloadsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   GetAppRoute: GetAppRoute,
   HotTracksRoute: HotTracksRoute,
