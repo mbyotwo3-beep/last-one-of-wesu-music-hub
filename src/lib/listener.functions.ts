@@ -62,10 +62,13 @@ export async function computePlaylistMissing(
       .from("songs")
       .select("id,title,price,cover_url,album_id,status,artist_id")
       .in("id", songIds);
-    const artistIds = [...new Set(((songRows ?? []) as any[]).map((s) => s.artist_id).filter(Boolean))];
-    const { data: artists } = artistIds.length > 0
-      ? await admin.from("artists").select("id,name").in("id", artistIds)
-      : { data: [] };
+    const artistIds = [
+      ...new Set(((songRows ?? []) as any[]).map((s) => s.artist_id).filter(Boolean)),
+    ];
+    const { data: artists } =
+      artistIds.length > 0
+        ? await admin.from("artists").select("id,name").in("id", artistIds)
+        : { data: [] };
     const artistMap = new Map(((artists ?? []) as any[]).map((a: any) => [a.id, a.name]));
     const byId = new Map(((songRows ?? []) as any[]).map((s: any) => [s.id, s]));
     songs = songIds.map((id: string) => byId.get(id)).filter(Boolean);
@@ -81,9 +84,7 @@ export async function computePlaylistMissing(
       .map((s) => s.id as string);
     const albumIds = [
       ...new Set(
-        songs
-          .filter((s) => paidIds.includes(s.id) && s.album_id)
-          .map((s) => s.album_id as string),
+        songs.filter((s) => paidIds.includes(s.id) && s.album_id).map((s) => s.album_id as string),
       ),
     ];
     let ownedSongIds = new Set<string>();
@@ -172,7 +173,7 @@ export const updateProfile = createServerFn({ method: "POST" })
     for (const k of ["full_name", "bio", "avatar_url", "location"] as const) {
       if (data[k] !== undefined) patch[k] = data[k];
     }
-    
+
     // Check if profile exists
     const { data: existing } = await context.supabase
       .from("profiles")
@@ -189,7 +190,7 @@ export const updateProfile = createServerFn({ method: "POST" })
         console.warn("[Profile Update] Could not delete old avatar photo:", err);
       }
     }
-    
+
     let error;
     if (existing) {
       // Update existing profile
@@ -200,12 +201,10 @@ export const updateProfile = createServerFn({ method: "POST" })
       error = result.error;
     } else {
       // Insert new profile
-      const result = await context.supabase
-        .from("profiles")
-        .insert(patch as any);
+      const result = await context.supabase.from("profiles").insert(patch as any);
       error = result.error;
     }
-    
+
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -278,11 +277,11 @@ export const addToPlaylist = createServerFn({ method: "POST" })
       .eq("playlist_id", data.playlist_id)
       .eq("song_id", data.song_id)
       .maybeSingle();
-    
+
     if (existing) {
       return { ok: true, alreadyInPlaylist: true };
     }
-    
+
     // Get the current max position for this playlist
     const { data: maxPos } = await context.supabase
       .from("playlist_songs")
@@ -291,15 +290,15 @@ export const addToPlaylist = createServerFn({ method: "POST" })
       .order("position", { ascending: false })
       .limit(1)
       .maybeSingle();
-    
+
     const nextPosition = (maxPos?.position ?? -1) + 1;
-    
+
     const { error } = await context.supabase.from("playlist_songs").insert({
       playlist_id: data.playlist_id,
       song_id: data.song_id,
       position: nextPosition,
     } as any);
-    
+
     if (error) throw new Error(error.message);
     return { ok: true, alreadyInPlaylist: false };
   });
@@ -346,7 +345,9 @@ async function requirePlaylistOwner(supabase: any, userId: string, playlistId: s
 
 export const updatePlaylist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { id: string; name?: string; description?: string | null; is_public?: boolean }) => d)
+  .validator(
+    (d: { id: string; name?: string; description?: string | null; is_public?: boolean }) => d,
+  )
   .handler(async ({ context, data }) => {
     await requirePlaylistOwner(context.supabase, context.userId, data.id);
     const patch: Record<string, unknown> = {};
@@ -464,9 +465,7 @@ export const listFollowedPlaylists = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? [])
-      .map((r: any) => r.playlists)
-      .filter(Boolean);
+    return (data ?? []).map((r: any) => r.playlists).filter(Boolean);
   });
 
 export const getPlaylistFollowerCount = createServerFn({ method: "GET" })
@@ -543,9 +542,10 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
 
     // 4. Fetch artists for these songs
     const artistIds = [...new Set((songRows ?? []).map((s: any) => s.artist_id).filter(Boolean))];
-    const { data: artists } = artistIds.length > 0
-      ? await supabase.from("artists").select("id,name").in("id", artistIds)
-      : { data: [] };
+    const { data: artists } =
+      artistIds.length > 0
+        ? await supabase.from("artists").select("id,name").in("id", artistIds)
+        : { data: [] };
 
     const artistMap = new Map((artists ?? []).map((a: any) => [a.id, a]));
 
@@ -554,7 +554,7 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
         s.id,
         {
           ...s,
-          artist: s.artist_id ? artistMap.get(s.artist_id) ?? null : null,
+          artist: s.artist_id ? (artistMap.get(s.artist_id) ?? null) : null,
         },
       ]),
     );
@@ -682,16 +682,18 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
-      if (!songPurchase && !albumPurchase) throw new Error("Purchase required before downloading this song");
+      if (!songPurchase && !albumPurchase)
+        throw new Error("Purchase required before downloading this song");
     }
 
     const rawPath = String(song.audio_url ?? "");
     if (!rawPath || rawPath === "null") throw new Error("Song audio file not found");
     const extension = rawPath.match(/\.([a-z0-9]{2,5})(?:\?|$)/i)?.[1]?.toLowerCase() ?? "mp3";
-    const safeTitle = String(song.title ?? "song")
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 80) || "song";
+    const safeTitle =
+      String(song.title ?? "song")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80) || "song";
     const filename = `${safeTitle}.${extension}`;
 
     if (/^https?:\/\//i.test(rawPath)) {
@@ -772,9 +774,11 @@ export const getPreviewAudioUrl = createServerFn({ method: "POST" })
     }
 
     const { signMediaUrl } = await import("./media.server");
-    // Preview links are deliberately short-lived (45s) so an unauthenticated
-    // sampler cannot reuse the URL to download the full paid track.
-    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 45 }) };
+    // Preview links live ~5 minutes: long enough for slow networks to
+    // resolve + buffer + play the 15s cap, short enough to stay a sample.
+    // (A shorter window just breaks slow clients — anyone can already fetch
+    // the whole file inside ANY window, so sub-minute expiries buy nothing.)
+    const signed = { signedUrl: await signMediaUrl("song-audio", rawPath, { expiresIn: 300 }) };
     return { url: signed.signedUrl };
   });
 

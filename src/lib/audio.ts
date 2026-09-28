@@ -85,9 +85,9 @@ export function setCachedAudioUrl(
   url: string,
   previewMode: boolean,
 ): void {
-  // Previews are signed for 45s server-side — cache them shorter so a replay
-  // re-resolves instead of playing an expired URL. Full URLs live 1h.
-  const ttl = previewMode ? 40_000 : 15 * 60 * 1000;
+  // Previews are signed for ~5 minutes server-side — cache them shorter so
+  // a replay re-resolves instead of playing an expired URL. Full URLs live 1h.
+  const ttl = previewMode ? 270_000 : 15 * 60 * 1000;
   audioUrlCache.set(cacheKey(userId, songId), {
     url,
     previewMode,
@@ -100,6 +100,33 @@ export function evictCachedAudioUrl(songId: string): void {
   for (const key of audioUrlCache.keys()) {
     if (key.endsWith(`:${songId}`)) audioUrlCache.delete(key);
   }
+}
+
+export type PreviewCapAction = "advance" | "replay" | "wait" | "idle";
+
+/**
+ * Pure: what should the 15s preview cap do right now? Advances only once
+ * the listener actually HEARD the cap (engine-mirrored progress) — a bare
+ * wall-clock used to skip unheard previews on slow networks that were still
+ * buffering at 15s. (unit-tested)
+ */
+export function previewCapDecision(args: {
+  playing: boolean;
+  heardSeconds: number;
+  elapsedMs: number;
+  repeatOne: boolean;
+  capSeconds?: number;
+  heardThreshold?: number;
+  giveUpMs?: number;
+}): PreviewCapAction {
+  const { playing, heardSeconds, elapsedMs, repeatOne } = args;
+  const cap = args.capSeconds ?? 15;
+  const heardAt = args.heardThreshold ?? Math.max(0, cap - 2);
+  const giveUp = args.giveUpMs ?? 120_000;
+  if (!playing) return "idle";
+  if (heardSeconds >= heardAt) return repeatOne ? "replay" : "advance";
+  if (elapsedMs > giveUp) return "advance";
+  return "wait";
 }
 
 // Global user interaction listener to prime the audio context on first touch/click anywhere

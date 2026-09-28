@@ -75,7 +75,13 @@ import {
   decideStaleVaultPlayback,
 } from "@/lib/offline-vault";
 import { supabase } from "@/integrations/supabase/client";
-import { getAudio, primeAudio, getCachedAudioUrl, setCachedAudioUrl } from "@/lib/audio";
+import {
+  getAudio,
+  primeAudio,
+  getCachedAudioUrl,
+  setCachedAudioUrl,
+  previewCapDecision,
+} from "@/lib/audio";
 
 let _nativeAvailable: boolean | null = null;
 
@@ -235,7 +241,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Next-track URL prefetch: resolve the upcoming track's signed URL ~1.5s
   // after the current one starts, so skips start instantly (Spotify-like).
   // Only warms the signed-URL cache — no audio is preloaded, entitlements
-  // don't change, previews expire in 40s, and anything stale re-resolves.
+  // don't change, preview URLs live minutes, and anything stale re-resolves.
   // Natively the warmed URL is ALSO preloaded into ExoPlayer (see
   // warmNextTrack): advancing later is then a single play() instead of a
   // resolve→preload→play chain, which stalls when backgrounded WebViews
@@ -746,19 +752,28 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 }
                 if (previewMode) {
                   const previewSelection = selectionId;
-                  previewTimerRef.current = setTimeout(() => {
-                    // Stale timer (track changed) or paused meanwhile: a
-                    // preview must never cut off another selection, and ended
-                    // previews flow onward like Spotify (repeat-one replays).
+                  const previewStartedAt = Date.now();
+                  const tickPreviewCap = () => {
                     if (currentSelectionRef.current !== previewSelection) return;
                     const st = usePlayer.getState();
-                    if (!st.playing) return;
-                    if (st.repeat === "one") {
+                    const action = previewCapDecision({
+                      playing: st.playing,
+                      heardSeconds: st.progressSeconds,
+                      elapsedMs: Date.now() - previewStartedAt,
+                      repeatOne: st.repeat === "one",
+                    });
+                    if (action === "idle") return;
+                    if (action === "replay") {
                       seekNative(track!.id, 0).catch(() => {});
                       return;
                     }
-                    st.skipNext();
-                  }, 15000);
+                    if (action === "advance") {
+                      st.skipNext();
+                      return;
+                    }
+                    previewTimerRef.current = setTimeout(tickPreviewCap, 2000);
+                  };
+                  previewTimerRef.current = setTimeout(tickPreviewCap, 15000);
                 }
                 const cleanup = await onNativeComplete(track!.id, () => {
                   if (usePlayer.getState().repeat === "one") {

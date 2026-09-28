@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import fc from "fast-check";
+import { previewCapDecision } from "../audio";
 
 // ---------------------------------------------------------------------------
 // AudioEngine state model
@@ -262,13 +263,9 @@ describe("Prime never starts real media", () => {
 
   it("real song attached (paused or playing) → leave it alone", () => {
     fc.assert(
-      fc.property(
-        fc.webUrl(),
-        fc.boolean(),
-        (url, paused) => {
-          expect(decidePrime(url, paused)).toBe("leave");
-        },
-      ),
+      fc.property(fc.webUrl(), fc.boolean(), (url, paused) => {
+        expect(decidePrime(url, paused)).toBe("leave");
+      }),
       { numRuns: 100 },
     );
   });
@@ -276,5 +273,36 @@ describe("Prime never starts real media", () => {
   it("silent placeholder attached → unlock", () => {
     expect(decidePrime(SILENT, true)).toBe("unlock");
     expect(decidePrime(SILENT, false)).toBe("unlock");
+  });
+});
+
+describe("preview 15s cap decision (never skip unheard audio)", () => {
+  // The wall-clock used to advance at 15s even when slow networks were still
+  // buffering — previews jumped onward in silence. Advance requires HEARD.
+  it("advances once heard, replays in repeat-one", () => {
+    expect(
+      previewCapDecision({ playing: true, heardSeconds: 13, elapsedMs: 16_000, repeatOne: false }),
+    ).toBe("advance");
+    expect(
+      previewCapDecision({ playing: true, heardSeconds: 14, elapsedMs: 16_000, repeatOne: true }),
+    ).toBe("replay");
+  });
+
+  it("waits while buffering instead of skipping unheard", () => {
+    expect(
+      previewCapDecision({ playing: true, heardSeconds: 0, elapsedMs: 16_000, repeatOne: false }),
+    ).toBe("wait");
+    expect(
+      previewCapDecision({ playing: true, heardSeconds: 5, elapsedMs: 30_000, repeatOne: false }),
+    ).toBe("wait");
+  });
+
+  it("idles when paused, advances on hopeless stall", () => {
+    expect(
+      previewCapDecision({ playing: false, heardSeconds: 0, elapsedMs: 16_000, repeatOne: false }),
+    ).toBe("idle");
+    expect(
+      previewCapDecision({ playing: true, heardSeconds: 0, elapsedMs: 200_000, repeatOne: false }),
+    ).toBe("advance");
   });
 });
