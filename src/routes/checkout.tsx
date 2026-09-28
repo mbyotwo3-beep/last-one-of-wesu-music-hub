@@ -291,7 +291,7 @@ function CheckoutPage() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 onFocus={(e) => {
                   try {
-                    e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                    e.currentTarget.scrollIntoView({ block: "nearest" });
                   } catch {
                     /* ignore */
                   }
@@ -549,7 +549,7 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     onFocus={(e) => {
                       try {
-                        e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                        e.currentTarget.scrollIntoView({ block: "nearest" });
                       } catch {
                         /* ignore */
                       }

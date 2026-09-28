@@ -120,7 +120,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        // interactive-widget=resizes-content: the keyboard resizes the layout
+        // viewport (instead of overlaying it) so focused inputs stay reachable
+        // and no phantom space appears. Ignored where unsupported.
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content",
       },
       { name: "theme-color", content: "#fbf7ee" },
       { title: "Wesu+ — Music Streaming" },

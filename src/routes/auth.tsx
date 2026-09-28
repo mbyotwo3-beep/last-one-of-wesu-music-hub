@@ -130,10 +130,12 @@ function AuthPage() {
   };
 
   // Keyboard-open viewports (and adjustPan shells) can leave the focused
-  // field under the keyboard — bring it into view on every focus.
+  // field under the keyboard. Nudge it into view instantly — a smooth
+  // animation would fight the WebView's own focus scroll and end up
+  // hiding the field instead.
   const focusFieldIntoView = (e: React.FocusEvent<HTMLElement>) => {
     try {
-      e.currentTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+      e.currentTarget.scrollIntoView({ block: "nearest" });
     } catch {
       /* ignore */
     }
