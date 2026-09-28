@@ -72,6 +72,10 @@ function QueuePage() {
   });
 
   const playFallback = () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      navigate({ to: "/downloads" });
+      return;
+    }
     if (!fallbackTracks || fallbackTracks.length === 0) {
       navigate({ to: "/browse" });
       return;
@@ -98,15 +102,18 @@ function QueuePage() {
   };
 
   if (queue.length === 0) {
+    const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <div className="flex flex-col items-center justify-center gap-4">
           <ListMusic className="size-16 text-muted-foreground" />
           <h1 className="text-2xl font-bold">Your queue is empty</h1>
           <p className="text-muted-foreground">
-            {fallbackTracks && fallbackTracks.length > 0
-              ? `Start with the ${fallbackTracks.length} song(s) you've bought or liked to keep your music going.`
-              : "Add songs to your queue to listen to them later"}
+            {isOffline
+              ? "You're offline — your downloaded songs still play."
+              : fallbackTracks && fallbackTracks.length > 0
+                ? `Start with the ${fallbackTracks.length} song(s) you've bought or liked to keep your music going.`
+                : "Add songs to your queue to listen to them later"}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             {fallbackTracks && fallbackTracks.length > 0 && (
@@ -118,10 +125,10 @@ function QueuePage() {
               </button>
             )}
             <Link
-              to="/browse"
+              to={isOffline ? "/downloads" : "/browse"}
               className="px-6 py-2 rounded-full bg-secondary border border-border font-semibold"
             >
-              Browse Music
+              {isOffline ? "My downloads" : "Browse Music"}
             </Link>
           </div>
         </div>

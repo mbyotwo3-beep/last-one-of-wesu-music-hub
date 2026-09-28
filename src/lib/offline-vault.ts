@@ -179,6 +179,55 @@ export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
   }
 }
 
+// Session cover-art object URLs (plaintext art, never persisted as files).
+const vaultArtUrlCache = new Map<string, string>();
+
+function revokeVaultArtUrl(songId: string) {
+  const url = vaultArtUrlCache.get(songId);
+  if (url) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+    vaultArtUrlCache.delete(songId);
+  }
+}
+
+/**
+ * Cover bytes for a download WITHOUT decrypting audio (cheap metadata read).
+ * Powers offline artwork in lists and the shade player.
+ */
+export async function getVaultArtwork(songId: string): Promise<ArrayBuffer | null> {
+  if (!supported() || !songId) return null;
+  try {
+    const rec = await tx<VaultRecord | undefined>(TRACKS_STORE, "readonly", (s) => s.get(songId));
+    const art = rec?.artwork;
+    if (!art || !(art instanceof ArrayBuffer) || art.byteLength === 0) return null;
+    return art;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Same-tab object URL for vault cover art (cached per session). Falls back
+ * to null so callers render the regular cover component instead.
+ */
+export async function getVaultArtObjectUrl(songId: string): Promise<string | null> {
+  const cached = vaultArtUrlCache.get(songId);
+  if (cached) return cached;
+  const art = await getVaultArtwork(songId);
+  if (!art) return null;
+  try {
+    const url = URL.createObjectURL(new Blob([art], { type: "image/jpeg" }));
+    vaultArtUrlCache.set(songId, url);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 /** Cheap existence probe — reads the key only, never the audio bytes. */
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;
@@ -283,6 +332,7 @@ export async function saveTrackToVault(
 
 export async function removeTrackFromVault(songId: string): Promise<void> {
   revokeOfflineObjectUrl(songId);
+  revokeVaultArtUrl(songId);
   if (!supported() || !songId) return;
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.delete(songId));

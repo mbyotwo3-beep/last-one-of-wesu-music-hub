@@ -1,14 +1,53 @@
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import {
+  getVaultArtObjectUrl,
   getVaultUsage,
   isVaultSupported,
   listVaultMeta,
   removeTrackFromVault,
 } from "@/lib/offline-vault";
+
+/**
+ * Cover that prefers vault art bytes (works with zero bars) and falls back
+ * to the regular cover component when the row predates artwork storage.
+ */
+function VaultCover({ songId, path, alt }: { songId: string; path: string | null; alt: string }) {
+  const [artUrl, setArtUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setArtUrl(null);
+    getVaultArtObjectUrl(songId)
+      .then((url) => {
+        if (!cancelled) setArtUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [songId]);
+  if (artUrl) {
+    return (
+      <img
+        src={artUrl}
+        alt={alt}
+        className="size-11 rounded-md object-cover bg-secondary shrink-0"
+      />
+    );
+  }
+  return (
+    <StorageImage
+      bucket="album-art"
+      path={path}
+      alt={alt}
+      className="size-11 rounded-md overflow-hidden bg-secondary shrink-0 object-cover"
+    />
+  );
+}
 
 /**
  * Offline downloads living in the encrypted on-device vault. Fully usable
@@ -112,12 +151,7 @@ export function DownloadsSection() {
                   className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
                   aria-label={`Play ${t.title} offline`}
                 >
-                  <StorageImage
-                    bucket="album-art"
-                    path={t.coverUrl}
-                    alt={t.title}
-                    className="size-11 rounded-md overflow-hidden bg-secondary shrink-0 object-cover"
-                  />
+                  <VaultCover songId={t.songId} path={t.coverUrl} alt={t.title} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{t.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{t.artistName}</p>

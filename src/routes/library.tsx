@@ -220,6 +220,7 @@ function Page() {
   const safePurchasedSongs = (purchasedSongs ?? []).filter(hasId);
   const safePurchasedAlbums = (purchasedAlbums ?? []).filter(hasId);
   const safeFollowedArtists = (followedArtists ?? []).filter(hasId);
+  const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
@@ -227,16 +228,23 @@ function Page() {
 
       <DownloadsSection />
 
-      {sectionError && (
-        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex flex-wrap items-center justify-between gap-3">
-          <span>Some sections couldn't load — your content may be incomplete.</span>
-          <button
-            onClick={retryAll}
-            className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
-          >
-            Retry
-          </button>
+      {isOffline ? (
+        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          You're offline — your downloads above play normally. Everything else below needs internet
+          and will reload when you're back.
         </div>
+      ) : (
+        sectionError && (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex flex-wrap items-center justify-between gap-3">
+            <span>Some sections couldn't load — your content may be incomplete.</span>
+            <button
+              onClick={retryAll}
+              className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+            >
+              Retry
+            </button>
+          </div>
+        )
       )}
 
       <section className="mb-10">
