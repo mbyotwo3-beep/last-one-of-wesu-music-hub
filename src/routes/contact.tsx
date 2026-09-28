@@ -65,8 +65,8 @@ function ContactPage() {
                 <div>
                   <h3 className="font-semibold">Support inbox</h3>
                   <p className="text-muted-foreground text-sm">
-                    Messages go straight to our admin team — no mailbox needed. We reply by
-                    email, usually within 2 business days.
+                    Messages go straight to our admin team — no mailbox needed. We reply by email,
+                    usually within 2 business days.
                   </p>
                 </div>
               </div>
@@ -88,8 +88,7 @@ function ContactPage() {
                 <CheckCircle2 className="size-12 text-primary mx-auto mb-4" />
                 <h2 className="text-xl font-semibold mb-2">Message sent</h2>
                 <p className="text-sm text-muted-foreground">
-                  Thanks {name.split(" ")[0] || "there"} — our admin team will reply to{" "}
-                  {email}.
+                  Thanks {name.split(" ")[0] || "there"} — our admin team will reply to {email}.
                 </p>
               </div>
             ) : (
@@ -103,6 +102,11 @@ function ContactPage() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Mutinta Phiri"
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="next"
                       className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground"
                     />
                   </div>
@@ -113,6 +117,11 @@ function ContactPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
+                      autoComplete="email"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="next"
                       className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground"
                     />
                   </div>
@@ -135,6 +144,8 @@ function ContactPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="How can we help?"
+                      autoCapitalize="sentences"
+                      enterKeyHint="send"
                       className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground resize-none"
                     />
                   </div>

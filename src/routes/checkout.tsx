@@ -297,6 +297,9 @@ function CheckoutPage() {
                   }
                 }}
                 placeholder="e.g. 0977 123 456"
+                inputMode="numeric"
+                autoComplete="tel"
+                enterKeyHint="done"
                 className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
               />
               <p className="text-xs text-muted-foreground">
@@ -555,6 +558,9 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
                       }
                     }}
                     placeholder="e.g. 0977 123 456"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    enterKeyHint="done"
                     className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
                   />
                   <p className="text-xs text-muted-foreground">

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -66,6 +66,11 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Enter-advance refs: phone keyboards show Next/Go and move through the
+  // form instead of submitting early or hiding behind the keyboard.
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const { redirect, action, artistId, itemId, itemType, invite } = search;
   const acceptInviteFn = useServerFn(acceptInvitation);
 
@@ -331,8 +336,21 @@ function AuthPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onFocus={focusFieldIntoView}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      emailRef.current?.focus();
+                    }
+                  }}
+                  ref={nameRef}
                   required
                   placeholder="Your name"
+                  autoComplete="name"
+                  autoCapitalize="words"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
                   className="w-full bg-card border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground"
                 />
               </div>
@@ -347,8 +365,21 @@ function AuthPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={focusFieldIntoView}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    passwordRef.current?.focus();
+                  }
+                }}
+                ref={emailRef}
                 required
                 placeholder="you@example.com"
+                autoComplete="email"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="next"
                 className="w-full bg-card border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -362,8 +393,14 @@ function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={focusFieldIntoView}
+                ref={passwordRef}
                 required
                 placeholder="Min 6 characters"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
                 minLength={6}
                 className="w-full bg-card border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground"
               />
