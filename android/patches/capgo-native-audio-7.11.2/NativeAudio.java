@@ -88,6 +88,11 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     private Map<String, Map<String, String>> notificationMetadataMap = new HashMap<>();
     private MediaSessionCompat mediaSession;
     private String currentlyPlayingAssetId;
+    // WESU PATCH (not upstream): live notification rebuild state.
+    private String lastNotifTitle = "";
+    private String lastNotifArtist = "";
+    private Bitmap lastNotifArtwork = null;
+    private int lastPlaybackState = PlaybackStateCompat.STATE_NONE;
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "native_audio_channel";
 
@@ -1084,10 +1089,14 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                 if (bitmap != null) {
                     metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap);
                 }
+                // WESU PATCH: keep the bitmap for notification rebuilds.
+                lastNotifArtwork = bitmap;
                 mediaSession.setMetadata(metadataBuilder.build());
                 showNotification(title, artist);
             });
         } else {
+            // WESU PATCH: no art for this track — drop any stale bitmap.
+            lastNotifArtwork = null;
             mediaSession.setMetadata(metadataBuilder.build());
             showNotification(title, artist);
         }
@@ -1096,23 +1105,45 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     }
 
     private void showNotification(String title, String artist) {
-        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(getContext(), CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(title)
-            .setContentText(artist)
-            .setStyle(
-                new androidx.media.app.NotificationCompat.MediaStyle()
-                    .setMediaSession(mediaSession.getSessionToken())
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .addAction(android.R.drawable.ic_media_previous, "Previous", null)
-            .addAction(android.R.drawable.ic_media_pause, "Pause", null)
-            .addAction(android.R.drawable.ic_media_next, "Next", null)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOnlyAlertOnce(true);
+        lastNotifTitle = title != null ? title : "";
+        lastNotifArtist = artist != null ? artist : "";
+        refreshNotification();
+    }
 
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
-        notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+    // WESU PATCH (not upstream): re-posts the player notification with the
+    // play/pause glyph matching live state and the cached artwork. Without
+    // this the shade keeps the icon from track start (stale glyph reads as
+    // "dead buttons", especially on OEM skins rendering raw actions).
+    private void refreshNotification() {
+        try {
+            if (mediaSession == null || !showNotification) return;
+            if (lastNotifTitle.isEmpty()) return;
+            boolean playing = lastPlaybackState == PlaybackStateCompat.STATE_PLAYING;
+            NotificationCompat.Builder notificationBuilder =
+                new NotificationCompat.Builder(getContext(), CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_media_play)
+                    .setContentTitle(lastNotifTitle)
+                    .setContentText(lastNotifArtist)
+                    .setStyle(
+                        new androidx.media.app.NotificationCompat.MediaStyle()
+                            .setMediaSession(mediaSession.getSessionToken())
+                            .setShowActionsInCompactView(0, 1, 2))
+                    .addAction(android.R.drawable.ic_media_previous, "Previous", null)
+                    .addAction(
+                        playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                        playing ? "Pause" : "Play",
+                        null)
+                    .addAction(android.R.drawable.ic_media_next, "Next", null)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setOnlyAlertOnce(true);
+            if (lastNotifArtwork != null && !lastNotifArtwork.isRecycled()) {
+                notificationBuilder.setLargeIcon(lastNotifArtwork);
+            }
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
+            notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
+        } catch (Exception e) {
+            Log.e(TAG, "Error refreshing notification", e);
+        }
     }
 
     private void clearNotification() {
@@ -1129,8 +1160,18 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
 
         PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
             .setState(state, 0, state == PlaybackStateCompat.STATE_PLAYING ? 1.0f : 0.0f)
-            .setActions(PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE | PlaybackStateCompat.ACTION_STOP);
+            // WESU PATCH: advertise skip so lock-screen/shade offer next/prev
+            // (matches the onSkipToNext/onSkipToPrevious callbacks).
+            .setActions(
+                PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE | PlaybackStateCompat.ACTION_STOP
+                    | PlaybackStateCompat.ACTION_SKIP_TO_NEXT | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS);
         mediaSession.setPlaybackState(stateBuilder.build());
+        // WESU PATCH: keep the posted glyph in step (not on STOP — the
+        // notification was just cancelled and must stay gone).
+        lastPlaybackState = state;
+        if (state != PlaybackStateCompat.STATE_STOPPED) {
+            refreshNotification();
+        }
     }
 
     private void loadArtwork(String urlString, ArtworkCallback callback) {
