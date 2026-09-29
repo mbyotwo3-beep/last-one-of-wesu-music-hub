@@ -3,25 +3,30 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { normalizeGenre } from "./genres";
 
+// Follower COUNT is public (maintained counter on `artists`), but "am I
+// following this?" reads the caller's OWN row, which RLS scopes to the
+// authenticated user. It used to run unauthenticated through the anon client
+// and take a caller-supplied user_id, so the read always errored (discarded)
+// and returned following:false for everyone — the Follow button could never
+// stick. The user identity now comes from the verified token only.
 export const getFollowState = createServerFn({ method: "GET" })
-  .validator((d: { artist_id: string; user_id?: string | null }) => d)
-  .handler(async ({ data }) => {
-    const supabase = getPublicSupabase();
+  .middleware([requireSupabaseAuth])
+  .validator((d: { artist_id: string }) => d)
+  .handler(async ({ context, data }) => {
     const [countRes, mineRes] = await Promise.all([
       // Aggregate only: the maintained counter on `artists`. Raw follower rows stay private.
-      supabase
+      getPublicSupabase()
         .from("artists")
         .select("follower_count")
         .eq("id", data.artist_id)
         .maybeSingle(),
-      data.user_id
-        ? supabase
-            .from("artist_followers")
-            .select("id")
-            .eq("artist_id", data.artist_id)
-            .eq("user_id", data.user_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
+      // RLS: "Users read own follow rows" — only ever returns the caller's row.
+      context.supabase
+        .from("artist_followers")
+        .select("id")
+        .eq("artist_id", data.artist_id)
+        .eq("user_id", context.userId)
+        .maybeSingle(),
     ]);
     return {
       count: Number(
@@ -30,7 +35,6 @@ export const getFollowState = createServerFn({ method: "GET" })
       following: !!(mineRes as { data: unknown }).data,
     };
   });
-
 
 export const toggleFollow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Shield,
   Music,
@@ -9,6 +11,56 @@ import {
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
+import { getSiteConfig, DEFAULT_SITE } from "@/lib/pricing.functions";
+
+/**
+ * The published artist terms must state the commission the LEDGER actually
+ * applies — `platform_settings.site.commission_pct`, editable by superadmin.
+ * A hardcoded 20% here contradicted the real split and the payout maths.
+ */
+function useCommissionPct(): number {
+  const siteFn = useServerFn(getSiteConfig);
+  const { data } = useQuery({
+    queryKey: ["site-config"],
+    queryFn: siteFn,
+    staleTime: 10 * 60 * 1000,
+  });
+  const pct = Number(data?.commission_pct ?? DEFAULT_SITE.commission_pct);
+  return Number.isFinite(pct) && pct >= 0 && pct <= 90 ? pct : DEFAULT_SITE.commission_pct;
+}
+
+function CommissionShare({ part, className }: { part: "artist" | "platform"; className?: string }) {
+  const platform = useCommissionPct();
+  const value = part === "platform" ? platform : 100 - platform;
+  return <span className={className}>{Math.round(value * 10) / 10}%</span>;
+}
+
+function RevenueSplitBar() {
+  const platform = useCommissionPct();
+  const artist = Math.round((100 - platform) * 10) / 10;
+  return (
+    <div className="rounded-xl overflow-hidden border border-border mt-2">
+      <div className="flex h-4">
+        <div
+          className="bg-primary flex items-center justify-center"
+          style={{ width: `${artist}%` }}
+        />
+        <div
+          className="bg-muted flex items-center justify-center"
+          style={{ width: `${100 - artist}%` }}
+        />
+      </div>
+      <div className="flex text-xs px-3 py-2 justify-between text-muted-foreground">
+        <span>
+          <span className="text-primary font-semibold">{artist}%</span> — Artist
+        </span>
+        <span>
+          <span className="font-semibold">{Math.round(platform * 10) / 10}%</span> — Wesu+
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/terms-artist")({
   head: () => ({
@@ -31,10 +83,9 @@ const sections = [
     title: "Introduction",
     content: (
       <p className="text-muted-foreground leading-relaxed">
-        Welcome to <strong className="text-foreground">Wesu+</strong>, Zambia's
-        home for music streaming and digital music sales. By using our platform,
-        you agree to these Terms &amp; Conditions. Please read them carefully
-        before uploading, purchasing, or streaming content.
+        Welcome to <strong className="text-foreground">Wesu+</strong>, Zambia's home for music
+        streaming and digital music sales. By using our platform, you agree to these Terms &amp;
+        Conditions. Please read them carefully before uploading, purchasing, or streaming content.
       </p>
     ),
   },
@@ -44,11 +95,10 @@ const sections = [
     title: "Content & Intellectual Property",
     content: (
       <p className="text-muted-foreground leading-relaxed">
-        Artists retain <strong className="text-foreground">full ownership</strong>{" "}
-        and copyright of the music they upload to Wesu+. By uploading content,
-        you confirm that you own the rights or have permission to distribute it.
-        Wesu+ is granted permission to host, stream, and sell your content
-        through the platform.
+        Artists retain <strong className="text-foreground">full ownership</strong> and copyright of
+        the music they upload to Wesu+. By uploading content, you confirm that you own the rights or
+        have permission to distribute it. Wesu+ is granted permission to host, stream, and sell your
+        content through the platform.
       </p>
     ),
   },
@@ -63,45 +113,25 @@ const sections = [
           <div>
             <p className="font-semibold text-foreground text-sm">Free Song Upload</p>
             <p className="text-muted-foreground text-sm mt-1">
-              A one-time upload fee of{" "}
-              <span className="text-primary font-bold">K100 per song</span>.
+              A one-time upload fee of <span className="text-primary font-bold">K100 per song</span>
+              .
             </p>
           </div>
         </div>
         <div className="flex items-start gap-4 bg-primary/5 border border-primary/20 rounded-xl p-4">
           <div className="size-2 rounded-full bg-primary mt-2 shrink-0" />
           <div>
-            <p className="font-semibold text-foreground text-sm">Premium Songs</p>
+            <p className="font-semibold text-foreground text-sm">Paid Songs</p>
             <p className="text-muted-foreground text-sm mt-1">
               Artists set their own selling price. Wesu+ retains{" "}
-              <span className="text-primary font-bold">20%</span> of each sale
-              or revenue generated, while the remaining{" "}
-              <span className="text-primary font-bold">80%</span> is paid to the
+              <CommissionShare part="platform" className="text-primary font-bold" /> of each sale or
+              revenue generated, while the remaining{" "}
+              <CommissionShare part="artist" className="text-primary font-bold" /> is paid to the
               artist.
             </p>
           </div>
         </div>
-        {/* Visual split */}
-        <div className="rounded-xl overflow-hidden border border-border mt-2">
-          <div className="flex h-4">
-            <div
-              className="bg-primary flex items-center justify-center"
-              style={{ width: "80%" }}
-            />
-            <div
-              className="bg-muted flex items-center justify-center"
-              style={{ width: "20%" }}
-            />
-          </div>
-          <div className="flex text-xs px-3 py-2 justify-between text-muted-foreground">
-            <span>
-              <span className="text-primary font-semibold">80%</span> — Artist
-            </span>
-            <span>
-              <span className="font-semibold">20%</span> — Wesu+
-            </span>
-          </div>
-        </div>
+        <RevenueSplitBar />
       </div>
     ),
   },
@@ -112,9 +142,8 @@ const sections = [
     content: (
       <p className="text-muted-foreground leading-relaxed">
         Our customer support team is available{" "}
-        <strong className="text-foreground">24 hours a day</strong> to assist
-        with technical issues, account inquiries, payments, and other
-        platform-related questions.
+        <strong className="text-foreground">24 hours a day</strong> to assist with technical issues,
+        account inquiries, payments, and other platform-related questions.
       </p>
     ),
   },
@@ -124,9 +153,8 @@ const sections = [
     title: "Problems & Disputes",
     content: (
       <p className="text-muted-foreground leading-relaxed">
-        If a dispute arises between users, artists, or Wesu+, we encourage all
-        parties to contact our support team first. We will make every reasonable
-        effort to resolve issues{" "}
+        If a dispute arises between users, artists, or Wesu+, we encourage all parties to contact
+        our support team first. We will make every reasonable effort to resolve issues{" "}
         <strong className="text-foreground">fairly and promptly</strong>.
       </p>
     ),
@@ -137,9 +165,8 @@ const sections = [
     title: "Changes to These Terms",
     content: (
       <p className="text-muted-foreground leading-relaxed">
-        Wesu+ may update these Terms &amp; Conditions from time to time.
-        Continued use of the platform after any updates means you accept the
-        revised terms.
+        Wesu+ may update these Terms &amp; Conditions from time to time. Continued use of the
+        platform after any updates means you accept the revised terms.
       </p>
     ),
   },
@@ -172,13 +199,11 @@ function ArtistTermsPage() {
             Artist Terms &amp; Conditions
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            Wesu+ Streaming Services — everything you need to know about
-            uploading and distributing your music on our platform.
+            Wesu+ Streaming Services — everything you need to know about uploading and distributing
+            your music on our platform.
           </p>
 
-          <p className="mt-6 text-xs text-muted-foreground/60">
-            Last updated: August 2025
-          </p>
+          <p className="mt-6 text-xs text-muted-foreground/60">Last updated: August 2025</p>
         </div>
       </div>
 
@@ -215,9 +240,8 @@ function ArtistTermsPage() {
         {/* Footer note */}
         <div className="mt-10 rounded-2xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Thank you for choosing{" "}
-            <strong className="text-primary">Wesu+</strong> — where music speaks
-            and artists grow.
+            Thank you for choosing <strong className="text-primary">Wesu+</strong> — where music
+            speaks and artists grow.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <Link

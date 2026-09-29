@@ -186,7 +186,9 @@ export const getAlbumWithSongs = createServerFn({ method: "GET" })
     const [album, songs] = await Promise.all([
       supabase
         .from("albums")
-        .select("*, artist:artists(id,name,avatar_url)")
+        // user_id is the owner check for the album editor — without it the
+        // editor's "is this my album?" test can never be true.
+        .select("*, artist:artists(id,name,avatar_url,user_id)")
         .eq("id", data.id)
         .eq("status", "approved")
         .maybeSingle(),
@@ -200,6 +202,46 @@ export const getAlbumWithSongs = createServerFn({ method: "GET" })
     ]);
     if (album.error) throw new Error(album.error.message);
     return { album: album.data, songs: songs.data ?? [] };
+  });
+
+/**
+ * Album + tracks for the EDITOR, owner-only and status-agnostic.
+ *
+ * The public getAlbumWithSongs filters status='approved', so a draft (the
+ * state an album is in exactly when it needs editing) 404s. This variant is
+ * the authenticated owner's view: any status, and a hard 403 for anyone else
+ * so the editor can never render for a non-owner.
+ */
+export const getAlbumWithSongsForEdit = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string }) => d)
+  .handler(async ({ context, data }) => {
+    const { supabase: userClient, userId } = context;
+    const { data: album, error: albumErr } = await userClient
+      .from("albums")
+      .select("*, artist:artists(id,name,avatar_url,user_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (albumErr) throw new Error(albumErr.message);
+    if (!album) return { album: null, songs: [], forbidden: false };
+
+    // Ownership lives on the album row (creator) or its artist profile
+    // (user_id). Either counts as owner.
+    const artistOwner = (album as { artist?: { user_id?: string | null } | null }).artist?.user_id;
+    const albumOwner = (album as { user_id?: string | null }).user_id;
+    const isOwner = artistOwner === userId || albumOwner === userId;
+    if (!isOwner) return { album: null, songs: [], forbidden: true };
+
+    // Songs via the public client: RLS hides drafts from a public read, so
+    // the owner must read them with their own client to see every track.
+    const { data: songs, error: songsErr } = await userClient
+      .from("songs")
+      .select("id,title,duration,price,explicit,track_number,status,album_id")
+      .eq("album_id", data.id)
+      .order("track_number", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true });
+    if (songsErr) throw new Error(songsErr.message);
+    return { album, songs: songs ?? [], forbidden: false };
   });
 
 export const getSongById = createServerFn({ method: "GET" })

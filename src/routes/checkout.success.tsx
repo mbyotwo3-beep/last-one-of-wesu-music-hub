@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -23,6 +23,38 @@ export const Route = createFileRoute("/checkout/success")({
     ref: typeof s.ref === "string" ? s.ref : undefined,
   }),
   component: CheckoutSuccessPage,
+  // A payment receipt is the last thing a buyer sees — it must never render
+  // a raw stack/message or fall through to the generic root error page.
+  errorComponent: ({ error, reset }) => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-4">
+      <XCircle className="size-10 text-destructive mx-auto" />
+      <h1 className="text-2xl font-bold">We couldn't load your receipt</h1>
+      <p className="text-muted-foreground text-sm">
+        Your payment may still have gone through. Check your Library, or try again — if you were
+        charged and the track isn't there, contact support with your payment reference.
+      </p>
+      <div className="flex gap-3 justify-center">
+        <button
+          onClick={() => reset()}
+          className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+        >
+          Try again
+        </button>
+        <Link
+          to="/library"
+          className="px-5 py-2.5 rounded-full bg-secondary border border-border font-semibold"
+        >
+          My Library
+        </Link>
+      </div>
+      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center">
+      <h1 className="text-2xl font-bold">Receipt not found</h1>
+    </div>
+  ),
 });
 
 function CheckoutSuccessPage() {
@@ -31,7 +63,11 @@ function CheckoutSuccessPage() {
   const navigate = useNavigate();
   const verifyFn = useServerFn(verifyPayment);
 
-  const { data: transaction, isLoading, refetch: refetchTransaction } = useQuery({
+  const {
+    data: transaction,
+    isLoading,
+    refetch: refetchTransaction,
+  } = useQuery({
     queryKey: ["transaction", ref],
     queryFn: async () => {
       if (!ref || !user) return null;
@@ -66,7 +102,8 @@ function CheckoutSuccessPage() {
     refetchIntervalInBackground: true,
   });
 
-  const { data: receiptItem } = useQuery({    queryKey: ["receipt-item", transaction?.item_type, transaction?.item_id],
+  const { data: receiptItem } = useQuery({
+    queryKey: ["receipt-item", transaction?.item_type, transaction?.item_id],
     enabled: !!transaction?.item_id && !!transaction?.item_type,
     queryFn: async () => {
       const t = transaction as any;
@@ -273,7 +310,12 @@ function CheckoutSuccessPage() {
                 onClick={handleSuccessRedirect}
                 className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
               >
-                Go to {tx?.item_type === "album" ? "Album" : tx?.item_type === "playlist" ? "Playlist" : "Song"}
+                Go to{" "}
+                {tx?.item_type === "album"
+                  ? "Album"
+                  : tx?.item_type === "playlist"
+                    ? "Playlist"
+                    : "Song"}
               </button>
             </>
           ) : isFailed ? (
@@ -303,8 +345,8 @@ function CheckoutSuccessPage() {
               </p>
               {pollElapsed >= 120 && (
                 <div className="mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">
-                  Still not confirmed after 2 minutes. If money left your account, contact
-                  support with the transaction ID below — otherwise check again.
+                  Still not confirmed after 2 minutes. If money left your account, contact support
+                  with the transaction ID below — otherwise check again.
                   <button
                     onClick={() => {
                       setPollElapsed(0);

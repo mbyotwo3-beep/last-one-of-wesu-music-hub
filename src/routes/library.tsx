@@ -395,7 +395,7 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
 
   const followQuery = useQuery({
     queryKey: followQK,
-    queryFn: () => getFollowState({ data: { artist_id: artist.id, user_id: userId } }),
+    queryFn: () => getFollowState({ data: { artist_id: artist.id } }),
     enabled: !!userId,
   });
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAlbumWithSongs } from "@/lib/music.functions";
+import { queryOptions, useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { getAlbumWithSongsForEdit } from "@/lib/music.functions";
+import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,16 +14,17 @@ import { useState, useRef } from "react";
 import { audit } from "@/lib/artist.functions";
 import { supabase } from "@/integrations/supabase/client";
 
-const albumQO = (id: string) =>
+const albumEditQO = (id: string) =>
   queryOptions({
-    queryKey: ["album", id],
-    queryFn: () => getAlbumWithSongs({ data: { id } }),
+    queryKey: ["album-edit", id],
+    queryFn: () => getAlbumWithSongsForEdit({ data: { id } }),
     staleTime: 60_000,
   });
 
 export const Route = createFileRoute("/albums/$id/edit")({
   loader: async ({ context, params }) => {
-    const data = await context.queryClient.ensureQueryData(albumQO(params.id));
+    const data = await context.queryClient.ensureQueryData(albumEditQO(params.id));
+    if (data.forbidden) throw new Error("You don't have permission to edit this album.");
     if (!data.album) throw notFound();
     return data;
   },
@@ -42,26 +44,22 @@ function AlbumEditPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const { data } = useSuspenseQuery(albumQO(id));
+  const { data } = useSuspenseQuery(albumEditQO(id));
   const updateAlbumFn = useServerFn(updateAlbum);
   const updateSongFn = useServerFn(updateSong);
   const deleteSongFn = useServerFn(deleteSong);
 
-  const album = data.album!;
-  const artist = (album as { artist?: { id: string; name: string; user_id: string } | null }).artist ?? null;
+  // Live ceiling from the server config, not a hardcoded 500 — superadmin
+  // can change album_max, and a stale client bound rejects valid saves.
+  const pricingFn = useServerFn(getPricingConfig);
+  const { data: pricing = DEFAULT_PRICING } = useQuery({
+    queryKey: ["pricing-config"],
+    queryFn: pricingFn,
+    staleTime: 5 * 60 * 1000,
+  });
+  const albumMax = pricing.album_max;
 
-  // Permission check
-  if (artist && artist.user_id !== user?.id) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-        <p className="text-muted-foreground mb-6">You don't have permission to edit this album.</p>
-        <Link to="/albums/$id" params={{ id }} className="text-primary underline">
-          View album instead
-        </Link>
-      </div>
-    );
-  }
+  const album = data.album!;
 
   // Form state
   const [title, setTitle] = useState(album.title);
@@ -157,8 +155,8 @@ function AlbumEditPage() {
       toast.error("Album title is required");
       return;
     }
-    if (!Number.isFinite(price) || price < 0 || price > 500) {
-      toast.error("Album price must be between 0 and 500");
+    if (!Number.isFinite(price) || price < 0 || price > albumMax) {
+      toast.error(`Album price must be between 0 and ${albumMax}`);
       return;
     }
     try {

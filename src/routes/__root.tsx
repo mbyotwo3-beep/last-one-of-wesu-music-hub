@@ -132,14 +132,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Stream Zambian and African music. Free & Premium tiers with Mobile Money payments.",
+          "Stream Zambian and African music. Buy songs and albums with Mobile Money or card.",
       },
       { name: "author", content: "Wesu+" },
       { property: "og:title", content: "Wesu+ — Music Streaming" },
       {
         property: "og:description",
         content:
-          "Stream Zambian and African music. Free & Premium tiers with Mobile Money payments.",
+          "Stream Zambian and African music. Buy songs and albums with Mobile Money or card.",
       },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Wesu+" },

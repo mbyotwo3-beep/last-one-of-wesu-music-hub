@@ -41,6 +41,7 @@ import {
   listMyLabelInvites,
   listMySongs,
   updateAlbum,
+  getArtistAvailableBalanceFn,
 } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
@@ -872,10 +873,14 @@ function UploadWizard() {
     // Checked box + no artist/label picked or entered = user error. Block
     // instead of silently downgrading to a solo upload the artist didn't ask for.
     if (hasFeature && !featureEmail && !pickedFeatureArtistId) {
-      return setError("Feature is checked but no artist was picked or entered — search for a registered artist or enter their email.");
+      return setError(
+        "Feature is checked but no artist was picked or entered — search for a registered artist or enter their email.",
+      );
     }
     if (hasLabel && !labelEmail && !pickedLabelId) {
-      return setError("Label is checked but no label was picked or entered — search for a registered label or enter their email.");
+      return setError(
+        "Label is checked but no label was picked or entered — search for a registered label or enter their email.",
+      );
     }
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (featureEmail && !emailRe.test(featureEmail)) {
@@ -1343,10 +1348,14 @@ function UploadWizard() {
 
         {featureInviteLink.length > 0 && (
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
-            <p className="text-sm font-medium">🎤 Featured Artist Invitation{featureInviteLink.length > 1 ? "s" : ""}</p>
+            <p className="text-sm font-medium">
+              🎤 Featured Artist Invitation{featureInviteLink.length > 1 ? "s" : ""}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Copy {featureInviteLink.length > 1 ? "these registration links" : "this registration link"} and send {featureInviteLink.length > 1 ? "them" : "it"} to the featured artist via email or messaging
-              app.
+              Copy{" "}
+              {featureInviteLink.length > 1 ? "these registration links" : "this registration link"}{" "}
+              and send {featureInviteLink.length > 1 ? "them" : "it"} to the featured artist via
+              email or messaging app.
             </p>
             {featureInviteLink.map((link) => (
               <div key={link} className="flex gap-2">
@@ -1608,8 +1617,8 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Feature Artist Details</p>
               <p className="text-xs text-muted-foreground">
-                Already on Wesu? Search and add them directly — no email needed. They
-                confirm the split in their Collabs inbox.
+                Already on Wesu? Search and add them directly — no email needed. They confirm the
+                split in their Collabs inbox.
               </p>
               {pickedFeatureArtist ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
@@ -1716,8 +1725,8 @@ function UploadWizard() {
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
               <p className="text-sm font-medium">Label Details</p>
               <p className="text-xs text-muted-foreground">
-                Already on Wesu? Search and pick the label — they approve the release in
-                their dashboard (money only routes after their approval).
+                Already on Wesu? Search and pick the label — they approve the release in their
+                dashboard (money only routes after their approval).
               </p>
               {pickedLabel ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
@@ -2180,8 +2189,8 @@ function UploadWizard() {
                     onChange={(e) => setFeeAgreed(e.target.checked)}
                   />
                   <span>
-                    I agree to pay the <strong>K{FREE_SONG_FEE}</strong> maintenance fee per
-                    track when this free album is approved. You'll be billed via the Payouts tab.
+                    I agree to pay the <strong>K{FREE_SONG_FEE}</strong> maintenance fee per track
+                    when this free album is approved. You'll be billed via the Payouts tab.
                   </span>
                 </label>
               )}
@@ -2362,19 +2371,33 @@ function PayoutTab() {
       toast.error(`Failed to request payout: ${error.message}`);
     },
   });
-  // Available = lifetime gross minus everything already requested/paid.
-  // (The server enforces the same via getArtistAvailableBalance.)
-  const claimed = (payouts ?? [])
-    .filter((p: any) => p.status !== "rejected" && p.status !== "cancelled")
-    .reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
-  const availableBalance = Math.max(0, Number(overview?.totalRevenueZmw ?? 0) - claimed);
+  // Authoritative balance from the server ledger (after commission + label
+  // royalty). Recomputing it here from gross revenue disagreed with the value
+  // requestPayout validates against, so the panel promised withdrawals the
+  // server then refused.
+  const balanceFn = useServerFn(getArtistAvailableBalanceFn);
+  const { data: balanceData } = useQuery({
+    queryKey: ["artist-available-balance"],
+    queryFn: () => balanceFn(),
+    retry: false,
+    enabled: !!user,
+  });
+  const availableBalance = balanceData?.available ?? 0;
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
   const eligible = availableBalance > minWithdrawal;
+  // Pre-fill once the real minimum is known (initialising from the 500
+  // fallback froze a wrong figure into the form).
   const [form, setForm] = useState({
-    amount: minWithdrawal,
+    amount: 0,
     method_code: "MTN_MOMO",
     destination: "",
   });
+  useEffect(() => {
+    if (withdrawalConfig?.min_amount && form.amount === 0) {
+      setForm((f) => ({ ...f, amount: withdrawalConfig.min_amount }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withdrawalConfig?.min_amount]);
 
   return (
     <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>

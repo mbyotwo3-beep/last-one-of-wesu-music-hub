@@ -29,12 +29,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Stream the best Zambian and African music. Free & Premium tiers. Pay with MTN MoMo, Airtel Money, Zamtel Kwacha, or card.",
+          "Stream the best Zambian and African music. Buy songs and albums with MTN MoMo, Airtel Money, Zamtel Kwacha, or card.",
       },
       { property: "og:title", content: "Wesu+ — Stream Zambian & African Music" },
       {
         property: "og:description",
-        content: "Stream the best Zambian and African music. Free & Premium tiers.",
+        content:
+          "Stream the best Zambian and African music. Buy songs and albums with Mobile Money.",
       },
     ],
     links: [{ rel: "canonical", href: "/" }],

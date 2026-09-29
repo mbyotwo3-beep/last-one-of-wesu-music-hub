@@ -3,6 +3,7 @@
  * Called by the Lenco webhook handler after a transaction is confirmed.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildBundle, bundleIsFulfillable } from "./money-invariants";
 
 interface PaymentTransaction {
   id: string;
@@ -40,12 +41,19 @@ export async function fulfillTransaction(tx: PaymentTransaction): Promise<void> 
 
 async function fulfillPlaylistBundle(tx: PaymentTransaction): Promise<void> {
   const meta = (tx.metadata ?? {}) as Record<string, unknown>;
-  const songs = Array.isArray(meta.songs) ? (meta.songs as any[]) : [];
-  // Fall back to recomputing (defensive: old rows without a snapshot).
-  let bundle: { song_id: string; amount: number }[] = songs
-    .filter((s) => s && typeof s.song_id === "string")
-    .map((s) => ({ song_id: s.song_id as string, amount: Number(s.amount) || 0 }));
+  const bundle = buildBundle(meta.songs);
 
+  // An empty bundle would silently fall through the loop below and settle the
+  // transaction as "completed" — money taken, nothing granted, no error, and
+  // the buyer sees a success receipt. Fail loudly so settleTransaction marks
+  // it "fulfillment_failed" and support can see it.
+  if (!bundleIsFulfillable(bundle)) {
+    throw new Error("Playlist payment has no song bundle to fulfil");
+  }
+
+  // Tracks deleted between checkout and fulfilment: the buyer paid for them and
+  // cannot receive them. Record which so reconciliation/support can refund.
+  const unfulfilled: string[] = [];
   for (const { song_id, amount } of bundle) {
     const ref = `${tx.id}:${song_id}`;
 
@@ -63,18 +71,19 @@ async function fulfillPlaylistBundle(tx: PaymentTransaction): Promise<void> {
         .select("id")
         .eq("id", song_id)
         .maybeSingle();
-      if (!song) continue;
-      const { error: purchaseError } = await supabaseAdmin
-        .from("purchases")
-        .insert({
-          user_id: tx.user_id,
-          song_id,
-          album_id: null,
-          status: "completed",
-          amount,
-          payment_method: tx.method_code,
-          transaction_ref: ref,
-        } as any);
+      if (!song) {
+        unfulfilled.push(song_id);
+        continue;
+      }
+      const { error: purchaseError } = await supabaseAdmin.from("purchases").insert({
+        user_id: tx.user_id,
+        song_id,
+        album_id: null,
+        status: "completed",
+        amount,
+        payment_method: tx.method_code,
+        transaction_ref: ref,
+      } as any);
       // Lost race with a concurrent fulfilment — the other worker owns it.
       if (purchaseError && purchaseError.code !== "23505") {
         throw new Error(`fulfillPlaylistBundle purchase failed: ${purchaseError.message}`);
@@ -95,22 +104,35 @@ async function fulfillPlaylistBundle(tx: PaymentTransaction): Promise<void> {
       .filter("metadata->>bundle_parent", "eq", tx.id)
       .maybeSingle();
     if (!existingChild) {
-      const { error: childError } = await supabaseAdmin
+      const { error: childError } = await supabaseAdmin.from("payment_transactions").insert({
+        user_id: tx.user_id,
+        amount,
+        currency: tx.currency,
+        method_code: tx.method_code,
+        provider: tx.provider ?? "lenco",
+        provider_ref: null,
+        provider_token: null,
+        status: "completed",
+        item_type: "song",
+        item_id: song_id,
+        metadata: { bundle_parent: tx.id, phone: (meta.phone as string | null) ?? null },
+      } as any);
+      if (childError)
+        throw new Error(`fulfillPlaylistBundle child tx failed: ${childError.message}`);
+    }
+  }
+
+  // Paid for tracks that no longer exist. Record them on the parent so
+  // reconciliation can find and refund them — never fail the whole
+  // fulfilment, the buyer still keeps everything that DID exist.
+  if (unfulfilled.length > 0) {
+    try {
+      await supabaseAdmin
         .from("payment_transactions")
-        .insert({
-          user_id: tx.user_id,
-          amount,
-          currency: tx.currency,
-          method_code: tx.method_code,
-          provider: tx.provider ?? "lenco",
-          provider_ref: null,
-          provider_token: null,
-          status: "completed",
-          item_type: "song",
-          item_id: song_id,
-          metadata: { bundle_parent: tx.id, phone: (meta.phone as string | null) ?? null },
-        } as any);
-      if (childError) throw new Error(`fulfillPlaylistBundle child tx failed: ${childError.message}`);
+        .update({ metadata: { ...meta, unfulfilled_song_ids: unfulfilled } })
+        .eq("id", tx.id);
+    } catch (e) {
+      console.error("[payments] could not record unfulfilled playlist songs", tx.id, e);
     }
   }
 }
@@ -195,7 +217,11 @@ export async function settleTransaction(
     .eq("id", transactionId)
     .maybeSingle();
   if (!current) return "pending";
-  if (current.item_type !== "song" && current.item_type !== "album" && current.item_type !== "playlist") {
+  if (
+    current.item_type !== "song" &&
+    current.item_type !== "album" &&
+    current.item_type !== "playlist"
+  ) {
     await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null } as any)

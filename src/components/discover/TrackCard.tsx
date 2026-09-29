@@ -31,6 +31,9 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   const navigate = useNavigate();
+  // Subscribed (not getState()) so prices re-render when the currency
+  // toggle switches Kwacha to USD.
+  const formatPrice = useCurrency((s) => s.formatPrice);
 
   const isCurrentTrack = currentTrackId === song.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -123,9 +126,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             {song.title}
           </Link>
           {song.price != null && (
-            <p className="text-xs font-medium text-primary">
-              {useCurrency.getState().formatPrice(song.price)}
-            </p>
+            <p className="text-xs font-medium text-primary">{formatPrice(song.price)}</p>
           )}
           {song.artist?.id ? (
             <Link

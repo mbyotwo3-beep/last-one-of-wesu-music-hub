@@ -13,6 +13,26 @@ export const Route = createFileRoute("/contact")({
     ],
   }),
   component: ContactPage,
+  // Support is the escalation path when anything else is broken — it must
+  // never be the page that itself throws a raw error.
+  errorComponent: ({ error, reset }) => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-3">
+      <h1 className="text-2xl font-bold">Contact page failed to load</h1>
+      <p className="text-muted-foreground text-sm">
+        Please try again, or email us directly from your usual mail app.
+      </p>
+      <button
+        onClick={() => reset()}
+        className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+      >
+        Try again
+      </button>
+      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center">Page not found</div>
+  ),
 });
 
 function ContactPage() {

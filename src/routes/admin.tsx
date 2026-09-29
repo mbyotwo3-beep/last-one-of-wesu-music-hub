@@ -466,9 +466,7 @@ function AlbumMod() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Pending Albums ({pendingQ.data?.length ?? 0})
-      </h2>
+      <h2 className="text-lg font-semibold">Pending Albums ({pendingQ.data?.length ?? 0})</h2>
       {pendingQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {pendingQ.data?.length === 0 && (
         <p className="text-sm text-muted-foreground">No albums awaiting approval.</p>
@@ -494,7 +492,9 @@ function AlbumMod() {
             </button>
             <button
               onClick={() => {
-                if (window.confirm(`Reject album "${a.title}"? The artist will need to resubmit.`)) {
+                if (
+                  window.confirm(`Reject album "${a.title}"? The artist will need to resubmit.`)
+                ) {
                   modMutation.mutate({ data: { id: a.id, status: "rejected" } });
                 }
               }}
@@ -693,7 +693,7 @@ function SongMod() {
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                {pendingQ.data?.length} song(s) waiting for approval
+                {pendingQ.data?.length ?? 0} song(s) waiting for approval
               </p>
               {(pendingQ.data ?? []).map((s: any) => (
                 <div
@@ -1709,7 +1709,9 @@ function SupportMod() {
 
   if (isLoading) return <div className="text-muted-foreground">Loading messages…</div>;
   if (error)
-    return <div className="text-destructive">Error loading messages: {(error as Error).message}</div>;
+    return (
+      <div className="text-destructive">Error loading messages: {(error as Error).message}</div>
+    );
 
   const rows: any[] = data ?? [];
   const visible = filter === "open" ? rows.filter((r) => r.status === "open") : rows;

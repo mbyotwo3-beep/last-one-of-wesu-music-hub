@@ -504,6 +504,27 @@ async function getArtistAvailableBalance(
   return Math.max(0, totalEarned - totalPaid);
 }
 
+/**
+ * The artist's real withdrawable balance, straight from the ledger the payout
+ * request is validated against. The studio used to recompute this in the
+ * browser from gross revenue minus payouts, which ignores platform commission
+ * and label royalty — so the panel could say "you can withdraw" and the server
+ * then rejected the request. Self-scoped to the caller's own artist profile.
+ */
+export const getArtistAvailableBalanceFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: artist } = await supabase
+      .from("artists")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!artist) return { available: 0 };
+    const available = await getArtistAvailableBalance(supabase, artist.id);
+    return { available: Math.round(available * 100) / 100 };
+  });
+
 export const requestPayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { amount: number; method_code: string; destination: string }) => d)

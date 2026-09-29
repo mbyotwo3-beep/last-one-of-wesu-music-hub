@@ -180,7 +180,7 @@ export function NowPlayingSheet() {
         <div className="flex items-center justify-between px-6 py-2 shrink-0">
           <button
             onClick={closeNowPlaying}
-            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -ml-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
+            className="size-11 flex items-center justify-center text-white/70 hover:text-white -ml-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
             aria-label="Close"
           >
             <ChevronDown className="size-6" />
@@ -197,7 +197,7 @@ export function NowPlayingSheet() {
             onClick={() => {
               usePlayer.getState().exitSong();
             }}
-            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white -mr-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
+            className="size-11 flex items-center justify-center text-white/70 hover:text-white -mr-2 cursor-pointer rounded-full hover:bg-white/10 transition-colors"
             aria-label="Exit song"
             title="Exit song"
           >
@@ -348,7 +348,7 @@ export function NowPlayingSheet() {
         <div className="flex items-center justify-between px-8 mb-4 shrink-0">
           <button
             onClick={toggleShuffle}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 ${shuffle ? "text-primary" : "text-white/50 hover:text-white"}`}
+            className={`size-11 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 ${shuffle ? "text-primary" : "text-white/50 hover:text-white"}`}
             aria-label={`Shuffle ${shuffle ? "on" : "off"}`}
           >
             <Shuffle className="size-5" />
@@ -386,7 +386,7 @@ export function NowPlayingSheet() {
 
           <button
             onClick={cycleRepeat}
-            className={`w-10 h-10 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 relative ${repeat !== "off" ? "text-primary" : "text-white/50 hover:text-white"}`}
+            className={`size-11 flex items-center justify-center transition-colors active:scale-90 cursor-pointer rounded-full hover:bg-white/10 relative ${repeat !== "off" ? "text-primary" : "text-white/50 hover:text-white"}`}
             aria-label={repeatLabel}
           >
             <Repeat className="size-5" />

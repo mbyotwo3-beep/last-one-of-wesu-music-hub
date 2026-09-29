@@ -76,6 +76,7 @@ function SongRow({
   onPlaySong,
 }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
+  const formatPrice = useCurrency((s) => s.formatPrice);
   const isCurrentTrack = currentTrackId === s.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
 
@@ -127,7 +128,7 @@ function SongRow({
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
         {Number(s.price ?? 0) > 0 && (
           <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mr-1">
-            {useCurrency.getState().formatPrice(s.price)}
+            {formatPrice(s.price)}
           </span>
         )}
 
@@ -177,6 +178,7 @@ function AlbumPage() {
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
+  const formatPrice = useCurrency((s) => s.formatPrice);
   const album = data.album!;
   const artist =
     (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null })
@@ -349,7 +351,7 @@ function AlbumPage() {
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-6 rounded-full bg-secondary hover:bg-accent border border-border text-sm font-semibold transition-colors cursor-pointer"
               >
                 <ShoppingBag className="size-4 text-primary" />
-                Buy Album — {useCurrency.getState().formatPrice(album.price)}
+                Buy Album — {formatPrice(album.price)}
               </Link>
             )}
           </div>

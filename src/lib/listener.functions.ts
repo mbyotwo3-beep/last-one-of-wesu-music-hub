@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { isStaffUser, isSuperadminUser } from "./roles";
+import { playlistTotal } from "./money-invariants";
 
 export interface PlaylistMissingSong {
   song_id: string;
@@ -123,7 +124,10 @@ export async function computePlaylistMissing(
     }
   }
 
-  const total = missing.reduce((sum, m) => sum + m.price, 0);
+  // Round to 2dp at the boundary: this figure is displayed to the buyer AND
+  // charged as-is, so a float tail like 12.300000000000001 must never reach
+  // the payment provider or the receipt.
+  const total = playlistTotal(missing);
   return { playlist, songs, isOwner, missing, total };
 }
 

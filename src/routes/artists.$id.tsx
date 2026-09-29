@@ -73,10 +73,13 @@ function ArtistPage() {
     };
   }, [a.cover_url]);
 
+  const formatPrice = useCurrency((c) => c.formatPrice);
   const followQK = ["follow", id, user?.id ?? null];
   const followQuery = useQuery({
     queryKey: followQK,
-    queryFn: () => getFollowState({ data: { artist_id: id, user_id: user?.id ?? null } }),
+    queryFn: () => getFollowState({ data: { artist_id: id } }),
+    // Auth-scoped server fn: only run once a session exists.
+    enabled: !!id && !!user,
     staleTime: 60_000,
   });
   const similarQuery = useQuery({
@@ -106,10 +109,11 @@ function ArtistPage() {
       toast.error(e.message);
     },
     onSuccess: (res) => {
+      // Only the boolean: onMutate already applied the count delta, and
+      // re-applying it here made the number jump by 2.
       qc.setQueryData(followQK, (old: any) => ({
-        ...old,
+        ...(old ?? { count: 0 }),
         following: res.following,
-        count: Math.max(0, old.count + (res.following ? 1 : -1)),
       }));
       toast.success(res.action === "followed" ? `❤️ You're now following ${a.name}!` : `👋 Unfollowed ${a.name}`);
     },
@@ -308,7 +312,7 @@ function ArtistPage() {
                   </Link>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-muted-foreground">
-                      {useCurrency.getState().formatPrice(al.price)}
+                      {formatPrice(al.price)}
                     </p>
                     {Number(al.price ?? 0) > 0 && (
                       <Link

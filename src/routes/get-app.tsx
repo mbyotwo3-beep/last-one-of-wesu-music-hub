@@ -24,6 +24,21 @@ export const Route = createFileRoute("/get-app")({
     return context.queryClient.ensureQueryData(siteQO);
   },
   component: GetAppPage,
+  errorComponent: ({ error, reset }) => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-3">
+      <h1 className="text-2xl font-bold">Couldn't load the app download</h1>
+      <button
+        onClick={() => reset()}
+        className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+      >
+        Try again
+      </button>
+      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="max-w-lg mx-auto px-6 py-16 text-center">Page not found</div>
+  ),
 });
 
 function GetAppPage() {
@@ -48,8 +63,8 @@ function GetAppPage() {
 
         <h1 className="text-3xl font-black tracking-tight">Take Wesu+ anywhere</h1>
         <p className="mt-3 text-muted-foreground">
-          Downloads, offline listening, and background play live in the Wesu+ mobile app.
-          Anything you download plays only inside the Wesu+ app.
+          Downloads, offline listening, and background play live in the Wesu+ mobile app. Anything
+          you download plays only inside the Wesu+ app.
         </p>
 
         <div className="mt-6 grid gap-3 text-left">

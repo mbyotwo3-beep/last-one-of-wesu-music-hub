@@ -28,7 +28,9 @@ import { getWithdrawalConfig } from "@/lib/pricing.functions";
 export const Route = createFileRoute("/label-dashboard")({
   head: () => ({ meta: [{ title: "Label Dashboard — Wesu+" }] }),
   component: () => (
-    <RoleGate require="user">
+    // "label", not "user": any signed-in user was loading this and landing
+    // on the empty "no label" state instead of a clear "not a label" message.
+    <RoleGate require="label">
       <Page />
     </RoleGate>
   ),
@@ -207,8 +209,8 @@ function ReleaseRequests({ labelId }: { labelId: string }) {
     <div className="bg-card border border-border rounded-2xl p-6">
       <h3 className="font-semibold mb-1">Release requests</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        Artists who want this label on their song or album. Accepting attaches the label —
-        revenue splits route to you from that point on.
+        Artists who want this label on their song or album. Accepting attaches the label — revenue
+        splits route to you from that point on.
       </p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pending requests.</p>
