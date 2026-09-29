@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Heart,
@@ -70,7 +71,7 @@ function Page() {
     isLoading: followedLoading,
     isError: followedError,
     refetch: refetchFollowed,
-  } = useQuery({
+  } = useOfflineList("library:followed-playlists", {
     queryKey: ["followed-playlists", user?.id],
     queryFn: () => followedFn(),
     enabled: !!user?.id,
@@ -82,7 +83,7 @@ function Page() {
     isLoading: playlistsLoading,
     isError: playlistsError,
     refetch: refetchPlaylists,
-  } = useQuery({
+  } = useOfflineList("library:my-playlists", {
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -104,7 +105,7 @@ function Page() {
     isLoading: likedLoading,
     isError: likedError,
     refetch: refetchLiked,
-  } = useQuery({
+  } = useOfflineList("library:liked", {
     queryKey: ["liked-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -124,7 +125,7 @@ function Page() {
     isLoading: purchasedLoading,
     isError: purchasedError,
     refetch: refetchPurchased,
-  } = useQuery({
+  } = useOfflineList("library:purchased", {
     queryKey: ["purchased-songs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -146,7 +147,7 @@ function Page() {
     isLoading: purchasedAlbumsLoading,
     isError: purchasedAlbumsError,
     refetch: refetchPurchasedAlbums,
-  } = useQuery({
+  } = useOfflineList("library:purchased-albums", {
     queryKey: ["purchased-albums", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -168,7 +169,7 @@ function Page() {
     isLoading: followingLoading,
     isError: followingError,
     refetch: refetchFollowing,
-  } = useQuery({
+  } = useOfflineList("library:followed-artists", {
     queryKey: ["followed-artists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];

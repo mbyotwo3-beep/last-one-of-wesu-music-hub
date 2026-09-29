@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
@@ -39,13 +40,16 @@ export const Route = createFileRoute("/")({
     links: [{ rel: "canonical", href: "/" }],
   }),
   loader: ({ context }) => {
-    context.queryClient.ensureQueryData(discoverQO);
+    // Offline cold start must not throw: the page renders last-known
+    // content from snapshots instead (Spotify-style browsable cache).
+    context.queryClient.ensureQueryData(discoverQO).catch(() => {});
   },
   component: IndexRoute,
   errorComponent: ({ error, reset }) => (
     <div className="p-12 text-center">
       <p className="text-destructive mb-2">
-        Couldn't load the homepage{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+        Couldn't load the homepage{(error as Error)?.message ? `: ${(error as Error).message}` : ""}
+        .
       </p>
       <button
         onClick={() => reset()}
@@ -62,7 +66,11 @@ function IndexRoute() {
 }
 
 function HomePage() {
-  const { data } = useSuspenseQuery(discoverQO);
+  const { data: discoverData } = useOfflineList("home:discover", {
+    queryKey: ["home-discover"],
+    queryFn: () => getHomeDiscover(),
+    staleTime: 5 * 60 * 1000,
+  });
   const setQueue = usePlayer((s) => s.setQueue);
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
@@ -70,32 +78,39 @@ function HomePage() {
   const carouselsFn = useServerFn(getActiveCarousels);
   const heroSlidesFn = useServerFn(getActiveHeroSlides);
 
-  const { data: carousels, isLoading: carouselsLoading } = useQuery({
+  const { data: carousels, isLoading: carouselsLoading } = useOfflineList("home:carousels", {
     queryKey: ["active-carousels"],
     queryFn: () => carouselsFn(),
     staleTime: 60 * 1000,
   });
 
-  const { data: heroSlides, isLoading: heroSlidesLoading } = useQuery({
+  const { data: heroSlides, isLoading: heroSlidesLoading } = useOfflineList("home:hero", {
     queryKey: ["active-hero-slides"],
     queryFn: () => heroSlidesFn(),
     staleTime: 60 * 1000,
   });
 
-  const { data: forYouData, isLoading: forYouLoading } = useQuery({
+  const { data: forYouData, isLoading: forYouLoading } = useOfflineList("home:foryou", {
     queryKey: ["for-you", user?.id],
     queryFn: () => forYouFn(),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   });
-  const { data: recentlyPlayed, isLoading: recentlyPlayedLoading } = useQuery({
+  const { data: recentlyPlayed, isLoading: recentlyPlayedLoading } = useOfflineList("home:recent", {
     queryKey: ["recently-played", user?.id],
     queryFn: () => recentlyPlayedFn(),
     enabled: !!user,
     staleTime: 60 * 1000,
   });
-  const { featured, newReleases, trending, topArtists, recentAlbums, editorialPlaylists, moods } =
-    data;
+  const {
+    featured = [],
+    newReleases = [],
+    trending = [],
+    topArtists = [],
+    recentAlbums = [],
+    editorialPlaylists = [],
+    moods = [],
+  } = discoverData ?? {};
 
   const heroPick = featured[0] ?? recentAlbums[0];
   const empty =
