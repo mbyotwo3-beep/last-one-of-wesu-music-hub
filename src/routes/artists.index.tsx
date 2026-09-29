@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import { listArtists } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { CheckCircle2, User } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 
@@ -17,14 +18,20 @@ export const Route = createFileRoute("/artists/")({
       { name: "description", content: "Browse every artist on Wesu+." },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(artistsQO),
+  loader: ({ context }) => {
+    context.queryClient.ensureQueryData(artistsQO).catch(() => {});
+  },
   component: ArtistsPage,
   errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function ArtistsPage() {
-  const { data: artists } = useSuspenseQuery(artistsQO);
+  const { data: artists = [] } = useOfflineList("lists:artists", {
+    queryKey: ["artists"],
+    queryFn: () => listArtists(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <div className="min-h-screen pb-24">

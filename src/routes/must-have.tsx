@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { getFeaturedAlbums } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { StorageImage } from "@/components/StorageImage";
 
 export const Route = createFileRoute("/must-have")({
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/must-have")({
 });
 
 function Page() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useOfflineList("lists:featured-albums", {
     queryKey: ["featured-albums"],
     queryFn: () => getFeaturedAlbums(),
     staleTime: 5 * 60 * 1000,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Play } from "lucide-react";
 import { getTrendingSongs } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/hot-tracks")({
 });
 
 function Page() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useOfflineList("lists:trending", {
     queryKey: ["trending"],
     queryFn: () => getTrendingSongs(),
     staleTime: 60_000,

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { getNewReleases } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { TrackCard } from "@/components/discover/TrackCard";
 
 export const Route = createFileRoute("/new-music")({
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/new-music")({
 });
 
 function Page() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useOfflineList("lists:new-releases", {
     queryKey: ["new-releases"],
     queryFn: () => getNewReleases(),
     staleTime: 60_000,

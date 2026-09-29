@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { Disc } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 import { useCurrency } from "@/stores/currency";
@@ -18,14 +19,20 @@ export const Route = createFileRoute("/albums/")({
       { name: "description", content: "Browse every album and single available on Wesu+." },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(albumsQO),
+  loader: ({ context }) => {
+    context.queryClient.ensureQueryData(albumsQO).catch(() => {});
+  },
   component: AlbumsPage,
   errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function AlbumsPage() {
-  const { data: albums } = useSuspenseQuery(albumsQO);
+  const { data: albums = [] } = useOfflineList("lists:albums", {
+    queryKey: ["albums"],
+    queryFn: () => listAlbums(),
+    staleTime: 5 * 60 * 1000,
+  });
   const formatPrice = useCurrency((s) => s.formatPrice);
 
   return (
