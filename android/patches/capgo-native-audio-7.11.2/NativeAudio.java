@@ -95,6 +95,15 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     private int lastPlaybackState = PlaybackStateCompat.STATE_NONE;
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "native_audio_channel";
+    // WESU PATCH (not upstream — reapply after reinstall, see
+    // android/patches/capgo-native-audio-7.11.2): the shade action row used to
+    // be built with a NULL PendingIntent, so Previous / Play-Pause / Next drew
+    // as buttons but did nothing when tapped. These route through our own
+    // MediaSession transport controls, which work even when the WebView (and
+    // therefore JS) is dead — the case that matters while the app is
+    // backgrounded, which is exactly when the shade is used.
+    private static final String TRANSPORT_ACTION = "com.wesu.music.TRANSPORT";
+    private android.content.BroadcastReceiver transportReceiver;
 
     @Override
     public void load() {
@@ -955,6 +964,8 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                 if (mediaSession != null) {
                     mediaSession.release();
                     mediaSession = null;
+                    // WESU PATCH: receiver is bound to the session's lifetime.
+                    releaseTransportReceiver();
                 }
             }
 
@@ -1119,6 +1130,7 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
             if (mediaSession == null || !showNotification) return;
             if (lastNotifTitle.isEmpty()) return;
             boolean playing = lastPlaybackState == PlaybackStateCompat.STATE_PLAYING;
+            ensureTransportReceiver();
             NotificationCompat.Builder notificationBuilder =
                 new NotificationCompat.Builder(getContext(), CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_media_play)
@@ -1128,12 +1140,15 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                         new androidx.media.app.NotificationCompat.MediaStyle()
                             .setMediaSession(mediaSession.getSessionToken())
                             .setShowActionsInCompactView(0, 1, 2))
-                    .addAction(android.R.drawable.ic_media_previous, "Previous", null)
+                    .addAction(
+                        android.R.drawable.ic_media_previous,
+                        "Previous",
+                        transportIntent("prev", 11))
                     .addAction(
                         playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                         playing ? "Pause" : "Play",
-                        null)
-                    .addAction(android.R.drawable.ic_media_next, "Next", null)
+                        transportIntent(playing ? "pause" : "play", 12))
+                    .addAction(android.R.drawable.ic_media_next, "Next", transportIntent("next", 13))
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setOnlyAlertOnce(true);
             if (lastNotifArtwork != null && !lastNotifArtwork.isRecycled()) {
@@ -1144,6 +1159,83 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
         } catch (Exception e) {
             Log.e(TAG, "Error refreshing notification", e);
         }
+    }
+
+    // WESU PATCH (not upstream): a real PendingIntent per transport button.
+    // Immutable + explicit package so the system delivers it to our own
+    // dynamically registered receiver and nothing else (Android 14 requires
+    // RECEIVER_NOT_EXPORTED for non-system broadcasts).
+    private android.app.PendingIntent transportIntent(String command, int requestCode) {
+        try {
+            android.content.Intent intent = new android.content.Intent(TRANSPORT_ACTION);
+            intent.setPackage(getContext().getPackageName());
+            intent.putExtra("command", command);
+            int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= android.app.PendingIntent.FLAG_IMMUTABLE;
+            }
+            return android.app.PendingIntent.getBroadcast(getContext(), requestCode, intent, flags);
+        } catch (Exception e) {
+            Log.e(TAG, "Error building transport intent", e);
+            return null;
+        }
+    }
+
+    // WESU PATCH (not upstream): one receiver for the whole process, driving
+    // the MediaSession transport controls. Those land in the same
+    // MediaSession.Callback used by the lock screen, so play/pause act on the
+    // live asset immediately (no WebView round-trip) and skip events still
+    // advance the JS queue.
+    private void ensureTransportReceiver() {
+        if (transportReceiver != null) return;
+        try {
+            transportReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, android.content.Intent intent) {
+                    if (intent == null || !TRANSPORT_ACTION.equals(intent.getAction())) return;
+                    MediaSessionCompat session = mediaSession;
+                    if (session == null) return;
+                    try {
+                        android.support.v4.media.session.MediaControllerCompat controller =
+                            new android.support.v4.media.session.MediaControllerCompat(
+                                context, session.getSessionToken());
+                        String command = intent.getStringExtra("command");
+                        if (command == null) return;
+                        if (command.equals("play")) {
+                            controller.getTransportControls().play();
+                        } else if (command.equals("pause")) {
+                            controller.getTransportControls().pause();
+                        } else if (command.equals("next")) {
+                            controller.getTransportControls().skipToNext();
+                        } else if (command.equals("prev")) {
+                            controller.getTransportControls().skipToPrevious();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Transport command failed", e);
+                    }
+                }
+            };
+            android.content.IntentFilter filter = new android.content.IntentFilter(TRANSPORT_ACTION);
+            Context app = getContext().getApplicationContext();
+            if (Build.VERSION.SDK_INT >= 33) {
+                app.registerReceiver(transportReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                app.registerReceiver(transportReceiver, filter);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error registering transport receiver", e);
+        }
+    }
+
+    // WESU PATCH (not upstream): drop the receiver with the session so a
+    // destroyed plugin never leaks a registered receiver.
+    private void releaseTransportReceiver() {
+        if (transportReceiver == null) return;
+        try {
+            getContext().getApplicationContext().unregisterReceiver(transportReceiver);
+        } catch (Exception ignored) {
+        }
+        transportReceiver = null;
     }
 
     private void clearNotification() {
