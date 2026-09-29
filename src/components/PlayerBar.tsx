@@ -65,6 +65,7 @@ import {
   setPlaybackServiceActive,
   shouldRunPlaybackService,
   shouldAdoptNullAsPaused,
+  ensurePlaybackNotificationPermission,
 } from "@/lib/native-audio";
 import { resolveImageUrl } from "@/lib/storage-url";
 import {
@@ -1162,6 +1163,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       if (cancelled) return;
       const st = usePlayer.getState();
       void setPlaybackServiceActive(shouldRunPlaybackService(st.playing, !!st.track, appActive));
+      // Android 13+ needs POST_NOTIFICATIONS for the shade/lock-screen
+      // player, and the system only prompts in the foreground — so ask once,
+      // the first time a track actually plays here. No-op everywhere else.
+      if (st.playing && st.track && appActive === true) {
+        void ensurePlaybackNotificationPermission();
+      }
     };
     sync();
     let removeListener: (() => void) | undefined;

@@ -20,7 +20,7 @@ import { ThemeProvider, themeInitScript } from "../hooks/use-theme";
 import { usePlatform } from "../hooks/use-platform";
 import { BottomTabBar } from "../components/mobile/BottomTabBar";
 import { OfflineBanner } from "../components/OfflineBanner";
-import { NotificationNudge } from "../components/NotificationNudge";
+import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
 import { MiniPlayer } from "../components/mobile/MiniPlayer";
 import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
 import { StatusBarInit } from "../components/mobile/StatusBarInit";
@@ -248,7 +248,7 @@ function RootComponent() {
               className={`flex-1 pt-[calc(env(safe-area-inset-top)+3.25rem)] lg:pt-0 lg:pb-0 ${hasTrack ? "pb-[calc(env(safe-area-inset-bottom)+8rem)]" : "pb-[calc(env(safe-area-inset-bottom)+4rem)]"}`}
             >
               <OfflineBanner />
-              <NotificationNudge />
+              <DeviceSetupNudge />
               <Outlet />
             </main>
             {/* Single audio engine + desktop UI. Stays mounted at all

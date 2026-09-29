@@ -12,6 +12,11 @@ import {
   shouldRunPlaybackService,
   shouldAdoptNullAsPaused,
   setPlaybackServiceActive,
+  arePlaybackNotificationsEnabled,
+  batteryExemptState,
+  requestBatteryExemption,
+  openPlaybackNotificationSettings,
+  ensurePlaybackNotificationPermission,
   __resetNativeAudioConfig,
   __resetNativeCommandClock,
 } from "../native-audio";
@@ -157,6 +162,17 @@ describe("background-playback service hold decision", () => {
     // Node test env: no Capacitor bridge — must resolve silently.
     await expect(setPlaybackServiceActive(true)).resolves.toBeUndefined();
     await expect(setPlaybackServiceActive(false)).resolves.toBeUndefined();
+  });
+
+  it("device-health bridge calls stay silent on web", async () => {
+    // No window.Capacitor here: everything must resolve without throwing, so
+    // the first-play hook can never break playback on a browser.
+    await expect(arePlaybackNotificationsEnabled()).resolves.toBeNull();
+    await expect(batteryExemptState()).resolves.toBeNull();
+    await expect(requestBatteryExemption()).resolves.toBeUndefined();
+    await expect(openPlaybackNotificationSettings()).resolves.toBeUndefined();
+    // No bridge → unknowable → treated as "fine", no prompt attempted.
+    await expect(ensurePlaybackNotificationPermission()).resolves.toBe(true);
   });
 });
 

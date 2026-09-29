@@ -320,6 +320,61 @@ export async function openPlaybackNotificationSettings(): Promise<void> {
   }
 }
 
+const NOTIF_ASKED_KEY = "wesu:notif-asked";
+
+/**
+ * Ask for POST_NOTIFICATIONS once, the first time a track actually plays on
+ * Android 13+ (where the prompt exists and is required for the shade/lock
+ * screen controls). Never prompts twice, never blocks playback, and is a
+ * silent no-op below 33 / on web / in old APKs — the install-time prompt
+ * those builds show is the only one they get.
+ */
+export async function ensurePlaybackNotificationPermission(): Promise<boolean> {
+  try {
+    if (typeof window === "undefined") return true;
+    const enabled = await arePlaybackNotificationsEnabled();
+    // true → granted; null → unknowable (web/old APK) → never nag.
+    if (enabled !== false) return true;
+    if (window.localStorage?.getItem(NOTIF_ASKED_KEY) === "1") return false;
+    try {
+      window.localStorage?.setItem(NOTIF_ASKED_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    const plugin = playbackPlugin();
+    if (!plugin?.requestNotificationPermission) return false;
+    await plugin.requestNotificationPermission();
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/** Battery-exemption state: null when unknowable (web / old APK). */
+export async function batteryExemptState(): Promise<{
+  exempt: boolean;
+  brand: string;
+} | null> {
+  try {
+    const plugin = playbackPlugin();
+    if (!plugin?.batteryExempt) return null;
+    const res = await plugin.batteryExempt();
+    if (!res || typeof res.exempt !== "boolean") return null;
+    return { exempt: res.exempt === true, brand: String(res.brand ?? "") };
+  } catch {
+    return null;
+  }
+}
+
+/** Opens the system "ignore battery optimisation" prompt (best-effort). */
+export async function requestBatteryExemption(): Promise<void> {
+  try {
+    await playbackPlugin()?.requestBatteryExemption?.();
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Delete a staged temp file (best effort — the cache dir is expendable). */
 export async function deleteNativeTempFile(path: string | null): Promise<void> {
   if (!path) return;

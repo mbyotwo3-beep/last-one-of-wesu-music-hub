@@ -7,6 +7,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:largeHeap="true"
         android:theme="@style/AppTheme">
 
         <activity
@@ -66,4 +67,12 @@
          no runtime grant needed). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Battery exemption request: Xiaomi/Oppo/Transsion/Samsung kill
+         background audio without it, service or not. System dialog, the
+         user decides. (Play Console: declared as media-playback need.) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Partial wake lock while streaming (normal permission): the CPU may
+         otherwise sleep between buffered chunks and playback gaps with the
+         screen off, worst on 2-3GB phones (Infinix, Itel, Tecno). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>
