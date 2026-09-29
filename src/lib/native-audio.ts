@@ -295,6 +295,31 @@ export async function setPlaybackServiceActive(active: boolean): Promise<void> {
   }
 }
 
+/**
+ * Whether playback notifications (shade + lock-screen controls) can show.
+ * Null when unknowable (web, old APKs without the bridge method). False is
+ * the top cause of "no notification buttons" reports (denied permission).
+ */
+export async function arePlaybackNotificationsEnabled(): Promise<boolean | null> {
+  try {
+    const plugin = playbackPlugin();
+    if (!plugin?.notificationsEnabled) return null;
+    const res = await plugin.notificationsEnabled();
+    return res?.enabled === true;
+  } catch {
+    return null;
+  }
+}
+
+/** Opens this app's notification settings (best-effort). */
+export async function openPlaybackNotificationSettings(): Promise<void> {
+  try {
+    await playbackPlugin()?.openNotificationSettings?.();
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Delete a staged temp file (best effort — the cache dir is expendable). */
 export async function deleteNativeTempFile(path: string | null): Promise<void> {
   if (!path) return;
