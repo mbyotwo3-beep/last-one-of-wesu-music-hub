@@ -3,37 +3,44 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { normalizeGenre } from "./genres";
 
-// Follower COUNT is public (maintained counter on `artists`), but "am I
-// following this?" reads the caller's OWN row, which RLS scopes to the
-// authenticated user. It used to run unauthenticated through the anon client
-// and take a caller-supplied user_id, so the read always errored (discarded)
-// and returned following:false for everyone — the Follow button could never
-// stick. The user identity now comes from the verified token only.
+/**
+ * Public follower COUNT. Kept separate from the "am I following?" read on
+ * purpose: the count comes from the maintained `artists.follower_count`
+ * counter and must render for signed-OUT visitors, while the personal flag
+ * needs an authenticated caller. One function that required auth made the
+ * count disappear for every logged-out visitor.
+ */
+export const getFollowerCount = createServerFn({ method: "GET" })
+  .validator((d: { artist_id: string }) => d)
+  .handler(async ({ data }) => {
+    const res = await getPublicSupabase()
+      .from("artists")
+      .select("follower_count")
+      .eq("id", data.artist_id)
+      .maybeSingle();
+    return Number((res as { data: { follower_count?: number } | null }).data?.follower_count ?? 0);
+  });
+
+/**
+ * The caller's OWN follow state. This reads `artist_followers`, which RLS
+ * scopes to the authenticated user — it used to run unauthenticated through
+ * the anon client and take a caller-supplied user_id, so the read always
+ * errored (and the error was discarded) and returned following:false for
+ * everyone: the Follow button could never stick. Identity now comes from the
+ * verified token only.
+ */
 export const getFollowState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((d: { artist_id: string }) => d)
   .handler(async ({ context, data }) => {
-    const [countRes, mineRes] = await Promise.all([
-      // Aggregate only: the maintained counter on `artists`. Raw follower rows stay private.
-      getPublicSupabase()
-        .from("artists")
-        .select("follower_count")
-        .eq("id", data.artist_id)
-        .maybeSingle(),
-      // RLS: "Users read own follow rows" — only ever returns the caller's row.
-      context.supabase
-        .from("artist_followers")
-        .select("id")
-        .eq("artist_id", data.artist_id)
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-    ]);
-    return {
-      count: Number(
-        (countRes as { data: { follower_count?: number } | null }).data?.follower_count ?? 0,
-      ),
-      following: !!(mineRes as { data: unknown }).data,
-    };
+    // RLS: "Users read own follow rows" — only ever returns the caller's row.
+    const mine = await context.supabase
+      .from("artist_followers")
+      .select("id")
+      .eq("artist_id", data.artist_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    return { following: !!(mine as { data: unknown }).data };
   });
 
 export const toggleFollow = createServerFn({ method: "POST" })

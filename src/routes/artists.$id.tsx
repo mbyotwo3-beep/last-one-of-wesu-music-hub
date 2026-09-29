@@ -1,8 +1,28 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useSuspenseQuery,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { getArtistById } from "@/lib/music.functions";
-import { getFollowState, toggleFollow, getSimilarArtists } from "@/lib/follow.functions";
-import { CheckCircle2, Play, Pause, UserPlus, UserCheck, UserMinus, ShoppingBag, Heart } from "lucide-react";
+import {
+  getFollowerCount,
+  getFollowState,
+  toggleFollow,
+  getSimilarArtists,
+} from "@/lib/follow.functions";
+import {
+  CheckCircle2,
+  Play,
+  Pause,
+  UserPlus,
+  UserCheck,
+  UserMinus,
+  ShoppingBag,
+  Heart,
+} from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -75,10 +95,18 @@ function ArtistPage() {
 
   const formatPrice = useCurrency((c) => c.formatPrice);
   const followQK = ["follow", id, user?.id ?? null];
+  // Public: renders for signed-out visitors too, so the count never blanks.
+  const countQK = ["follower-count", id];
+  const countQuery = useQuery({
+    queryKey: countQK,
+    queryFn: () => getFollowerCount({ data: { artist_id: id } }),
+    enabled: !!id,
+    staleTime: 60_000,
+  });
+  // Personal flag: auth-scoped (RLS returns the caller's own row only).
   const followQuery = useQuery({
     queryKey: followQK,
     queryFn: () => getFollowState({ data: { artist_id: id } }),
-    // Auth-scoped server fn: only run once a session exists.
     enabled: !!id && !!user,
     staleTime: 60_000,
   });
@@ -94,31 +122,36 @@ function ArtistPage() {
   const follow = useMutation({
     mutationFn: () => toggleFollow({ data: { artist_id: id } }),
     onMutate: async () => {
+      // Optimistic on both: the personal flag and the public counter.
       await qc.cancelQueries({ queryKey: followQK });
-      const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
-      if (prev) {
-        qc.setQueryData(followQK, {
-          following: !prev.following,
-          count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
-        });
+      await qc.cancelQueries({ queryKey: countQK });
+      const prev = qc.getQueryData<{ following: boolean }>(followQK);
+      const prevCount = qc.getQueryData<number>(countQK);
+      const next = !prev?.following;
+      if (prev) qc.setQueryData(followQK, { following: next });
+      if (typeof prevCount === "number") {
+        qc.setQueryData(countQK, Math.max(0, prevCount + (next ? 1 : -1)));
       }
-      return { prev };
+      return { prev, prevCount };
     },
     onError: (e: Error, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      if (typeof ctx?.prevCount === "number") qc.setQueryData(countQK, ctx.prevCount);
       toast.error(e.message);
     },
     onSuccess: (res) => {
       // Only the boolean: onMutate already applied the count delta, and
       // re-applying it here made the number jump by 2.
-      qc.setQueryData(followQK, (old: any) => ({
-        ...(old ?? { count: 0 }),
-        following: res.following,
-      }));
-      toast.success(res.action === "followed" ? `❤️ You're now following ${a.name}!` : `👋 Unfollowed ${a.name}`);
+      qc.setQueryData(followQK, { following: res.following });
+      toast.success(
+        res.action === "followed"
+          ? `❤️ You're now following ${a.name}!`
+          : `👋 Unfollowed ${a.name}`,
+      );
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: followQK });
+      qc.invalidateQueries({ queryKey: countQK });
       qc.invalidateQueries({ queryKey: ["followed-artists"] });
       qc.invalidateQueries({ queryKey: ["similar-artists", id] });
     },
@@ -129,7 +162,7 @@ function ArtistPage() {
       const currentPath = window.location.pathname + window.location.search;
       navigate({
         to: "/auth",
-        search: { redirect: currentPath, action: "follow", artistId: id }
+        search: { redirect: currentPath, action: "follow", artistId: id },
       });
       return;
     }
@@ -169,7 +202,8 @@ function ArtistPage() {
   };
 
   const following = !!followQuery.data?.following;
-  const followerCount = followQuery.data?.count ?? 0;
+  // Public counter — renders for signed-out visitors too.
+  const followerCount = countQuery.data ?? 0;
 
   return (
     <div className="min-h-screen pb-24">
@@ -292,7 +326,6 @@ function ArtistPage() {
           )}
         </section>
 
-
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Discography</h2>
           {data.albums.length === 0 ? (
@@ -311,9 +344,7 @@ function ArtistPage() {
                     <p className="font-semibold text-sm truncate">{al.title}</p>
                   </Link>
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-muted-foreground">
-                      {formatPrice(al.price)}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{formatPrice(al.price)}</p>
                     {Number(al.price ?? 0) > 0 && (
                       <Link
                         to="/checkout"
@@ -407,7 +438,9 @@ function ArtistTopSongRow({
           <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
             {s.title}
           </p>
-          <p className="text-xs text-muted-foreground">{(s.play_count ?? 0).toLocaleString()} plays</p>
+          <p className="text-xs text-muted-foreground">
+            {(s.play_count ?? 0).toLocaleString()} plays
+          </p>
         </div>
       </button>
       <div className="flex items-center gap-2 shrink-0">

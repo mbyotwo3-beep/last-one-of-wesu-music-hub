@@ -16,7 +16,7 @@ import {
   ListMusic,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getFollowState, toggleFollow } from "@/lib/follow.functions";
+import { getFollowerCount, getFollowState, toggleFollow } from "@/lib/follow.functions";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
@@ -392,7 +392,14 @@ function Page() {
 function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | null }) {
   const qc = useQueryClient();
   const followQK = ["follow", artist.id, userId];
+  const countQK = ["follower-count", artist.id];
 
+  // Public counter (renders regardless of session), personal flag (auth-scoped).
+  const countQuery = useQuery({
+    queryKey: countQK,
+    queryFn: () => getFollowerCount({ data: { artist_id: artist.id } }),
+    staleTime: 60_000,
+  });
   const followQuery = useQuery({
     queryKey: followQK,
     queryFn: () => getFollowState({ data: { artist_id: artist.id } }),
@@ -403,14 +410,15 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
     mutationFn: () => toggleFollow({ data: { artist_id: artist.id } }),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: followQK });
+      await qc.cancelQueries({ queryKey: countQK });
       await qc.cancelQueries({ queryKey: ["followed-artists", userId] });
-      const prev = qc.getQueryData<{ count: number; following: boolean }>(followQK);
+      const prev = qc.getQueryData<{ following: boolean }>(followQK);
+      const prevCount = qc.getQueryData<number>(countQK);
       const prevFollowed = qc.getQueryData<any[]>(["followed-artists", userId]) ?? [];
-      if (prev) {
-        qc.setQueryData(followQK, {
-          following: !prev.following,
-          count: Math.max(0, prev.count + (prev.following ? -1 : 1)),
-        });
+      const next = !prev?.following;
+      if (prev) qc.setQueryData(followQK, { following: next });
+      if (typeof prevCount === "number") {
+        qc.setQueryData(countQK, Math.max(0, prevCount + (next ? 1 : -1)));
       }
       // Optimistically remove from followed artists list if unfollowing
       if (prev?.following) {
@@ -419,26 +427,30 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
           prevFollowed.filter((a) => a.id !== artist.id),
         );
       }
-      return { prev, prevFollowed };
+      return { prev, prevCount, prevFollowed };
     },
     onError: (e: Error, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(followQK, ctx.prev);
+      if (typeof ctx?.prevCount === "number") qc.setQueryData(countQK, ctx.prevCount);
       if (ctx?.prevFollowed) qc.setQueryData(["followed-artists", userId], ctx.prevFollowed);
       toast.error(e.message);
     },
     onSuccess: (res) => {
+      qc.setQueryData(followQK, { following: res.following });
       toast.success(
         res.action === "followed" ? `❤️ Following ${artist.name}!` : `👋 Unfollowed ${artist.name}`,
       );
     },
     onSettled: () => {
+      qc.invalidateQueries({ queryKey: followQK });
+      qc.invalidateQueries({ queryKey: countQK });
       qc.invalidateQueries({ queryKey: ["followed-artists", userId] });
       qc.invalidateQueries({ queryKey: ["library", userId] });
     },
   });
 
   const following = !!followQuery.data?.following;
-  const count = followQuery.data?.count ?? 0;
+  const count = countQuery.data ?? 0;
 
   return (
     <div className="text-center p-4 rounded-xl hover:bg-accent/40 transition-colors border border-transparent hover:border-border">
