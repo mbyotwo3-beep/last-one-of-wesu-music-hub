@@ -1,7 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Music2, Play, Pause, ShoppingBag, Heart, ArrowLeft } from "lucide-react";
 import { getSongById } from "@/lib/music.functions";
+import { listSongCollaborators } from "@/lib/collabs.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -53,6 +55,17 @@ function SongPage() {
   const isFree = Number(song!.price ?? 0) <= 0;
   const { owned } = useSongEntitlement(id, song!.price, song!.album_id);
   const { isSaved, toggle } = useSavedTrack(id);
+
+  // Accepted credits for this song. Public and cheap, but it must never
+  // decide the page: a failed read simply shows no credits.
+  const creditsFn = useServerFn(listSongCollaborators);
+  const { data: creditsData } = useQuery({
+    queryKey: ["song-credits", id],
+    queryFn: () => creditsFn({ data: { song_id: id } }),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const credits = (creditsData ?? []).filter((c: any) => !!c?.name);
 
   const isCurrentTrack = currentTrackId === song!.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -111,6 +124,32 @@ function SongPage() {
             ) : (
               <p className="mt-3 text-lg text-muted-foreground">Unknown artist</p>
             )}
+            {/* Credits: features and production credits, which existed in the
+                database but were never rendered anywhere. A featured artist or
+                a credited producer/writer with an account links to their page;
+                a name-only credit shows as a plain name. */}
+            {credits.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {credits.map((c) => (
+                  <span key={c.id} className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {c.artistId ? (
+                        <Link
+                          to="/artists/$id"
+                          params={{ id: c.artistId }}
+                          className="hover:underline"
+                        >
+                          {c.name}
+                        </Link>
+                      ) : (
+                        c.name
+                      )}
+                    </span>{" "}
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <p className="mt-3 text-sm text-muted-foreground">
               {song!.genre ?? "Music"}
               {song!.explicit ? " · Explicit" : ""}

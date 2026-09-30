@@ -2,6 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isStaffUser } from "@/lib/roles";
 
+/** Human labels for credit roles, shown to listeners on the song page. */
+const CREDroleLabel: Record<string, string> = {
+  featured: "Featuring",
+  producer: "Produced by",
+  writer: "Written by",
+  remixer: "Remixed by",
+  main: "Main artist",
+};
+
+/** Roles a plain, account-less credit may use. A feature is not one of them. */
+export const NAME_ONLY_CREDIT_ROLES = ["producer", "writer", "remixer"] as const;
+
 async function audit(
   actorId: string,
   action: string,
@@ -150,42 +162,180 @@ export const listMyCollabInvites = createServerFn({ method: "GET" })
     return { incoming: incoming ?? [], outgoing: outgoing ?? [] };
   });
 
+/**
+ * Credits for one song, as shown to a listener.
+ *
+ * Two kinds of credit, and the difference is the point of the feature:
+ *   - account credits ("featured", or any role that took a split) link to the
+ *     person's artist page. A feature must be a real account — enforced by the
+ *     database, not just here.
+ *   - name-only credits (producer/writer/remixer with no account) show as a
+ *     plain name. They never carry a share: split_pct is forced to 0 for them,
+ *     so there is nothing to pay and nothing to leak.
+ *
+ * `split_pct` is deliberately NOT returned. It is read from a public view that
+ * excludes it; financial terms are not something a listener should see, and
+ * the view is the only thing an anonymous browser can read.
+ */
 export const listSongCollaborators = createServerFn({ method: "GET" })
   .validator((d: { song_id: string }) => d)
   .handler(async ({ data }) => {
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const { getPublicSupabase } = await import("@/lib/supabase-public.server");
+    const sb = getPublicSupabase();
 
-    // SECURITY: Don't expose split_pct to public queries
-    // Use the public view which excludes financial data
-    const { data: rows } = await sb
-      .from("public_song_collaborators")
-      .select("id, role, accepted, created_at, song_id, artist_id")
-      .eq("song_id", data.song_id);
-
+    // SECURITY: split_pct is not in this view by design.
+    const select = (cols: string) =>
+      sb.from("public_song_collaborators").select(cols).eq("song_id", data.song_id);
+    const current = await select("id, role, accepted, created_at, song_id, artist_id, credit_name");
+    let rows = current.data as any[] | null;
+    if (current.error) {
+      // A missing column (migration not applied yet) must not break the song
+      // page — fall back to the pre-migration shape.
+      const legacy = await select("id, role, accepted, created_at, song_id, artist_id");
+      if (legacy.error) return [];
+      rows = (legacy.data ?? []).map((r: any) => ({ ...r, credit_name: null }));
+    }
     if (!rows) return [];
 
-    // Fetch artist details separately
-    const artistIds = rows.map((r: any) => r.artist_id);
-    const { data: artists } = await sb
-      .from("artists")
-      .select("id, name, avatar_url")
-      .in("id", artistIds);
+    // Artist details for account-backed credits only. A name-only credit has
+    // no artist row, and `in()` with a null entry would be a wasted query.
+    const artistIds = rows.map((r: any) => r.artist_id).filter((id: unknown): id is string => !!id);
+    const { data: artists } = artistIds.length
+      ? await sb.from("artists").select("id, name, avatar_url").in("id", artistIds)
+      : { data: [] as any[] };
 
     // Combine the data
-    const result = rows.map((row: any) => {
+    return rows.map((row: any) => {
       const artist = (artists ?? []).find((a: any) => a.id === row.artist_id);
       return {
         id: row.id,
         role: row.role,
-        accepted: row.accepted,
-        artists: artist ? [artist] : [],
+        // "featured" reads as a byline; the rest read as what they did.
+        label: row.role === "featured" ? "Featuring" : (CREDroleLabel[row.role] ?? row.role),
+        name: artist?.name ?? row.credit_name ?? null,
+        avatarUrl: artist?.avatar_url ?? null,
+        artistId: artist?.id ?? null,
+        hasAccount: !!artist?.id,
       };
     });
+  });
 
-    return result;
+/**
+ * Add a credit to a song.
+ *
+ * Two modes, decided by whether the other person has a Wesu account:
+ *
+ *   artist_id  → a real account. Can be a FEATURE, and can take a share of the
+ *                song's earnings (split_pct, validated against the 100% total).
+ *                The payout happens in the revenue-split trigger.
+ *
+ *   credit_name→ a plain collaborator with no account (producer, writer,
+ *                remixer). Credit only: no share is stored, because there is no
+ *                account to pay. A FEATURE cannot be done this way — the
+ *                database rejects it, and so does this function.
+ */
+export const addSongCredit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (d: {
+      song_id: string;
+      role: "featured" | "producer" | "writer" | "remixer";
+      /** Present for an account credit. */
+      artist_id?: string | null;
+      /** Present for a name-only credit. */
+      credit_name?: string | null;
+      /** Share of the song's earnings, 0-100. Only meaningful with an account. */
+      split_pct?: number | null;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const hasAccount = !!data.artist_id;
+    const name = (data.credit_name ?? "").trim();
+
+    if (!hasAccount && !name) {
+      throw new Error("Add either an artist account or a name for the credit");
+    }
+    if (hasAccount && name) {
+      throw new Error("A credit is either an account or a name, not both");
+    }
+    if (!hasAccount && data.role === "featured") {
+      throw new Error(
+        "A featured artist needs their own Wesu account so the credit can link to their profile",
+      );
+    }
+    if (name && (name.length < 1 || name.length > 80)) {
+      throw new Error("Name must be between 1 and 80 characters");
+    }
+
+    // SECURITY: validate the share. A name-only credit can never take money.
+    const split = hasAccount ? Number(data.split_pct ?? 0) : 0;
+    if (!Number.isFinite(split) || split < 0 || split > 100) {
+      throw new Error("Share must be between 0 and 100");
+    }
+    if (!hasAccount && Number(data.split_pct ?? 0) !== 0) {
+      throw new Error("Only an artist with an account can take a share of the earnings");
+    }
+
+    // SECURITY: only the song owner (or staff) may attach credits.
+    const { data: song } = await supabaseAdmin
+      .from("songs")
+      .select("id, artist_id")
+      .eq("id", data.song_id)
+      .maybeSingle();
+    if (!song) throw new Error("Song not found");
+    const staff = await isStaffUser(supabase, userId);
+    if (!staff) {
+      const { data: artist } = await supabase
+        .from("artists")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!artist || (artist as any).id !== (song as any).artist_id) {
+        throw new Error("Forbidden: only the song owner can add credits");
+      }
+    }
+
+    // SECURITY: total shares on a song must not exceed 100%.
+    if (split > 0) {
+      const { data: existing } = await supabaseAdmin
+        .from("song_collaborators")
+        .select("split_pct")
+        .eq("song_id", data.song_id);
+      const total = (existing ?? []).reduce((s: number, r: any) => s + Number(r.split_pct ?? 0), 0);
+      if (total + split > 100) {
+        throw new Error(`Total shares would exceed 100% (currently ${total}%)`);
+      }
+    }
+
+    // An account credit is an invitation the other person must accept; a
+    // name-only credit has nobody to ask, so it is live immediately.
+    const row = {
+      song_id: data.song_id,
+      artist_id: hasAccount ? data.artist_id : null,
+      credit_name: hasAccount ? null : name,
+      role: data.role,
+      split_pct: split,
+      invited_by: userId,
+      accepted: hasAccount ? false : true,
+    } as any;
+
+    const { error } = await supabaseAdmin.from("song_collaborators").insert(row);
+    if (error) {
+      if (error.code === "23505") {
+        throw new Error("That person is already credited on this song");
+      }
+      throw new Error(error.message);
+    }
+    await audit(userId, "collab.add_credit", "song", data.song_id, {
+      role: data.role,
+      artist_id: data.artist_id ?? null,
+      credit_name: hasAccount ? null : name,
+      split_pct: split,
+    });
+    return { ok: true };
   });
 
 export const removeCollaborator = createServerFn({ method: "POST" })

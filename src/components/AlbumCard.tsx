@@ -1,8 +1,8 @@
 import { Play, Pause } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
-import { useCurrency } from "@/stores/currency";
 import { StorageImage } from "@/components/StorageImage";
+import { PriceTag } from "@/components/PriceTag";
 
 interface AlbumCardProps {
   id: string;
@@ -27,12 +27,13 @@ export function AlbumCard({
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
-  const formatPrice = useCurrency((s) => s.formatPrice);
 
   const isCurrentTrack = currentTrackId === id;
   const isPlayingThisTrack = playing && isCurrentTrack;
 
   const handlePlay = (e?: React.MouseEvent) => {
+    // The play control is a SIBLING of the link, not a child, so a tap can
+    // never both start playback and navigate.
     e?.stopPropagation();
     e?.preventDefault();
     if (isCurrentTrack) {
@@ -58,43 +59,55 @@ export function AlbumCard({
   };
 
   return (
-    <Link
-      to="/albums/$id"
-      params={{ id }}
-      className="group relative block aspect-square rounded-xl overflow-hidden bg-secondary transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-    >
-      {/* Album Art */}
-      <StorageImage
-        bucket="album-art"
-        path={imageUrl}
-        alt={title}
-        className="w-full h-full object-cover"
-      />
+    // Not a <Link> wrapper: title and price must stay visible on a phone,
+    // where there is no hover, and the play button must not be nested in it.
+    <div className="group relative flex flex-col gap-2">
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-secondary">
+        <Link
+          to="/albums/$id"
+          params={{ id }}
+          aria-label={`${title} by ${subtitle}`}
+          className="block h-full w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/60"
+        >
+          <StorageImage
+            bucket="album-art"
+            path={imageUrl}
+            alt={title}
+            className="h-full w-full object-cover"
+          />
+        </Link>
 
-      {/* Hover Overlay */}
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-        {/* Play Button */}
+        {/* Play: always visible on touch (small screens), hover-revealed on desktop. */}
         <button
+          type="button"
           onClick={handlePlay}
           aria-label={isPlayingThisTrack ? `Pause ${title}` : `Play ${title}`}
-          className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors cursor-pointer"
+          className="absolute bottom-2 right-2 grid size-11 place-items-center rounded-full bg-black/55 text-white shadow-lg backdrop-blur-md transition hover:bg-black/75 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary opacity-100 md:opacity-0 md:group-hover:opacity-100"
         >
           {isPlayingThisTrack ? (
-            <Pause className="size-5 text-white" />
+            <Pause className="size-5 fill-white" />
           ) : (
-            <Play className="size-5 text-white fill-white ml-0.5" />
+            <Play className="size-5 fill-white" />
           )}
         </button>
       </div>
 
-      {/* Card Info (shown below card in grid layout) */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <p className="text-sm font-semibold text-white truncate">{title}</p>
-        <p className="text-xs text-zinc-300 truncate">{subtitle}</p>
-        {price !== null && price !== undefined && (
-          <p className="text-xs font-medium text-primary mt-1">{formatPrice(price)}</p>
-        )}
+      {/* Always-visible metadata: this is what a touch user reads. */}
+      <div className="min-w-0">
+        <Link
+          to="/albums/$id"
+          params={{ id }}
+          className="block truncate text-sm font-semibold hover:underline focus:outline-none focus-visible:underline"
+        >
+          {title}
+        </Link>
+        <div className="flex items-center gap-2">
+          {subtitle ? (
+            <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{subtitle}</p>
+          ) : null}
+          <PriceTag price={price} />
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }

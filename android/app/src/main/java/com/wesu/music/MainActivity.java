@@ -49,6 +49,79 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebViewClient(new WesuWebViewClient(bridge));
         }
+        checkWebViewIsUsable(bridge);
+    }
+
+    /**
+     * The app IS a web page, so the phone's Android System WebView is the
+     * runtime. On cheap and older devices (very common on the Transsion and
+     * Samsung lines) that WebView is a leftover build that can no longer be
+     * updated from the Play Store — so the app installs fine and then renders
+     * a blank shell or crashes on modern syntax. minSdk cannot fix that.
+     *
+     * Detecting it lets us say something useful instead. The WebView exposes
+     * its version as a Chrome major version, so anything below the last
+     * version that still supports the bundle we ship is refused up front with
+     * a clear instruction to update Android System WebView / Chrome.
+     */
+    private void checkWebViewIsUsable(Bridge bridge) {
+        try {
+            if (bridge == null || bridge.getWebView() == null) return;
+            String version = android.webkit.WebView.getCurrentWebViewPackage() == null
+                    ? null
+                    : android.webkit.WebView.getCurrentWebViewPackage().versionName;
+            int major = parseChromeMajor(version);
+            // 105 is the floor for the CSS/JS features the app bundle relies
+            // on (container queries, :has(), nested CSS in the UI kit).
+            final int MIN_MAJOR = 105;
+            if (major > 0 && major < MIN_MAJOR) {
+                bridge.getWebView().loadDataWithBaseURL(
+                        null,
+                        outdatedWebViewPage(version, MIN_MAJOR),
+                        "text/html",
+                        "utf-8",
+                        null);
+            }
+        } catch (Exception ignored) {
+            // Never block a launch on the check itself.
+        }
+    }
+
+    /** "120.0.6099.144" → 120. Returns 0 when the version is unreadable. */
+    private static int parseChromeMajor(String versionName) {
+        if (versionName == null) return 0;
+        int dot = versionName.indexOf('.');
+        String head = dot > 0 ? versionName.substring(0, dot) : versionName;
+        try {
+            return Integer.parseInt(head.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private String outdatedWebViewPage(String version, int minMajor) {
+        String safeVersion = version == null ? "out of date" : version.replaceAll("[^0-9A-Za-z. ]", "");
+        return "<!doctype html><html><head><meta name=\"viewport\" "
+                + "content=\"width=device-width,initial-scale=1\"><style>"
+                + "body{margin:0;min-height:100vh;display:flex;align-items:center;"
+                + "justify-content:center;background:#0b0b0d;color:#fff;"
+                + "font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;"
+                + "text-align:center;padding:24px}"
+                + ".c{max-width:22rem}h1{font-size:1.25rem;margin:0 0 12px}"
+                + "p{color:#b9b9c2;line-height:1.5;font-size:.95rem;margin:0 0 8px}"
+                + "code{background:#1c1c1e;padding:2px 6px;border-radius:6px}"
+                + "</style></head><body><div class=\"c\">"
+                + "<h1>Please update Android System WebView</h1>"
+                + "<p>Wesu+ needs a newer Android System WebView to run. Your phone has "
+                + "version <code>"
+                + safeVersion
+                + "</code>, and we need <code>"
+                + minMajor
+                + "+</code>.</p>"
+                + "<p>Open the Play Store, search for <b>Android System WebView</b> "
+                + "(or <b>Chrome</b>), tap <b>Update</b>, then reopen Wesu+.</p>"
+                + "<p>Your music and downloads are safe — nothing has been lost.</p>"
+                + "</div></body></html>";
     }
 
     /**

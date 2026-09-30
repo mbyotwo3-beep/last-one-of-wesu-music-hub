@@ -5,7 +5,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSavedAlbum } from "@/hooks/use-saved-album";
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrency } from "@/stores/currency";
+import { PriceTag } from "@/components/PriceTag";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 
@@ -31,9 +31,6 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const { user } = useAuth();
   const { isSaved, toggle } = useSavedTrack(song.id);
   const navigate = useNavigate();
-  // Subscribed (not getState()) so prices re-render when the currency
-  // toggle switches Kwacha to USD.
-  const formatPrice = useCurrency((s) => s.formatPrice);
 
   const isCurrentTrack = currentTrackId === song.id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -95,7 +92,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             type="button"
             onClick={handlePlay}
             aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
-            className="size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+            className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
           >
             {isPlayingThisTrack ? (
               <Pause className="size-4 fill-current" />
@@ -125,9 +122,11 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
           >
             {song.title}
           </Link>
-          {song.price != null && (
-            <p className="text-xs font-medium text-primary">{formatPrice(song.price)}</p>
-          )}
+          {song.price != null ? (
+            <div className="mt-0.5">
+              <PriceTag price={song.price} />
+            </div>
+          ) : null}
           {song.artist?.id ? (
             <Link
               to="/artists/$id"
@@ -140,16 +139,17 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             <p className="text-xs text-muted-foreground truncate">{artistName}</p>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0 relative z-10">
-          {user && (
-            <DownloadButton
-              songId={song.id}
-              label="Download"
-              title={song.title}
-              artistName={artistName}
-              coverUrl={song.cover_url}
-            />
-          )}
+        <div className="relative z-10 flex shrink-0 items-center gap-1">
+          {/* Always rendered: DownloadButton already routes anonymous taps to
+              sign-in, and hiding it removed the only buy/download signal for
+              signed-out listeners — the ones who make up most of first visits. */}
+          <DownloadButton
+            songId={song.id}
+            label="Download"
+            title={song.title}
+            artistName={artistName}
+            coverUrl={song.cover_url}
+          />
           <ShareMenu
             songId={song.id}
             songTitle={song.title}
