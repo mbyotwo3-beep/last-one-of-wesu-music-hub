@@ -13,7 +13,8 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "postinstall": "node scripts/apply-native-audio-patch.mjs",
-    "launch:check": "node scripts/launch-check.mjs"
+    "launch:check": "node scripts/launch-check.mjs",
+    "import:catalogue": "node scripts/import-catalogue.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

@@ -1,0 +1,48 @@
+{
+  "_comment": "Copy this, point `audio`/`cover` at files under the --media folder, and run the importer. Paths are relative to that folder. Use price 0 for free tracks.",
+  "artists": [
+    {
+      "name": "Artist Name",
+      "_comment": "Give email (an account is created) OR user_id (an existing artist account). One is required.",
+      "email": "artist@example.com",
+      "genre": "Gospel",
+      "bio": "Short artist biography.",
+      "avatar": "artists/artist-name.jpg",
+      "albums": [
+        {
+          "title": "Album Title",
+          "price": 150,
+          "genre": "Gospel",
+          "release_date": "2026-09-01",
+          "cover": "albums/album-title.jpg",
+          "status": "approved",
+          "tracks": [
+            {
+              "title": "Track One",
+              "price": 10,
+              "audio": "audio/artist-name/track-one.mp3",
+              "duration": 214,
+              "track_number": 1
+            },
+            {
+              "title": "Track Two",
+              "price": 0,
+              "_comment": "price 0 = free. This is what builds the free tier people explore before paying.",
+              "audio": "audio/artist-name/track-two.mp3",
+              "duration": 187,
+              "track_number": 2
+            }
+          ]
+        }
+      ],
+      "singles": [
+        {
+          "title": "Unreleased Single",
+          "price": 10,
+          "audio": "audio/artist-name/unreleased.mp3",
+          "duration": 201
+        }
+      ]
+    }
+  ]
+}
