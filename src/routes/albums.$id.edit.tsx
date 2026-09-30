@@ -1,11 +1,29 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useSuspenseQuery,
+  useMutation,
+  useQueryClient,
+  useQuery,
+} from "@tanstack/react-query";
 import { getAlbumWithSongsForEdit } from "@/lib/music.functions";
 import { getPricingConfig, DEFAULT_PRICING } from "@/lib/pricing.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
-import { Play, Pause, ArrowLeft, Save, Upload, X, ChevronUp, ChevronDown, GripVertical, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Play,
+  Pause,
+  ArrowLeft,
+  Save,
+  Upload,
+  X,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { updateAlbum, updateSong, deleteSong } from "@/lib/artist.functions";
 import { uploadFileToBucket } from "@/lib/storage";
@@ -13,6 +31,7 @@ import { toast } from "sonner";
 import { useState, useRef } from "react";
 import { audit } from "@/lib/artist.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { isUuid } from "@/lib/route-params";
 
 const albumEditQO = (id: string) =>
   queryOptions({
@@ -23,6 +42,9 @@ const albumEditQO = (id: string) =>
 
 export const Route = createFileRoute("/albums/$id/edit")({
   loader: async ({ context, params }) => {
+    // Reject a malformed id before it reaches the uuid column, which would
+    // otherwise 500 with a raw Postgres error.
+    if (!isUuid(params.id)) throw notFound();
     const data = await context.queryClient.ensureQueryData(albumEditQO(params.id));
     if (data.forbidden) throw new Error("You don't have permission to edit this album.");
     if (!data.album) throw notFound();
@@ -31,7 +53,10 @@ export const Route = createFileRoute("/albums/$id/edit")({
   head: ({ loaderData }) => ({
     meta: [
       { title: `Edit ${loaderData?.album?.title ?? "Album"} — Wesu+` },
-      { name: "description", content: `Edit ${loaderData?.album?.title ?? "this album"} on Wesu+.` },
+      {
+        name: "description",
+        content: `Edit ${loaderData?.album?.title ?? "this album"} on Wesu+.`,
+      },
     ],
   }),
   component: AlbumEditPage,
@@ -78,7 +103,7 @@ function AlbumEditPage() {
       track_number: s.track_number || 0,
       price: Number(s.price || 0),
       explicit: s.explicit || false,
-    }))
+    })),
   );
 
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -190,8 +215,8 @@ function AlbumEditPage() {
         tracks.map((track) =>
           updateSongMutation.mutateAsync({
             data: { id: track.id, status: "pending" },
-          })
-        )
+          }),
+        ),
       );
 
       // Audit log
@@ -224,9 +249,7 @@ function AlbumEditPage() {
   };
 
   const updateTrackTitle = (trackId: string, newTitle: string) => {
-    setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, title: newTitle } : t))
-    );
+    setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, title: newTitle } : t)));
   };
 
   const saveTrackOrder = async () => {
@@ -236,8 +259,8 @@ function AlbumEditPage() {
         tracks.map((track) =>
           updateSongMutation.mutateAsync({
             data: { id: track.id, track_number: track.track_number },
-          })
-        )
+          }),
+        ),
       );
       toast.success("Track order updated successfully!");
     } finally {
@@ -285,7 +308,11 @@ function AlbumEditPage() {
           <div>
             <h1 className="text-2xl font-bold">Edit Album</h1>
             <p className="text-sm text-muted-foreground">
-              {album.status === "draft" ? "Draft" : album.status === "pending" ? "Pending Approval" : "Published"}
+              {album.status === "draft"
+                ? "Draft"
+                : album.status === "pending"
+                  ? "Pending Approval"
+                  : "Published"}
             </p>
           </div>
         </div>
@@ -296,7 +323,11 @@ function AlbumEditPage() {
               disabled={isSubmitting}
               className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40"
             >
-              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
               Submit for Approval
             </button>
           )}
@@ -305,7 +336,11 @@ function AlbumEditPage() {
             disabled={isSubmitting}
             className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold disabled:opacity-40"
           >
-            {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {isSubmitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
             Save Changes
           </button>
         </div>
@@ -408,7 +443,11 @@ function AlbumEditPage() {
                 disabled={isSubmitting}
                 className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs font-semibold disabled:opacity-40"
               >
-                {isSubmitting ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                {isSubmitting ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Save className="size-3" />
+                )}
                 Save Order
               </button>
             </div>

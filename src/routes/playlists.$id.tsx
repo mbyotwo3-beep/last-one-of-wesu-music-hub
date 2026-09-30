@@ -46,6 +46,7 @@ import { ShareMenu } from "@/components/ShareMenu";
 import { IncrementalList } from "@/components/IncrementalList";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { isUuid } from "@/lib/route-params";
 
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
@@ -259,6 +260,10 @@ function Page() {
   const { data, isLoading } = useQuery({
     queryKey: ["playlist", id],
     queryFn: async () => {
+      // A malformed id would make the uuid column raise, surfacing a raw
+      // Postgres error. This route has no loader, so guard here: an unusable
+      // id is simply "no playlist", which the empty state already handles.
+      if (!isUuid(id)) return null;
       // 1. Try server function which bypasses RLS and formats songs cleanly
       try {
         const res = await getPlaylistFn({ data: { id } });

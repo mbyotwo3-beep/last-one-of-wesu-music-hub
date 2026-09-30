@@ -1,6 +1,10 @@
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+type RunResult = { code: number; out: string };
+type RunEnv = Record<string, string>;
 
 /**
  * The importer is the fastest route to a launch-worthy catalogue, so its
@@ -19,7 +23,7 @@ const script = join(process.cwd(), "scripts", "import-catalogue.mjs");
 // changes a price, and a dry run must work offline.
 const PRICING = JSON.stringify({ song_min: 10, song_max: 100, album_min: 150, album_max: 250 });
 
-async function run(args, env = {}) {
+async function run(args: string[], env: RunEnv = {}): Promise<RunResult> {
   const { execFile } = await import("node:child_process");
   return new Promise((resolve) => {
     execFile(
@@ -35,12 +39,17 @@ async function run(args, env = {}) {
         cwd: process.cwd(),
         timeout: 30_000,
       },
-      (err, stdout, stderr) => resolve({ code: err?.code ?? 0, out: stdout + stderr }),
+      (err, stdout, stderr) =>
+        // err.code is a number for a non-zero exit, but a string for a signal.
+        resolve({
+          code: typeof err?.code === "number" ? err.code : err ? 1 : 0,
+          out: stdout + stderr,
+        }),
     );
   });
 }
 
-async function makeFixture(manifest) {
+async function makeFixture(manifest: unknown) {
   const dir = await mkdtemp(join(tmpdir(), "wesu-import-"));
   const manifestPath = join(dir, "catalogue.json");
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));

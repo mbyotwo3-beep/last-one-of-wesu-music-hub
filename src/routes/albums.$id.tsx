@@ -9,6 +9,7 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
+import { isUuid } from "@/lib/route-params";
 
 const albumQO = (id: string) =>
   queryOptions({
@@ -19,6 +20,9 @@ const albumQO = (id: string) =>
 
 export const Route = createFileRoute("/albums/$id")({
   loader: async ({ context, params }) => {
+    // Reject a malformed id before it reaches the uuid column, which would
+    // otherwise 500 with a raw Postgres error.
+    if (!isUuid(params.id)) throw notFound();
     const data = await context.queryClient.ensureQueryData(albumQO(params.id));
     if (!data.album) throw notFound();
     return data;

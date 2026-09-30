@@ -9,6 +9,7 @@ import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSongEntitlement } from "@/hooks/use-song-entitlement";
+import { isUuid } from "@/lib/route-params";
 
 const songQO = (id: string) =>
   queryOptions({
@@ -19,6 +20,9 @@ const songQO = (id: string) =>
 
 export const Route = createFileRoute("/songs/$id")({
   loader: async ({ context, params }) => {
+    // Reject a malformed id before it reaches the uuid column, which would
+    // otherwise 500 with a raw Postgres error.
+    if (!isUuid(params.id)) throw notFound();
     const song = await context.queryClient.ensureQueryData(songQO(params.id));
     if (!song) throw notFound();
     return song;
@@ -93,7 +97,9 @@ function SongPage() {
           />
           <div className="min-w-0 text-center sm:text-left">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider">Song</p>
-            <h1 className="mt-2 text-4xl md:text-6xl font-black tracking-tight break-words">{song!.title}</h1>
+            <h1 className="mt-2 text-4xl md:text-6xl font-black tracking-tight break-words">
+              {song!.title}
+            </h1>
             {artist ? (
               <Link
                 to="/artists/$id"
@@ -108,7 +114,9 @@ function SongPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               {song!.genre ?? "Music"}
               {song!.explicit ? " · Explicit" : ""}
-              {song!.duration ? ` · ${Math.floor(song!.duration / 60)}:${String(song!.duration % 60).padStart(2, "0")}` : ""}
+              {song!.duration
+                ? ` · ${Math.floor(song!.duration / 60)}:${String(song!.duration % 60).padStart(2, "0")}`
+                : ""}
             </p>
           </div>
         </div>
@@ -147,9 +155,7 @@ function SongPage() {
             onClick={toggle}
             className="inline-flex items-center gap-2 rounded-full bg-secondary px-6 py-3 font-bold hover:bg-accent transition-colors"
           >
-            <Heart
-              className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`}
-            />
+            <Heart className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`} />
             {isSaved ? "Liked" : "Like"}
           </button>
           <ShareMenu

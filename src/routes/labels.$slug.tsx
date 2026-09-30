@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getLabelBySlug } from "@/lib/labels.functions";
 import { StorageImage } from "@/components/StorageImage";
+import { isSlug } from "@/lib/route-params";
 
 const labelQuery = (slug: string) =>
   queryOptions({
@@ -20,8 +21,11 @@ export const Route = createFileRoute("/labels/$slug")({
       { name: "description", content: ctx?.loaderData?.label?.bio ?? "Record label on Wesu+." },
     ],
   }),
-  loader: ({ context, params }: any) =>
-    context.queryClient.ensureQueryData(labelQuery(params.slug)),
+  loader: async ({ context, params }: any) => {
+    // A hostile slug must never reach the query builder.
+    if (!isSlug(params.slug)) throw notFound();
+    return context.queryClient.ensureQueryData(labelQuery(params.slug));
+  },
   component: LabelPage,
   errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
   notFoundComponent: () => <div className="p-12 text-center">Label not found</div>,
