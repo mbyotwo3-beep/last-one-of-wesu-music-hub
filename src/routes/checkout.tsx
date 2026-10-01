@@ -168,6 +168,13 @@ function CheckoutPage() {
           });
         return;
       }
+      if ((res as any)?.alreadyOwned) {
+        // The server refused a second charge for something already owned.
+        // Send them to their library rather than to a payment page.
+        toast.success("You already own this — it's in your library.");
+        navigate({ to: "/library" });
+        return;
+      }
       if (res?.transactionId) {
         // Mobile money — redirect to success page to poll for status
         navigate({ to: "/checkout/success", search: { ref: res.transactionId } });
@@ -404,6 +411,11 @@ function PlaylistCheckoutPage({ playlistId }: { playlistId: string }) {
             setResultMsg(err.message);
             toast.error(`Payment failed: ${err.message}`);
           });
+        return;
+      }
+      if ((res as any)?.alreadyOwned) {
+        toast.success("You already own these tracks — they're in your library.");
+        navigate({ to: "/library" });
         return;
       }
       if (res?.transactionId) {

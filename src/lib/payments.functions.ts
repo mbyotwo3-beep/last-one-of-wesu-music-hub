@@ -4,6 +4,114 @@ import { computePlaylistMissing, type PlaylistMissingSong } from "@/lib/listener
 
 type PurchaseItemType = "song" | "album";
 
+/**
+ * Resume an existing open transaction, re-driving the provider if it never
+ * started.
+ *
+ * A pending row with no `provider_token` never reached the provider — the
+ * server died between the insert and `startCollectionForTx`, or the attempt
+ * failed before its response was recorded. Returning the bare id to the client
+ * handed back a transaction that could never settle: it polled a collection
+ * that did not exist, forever, with no money taken and no way for the buyer to
+ * recover. So re-drive it here. The reference is the transaction id, so a
+ * provider that already has this reference rejects the duplicate rather than
+ * charging twice.
+ */
+async function resumeOrRedriveCollection(args: {
+  supabaseAdmin: any;
+  openRow: any;
+  methodCode: string;
+  phone?: string;
+  email?: string | null;
+}): Promise<{ transactionId: string; resumed: true }> {
+  const { supabaseAdmin, openRow, methodCode } = args;
+  if (!openRow.provider_token) {
+    const { data: method } = await supabaseAdmin
+      .from("payment_methods")
+      .select("code,category,lenco_operator,is_enabled")
+      .eq("code", methodCode)
+      .maybeSingle();
+    if (method && (method as any).is_enabled !== false) {
+      const { getSiteConfigServer } = await import("@/lib/pricing.functions");
+      const siteConfig = await getSiteConfigServer();
+      try {
+        return (await startCollectionForTx({
+          txId: openRow.id,
+          amount: Number(openRow.amount),
+          itemLabel: `Wesu+ ${openRow.item_type}`,
+          method: method as any,
+          phone: args.phone ?? (openRow.metadata?.phone as string | undefined),
+          email:
+            args.email ??
+            (openRow.metadata?.email as string | undefined) ??
+            siteConfig.support_email,
+          appUrl: process.env.APP_URL ?? siteConfig.url,
+        })) as any;
+      } catch {
+        // Fall through to the plain resume so the buyer still sees their
+        // order instead of an exception.
+      }
+    }
+  }
+  return { transactionId: openRow.id, resumed: true };
+}
+
+/**
+ * Does this buyer already own this item?
+ *
+ * Mirrors the fulfilment rule exactly, so the answer the buyer gets at
+ * checkout is the same answer that would have been reached after paying:
+ *   - a free item needs nothing bought,
+ *   - a single song is owned via a completed `purchases` row,
+ *   - an album is owned when every track on it is owned.
+ */
+export async function alreadyOwnsItem(
+  supabase: { from: (t: string) => any },
+  userId: string,
+  itemType: PurchaseItemType,
+  itemId: string,
+): Promise<boolean> {
+  if (itemType === "song") {
+    const { data: song } = await supabase
+      .from("songs")
+      .select("id,price")
+      .eq("id", itemId)
+      .maybeSingle();
+    // Free tracks are always playable, so there is nothing to buy.
+    if (Number(song?.price ?? 0) <= 0) return true;
+    const { data: owned } = await supabase
+      .from("purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("song_id", itemId)
+      .eq("status", "completed")
+      .limit(1)
+      .maybeSingle();
+    return !!owned;
+  }
+
+  // Album: every track must be owned. A partially-owned album is still
+  // purchasable — the tracks they are missing are what they are buying.
+  const { data: tracks } = await supabase
+    .from("songs")
+    .select("id,price")
+    .eq("album_id", itemId)
+    .eq("status", "approved");
+  const payable = (tracks ?? []).filter((t: any) => Number(t.price ?? 0) > 0);
+  if (payable.length === 0) return true;
+  const { data: ownedRows } = await supabase
+    .from("purchases")
+    .select("song_id")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in(
+      "song_id",
+      payable.map((t: any) => t.id),
+    );
+  const ownedIds = new Set((ownedRows ?? []).map((r: any) => r.song_id));
+  return payable.every((t: any) => ownedIds.has(t.id));
+}
+
 function validateTransactionId(input: unknown): { transactionId: string } {
   if (!input || typeof input !== "object") throw new Error("Invalid payment request");
   const transactionId = (input as Record<string, unknown>).transactionId;
@@ -149,9 +257,37 @@ async function startCollectionForTx(args: {
         message: "Check your phone and approve the payment prompt to complete this purchase.",
       };
     } catch (e: any) {
-      const { settleTransaction } = await import("@/lib/payments.server");
-      await settleTransaction(args.txId, "failed", null, e?.message ?? "Unable to start payment");
-      throw new Error(e?.message ?? "Failed to start mobile money payment");
+      // Do NOT mark this failed. A timeout here is ambiguous: the prompt may
+      // already be sitting on the buyer's phone, still approvable. Marking it
+      // failed made the retry open a SECOND collection, so the buyer could
+      // approve two prompts and be debited twice for one track. Leave it
+      // pending, record why, and let the status lookup discover the truth.
+      const raw = e?.message ?? "Unable to start payment";
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: current } = await supabaseAdmin
+          .from("payment_transactions")
+          .select("metadata")
+          .eq("id", args.txId)
+          .maybeSingle();
+        await supabaseAdmin
+          .from("payment_transactions")
+          .update({
+            metadata: {
+              ...((current as any)?.metadata ?? {}),
+              initiate_error: raw,
+              // Distinguishes "never pushed" from "pushed but we lost the
+              // reply", which decides whether a resume may re-drive it.
+              initiate_at: new Date().toISOString(),
+            },
+          } as any)
+          .eq("id", args.txId);
+      } catch (persistErr) {
+        console.error("[payments] could not record initiate_error", args.txId, persistErr);
+      }
+      console.error("[payments] mobile money initiate failed", args.txId, raw);
+      const { friendlyPaymentError } = await import("@/lib/payment-errors");
+      throw new Error(friendlyPaymentError(raw));
     }
   }
 
@@ -258,6 +394,23 @@ export const initiatePayment = createServerFn({ method: "POST" })
     if (isMobile && !data.phone) {
       throw new Error("Phone number is required for mobile money");
     }
+    // Validate the MSISDN BEFORE recording a transaction. Previously the only
+    // check was "is it present" and the real validation ran inside
+    // startCollectionForTx — after the pending row was written — so a typo
+    // burned a real STK attempt and left an orphan pending row behind.
+    let phone: string | undefined;
+    if (isMobile) {
+      const { normalizeZmPhone } = await import("@/lib/lenco.server");
+      phone = normalizeZmPhone(data.phone!);
+    }
+
+    // Never let a buyer pay twice for something they already own. Fulfilment
+    // keys its idempotency on the transaction, so a second purchase of an
+    // owned track would insert another `purchases` row AND fire the revenue
+    // trigger again: the buyer is debited twice and the artist is paid twice.
+    if (await alreadyOwnsItem(supabase, userId, data.item_type, data.item_id)) {
+      return { alreadyOwned: true, transactionId: null } as any;
+    }
 
     // -- Idempotency: double-clicks/retries within 5 minutes reuse the open
     // transaction instead of creating duplicate payable pendings. Applies to
@@ -278,7 +431,14 @@ export const initiatePayment = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (open) return { transactionId: (open as any).id, resumed: true };
+      if (open)
+        return resumeOrRedriveCollection({
+          supabaseAdmin,
+          openRow: open,
+          methodCode: data.method_code,
+          phone,
+          email: (claims?.email as string | undefined) ?? null,
+        });
     }
 
     // -- Record the pending transaction --
@@ -428,6 +588,13 @@ export const initiatePlaylistUnlock = createServerFn({ method: "POST" })
     if (isMobile && !data.phone) {
       throw new Error("Phone number is required for mobile money");
     }
+    // Validate the MSISDN before recording anything, so a typo cannot burn a
+    // real STK attempt and leave an orphan pending row behind.
+    let phone: string | undefined;
+    if (isMobile) {
+      const { normalizeZmPhone } = await import("@/lib/lenco.server");
+      phone = normalizeZmPhone(data.phone!);
+    }
 
     // Idempotency: same user + playlist + open row within 5 minutes reuses.
     {
@@ -444,7 +611,14 @@ export const initiatePlaylistUnlock = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (open) return { transactionId: (open as any).id, resumed: true };
+      if (open)
+        return resumeOrRedriveCollection({
+          supabaseAdmin,
+          openRow: open,
+          methodCode: data.method_code,
+          phone,
+          email: (claims?.email as string | undefined) ?? null,
+        });
     }
 
     const cardEmail = (claims?.email as string | undefined) ?? null;

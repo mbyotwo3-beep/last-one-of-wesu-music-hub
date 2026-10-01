@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,6 +95,9 @@ function CheckoutSuccessPage() {
     refetchInterval: (q) => {
       const status = (q.state.data as any)?.status;
       if (status === "completed" || status === "failed") return false;
+      // A broken fulfilment is a human problem, not a pending one: polling it
+      // forever just spun on the worst possible screen.
+      if (status === "fulfillment_failed") return false;
       const count = q.state.dataUpdateCount;
       if (count * 3 >= 120) return false;
       return 3000;
@@ -215,6 +218,9 @@ function CheckoutSuccessPage() {
   const isSuccess = transaction?.status === "completed";
   const isFailed = transaction?.status === "failed";
   const isPending = transaction?.status === "pending" || transaction?.status === "processing";
+  // Paid, but fulfilment failed. Treated as its own state, never as "not
+  // found": the money is gone and the buyer must not be told otherwise.
+  const isBroken = transaction?.status === "fulfillment_failed";
   const tx: any = transaction;
   const failureReason =
     typeof tx?.metadata?.failure_reason === "string" ? tx.metadata.failure_reason : null;
@@ -236,6 +242,12 @@ function CheckoutSuccessPage() {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">
           Processing
+        </span>
+      );
+    if (isBroken)
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/20">
+          Library update pending
         </span>
       );
     return null;
@@ -365,6 +377,37 @@ function CheckoutSuccessPage() {
               >
                 Return to Dashboard
               </button>
+            </>
+          ) : isBroken ? (
+            <>
+              {/* Paid, but the entitlement did not land. This used to fall
+                  through to "Transaction Not Found", telling a buyer who had
+                  already been debited that their payment had vanished. */}
+              <AlertTriangle className="size-16 text-amber-500 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-2">Your payment went through</h1>
+              <p className="text-muted-foreground mb-2">
+                We received your payment but couldn&apos;t finish adding the music to your library
+                yet. Nothing is lost — your purchase is recorded and we&apos;re fixing it.
+              </p>
+              <p className="text-muted-foreground mb-6 text-sm">
+                If it isn&apos;t in your library within a few minutes, contact support and quote the
+                transaction ID below.
+              </p>
+              <Receipt />
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => refetchTransaction()}
+                  className="px-6 py-3 bg-primary text-obsidian rounded-xl font-semibold hover:brightness-110 transition-all"
+                >
+                  Check again
+                </button>
+                <button
+                  onClick={() => navigate({ to: "/library" })}
+                  className="px-6 py-3 bg-secondary text-foreground rounded-xl font-semibold hover:brightness-110 transition-all"
+                >
+                  My Library
+                </button>
+              </div>
             </>
           ) : (
             <>

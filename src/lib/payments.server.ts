@@ -184,7 +184,7 @@ export async function settleTransaction(
   outcome: "successful" | "failed",
   providerRef?: string | null,
   failureReason?: string | null,
-): Promise<"completed" | "failed" | "pending" | "fulfillment_failed"> {
+): Promise<"completed" | "failed" | "pending" | "processing" | "fulfillment_failed"> {
   if (outcome === "failed") {
     // Preserve the original request metadata (including the phone number) and
     // attach Lenco's reason so the receipt can explain an actual decline.
@@ -201,11 +201,26 @@ export async function settleTransaction(
     const metadata = failureReason
       ? { ...(existingMetadata as Record<string, unknown>), failure_reason: failureReason }
       : existingMetadata;
-    await supabaseAdmin
+    const { data: marked } = await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null, metadata } as any)
       .eq("id", transactionId)
-      .in("status", ["pending", "processing", "fulfillment_failed"]);
+      .in("status", ["pending", "processing", "fulfillment_failed"])
+      .select("status")
+      .maybeSingle();
+    // A LATE failure webhook for a transaction that already completed must not
+    // be reported as a failure: returning "failed" here made verifyPayment tell
+    // a buyer whose purchase was delivered that their payment failed. Report
+    // what the row actually says.
+    if (!marked) {
+      const { data: after } = await supabaseAdmin
+        .from("payment_transactions")
+        .select("status")
+        .eq("id", transactionId)
+        .maybeSingle();
+      const actual = (after as any)?.status;
+      if (actual === "completed" || actual === "failed") return actual;
+    }
     return "failed";
   }
 
@@ -236,17 +251,31 @@ export async function settleTransaction(
   // Claim the transaction before making the entitlement available. This
   // prevents duplicate Lenco delivery from producing duplicate purchases and
   // means the database split trigger runs only after a purchase exists.
-  let claimed = current;
-  if (current.status !== "processing") {
-    const { data: processing } = await supabaseAdmin
+  //
+  // The claim is UNCONDITIONAL. It used to be skipped when the row was already
+  // "processing", which is precisely the state the Lenco webhook and the
+  // client's status poller both converge on — so both proceeded to fulfil
+  // concurrently and the idempotency this comment promised was never enforced.
+  // If the update matches no row, someone else owns the fulfilment; report
+  // their state and let the caller poll instead of double-granting.
+  const { data: claimed } = await supabaseAdmin
+    .from("payment_transactions")
+    .update({ status: "processing", provider_ref: providerRef ?? null } as any)
+    .eq("id", transactionId)
+    .in("status", ["pending", "fulfillment_failed"])
+    .select()
+    .maybeSingle();
+
+  if (!claimed) {
+    const { data: owned } = await supabaseAdmin
       .from("payment_transactions")
-      .update({ status: "processing", provider_ref: providerRef ?? null } as any)
+      .select("status")
       .eq("id", transactionId)
-      .in("status", ["pending", "fulfillment_failed"])
-      .select()
       .maybeSingle();
-    if (!processing) return "pending";
-    claimed = processing;
+    const status = (owned as any)?.status;
+    if (status === "completed" || status === "failed") return status;
+    // "processing" = another caller is fulfilling right now.
+    return "processing";
   }
 
   try {
