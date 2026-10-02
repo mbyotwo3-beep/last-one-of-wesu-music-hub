@@ -620,6 +620,37 @@ export async function onNativeComplete(assetId: string, callback: () => void): P
 }
 
 /**
+ * Native engine playback errors.
+ *
+ * The ExoPlayer listener had no onPlayerError override at all, so a mid-track
+ * failure (network drop, 403 on an expired signed URL, corrupt stream) emitted
+ * nothing. The app sat on `playing: true` with a frozen progress bar, and the
+ * notification kept offering transport controls for a dead engine.
+ *
+ * The engine's error code is passed for logs only — see the mapping in PlayerBar,
+ * which shows the listener plain language.
+ * Only fires for the given asset id, so a stale listener from a skipped track
+ * cannot fail the one now playing.
+ */
+export async function onNativePlaybackError(
+  assetId: string,
+  callback: (errorCode: string | null) => void,
+): Promise<() => void> {
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const handle = await (NativeAudio as any).addListener("playbackError", (event: any) => {
+      if (!event || event.assetId === undefined || event.assetId === assetId) {
+        callback(event?.errorCode ?? null);
+      }
+    });
+    return () => handle.remove();
+  } catch {
+    // An older APK has no such event; the web engine path still reports errors.
+    return () => {};
+  }
+}
+
+/**
  * Check if the @capgo/native-audio plugin is available in the current environment.
  * Proves a registered runtime plugin (not just a resolvable npm import, which
  * is also true on desktop browsers where no native runtime exists).

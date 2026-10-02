@@ -105,6 +105,14 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     private static final String TRANSPORT_ACTION = "com.wesu.music.TRANSPORT";
     private android.content.BroadcastReceiver transportReceiver;
 
+    // WESU PATCH (not upstream): lock-screen progress. Position was hardcoded
+    // to 0 in the published PlaybackState, so the shade/lock-screen progress
+    // bar never advanced during a track. These feed it from the engine's own
+    // time updates, throttled to 1Hz.
+    private long lastPositionMs = 0;
+    private long lastDurationMs = 0;
+    private long lastStatePushMs = 0;
+
     @Override
     public void load() {
         super.load();
@@ -634,9 +642,35 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
     }
 
     public void dispatchComplete(String assetId) {
+        // WESU PATCH: reset the lock-screen progress for the next track.
+        lastPositionMs = 0;
+        lastDurationMs = 0;
+        lastStatePushMs = 0;
         JSObject ret = new JSObject();
         ret.put("assetId", assetId);
         notifyListeners("complete", ret);
+    }
+
+    // WESU PATCH (not upstream — reapply after reinstall, see
+    // android/patches/capgo-native-audio-7.11.2): surface engine playback
+    // errors to JS. Without this a mid-track failure (network drop, 403 on an
+    // expired signed URL, corrupt stream) raised no event at all, so the UI
+    // stayed frozen on "playing" and the shade kept advertising transport
+    // controls for a dead engine. The code is a hint for logs only — the web
+    // side must never render a raw engine string to a listener.
+    public void dispatchPlaybackError(String assetId, String errorCode) {
+        try {
+            JSObject ret = new JSObject();
+            ret.put("assetId", assetId);
+            ret.put("errorCode", errorCode);
+            notifyListeners("playbackError", ret);
+            if (currentlyPlayingAssetId != null && currentlyPlayingAssetId.equals(assetId)) {
+                currentlyPlayingAssetId = null;
+                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error dispatching playback error", e);
+        }
     }
 
     // WESU PATCH (not upstream): forward lock-screen transport taps to JS.
@@ -659,6 +693,36 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
         ret.put("currentTime", roundedTime);
         ret.put("assetId", assetId);
         notifyListeners("currentTime", ret);
+
+        // WESU PATCH (not upstream): feed the lock screen. The playback state
+        // was built with position 0 and no duration, so the lock-screen and
+        // shade progress bar never moved for the whole track. Track the
+        // position here and re-publish the state (throttled, because this
+        // fires several times a second and a MediaSession update is not free).
+        if (assetId != null && assetId.equals(currentlyPlayingAssetId)) {
+            lastPositionMs = (long) (currentTime * 1000.0);
+            // Pick the duration up from the live asset so the lock screen can
+            // draw a proportional bar rather than an unbounded one.
+            try {
+                AudioAsset asset = audioAssetList.get(assetId);
+                if (asset != null) {
+                    double d = asset.getDuration();
+                    if (d > 0) {
+                        long ms = (long) (d * 1000.0);
+                        if (ms != lastDurationMs) {
+                            lastDurationMs = ms;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                /* duration is best-effort */
+            }
+            long now = System.currentTimeMillis();
+            if (now - lastStatePushMs >= 1000) {
+                lastStatePushMs = now;
+                updatePlaybackState(lastPlaybackState);
+            }
+        }
     }
 
     private void preloadAsset(PluginCall call) {
@@ -1251,7 +1315,16 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
         if (mediaSession == null) return;
 
         PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
-            .setState(state, 0, state == PlaybackStateCompat.STATE_PLAYING ? 1.0f : 0.0f)
+            // WESU PATCH: real position, so the lock screen and shade show a
+            // moving elapsed time instead of sitting at 0:00 for the whole
+            // track. (This support-v4 PlaybackStateCompat has no duration
+            // overload, so the bar is not proportional — a moving clock is
+            // still the honest reading, and duration is known only once the
+            // engine has reported metadata.)
+            .setState(
+                    state,
+                    lastPositionMs,
+                    state == PlaybackStateCompat.STATE_PLAYING ? 1.0f : 0.0f)
             // WESU PATCH: advertise skip so lock-screen/shade offer next/prev
             // (matches the onSkipToNext/onSkipToPrevious callbacks).
             .setActions(

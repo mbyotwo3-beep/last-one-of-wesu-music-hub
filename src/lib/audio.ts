@@ -95,6 +95,18 @@ export function setCachedAudioUrl(
   });
 }
 
+/**
+ * Drop a song's cached URLs for BOTH the signed-in and anonymous keys.
+ *
+ * Needed on any playback failure: a signed URL that returned 403 stays in the
+ * cache for its full TTL, so without evicting it every retry replays the same
+ * dead URL and the track is unrecoverable until the app restarts.
+ */
+export function evictCachedAudioUrlForUser(songId: string, userId: string | null): void {
+  audioUrlCache.delete(cacheKey(userId, songId));
+  audioUrlCache.delete(cacheKey(null, songId));
+}
+
 /** Drop cached URLs for a song (e.g. right after purchase unlocks the full track). */
 export function evictCachedAudioUrl(songId: string): void {
   for (const key of audioUrlCache.keys()) {

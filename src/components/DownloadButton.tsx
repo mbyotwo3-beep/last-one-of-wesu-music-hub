@@ -158,7 +158,22 @@ export function DownloadButton({
     );
   }
 
-  if (!isVaultSupported()) return null;
+  // Previously the control vanished entirely where the encrypted vault is not
+  // available, so on those platforms the download feature simply did not
+  // exist with no explanation — and a listener who had already downloaded in
+  // the app had no way to reach their downloads. Say where it lives instead.
+  if (!isVaultSupported()) {
+    return (
+      <Link
+        to="/get-app"
+        className="inline-flex size-11 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full bg-secondary border border-border text-foreground transition-colors hover:bg-accent"
+        aria-label="Offline downloads are available in the Wesu+ Android app"
+        title="Offline downloads are available in the Wesu+ app"
+      >
+        <Download className={iconClass} />
+      </Link>
+    );
+  }
 
   async function download() {
     if (progress !== null) return;

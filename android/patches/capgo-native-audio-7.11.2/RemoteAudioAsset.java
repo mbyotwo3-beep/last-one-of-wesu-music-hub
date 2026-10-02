@@ -152,6 +152,29 @@ public class RemoteAudioAsset extends AudioAsset {
                 public void onIsLoadingChanged(boolean isLoading) {
                     Log.d(TAG, "isLoading changed to: " + isLoading + ", state: " + getStateString(player.getPlaybackState()));
                 }
+
+                // WESU PATCH (not upstream — reapply after reinstall, see
+                // android/patches/capgo-native-audio-7.11.2): report playback
+                // errors. This listener never overrode onPlayerError at all, so
+                // a mid-track network drop, a 403 on an expired signed URL or a
+                // corrupt stream produced NO event: the app sat at
+                // playing:true with the progress bar frozen mid-track and the
+                // listener had no idea anything had gone wrong.
+                @Override
+                public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                    String code;
+                    try {
+                        code = error != null && error.getErrorCodeName() != null
+                                ? error.getErrorCodeName()
+                                : "unknown";
+                    } catch (Exception e) {
+                        code = "unknown";
+                    }
+                    Log.e(TAG, "Playback error: " + code, error);
+                    if (owner != null) {
+                        owner.dispatchPlaybackError(assetId, code);
+                    }
+                }
             }
         );
 

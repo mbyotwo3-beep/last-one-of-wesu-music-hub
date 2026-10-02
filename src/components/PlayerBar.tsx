@@ -46,6 +46,7 @@ import {
   stopNative,
   onNativeComplete,
   onNativeTimeUpdate,
+  onNativePlaybackError,
   onNativeSkip,
   isNativeAudioAvailable,
   isNativePreloaded,
@@ -82,6 +83,7 @@ import {
   primeAudio,
   getCachedAudioUrl,
   setCachedAudioUrl,
+  evictCachedAudioUrlForUser,
   previewCapDecision,
 } from "@/lib/audio";
 
@@ -180,6 +182,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const resolvedForUserRef = useRef<string | null>(null);
   const nativeCleanupRef = useRef<(() => void) | null>(null);
   const audioEventsCleanupRef = useRef<(() => void) | null>(null);
+  // Separate from the audio-element listeners: the native engine error hook
+  // must be torn down on every selection change, or a failure from a skipped
+  // track surfaces on the one now playing.
+  const nativeErrorCleanupRef = useRef<(() => void) | null>(null);
   const trackSessionDetachRef = useRef<(() => void) | null>(null);
   // In-flight native stop from the track-change branch, awaited at the top
   // of loadUrl so a reselect can't unload the asset being preloaded.
@@ -406,6 +412,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
+      nativeErrorCleanupRef.current?.();
+      nativeErrorCleanupRef.current = null;
       dropNativeTempFiles();
       getAudio().pause();
       // Clear stale lock-screen / notification controls on exit.
@@ -464,6 +472,8 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       nativeCleanupRef.current = null;
       audioEventsCleanupRef.current?.();
       audioEventsCleanupRef.current = null;
+      nativeErrorCleanupRef.current?.();
+      nativeErrorCleanupRef.current = null;
       // Drop the previous track's staged offline files (app-private cache).
       dropNativeTempFiles();
       // Drop a pre-warmed next asset that never got played (selection moved
@@ -807,6 +817,24 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                     incrementFn({ data: { song_id: track!.id } }).catch(() => {});
                   }
                 });
+                // Engine error (WESU PATCH in the plugin: onPlayerError was
+                // never wired, so a mid-track failure used to be silent and
+                // the UI stayed frozen on "playing"). Drop the cached signed
+                // URL first — replaying a 403'd URL is permanent until it is
+                // evicted, so without this a retry could never succeed.
+                const errorCleanup = await onNativePlaybackError(track!.id, (code) => {
+                  if (!isCurrentTrack()) return;
+                  console.error("[player] native playback error", code, track!.id);
+                  evictCachedAudioUrlForUser(track!.id, user?.id ?? null);
+                  setLoading(false);
+                  const message =
+                    typeof navigator !== "undefined" && navigator.onLine === false
+                      ? "Connection lost — reconnect to keep listening"
+                      : "Playback stopped — tap play to try again";
+                  setError(message);
+                  usePlayer.getState().setError(message);
+                });
+                nativeErrorCleanupRef.current = errorCleanup;
                 if (!isCurrentTrack()) {
                   cleanup();
                   await stopNative(track!.id).catch(() => {});
