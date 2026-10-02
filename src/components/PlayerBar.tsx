@@ -936,7 +936,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         }
         setLoading(false);
         setAudioUrl(null);
-        setError((err as Error).message);
+        // Never surface the raw error: it is whatever the browser or the
+        // signed-URL endpoint threw, which can contain the expiring media URL
+        // and is never actionable for a listener. Log it, show plain words.
+        console.error("[player] load failed", err);
+        setError("Couldn't play this track. Check your connection and try again.");
+        usePlayer
+          .getState()
+          .setError("Couldn't play this track. Check your connection and try again.");
         if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
       }
     }

@@ -51,6 +51,8 @@ function QueuePage() {
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const repeat = usePlayer((s) => s.repeat);
   const removeFromQueue = usePlayer((s) => s.removeFromQueue);
+  const clearQueue = usePlayer((s) => s.clearQueue);
+  const moveInQueue = usePlayer((s) => s.moveInQueue);
   const { user } = useAuth();
 
   // Empty queue falls back to owned music (purchased +
@@ -170,20 +172,38 @@ function QueuePage() {
         <div className="flex items-center gap-2">
           <button
             onClick={toggleShuffle}
-            className={`p-2 rounded-full ${shuffle ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent"} transition`}
-            title="Shuffle"
+            className={`grid size-11 place-items-center rounded-full ${shuffle ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent"} transition`}
+            title={shuffle ? "Shuffle on" : "Shuffle off"}
+            aria-label="Shuffle"
+            aria-pressed={shuffle}
           >
             <Shuffle className="size-5" />
           </button>
           <button
             onClick={cycleRepeat}
-            className={`p-2 rounded-full ${repeat !== "off" ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent"} transition`}
-            title={`Repeat: ${repeat}`}
+            className={`grid size-11 place-items-center rounded-full ${repeat !== "off" ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent"} transition`}
+            // Human labels, not the raw mode string.
+            title={
+              repeat === "all" ? "Repeat queue" : repeat === "one" ? "Repeat track" : "Repeat off"
+            }
+            aria-label="Repeat"
           >
             {repeat === "all" && <Repeat className="size-5" />}
             {repeat === "one" && <Repeat1 className="size-5" />}
             {repeat === "off" && <Repeat className="size-5 opacity-60" />}
           </button>
+          {queue.length > 0 ? (
+            <button
+              onClick={() => {
+                if (confirm("Clear the whole queue and stop playing?")) clearQueue();
+              }}
+              className="grid size-11 place-items-center rounded-full bg-secondary hover:bg-accent transition"
+              title="Clear queue"
+              aria-label="Clear queue"
+            >
+              <Trash2 className="size-5" />
+            </button>
+          ) : null}
         </div>
       </div>
 

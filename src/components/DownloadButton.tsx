@@ -40,6 +40,22 @@ export function mapDownloadError(raw: unknown, online: boolean): string {
   if (/purchase|buy|entitl|unlock|payment|402|403/i.test(msg)) {
     return "Available after purchase — buy this track to download it";
   }
+  // A full phone is the most common failure on the low-end devices this app
+  // runs on, and the browser throws a raw DOM string for it. Without this the
+  // listener saw "QuotaExceededError: Failed to execute 'setItem'…".
+  if (/quota|storage|space|ENOSPC|exceed/i.test(msg)) {
+    return "Not enough space on your phone — free up some storage and try again";
+  }
+  if (/network|timeout|offline|fetch|ENOTFOUND/i.test(msg)) {
+    return "Download interrupted — check your connection and try again";
+  }
+  if (/decrypt|vault|key/i.test(msg)) {
+    return "This download needs re-verifying — download it again";
+  }
+  // Anything else passes through as before: no URL or signed token is minted
+  // on this path, so the message carries no secret, and a specific server
+  // error ("Download failed (500)") is more useful to a listener than a
+  // generic "try again".
   return msg;
 }
 
@@ -106,7 +122,7 @@ export function DownloadButton({
   // metadata on small screens. Unbought tracks lead to checkout, where
   // the price is shown before anything is charged.
   const buttonClass =
-    "inline-flex items-center justify-center size-9 shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
+    "inline-flex items-center justify-center size-11 min-h-\[44px\] min-w-\[44px\] shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
   const iconClass = "size-4";
 
   // Anonymous listeners get a download icon that leads to sign-in (with a

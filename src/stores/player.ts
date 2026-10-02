@@ -2,6 +2,15 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { primeAudio, getAudio } from "@/lib/audio";
 import { emitNativeSeek, setNativeSeekHook } from "@/lib/native-audio";
+import {
+  buildShuffleDeck,
+  insertIndexForPlayNext,
+  pickNextIndex,
+  type RepeatMode,
+  type ShuffleDeck,
+} from "@/stores/play-order";
+
+export type { ShuffleDeck };
 
 export interface PlayerTrack {
   id: string;
@@ -13,7 +22,9 @@ export interface PlayerTrack {
   price?: number | null;
 }
 
-export type RepeatMode = "off" | "all" | "one";
+// RepeatMode is defined once, in play-order.ts, next to the logic that reads
+// it. Re-exported here because the store's public type surface is this module.
+export type { RepeatMode } from "@/stores/play-order";
 
 function preserveResolvedAudioUrl(
   next: PlayerTrack | null,
@@ -45,13 +56,22 @@ interface PlayerState {
    */
   selectionId: number;
   playing: boolean;
-  liked: boolean;
   progressSeconds: number;
   nowPlayingOpen: boolean;
   volume: number;
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  /**
+   * The shuffle deck: which queue positions are still unplayed, and the one
+   * currently playing. Held here (not recomputed per skip) so shuffle draws
+   * without replacement — see play-order.ts for why that matters.
+   */
+  shuffleDeck: ShuffleDeck | null;
+  /** Playback error, in words a listener can act on. */
+  error: string | null;
+  /** Bumped by `retry` to force a fresh resolve of the current track. */
+  retryNonce: number;
   isPreview: boolean;
   setIsPreview: (v: boolean) => void;
   setTrack: (t: PlayerTrack | null) => void;
@@ -73,7 +93,16 @@ interface PlayerState {
   setTrackDuration: (seconds: number) => void;
   hydrateTrackCovers: (covers: Record<string, string>) => void;
   seekTo: (seconds: number) => void;
-  toggleLike: () => void;
+  /** Insert directly after the current track so it plays next. */
+  playNext: (track: PlayerTrack) => void;
+  /** Wipe the queue and stop. */
+  clearQueue: () => void;
+  /** Move a queue entry, keeping queueIndex pointing at the same track. */
+  moveInQueue: (from: number, to: number) => void;
+  /** Report a playback failure in language the listener can act on. */
+  setError: (message: string | null) => void;
+  /** Re-resolve and restart the current track. */
+  retry: () => void;
   openNowPlaying: () => void;
   closeNowPlaying: () => void;
   exitSong: () => void;
@@ -91,13 +120,15 @@ export const usePlayer = create<PlayerState>()(
       queueIndex: 0,
       selectionId: 0,
       playing: false,
-      liked: false,
       progressSeconds: 0,
       nowPlayingOpen: false,
       volume: 1,
       muted: false,
       shuffle: false,
       repeat: "off",
+      shuffleDeck: null,
+      error: null,
+      retryNonce: 0,
       isPreview: false,
 
       setIsPreview: (v) => set({ isPreview: v }),
@@ -108,7 +139,6 @@ export const usePlayer = create<PlayerState>()(
           selectionId: t ? state.selectionId + 1 : state.selectionId,
           playing: !!t,
           progressSeconds: 0,
-          liked: false,
           isPreview: false,
         }));
       },
@@ -123,7 +153,11 @@ export const usePlayer = create<PlayerState>()(
         // Clamp out-of-bounds callers instead of storing a queueIndex with no track.
         const safeIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
         if (tracks.length) primeAudio();
-        const track = preserveResolvedAudioUrl(tracks[safeIndex] ?? null, get().track, get().isPreview);
+        const track = preserveResolvedAudioUrl(
+          tracks[safeIndex] ?? null,
+          get().track,
+          get().isPreview,
+        );
         set((state) => ({
           queue: tracks,
           queueIndex: safeIndex,
@@ -131,7 +165,6 @@ export const usePlayer = create<PlayerState>()(
           selectionId: track ? state.selectionId + 1 : state.selectionId,
           playing: !!track,
           progressSeconds: 0,
-          liked: false,
         }));
       },
 
@@ -146,18 +179,19 @@ export const usePlayer = create<PlayerState>()(
         set((state) => {
           const newQueue = state.queue.filter((_, i) => i !== index);
           if (index === state.queueIndex) {
-            // Removing the currently playing track — advance to the track
-            // now at this position (or stop if the queue is empty).
-            const nextTrack = newQueue[Math.min(index, newQueue.length - 1)] ?? null;
+            // Removing the currently playing track. This used to START the
+            // next one: every queue mutation that replaced the track set
+            // playing:true, so deleting a row silently began playing
+            // something else. Spotify never does that — stop instead.
             return {
               queue: newQueue,
               queueIndex: Math.min(index, Math.max(newQueue.length - 1, 0)),
-              track: nextTrack,
-              selectionId: nextTrack ? state.selectionId + 1 : state.selectionId,
-              playing: !!nextTrack,
+              track: null,
+              playing: false,
               progressSeconds: 0,
-              liked: false,
               isPreview: false,
+              error: null,
+              shuffleDeck: null,
             };
           }
           const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
@@ -165,32 +199,108 @@ export const usePlayer = create<PlayerState>()(
         });
       },
 
-      skipNext: () => {
+      /**
+       * "Play next": insert directly after the current track so the listener
+       * hears it immediately, rather than at the end of a long queue.
+       */
+      playNext: (track) => {
+        if (track) primeAudio();
+        set((state) => {
+          const at = insertIndexForPlayNext(state.queue.length, state.queueIndex);
+          const queue = [...state.queue];
+          queue.splice(at, 0, track);
+          return { queue };
+        });
+      },
+
+      clearQueue: () => {
         primeAudio();
-        const { queue, queueIndex, shuffle, repeat } = get();
-        if (!queue.length) return;
-        let next: number;
-        if (shuffle) {
-          next = Math.floor(Math.random() * queue.length);
-        } else {
-          next = queueIndex + 1;
-          if (next >= queue.length) {
-            if (repeat === "off") {
-              // Dead end — stop instead of leaving playing:true on ended audio.
-              set({ playing: false });
-              return;
-            }
-            next = 0;
+        set({
+          queue: [],
+          queueIndex: 0,
+          track: null,
+          playing: false,
+          progressSeconds: 0,
+          isPreview: false,
+          error: null,
+          shuffleDeck: null,
+        });
+        const audio = getAudio();
+        if (audio) {
+          try {
+            audio.pause();
+            audio.removeAttribute("src");
+            audio.load();
+          } catch {
+            /* nothing to stop */
           }
         }
+      },
+
+      /**
+       * Reorder the queue. The track that is playing KEEPS playing — it is
+       * identified by position, so the index is moved with it, otherwise a
+       * reorder would start a different song mid-listen.
+       */
+      moveInQueue: (from, to) => {
+        set((state) => {
+          const { queue, queueIndex } = state;
+          if (from === to || from < 0 || to < 0 || from >= queue.length || to >= queue.length) {
+            return state;
+          }
+          const next = queue.slice();
+          const [moved] = next.splice(from, 1);
+          next.splice(to, 0, moved);
+          // Follow the track that is playing to its new position.
+          let index = queueIndex;
+          if (queueIndex === from) index = to;
+          else if (from < queueIndex && to >= queueIndex) index = queueIndex - 1;
+          else if (from > queueIndex && to <= queueIndex) index = queueIndex + 1;
+          return { queue: next, queueIndex: index };
+        });
+      },
+
+      setError: (message) => set({ error: message }),
+
+      /**
+       * Retry the current track. Bumping retryNonce forces the engine to drop
+       * its cached signed URL and resolve a fresh one — a 403 on an expired
+       * URL is otherwise permanent until the app restarts.
+       */
+      retry: () =>
         set((state) => ({
-          queueIndex: next,
-          track: preserveResolvedAudioUrl(queue[next], state.track, state.isPreview),
+          error: null,
+          playing: true,
+          retryNonce: state.retryNonce + 1,
+          progressSeconds: 0,
+        })),
+
+      skipNext: () => {
+        primeAudio();
+        const { queue } = get();
+        if (!queue.length) return;
+        const { index, deck } = pickNextIndex({
+          queueLength: queue.length,
+          queueIndex: get().queueIndex,
+          shuffle: get().shuffle,
+          repeat: get().repeat,
+          deck: get().shuffleDeck,
+        });
+        if (index === null) {
+          // Nothing playable left and repeat is off: stop honestly rather than
+          // leaving a finished track displayed as "playing".
+          set({ playing: false, progressSeconds: 0, error: null });
+          return;
+        }
+        set((state) => ({
+          queueIndex: index,
+          track: preserveResolvedAudioUrl(queue[index], state.track, state.isPreview),
           selectionId: state.selectionId + 1,
           progressSeconds: 0,
-          liked: false,
           playing: true,
           isPreview: false,
+          error: null,
+          shuffleDeck: deck,
         }));
       },
 
@@ -211,14 +321,21 @@ export const usePlayer = create<PlayerState>()(
           track: preserveResolvedAudioUrl(queue[prev], state.track, state.isPreview),
           selectionId: state.selectionId + 1,
           progressSeconds: 0,
-          liked: false,
           playing: true,
           isPreview: false,
         }));
       },
 
       togglePlay: () => {
-        const { isPreview, progressSeconds, playing } = get();
+        const { isPreview, progressSeconds, playing, error } = get();
+        // A failed track is a retry, not a pause. Toggling here used to leave
+        // the listener stuck: the failure path deliberately keeps playing:true
+        // (so the UI doesn't lie), so tapping play only set it to false and
+        // the button appeared to do nothing at all.
+        if (error) {
+          get().retry();
+          return;
+        }
         const audio = getAudio();
         if (!playing) primeAudio();
         // If a 15-second preview has reached the end and user clicks Play, replay from 0
@@ -233,55 +350,74 @@ export const usePlayer = create<PlayerState>()(
 
       setProgress: (s) => set({ progressSeconds: s }),
 
-  /**
-   * Fill in missing cover art for the current track / queue entries.
-   * Not every play entry point builds a complete track object, so the
-   * engine backfills covers from the DB on demand. Never bumps
-   * selectionId (this is not a new selection) and no-ops — returning the
-   * identical state — when there is nothing to fill, so it can't loop
-   * with the effect that calls it.
-   */
-  hydrateTrackCovers: (covers: Record<string, string>) => {
-    set((state) => {
-      let changed = false;
-      const fill = (t: PlayerTrack): PlayerTrack => {
-        const url = covers[t.id];
-        if (!t.coverUrl && url) {
-          changed = true;
-          return { ...t, coverUrl: url };
-        }
-        return t;
-      };
-      const track = state.track ? fill(state.track) : state.track;
-      // Skip the queue map entirely when the current track was the only
-      // thing that could change and didn't.
-      let queue = state.queue;
-      if (changed || state.queue.some((t) => !t.coverUrl && covers[t.id])) {
-        queue = state.queue.map(fill);
-      }
-      if (!changed && queue === state.queue) return state;
-      return { track, queue };
-    });
-  },
+      /**
+       * Fill in missing cover art for the current track / queue entries.
+       * Not every play entry point builds a complete track object, so the
+       * engine backfills covers from the DB on demand. Never bumps
+       * selectionId (this is not a new selection) and no-ops — returning the
+       * identical state — when there is nothing to fill, so it can't loop
+       * with the effect that calls it.
+       */
+      hydrateTrackCovers: (covers: Record<string, string>) => {
+        set((state) => {
+          let changed = false;
+          const fill = (t: PlayerTrack): PlayerTrack => {
+            const url = covers[t.id];
+            if (!t.coverUrl && url) {
+              changed = true;
+              return { ...t, coverUrl: url };
+            }
+            return t;
+          };
+          const track = state.track ? fill(state.track) : state.track;
+          // Skip the queue map entirely when the current track was the only
+          // thing that could change and didn't.
+          let queue = state.queue;
+          if (changed || state.queue.some((t) => !t.coverUrl && covers[t.id])) {
+            queue = state.queue.map(fill);
+          }
+          if (!changed && queue === state.queue) return state;
+          return { track, queue };
+        });
+      },
 
-  /**
-   * Fill in the real media duration once the element reports metadata.
-   * Many queue entries are built without durationSeconds — without this,
-   * mobile progress bars and seek stay stuck at 0:00.
-   */
-  setTrackDuration: (seconds: number) => {
-    if (!Number.isFinite(seconds) || seconds <= 0) return;
-    set((state) => {
-      if (!state.track || state.track.durationSeconds) return state;
-      return { track: { ...state.track, durationSeconds: Math.floor(seconds) } };
-    });
-  },
+      /**
+       * Fill in the real media duration once the element reports metadata.
+       * Many queue entries are built without durationSeconds — without this,
+       * mobile progress bars and seek stay stuck at 0:00.
+       */
+      setTrackDuration: (seconds: number) => {
+        if (!Number.isFinite(seconds) || seconds <= 0) return;
+        set((state) => {
+          if (!state.track || state.track.durationSeconds) return state;
+          return { track: { ...state.track, durationSeconds: Math.floor(seconds) } };
+        });
+      },
 
       seekTo: (seconds: number) => {
         const { isPreview, track } = get();
         const dur = track?.durationSeconds ?? 0;
-        const maxTime = isPreview ? 15 : dur > 0 ? dur : 100000;
-        const target = Math.max(0, Math.min(seconds, maxTime));
+        // The old clamp used 100000s when the duration was unknown, so a scrub
+        // on a track whose length had not loaded yet threw the playhead
+        // ~27 hours ahead and playback was effectively dead. Clamp to the real
+        // media duration when we have it, and refuse otherwise.
+        const engineDuration = getAudio()?.duration;
+        const known =
+          dur > 0
+            ? dur
+            : Number.isFinite(engineDuration) && (engineDuration as number) > 0
+              ? (engineDuration as number)
+              : 0;
+        if (isPreview) {
+          const target = Math.max(0, Math.min(seconds, 15));
+          const audio = getAudio();
+          if (audio?.src) audio.currentTime = target;
+          emitNativeSeek(target);
+          set({ progressSeconds: target });
+          return;
+        }
+        if (known <= 0) return;
+        const target = Math.max(0, Math.min(seconds, known));
         const audio = getAudio();
         // The shared element may have no src (native path, or seek before
         // load) — setting currentTime then is a no-op at best.
@@ -291,8 +427,6 @@ export const usePlayer = create<PlayerState>()(
         emitNativeSeek(target);
         set({ progressSeconds: Math.floor(target) });
       },
-
-      toggleLike: () => set((s) => ({ liked: !s.liked })),
       openNowPlaying: () => set({ nowPlayingOpen: true }),
       closeNowPlaying: () => set({ nowPlayingOpen: false }),
       exitSong: () => {
@@ -308,21 +442,31 @@ export const usePlayer = create<PlayerState>()(
         // native-audio (and its plugin import) out of bundles that never play.
         const exitingId = get().track?.id ?? null;
         setNativeSeekHook(null);
-        import("@/lib/native-audio").then(({ stopNative }) => {
-          if (exitingId) stopNative(exitingId).catch(() => {});
-        }).catch(() => {});
+        import("@/lib/native-audio")
+          .then(({ stopNative }) => {
+            if (exitingId) stopNative(exitingId).catch(() => {});
+          })
+          .catch(() => {});
         set({
           track: null,
           playing: false,
           progressSeconds: 0,
-          liked: false,
           nowPlayingOpen: false,
           isPreview: false,
         });
       },
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: v === 0 }),
       toggleMute: () => set((s) => ({ muted: !s.muted })),
-      toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
+      // Turning shuffle on starts a fresh deck; the old one was built for a
+      // different current track, so it could hand back the playing track.
+      toggleShuffle: () =>
+        set((s) => {
+          const shuffle = !s.shuffle;
+          return {
+            shuffle,
+            shuffleDeck: shuffle ? buildShuffleDeck(s.queue.length, s.queueIndex) : null,
+          };
+        }),
       cycleRepeat: () =>
         set((s) => ({ repeat: s.repeat === "off" ? "all" : s.repeat === "all" ? "one" : "off" })),
     }),
@@ -342,13 +486,31 @@ export const usePlayer = create<PlayerState>()(
           repeat: s.repeat,
           progressSeconds: s.progressSeconds,
         }) as PlayerState,
-      merge: (persisted: any, current) => ({
-        ...current,
-        ...persisted,
-        playing: false,
-        nowPlayingOpen: false,
-        liked: false,
-      }),
+      merge: (persisted: any, current) => {
+        const queue: PlayerTrack[] = persisted?.queue ?? [];
+        // A restored queue is capped at 200 entries, so a saved index could
+        // point past the end. Clamp rather than render a phantom track.
+        const queueIndex = Math.max(
+          0,
+          Math.min(persisted?.queueIndex ?? 0, Math.max(queue.length - 1, 0)),
+        );
+        return {
+          ...current,
+          ...persisted,
+          queue,
+          queueIndex,
+          // The deck is index-based; a stale one from a different queue would
+          // hand back a position that no longer means what it did.
+          shuffleDeck: null,
+          playing: false,
+          nowPlayingOpen: false,
+          error: null,
+          // The audio element is empty after a reload, so the restored
+          // position is fiction — showing a progress bar at 2:10 when nothing
+          // is loaded is a lie the listener can see.
+          progressSeconds: 0,
+        };
+      },
     },
   ),
 );

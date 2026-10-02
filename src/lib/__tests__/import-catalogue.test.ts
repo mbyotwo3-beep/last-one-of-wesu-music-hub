@@ -58,11 +58,6 @@ async function makeFixture(manifest: unknown) {
 }
 
 describe("catalogue importer safety", () => {
-  // These spawn the importer as a real child process — the only honest way to
-  // test its guards, since it has module-level side effects. That costs ~1s
-  // each, which overruns vitest's 5s default once the whole suite runs in
-  // parallel on a loaded machine.
-  const SPAWN_TIMEOUT = 30_000;
   it("refuses to APPLY without a service role key, but still rehearses", async () => {
     const { dir, manifestPath } = await makeFixture({
       artists: [
@@ -204,5 +199,5 @@ describe("catalogue importer safety", () => {
     expect(r.out).toMatch(/no audio file/i);
     expect(r.out).toMatch(/would import 0 song\(s\)/);
     await rm(dir, { recursive: true, force: true });
-  }, SPAWN_TIMEOUT);
+  });
 });
