@@ -108,6 +108,50 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
         }
 
         if (isSuccess) {
+          // Verify the money before granting anything. Success used to be
+          // inferred from the event/status alone, so a replayed or
+          // mis-keyed `collection.successful` for a DIFFERENT amount, matched
+          // on our transaction reference, would deliver the full purchase
+          // regardless of what was actually paid. Compare when the provider
+          // tells us; if it does not, fall back to the signature we already
+          // verified rather than refusing a legitimate payment.
+          const paidAmount = Number(tx.amount ?? NaN);
+          const paidCurrency = String(tx.currency ?? "").toUpperCase();
+          const mismatch =
+            Number.isFinite(paidAmount) &&
+            paidAmount > 0 &&
+            Number(row.amount) > 0 &&
+            Math.abs(paidAmount - Number(row.amount)) > 0.009;
+          const currencyMismatch =
+            paidCurrency !== "" &&
+            String(row.currency ?? "ZMW").toUpperCase() !== "" &&
+            paidCurrency !== String(row.currency ?? "ZMW").toUpperCase();
+
+          if (mismatch || currencyMismatch) {
+            // Record it loudly and DO NOT fulfil. Support refunds manually.
+            try {
+              await supabaseAdmin.from("audit_log").insert({
+                actor_id: null,
+                action: "webhook.amount_mismatch",
+                target_type: "payment_transaction",
+                target_id: row.id,
+                meta: {
+                  expected_amount: Number(row.amount),
+                  expected_currency: row.currency,
+                  received_amount: Number.isFinite(paidAmount) ? paidAmount : null,
+                  received_currency: paidCurrency || null,
+                  event,
+                },
+              } as any);
+            } catch {
+              /* audit must never break the webhook response */
+            }
+            console.error(
+              `[lenco-webhook] amount mismatch for ${row.id}: expected ${row.amount} ${row.currency}, got ${tx.amount} ${tx.currency} — not fulfilling`,
+            );
+            return new Response("OK", { status: 200 });
+          }
+
           // Idempotent: only the caller that wins pending → completed fulfils.
           await settleTransaction(row.id, "successful", providerRef ?? null);
         } else if (isFailure) {

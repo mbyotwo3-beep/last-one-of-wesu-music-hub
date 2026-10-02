@@ -36,6 +36,16 @@ export function NowPlayingScreen() {
   const seekTo = usePlayer((s) => s.seekTo);
   const isPreview = usePlayer((s) => s.isPreview);
   const { isSaved, toggle: toggleSaved } = useSavedTrack(track?.id);
+  const closeNowPlaying = usePlayer((s) => s.closeNowPlaying);
+
+  // Real swipe-down detection: track the touch start in the same coordinate
+  // space (clientY). The old code mixed clientY with screenY, which can never
+  // meaningfully exceed the threshold.
+  //
+  // This hook MUST sit above the `if (!track) return null` below. It was
+  // declared after it, so the hook count changed depending on whether a track
+  // was loaded — a React violation that breaks swipe-to-dismiss.
+  const touchStartY = useRef<number | null>(null);
 
   if (!track) return null;
 
@@ -46,6 +56,9 @@ export function NowPlayingScreen() {
   const isLoading = audioUrl === undefined && playing;
 
   function dismiss() {
+    // Clear the store flag too: it was set on open and never cleared, so the
+    // "now playing is open" state desynced from the actual route.
+    closeNowPlaying();
     // Direct loads (deep link) have no in-app history — fall back home
     // instead of getting stuck.
     if (router.history.length > 1) router.history.back();
@@ -63,10 +76,7 @@ export function NowPlayingScreen() {
     seekTo(values[0]);
   }
 
-  // Real swipe-down detection: track the touch start in the same coordinate
-  // space (clientY). The old code mixed clientY with screenY, which can never
-  // meaningfully exceed the threshold.
-  const touchStartY = useRef<number | null>(null);
+  // Real swipe-down detection (the ref is declared above the early return).
   function handleTouchStart(e: React.TouchEvent) {
     touchStartY.current = e.touches[0]?.clientY ?? null;
   }

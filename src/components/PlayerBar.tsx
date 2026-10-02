@@ -20,6 +20,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
+import { buildShuffleDeck } from "@/stores/play-order";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -302,10 +303,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           const st = usePlayer.getState();
           const q = st.queue;
           if (q.length < 2) return;
-          let next = myIndex + 1;
-          if (next >= q.length) {
-            if (st.repeat !== "all") return;
-            next = 0;
+          // Warm the track that will ACTUALLY play next. This always assumed
+          // in-order, so with shuffle on it pre-fetched a track the shuffle
+          // would never choose — leaving the audible skip to stall on a cold
+          // resolve. Same helper the store uses, so they can never disagree.
+          let next: number;
+          if (st.shuffle) {
+            const deck = st.shuffleDeck ?? buildShuffleDeck(q.length, st.queueIndex);
+            next = deck.cursor < deck.order.length ? deck.order[deck.cursor] : -1;
+            if (next < 0) return;
+          } else {
+            next = st.queueIndex + 1;
+            if (next >= q.length) {
+              if (st.repeat !== "all") return;
+              next = 0;
+            }
           }
           const target = q[next];
           if (!target || target.id === track.id) return;

@@ -63,6 +63,20 @@ function SearchPage() {
   const artists = data?.artists ?? [];
   const albums = data?.albums ?? [];
 
+  // How many results the ACTIVE tab can show. The old check summed all three
+  // lists, so switching to a tab with no matches (e.g. Artists when the query
+  // only matched songs) rendered an entirely blank page — every section was
+  // gated on its own list AND the "no results" message was gated on all three
+  // being empty at once.
+  const visibleCount =
+    tab === "songs"
+      ? songs.length
+      : tab === "artists"
+        ? artists.length
+        : tab === "albums"
+          ? albums.length
+          : songs.length + artists.length + albums.length;
+
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
       <h1 className="text-2xl font-bold mb-4">Search</h1>
@@ -210,8 +224,28 @@ function SearchPage() {
             </ResultSection>
           )}
 
-          {songs.length === 0 && albums.length === 0 && artists.length === 0 && (
-            <p className="text-muted-foreground">No results for “{q}”.</p>
+          {visibleCount === 0 && (
+            <div className="py-8 text-center space-y-3">
+              <p className="text-muted-foreground">
+                No {tab === "all" ? "results" : tab.replace(/s$/, "")} for “{q}”.
+              </p>
+              {/* A dead end with nothing to tap is how a search sends someone
+                  back to Spotify. Always offer a way forward. */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Link
+                  to="/browse"
+                  className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Browse all music
+                </Link>
+                <Link
+                  to="/artists"
+                  className="px-5 py-2 rounded-full bg-secondary border border-border text-sm font-semibold"
+                >
+                  All artists
+                </Link>
+              </div>
+            </div>
           )}
         </div>
       )}
