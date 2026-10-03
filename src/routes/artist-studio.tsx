@@ -28,6 +28,15 @@ import { RoleGate } from "@/components/RoleGate";
 import { GenreSelect } from "@/components/GenreSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { uploadFileToBucket } from "@/lib/storage";
+
+/**
+ * Escape a user's search text for PostgREST `ilike`: `%`, `_` and `\` are
+ * wildcards/escape characters there, so searching "100%" or "a_b" without
+ * this matched nearly everything instead of the literal name.
+ */
+function escapeIlike(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
 import { copyTextToClipboard } from "@/lib/external-url";
 import { toast } from "sonner";
 import {
@@ -43,6 +52,7 @@ import {
   updateAlbum,
   getArtistAvailableBalanceFn,
 } from "@/lib/artist.functions";
+import { addSongCredit } from "@/lib/collabs.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { inviteCollaborator } from "@/lib/collabs.functions";
 import { respondToLabelInvite, requestLabelForRelease } from "@/lib/labels.functions";
@@ -123,6 +133,7 @@ function CollabsTab() {
   const qc = useQueryClient();
   const songsFn = useServerFn(listMySongs);
   const inviteFn = useServerFn(inviteCollaborator);
+  const creditFn = useServerFn(addSongCredit);
   const { data: songs } = useQuery({
     queryKey: ["my-songs"],
     queryFn: () => songsFn(),
@@ -138,6 +149,26 @@ function CollabsTab() {
     onError: (error) => {
       toast.error(`Failed to send invite: ${error.message}`);
     },
+  });
+  // Name-only credit: producer/writer/remixer with no Wesu account. Credit
+  // only — no earnings share, because there is no account to pay. A FEATURED
+  // credit always needs an account, so it is not offered here (use the invite
+  // form above, which sends them a registration link).
+  const credit = useMutation({
+    mutationFn: creditFn,
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["my-collabs"] });
+      qc.invalidateQueries({ queryKey: ["song-credits", (vars as any)?.data?.song_id] });
+      toast.success("Credit added — it now shows on the song page.");
+    },
+    onError: (error) => {
+      toast.error(`Could not add credit: ${error.message}`);
+    },
+  });
+  const [creditForm, setCreditForm] = useState({
+    song_id: "",
+    credit_name: "",
+    role: "producer" as "producer" | "writer" | "remixer",
   });
   const [form, setForm] = useState({
     song_id: "",
@@ -156,7 +187,7 @@ function CollabsTab() {
       const { data, error } = await supabase
         .from("artists")
         .select("id, name")
-        .ilike("name", `%${search.trim()}%`)
+        .ilike("name", `%${escapeIlike(search.trim())}%`)
         .eq("status", "approved")
         .limit(8);
       if (error) throw error;
@@ -255,6 +286,80 @@ function CollabsTab() {
           className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
         >
           Send invite
+        </button>
+      </form>
+
+      {/* Name-only credit: the other person does NOT need an account. For a
+          producer, writer or remixer who will never sign up, a name is enough
+          to show the credit on the song page. No earnings share is attached —
+          there is no account to pay. If they need a FEATURE credit or a share
+          of the earnings, they must register (use the invite form above). */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const name = creditForm.credit_name.trim();
+          if (!creditForm.song_id || !name) return;
+          credit.mutate({
+            data: {
+              song_id: creditForm.song_id,
+              role: creditForm.role,
+              credit_name: name,
+            },
+          });
+        }}
+        className="bg-card border border-border rounded-2xl p-6 space-y-3"
+      >
+        <div>
+          <p className="text-sm font-semibold">Credit someone without an account</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Producer, writer or remixer — just a name on the song page. No account needed, no
+            earnings share. A <em>featured</em> artist always needs their own account.
+          </p>
+        </div>
+        <select
+          required
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={creditForm.song_id}
+          onChange={(e) => setCreditForm({ ...creditForm, song_id: e.target.value })}
+        >
+          <option value="">— Select your song —</option>
+          {(songs ?? []).map((s: any) => (
+            <option key={s.id} value={s.id}>
+              {s.title}
+            </option>
+          ))}
+        </select>
+        <input
+          required
+          maxLength={80}
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          placeholder="Their name (e.g. DJ Banda)"
+          value={creditForm.credit_name}
+          onChange={(e) => setCreditForm({ ...creditForm, credit_name: e.target.value })}
+        />
+        <select
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={creditForm.role}
+          onChange={(e) =>
+            setCreditForm({
+              ...creditForm,
+              role: e.target.value as "producer" | "writer" | "remixer",
+            })
+          }
+        >
+          <option value="producer">Producer</option>
+          <option value="writer">Writer</option>
+          <option value="remixer">Remixer</option>
+        </select>
+        {credit.error && (
+          <p className="text-sm text-destructive">{(credit.error as Error).message}</p>
+        )}
+        {credit.isSuccess && <p className="text-sm text-primary">Credit added.</p>}
+        <button
+          disabled={credit.isPending || !creditForm.song_id || !creditForm.credit_name.trim()}
+          className="px-4 py-2 rounded-full bg-secondary border border-border text-sm font-semibold disabled:opacity-50"
+        >
+          {credit.isPending ? "Adding…" : "Add credit"}
         </button>
       </form>
       <Link to="/collabs" className="text-sm text-primary underline">
@@ -359,6 +464,8 @@ function LabelTab() {
 
 function FeaturesTab() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const overviewFn = useServerFn(getMyArtistOverview);
   const fn = useServerFn(setCollabPrefs);
   const m = useMutation({
     mutationFn: fn,
@@ -375,6 +482,26 @@ function FeaturesTab() {
     allow_features: false,
     feature_rate: 0,
   });
+  // Prefill from the saved prefs: the old hardcoded defaults meant an artist
+  // opening this tab saw values that were not theirs, and saving without
+  // touching anything silently overwrote their real settings.
+  const { data: overview } = useQuery({
+    queryKey: ["artist-overview"],
+    queryFn: () => overviewFn(),
+    retry: false,
+    enabled: !!user,
+  });
+  const seeded = useRef(false);
+  useEffect(() => {
+    const a = (overview as any)?.artist;
+    if (!a || seeded.current) return;
+    seeded.current = true;
+    setForm({
+      accepts_collabs: a.accepts_collabs ?? true,
+      allow_features: a.available_for_features ?? false,
+      feature_rate: Number(a.feature_rate ?? 0),
+    });
+  }, [overview]);
   return (
     <form
       onSubmit={(e) => {
@@ -552,7 +679,7 @@ function UploadWizard() {
       const { data, error } = await supabase
         .from("artists")
         .select("id, name")
-        .ilike("name", `%${artistSearch.trim()}%`)
+        .ilike("name", `%${escapeIlike(artistSearch.trim())}%`)
         .eq("status", "approved")
         .limit(8);
       if (error) throw error;
@@ -588,7 +715,7 @@ function UploadWizard() {
       const { data, error } = await supabase
         .from("labels")
         .select("id, name")
-        .ilike("name", `%${labelSearch.trim()}%`)
+        .ilike("name", `%${escapeIlike(labelSearch.trim())}%`)
         .eq("status", "approved")
         .limit(8);
       if (error) throw error;
@@ -2384,6 +2511,9 @@ function PayoutTab() {
   });
   const availableBalance = balanceData?.available ?? 0;
   const minWithdrawal = withdrawalConfig?.min_amount ?? 500;
+  // Strictly over, matching requestPayout's own gate (`available <=
+  // minWithdrawal` rejects). An exact-minimum balance must read as NOT
+  // eligible here, otherwise the panel promises what the server refuses.
   const eligible = availableBalance > minWithdrawal;
   // Pre-fill once the real minimum is known (initialising from the 500
   // fallback froze a wrong figure into the form).
@@ -2416,6 +2546,24 @@ function PayoutTab() {
           if (form.amount < minWithdrawal) {
             toast.error(`Minimum withdrawal amount is K${minWithdrawal}`);
             return;
+          }
+          // Same shape check as the server: a typo'd MoMo number is money
+          // sent nowhere. Bank details stay free-form.
+          const mu = form.method_code.toUpperCase();
+          const needsPhone = mu.includes("MOMO") || mu.includes("MONEY") || mu.includes("KWACHA");
+          if (needsPhone) {
+            const digits = form.destination.replace(/[^\d]/g, "");
+            const normalized = digits.startsWith("260")
+              ? digits
+              : digits.startsWith("0")
+                ? `260${digits.slice(1)}`
+                : digits.length === 9
+                  ? `260${digits}`
+                  : digits;
+            if (!/^260[579]\d{8}$/.test(normalized)) {
+              toast.error("Enter a valid 10-digit Zambian mobile number");
+              return;
+            }
           }
           m.mutate({ data: form });
         }}

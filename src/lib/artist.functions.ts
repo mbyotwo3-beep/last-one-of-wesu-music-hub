@@ -81,6 +81,16 @@ export const applyAsArtist = createServerFn({ method: "POST" })
     }
     const termsVersion = data.termsVersion ?? "2025-08-01";
     const termsAcceptedAt = new Date().toISOString();
+    // A whitespace-only name passes the browser's `required` check but would
+    // land in the admin review queue as a blank artist. Reject it here so no
+    // client can store it.
+    const name = (data.name ?? "").trim();
+    if (!name) {
+      throw new Error("Artist name is required");
+    }
+    if (name.length > 120) {
+      throw new Error("Artist name is too long (max 120 characters)");
+    }
     const { data: existing } = await supabase
       .from("artists")
       .select("id, status")
@@ -94,7 +104,7 @@ export const applyAsArtist = createServerFn({ method: "POST" })
       const { data: row, error } = await supabase
         .from("artists")
         .update({
-          name: data.name,
+          name: name,
           bio: data.bio ?? null,
           genre: normalizeGenre(data.genre) || null,
           status: "pending",
@@ -114,7 +124,7 @@ export const applyAsArtist = createServerFn({ method: "POST" })
       .from("artists")
       .insert({
         user_id: userId,
-        name: data.name,
+        name: name,
         bio: data.bio ?? null,
         genre: normalizeGenre(data.genre) || null,
         status: "pending",
@@ -545,6 +555,23 @@ export const requestPayout = createServerFn({ method: "POST" })
     }
     if (!data.method_code?.trim()) throw new Error("A payout method is required");
     if (!data.destination?.trim()) throw new Error("A payout destination is required");
+
+    // Mobile-money payouts go to a phone: validate the shape now, because a
+    // typo'd destination is money sent nowhere and a support ticket later.
+    // Bank transfers keep free-form account details.
+    const methodUpper = data.method_code.trim().toUpperCase();
+    const isMomoDestination =
+      methodUpper.includes("MOMO") ||
+      methodUpper.includes("MONEY") ||
+      methodUpper.includes("KWACHA");
+    if (isMomoDestination) {
+      try {
+        const { normalizeZmPhone } = await import("@/lib/lenco.server");
+        normalizeZmPhone(data.destination.trim());
+      } catch {
+        throw new Error("Enter a valid 10-digit Zambian mobile number for mobile money payouts");
+      }
+    }
 
     // REQUIREMENT: Payout only allowed if money is over minimum
     if (amount < minWithdrawal) {
