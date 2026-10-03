@@ -201,7 +201,8 @@ function CollabsTab() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Invite collaborators to one of your songs and assign a revenue split. Total splits cannot
-        exceed 100%. Registered artists get an in-app invite — no email needed.
+        exceed 100%. Registered artists get an in-app invite — no email needed. They approve it in
+        their Collabs inbox (and get notified), and the credit goes live on the song page.
       </p>
       <form
         onSubmit={(e) => {

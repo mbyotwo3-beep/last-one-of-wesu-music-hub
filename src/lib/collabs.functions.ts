@@ -65,6 +65,26 @@ export const inviteCollaborator = createServerFn({ method: "POST" })
       }
     }
 
+    // The invited artist must exist and be approved: a pending (or missing)
+    // artist has no live profile, so the credit could never show and the
+    // invite could never be meaningfully approved.
+    const { data: target } = await supabaseAdmin
+      .from("artists")
+      .select("id, name, status, user_id")
+      .eq("id", data.artist_id)
+      .maybeSingle();
+    if (!target) throw new Error("Artist not found");
+    if ((target as any).status !== "approved") {
+      throw new Error(
+        `"${(target as any).name ?? "That artist"}" is not an approved artist yet — they need to apply first`,
+      );
+    }
+    // No self-invites: crediting yourself creates a row that can never be
+    // approved by anyone else and shows a phantom pending invite forever.
+    if ((target as any).user_id === userId) {
+      throw new Error("You can't invite yourself as a collaborator");
+    }
+
     // SECURITY: total splits on a song must not exceed 100%.
     const { data: existing } = await supabaseAdmin
       .from("song_collaborators")
@@ -83,7 +103,14 @@ export const inviteCollaborator = createServerFn({ method: "POST" })
       invited_by: userId,
       accepted: false,
     } as any);
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Re-inviting the same artist hits the unique index — say so plainly
+      // instead of leaking a constraint name.
+      if (error.code === "23505") {
+        throw new Error("That artist is already credited on this song");
+      }
+      throw new Error(error.message);
+    }
     await audit(userId, "collab.invite", "song", data.song_id, {
       artist_id: data.artist_id,
       split: data.split_pct,
