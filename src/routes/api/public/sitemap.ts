@@ -19,6 +19,7 @@ const STATIC_PATHS = [
   "/privacy",
   "/become-artist",
   "/apply-label",
+  "/podcast",
 ];
 
 async function origin() {

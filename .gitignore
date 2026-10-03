@@ -26,6 +26,8 @@ dist-ssr
 *.keystore
 *.jks
 keystore.properties
+*.apk
+*.aab
 
 # iOS build artifacts (regenerated on the Mac via cap sync + pod install).
 ios/App/App/public/
