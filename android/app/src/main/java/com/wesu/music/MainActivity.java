@@ -67,6 +67,13 @@ public class MainActivity extends BridgeActivity {
     private void checkWebViewIsUsable(Bridge bridge) {
         try {
             if (bridge == null || bridge.getWebView() == null) return;
+            // getCurrentWebViewPackage() only exists on API 26+. On Android
+            // 7.0/7.1 (our minSdk 24) the call itself throws NoSuchMethodError
+            // — an Error, not an Exception — which the old catch missed and
+            // crashed the app on launch. Those devices skip the version gate
+            // and load normally; if their WebView is too old the normal error
+            // page still catches failures.
+            if (Build.VERSION.SDK_INT < 26) return;
             String version = android.webkit.WebView.getCurrentWebViewPackage() == null
                     ? null
                     : android.webkit.WebView.getCurrentWebViewPackage().versionName;
@@ -82,8 +89,9 @@ public class MainActivity extends BridgeActivity {
                         "utf-8",
                         null);
             }
-        } catch (Exception ignored) {
-            // Never block a launch on the check itself.
+        } catch (Throwable ignored) {
+            // Never block a launch on the check itself (covers both
+            // Exceptions and Errors such as NoSuchMethodError on old runtimes).
         }
     }
 
@@ -121,6 +129,12 @@ public class MainActivity extends BridgeActivity {
                 + "<p>Open the Play Store, search for <b>Android System WebView</b> "
                 + "(or <b>Chrome</b>), tap <b>Update</b>, then reopen Wesu+.</p>"
                 + "<p>Your music and downloads are safe — nothing has been lost.</p>"
+                // After updating, the user returns to a page with no way back
+                // into the app (this HTML replaced the app URL). Offer reload.
+                + "<p><a href=\"https://www.wesuplusly.com/\" style=\"display:inline-block;"
+                + "margin-top:8px;padding:12px 32px;border-radius:999px;"
+                + "background:#f5c518;color:#111;text-decoration:none;"
+                + "font-weight:700\">Try again</a></p>"
                 + "</div></body></html>";
     }
 
