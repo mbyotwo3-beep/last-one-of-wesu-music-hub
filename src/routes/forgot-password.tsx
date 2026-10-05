@@ -33,7 +33,9 @@ function ForgotPasswordPage() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: isNative
           ? "com.wesu.music://login-callback?type=recovery"
-          : `${window.location.origin}/reset-password`,
+          : window.location.hostname.endsWith("wesuplus.com")
+            ? `${window.location.origin}/reset-password`
+            : "https://wesuplus.com/reset-password",
       });
       if (error) throw error;
       setSent(true);
