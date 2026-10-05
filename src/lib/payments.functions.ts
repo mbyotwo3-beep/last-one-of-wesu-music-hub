@@ -231,7 +231,7 @@ async function startCollectionForTx(args: {
 }): Promise<
   | { transactionId: string; pendingUssd: true; message: string }
   | { transactionId: string; paymentUrl: string }
-  | { transactionId: string; widget: Record<string, unknown> }
+  | { transactionId: string; widget: Record<string, any> }
 > {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { initiateMobileMoney, initiateCardCheckout, normalizeLencoOperator, normalizeZmPhone } =

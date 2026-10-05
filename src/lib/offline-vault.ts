@@ -232,7 +232,7 @@ export async function getVaultArtObjectUrl(songId: string): Promise<string | nul
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;
   try {
-    const key = await tx<unknown>(TRACKS_STORE, "readonly", (s) => s.getKey(songId));
+    const key = await tx<unknown>(TRACKS_STORE, "readonly", (s) => s.getKey(songId) as IDBRequest<unknown>);
     return key != null;
   } catch {
     return false;

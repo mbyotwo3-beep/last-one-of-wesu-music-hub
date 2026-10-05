@@ -116,7 +116,7 @@ function CheckoutPage() {
 
   const { data: purchasable, isLoading: purchasableLoading } = useQuery({
     queryKey: ["purchasable", search.item, search.id],
-    queryFn: () => getPurchasableItem({ data: { item_type: search.item!, id: search.id! } }),
+    queryFn: () => getPurchasableItem({ data: { item_type: search.item as any, id: search.id! } }),
     enabled: !!search.item && !!search.id,
   });
 
@@ -220,7 +220,7 @@ function CheckoutPage() {
   // Resolve line item
   const lineName = `${(purchasable as any).title}${(purchasable as any).artist?.name ? ` — ${(purchasable as any).artist.name}` : ""}`;
   const linePrice = Number((purchasable as any).price ?? 0);
-  const itemType: "song" | "album" = search.item!;
+  const itemType = search.item as "song" | "album";
   const itemId: string | undefined = (purchasable as any).id;
   const isFree = linePrice <= 0;
 
