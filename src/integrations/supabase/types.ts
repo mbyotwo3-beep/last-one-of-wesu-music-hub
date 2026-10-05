@@ -245,6 +245,54 @@ export type Database = {
         }
         Relationships: []
       }
+      hero_carousel_slides: {
+        Row: {
+          active: boolean
+          created_at: string
+          cta_external: boolean
+          cta_link: string
+          cta_text: string
+          description: string
+          id: string
+          image_url: string
+          link_target: string
+          position: number
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          cta_external?: boolean
+          cta_link: string
+          cta_text: string
+          description: string
+          id?: string
+          image_url: string
+          link_target?: string
+          position?: number
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          cta_external?: boolean
+          cta_link?: string
+          cta_text?: string
+          description?: string
+          id?: string
+          image_url?: string
+          link_target?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       home_carousel_items: {
         Row: {
           carousel_id: string
@@ -936,6 +984,35 @@ export type Database = {
           },
         ]
       }
+      saved_playlists: {
+        Row: {
+          created_at: string
+          id: string
+          playlist_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          playlist_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          playlist_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_playlists_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_tracks: {
         Row: {
           created_at: string
@@ -968,8 +1045,9 @@ export type Database = {
       song_collaborators: {
         Row: {
           accepted: boolean
-          artist_id: string
+          artist_id: string | null
           created_at: string
+          credit_name: string | null
           id: string
           invited_by: string | null
           role: string
@@ -978,8 +1056,9 @@ export type Database = {
         }
         Insert: {
           accepted?: boolean
-          artist_id: string
+          artist_id?: string | null
           created_at?: string
+          credit_name?: string | null
           id?: string
           invited_by?: string | null
           role?: string
@@ -988,8 +1067,9 @@ export type Database = {
         }
         Update: {
           accepted?: boolean
-          artist_id?: string
+          artist_id?: string | null
           created_at?: string
+          credit_name?: string | null
           id?: string
           invited_by?: string | null
           role?: string
@@ -1176,6 +1256,45 @@ export type Database = {
         }
         Relationships: []
       }
+      support_messages: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          subject: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -1201,6 +1320,7 @@ export type Database = {
           accepted: boolean | null
           artist_id: string | null
           created_at: string | null
+          credit_name: string | null
           id: string | null
           role: string | null
           song_id: string | null
@@ -1209,6 +1329,7 @@ export type Database = {
           accepted?: boolean | null
           artist_id?: string | null
           created_at?: string | null
+          credit_name?: string | null
           id?: string | null
           role?: string | null
           song_id?: string | null
@@ -1217,6 +1338,7 @@ export type Database = {
           accepted?: boolean | null
           artist_id?: string | null
           created_at?: string | null
+          credit_name?: string | null
           id?: string | null
           role?: string | null
           song_id?: string | null
@@ -1240,6 +1362,10 @@ export type Database = {
       }
     }
     Functions: {
+      decrement_follower_count: {
+        Args: { artist_id: string }
+        Returns: undefined
+      }
       get_artist_available_balance: {
         Args: { artist_uuid: string }
         Returns: number
@@ -1247,6 +1373,10 @@ export type Database = {
       get_label_available_balance: {
         Args: { label_uuid: string }
         Returns: number
+      }
+      increment_follower_count: {
+        Args: { artist_id: string }
+        Returns: undefined
       }
       increment_play_count: { Args: { _song_id: string }; Returns: undefined }
     }
