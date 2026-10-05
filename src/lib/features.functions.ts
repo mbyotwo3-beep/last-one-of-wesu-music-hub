@@ -64,7 +64,7 @@ export const upsertFeaturedSlot = createServerFn({ method: "POST" })
     // getHomeFeatured, so typos created invisible dead slots.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const table = TARGET_TABLE[data.target_type];
-    const { data: target } = await supabaseAdmin
+    const { data: target } = await (supabaseAdmin as any)
       .from(table)
       .select("id")
       .eq("id", data.target_id)

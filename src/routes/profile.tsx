@@ -43,11 +43,11 @@ function Page() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    supabase
+    Promise.resolve(supabase
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
-      .maybeSingle()
+      .maybeSingle())
       .then(({ data }) => {
         if (cancelled) return;
         if (data) {
