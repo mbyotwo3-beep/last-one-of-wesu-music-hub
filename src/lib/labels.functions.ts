@@ -443,6 +443,20 @@ export const getLabelPayoutBalance = createServerFn({ method: "GET" })
     return { available };
   });
 
+export const listLabelPayouts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { label_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertLabelManager(context.supabase, context.userId, data.label_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: payouts } = await supabaseAdmin
+      .from("payouts")
+      .select("id, amount, method_code, destination, status, requested_at, processed_at, notes")
+      .eq("label_id", data.label_id)
+      .order("requested_at", { ascending: false });
+    return payouts ?? [];
+  });
+
 export const requestLabelPayout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(

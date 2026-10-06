@@ -53,7 +53,7 @@ export const DEFAULT_SITE: SiteConfig = {
   name: "Wesu+",
   support_email: "support@wesu.app",
   commission_pct: 20,
-  url: "https://www.wesuplusly.com",
+  url: "https://www.wesuplus.com",
   description: "Stream Zambian and African music. Buy songs and albums with Mobile Money or card.",
   twitter_handle: "@wesuplus",
   mobile_app_url: "",

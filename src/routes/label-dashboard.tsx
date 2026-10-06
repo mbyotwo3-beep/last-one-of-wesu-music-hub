@@ -15,6 +15,7 @@ import {
   removeArtistFromLabel,
   requestLabelPayout,
   getLabelPayoutBalance,
+  listLabelPayouts,
   updateLabel,
   listLabelReleaseRequests,
   respondToLabelReleaseRequest,
@@ -471,9 +472,16 @@ function Payouts({ labelId }: { labelId: string }) {
   const fn = useServerFn(requestLabelPayout);
   const withdrawalFn = useServerFn(getWithdrawalConfig);
   const balanceFn = useServerFn(getLabelPayoutBalance);
+  const listPayoutsFn = useServerFn(listLabelPayouts);
+
   const { data: balanceData } = useQuery({
     queryKey: ["label-payout-balance", labelId],
     queryFn: () => balanceFn({ data: { label_id: labelId } }),
+    retry: false,
+  });
+  const { data: payouts } = useQuery({
+    queryKey: ["label-payouts", labelId],
+    queryFn: () => listPayoutsFn({ data: { label_id: labelId } }),
     retry: false,
   });
   const { data: withdrawalConfig } = useQuery({
@@ -486,6 +494,7 @@ function Payouts({ labelId }: { labelId: string }) {
     onSuccess: () => {
       toast.success("💵 Payout request submitted successfully!");
       qc.invalidateQueries({ queryKey: ["label-payout-balance", labelId] });
+      qc.invalidateQueries({ queryKey: ["label-payouts", labelId] });
     },
     onError: (error) => {
       toast.error(`Payout request failed: ${error.message}`);
@@ -501,69 +510,120 @@ function Payouts({ labelId }: { labelId: string }) {
   });
 
   return (
-    <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
-      <div className="bg-card border border-border rounded-2xl p-6">
-        <p className="text-sm text-muted-foreground">Available earnings</p>
-        <p className="text-3xl font-bold mt-1">ZMW {availableBalance.toFixed(2)}</p>
-        <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
-          {eligible
-            ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
-            : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`}
+    <div className="space-y-6">
+      <div className={`space-y-6 ${!eligible ? "opacity-60" : ""}`}>
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <p className="text-sm text-muted-foreground">Available earnings</p>
+          <p className="text-3xl font-bold mt-1">ZMW {availableBalance.toFixed(2)}</p>
+          <div className={`mt-2 text-xs ${eligible ? "text-primary" : "text-amber-500"}`}>
+            {eligible
+              ? `✓ You can withdraw (Minimum: K${minWithdrawal})`
+              : `⚠️ You can only apply for withdrawal when your available money is over K${minWithdrawal} (Current: K${availableBalance.toFixed(2)})`}
+          </div>
         </div>
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (form.amount < minWithdrawal) {
-            toast.error(`Minimum withdrawal amount is K${minWithdrawal}`);
-            return;
-          }
-          m.mutate({ data: { label_id: labelId, ...form } });
-        }}
-        className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-md"
-      >
-        <h3 className="font-semibold">Request label payout</h3>
-        <label className="block text-xs text-muted-foreground">
-          Withdrawal amount (Minimum K{minWithdrawal})
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (form.amount < minWithdrawal) {
+              toast.error(`Minimum withdrawal amount is K${minWithdrawal}`);
+              return;
+            }
+            m.mutate({ data: { label_id: labelId, ...form } });
+          }}
+          className="bg-card border border-border rounded-2xl p-6 space-y-3 max-w-md"
+        >
+          <h3 className="font-semibold">Request label payout</h3>
+          <label className="block text-xs text-muted-foreground">
+            Withdrawal amount (Minimum K{minWithdrawal})
+            <input
+              required
+              type="number"
+              min={minWithdrawal}
+              step="0.01"
+              placeholder="Amount"
+              className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+            />
+          </label>
+          <select
+            className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            value={form.method_code}
+            onChange={(e) => setForm({ ...form, method_code: e.target.value })}
+          >
+            <option value="MTN_MOMO">MTN Mobile Money</option>
+            <option value="AIRTEL_MONEY">Airtel Money</option>
+            <option value="ZAMTEL_KWACHA">Zamtel Kwacha</option>
+            <option value="BANK">Bank transfer</option>
+          </select>
           <input
             required
-            type="number"
-            min={minWithdrawal}
-            step="0.01"
-            placeholder="Amount"
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+            placeholder="Destination (phone or account number)"
+            className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+            value={form.destination}
+            onChange={(e) => setForm({ ...form, destination: e.target.value })}
           />
-        </label>
-        <select
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.method_code}
-          onChange={(e) => setForm({ ...form, method_code: e.target.value })}
-        >
-          <option value="MTN_MOMO">MTN Mobile Money</option>
-          <option value="AIRTEL_MONEY">Airtel Money</option>
-          <option value="ZAMTEL_KWACHA">Zamtel Kwacha</option>
-          <option value="BANK">Bank transfer</option>
-        </select>
-        <input
-          required
-          placeholder="Destination"
-          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-          value={form.destination}
-          onChange={(e) => setForm({ ...form, destination: e.target.value })}
-        />
-        {m.error && <p className="text-sm text-destructive">{(m.error as Error).message}</p>}
-        {m.isSuccess && (
-          <p className="text-sm text-primary">Submitted — pending superadmin approval.</p>
+          {m.error && <p className="text-sm text-destructive">{(m.error as Error).message}</p>}
+          {m.isSuccess && (
+            <p className="text-sm text-primary">Submitted — pending review.</p>
+          )}
+          <button
+            disabled={!eligible || m.isPending}
+            className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {m.isPending ? "Submitting..." : "Request Payout"}
+          </button>
+        </form>
+      </div>
+
+      {/* Payout History */}
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <h3 className="font-semibold mb-4">Payout History</h3>
+        {(payouts ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No payout requests yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50 text-muted-foreground text-xs uppercase">
+                <tr>
+                  <th className="text-left p-3">Requested</th>
+                  <th className="text-left p-3">Amount</th>
+                  <th className="text-left p-3">Method</th>
+                  <th className="text-left p-3">Destination</th>
+                  <th className="text-left p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(payouts ?? []).map((p: any) => (
+                  <tr key={p.id}>
+                    <td className="p-3 text-xs text-muted-foreground">
+                      {new Date(p.requested_at).toLocaleDateString()}
+                    </td>
+                    <td className="p-3 font-semibold text-foreground">
+                      ZMW {Number(p.amount).toFixed(2)}
+                    </td>
+                    <td className="p-3 text-xs">{p.method_code}</td>
+                    <td className="p-3 text-xs font-mono">{p.destination}</td>
+                    <td className="p-3">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize ${
+                          ["approved", "paid", "completed"].includes(p.status)
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : p.status === "rejected"
+                              ? "bg-destructive/15 text-destructive"
+                              : "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400"
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        <button
-          disabled={!eligible || m.isPending}
-          className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {m.isPending ? "Submitting..." : "Request Payout"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }

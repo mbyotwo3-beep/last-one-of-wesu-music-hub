@@ -643,7 +643,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // Validate URL. Offline copies are same-tab Blob URLs (never touch
         // the network); remote URLs must be absolute HTTPS/HTTP so the
         // browser can't resolve a bare filename against the current origin
-        // (which caused the OpaqueResponseBlocking errors on wesuplusly.com).
+        // (which caused the OpaqueResponseBlocking errors on wesuplus.com).
         const isUsableUrl = !!url && (offline || /^https?:\/\//i.test(url) || /^blob:/i.test(url));
         if (!isUsableUrl) {
           throw new Error("Audio unavailable (invalid URL)");

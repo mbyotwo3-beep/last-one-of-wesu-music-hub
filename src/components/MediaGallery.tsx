@@ -169,7 +169,7 @@ export function MediaGallery() {
                 {/* Preview */}
                 {file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                   <img
-                    src={`https://wesuplusly.supabase.co/storage/v1/object/public/${file.bucket_id}/${file.name}`}
+                    src={supabase.storage.from(file.bucket_id).getPublicUrl(file.name).data.publicUrl}
                     alt={file.name}
                     className="w-full h-full object-cover"
                     loading="lazy"

@@ -2615,14 +2615,39 @@ function PayoutTab() {
           <p className="text-sm text-muted-foreground">No requests yet.</p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {(payouts ?? []).map((p: any) => (
-              <li key={p.id} className="flex justify-between">
-                <span>
-                  ZMW {Number(p.amount).toFixed(2)} • {p.method_code}
-                </span>
-                <span className="text-xs text-muted-foreground">{p.status}</span>
-              </li>
-            ))}
+            {(payouts ?? []).map((p: any) => {
+              const code = (p.method_code || "").toUpperCase();
+              const label = code.includes("MTN")
+                ? "MTN Mobile Money"
+                : code.includes("AIRTEL")
+                  ? "Airtel Money"
+                  : code.includes("ZAMTEL")
+                    ? "Zamtel Kwacha"
+                    : code.includes("BANK")
+                      ? "Bank Transfer"
+                      : "Wesu+ Payment";
+              return (
+                <li key={p.id} className="flex justify-between items-center py-1">
+                  <div>
+                    <span className="font-medium text-foreground">
+                      ZMW {Number(p.amount).toFixed(2)}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">• {label}</span>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full capitalize ${
+                      ["approved", "paid", "completed"].includes(p.status)
+                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                        : p.status === "rejected"
+                          ? "bg-destructive/15 text-destructive"
+                          : "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400"
+                    }`}
+                  >
+                    {p.status}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

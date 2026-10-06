@@ -47,7 +47,7 @@ export function validateSettingsValue(key: string, value: unknown): string | nul
   switch (key) {
     case "site": {
       if (value.url !== undefined && !validHttpUrl(value.url)) {
-        return "Site URL must be a valid http(s) address (e.g. https://www.wesuplusly.com)";
+        return "Site URL must be a valid http(s) address (e.g. https://www.wesuplus.com)";
       }
       const commission = checkRange(value, "commission_pct", 0, 100);
       if (commission) return commission;

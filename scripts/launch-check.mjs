@@ -8,7 +8,7 @@
  * Catalog size is the churn driver that no amount of bug fixing can solve, so
  * it is checked first and fails loudly. Run: node scripts/launch-check.mjs
  */
-const BASE = process.env.SMOKE_BASE ?? "https://www.wesuplusly.com";
+const BASE = process.env.SMOKE_BASE ?? "https://www.wesuplus.com";
 
 const ROUTES = [
   "/", "/artists", "/albums", "/hot-tracks", "/new-music", "/must-have",

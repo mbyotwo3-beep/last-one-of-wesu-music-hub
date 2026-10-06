@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // Server-safe app URL — window doesn't exist in server functions.
 function appUrl() {
-  return process.env.APP_URL || "https://www.wesuplusly.com";
+  return process.env.APP_URL || "https://www.wesuplus.com";
 }
 
 async function audit(

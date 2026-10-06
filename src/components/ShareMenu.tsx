@@ -272,7 +272,7 @@ export function ShareMenu({
 
   const handleCopyLink = async () => {
     // Use the current page's base URL to ensure we get the correct domain
-    // This handles both wesuplus.com and wesuplusly.com correctly
+    // This handles wesuplus.com correctly
     const baseUrl = window.location.origin;
     let url = baseUrl;
     let title = "";

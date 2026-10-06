@@ -22,6 +22,7 @@ import { useUserRoles } from "@/hooks/use-roles";
 import { usePlatform, useIsMobile } from "@/hooks/use-platform";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { getMyArtistAnalytics } from "@/lib/analytics.functions";
+import { getMyEarningsDetail } from "@/lib/financials.functions";
 import {
   requestArtistVerification,
   deleteSong,
@@ -33,6 +34,7 @@ import { useCurrency } from "@/stores/currency";
 import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
+import { EarningsSection } from "@/components/EarningsSection";
 
 export const Route = createFileRoute("/artist-dashboard")({
   head: () => ({
@@ -53,6 +55,7 @@ function ArtistDashboardPage() {
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getMyArtistOverview);
   const fetchAnalytics = useServerFn(getMyArtistAnalytics);
+  const fetchEarnings = useServerFn(getMyEarningsDetail);
   const requestVerificationFn = useServerFn(requestArtistVerification);
   const verificationConfigFn = useServerFn(getVerificationConfig);
   const deleteSongFn = useServerFn(deleteSong);
@@ -82,6 +85,13 @@ function ArtistDashboardPage() {
     queryFn: () => fetchAnalytics(),
     enabled: !!user,
     staleTime: 60_000,
+  });
+
+  const { data: earningsDetail, isLoading: earningsLoading } = useQuery({
+    queryKey: ["artist-earnings-detail", user?.id],
+    queryFn: () => fetchEarnings(),
+    enabled: !!user,
+    staleTime: 120_000,
   });
 
   const { data: verificationConfig } = useQuery({
@@ -277,6 +287,10 @@ function ArtistDashboardPage() {
 
         <div className="mb-8">
           <AnalyticsSection data={analytics} scope="artist" title="Audience analytics" />
+        </div>
+
+        <div className="mb-8">
+          <EarningsSection data={earningsDetail as any} isLoading={earningsLoading} />
         </div>
 
         {/* Verification Status Banner / Application Card */}

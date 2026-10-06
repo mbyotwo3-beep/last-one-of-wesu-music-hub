@@ -131,7 +131,7 @@ public class MainActivity extends BridgeActivity {
                 + "<p>Your music and downloads are safe — nothing has been lost.</p>"
                 // After updating, the user returns to a page with no way back
                 // into the app (this HTML replaced the app URL). Offer reload.
-                + "<p><a href=\"https://www.wesuplusly.com/\" style=\"display:inline-block;"
+                + "<p><a href=\"https://www.wesuplus.com/\" style=\"display:inline-block;"
                 + "margin-top:8px;padding:12px 32px;border-radius:999px;"
                 + "background:#f5c518;color:#111;text-decoration:none;"
                 + "font-weight:700\">Try again</a></p>"

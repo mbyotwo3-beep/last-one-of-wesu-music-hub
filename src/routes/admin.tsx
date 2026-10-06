@@ -59,6 +59,7 @@ import { CarouselBuilder } from "@/components/CarouselBuilder";
 import { HeroCarouselBuilder } from "@/components/HeroCarouselBuilder";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { MediaGallery } from "@/components/MediaGallery";
+import { AdminFinancials } from "@/components/AdminFinancials";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — Wesu+" }] }),
@@ -84,6 +85,7 @@ type Tab =
   | "labels"
   | "payouts"
   | "payments"
+  | "financials"
   | "support"
   | "carousels"
   | "hero-carousel"
@@ -143,6 +145,7 @@ function AdminPage() {
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
     { id: "payouts", label: "Payouts" },
     { id: "payments", label: "Transaction Reconciliation" },
+    { id: "financials", label: "💰 Financial Analytics" },
     {
       id: "support",
       label: "Support",
@@ -201,6 +204,7 @@ function AdminPage() {
         {tab === "labels" && <LabelMod />}
         {tab === "payouts" && <PayoutMod />}
         {tab === "payments" && <PaymentsMod />}
+        {tab === "financials" && <AdminFinancials />}
         {tab === "support" && <SupportMod />}
         {tab === "carousels" && <CarouselBuilder />}
         {tab === "hero-carousel" && <HeroCarouselBuilder />}
@@ -1265,11 +1269,14 @@ function PayoutMod() {
   const listFn = useServerFn(listPayoutsForStaff);
   const reviewFn = useServerFn(reviewPayout);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected">("all");
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["staff-payouts"],
     queryFn: () => listFn(),
     retry: false,
   });
+
   const review = useMutation({
     mutationFn: reviewFn,
     onSuccess: (_, variables) => {
@@ -1278,6 +1285,8 @@ function PayoutMod() {
       qc.invalidateQueries({ queryKey: ["super-payouts"] });
       qc.invalidateQueries({ queryKey: ["super-payouts-overview"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["platform-financials"] });
+      qc.invalidateQueries({ queryKey: ["all-artist-financials"] });
     },
     onError: (err) => toast.error(`Payout review failed: ${(err as Error).message}`),
   });
@@ -1300,97 +1309,209 @@ function PayoutMod() {
 
   const payouts = data ?? [];
   const pending = payouts.filter((p: any) => p.status === "pending");
+  const nonPending = payouts.filter((p: any) => p.status !== "pending");
+
+  const totalPendingAmount = pending.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+  const totalApprovedAmount = payouts
+    .filter((p: any) => ["approved", "paid", "completed"].includes(p.status))
+    .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+  const totalRejectedAmount = payouts
+    .filter((p: any) => p.status === "rejected")
+    .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+
+  const filteredHistory = nonPending.filter((p: any) => {
+    if (historyFilter === "all") return true;
+    if (historyFilter === "approved") return ["approved", "paid", "completed"].includes(p.status);
+    if (historyFilter === "rejected") return p.status === "rejected";
+    return true;
+  });
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Payout requests</h2>
+        <h2 className="text-xl font-bold">Payout Moderation &amp; Review</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review completed-sale earnings before sending funds. Approving a request records the
-          review; it does not initiate a bank or mobile-money transfer.
+          Review artist payout requests before funds are disbursed. Approving records internal approval.
+          Payments are fulfilled via integrated mobile money / payment rails (Lenco internal gateway).
         </p>
       </div>
 
-      {pending.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6">
-          <CheckCircle2 className="size-5 text-primary" />
-          <p className="text-sm text-muted-foreground">No payout requests await review.</p>
+      {/* Summary metric cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+          <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">Awaiting Review</p>
+          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            ZMW {totalPendingAmount.toFixed(2)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{pending.length} pending requests</p>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {pending.map((p: any) => {
-            const payee = p.label?.name
-              ? `Label: ${p.label.name}`
-              : `Artist: ${p.artist?.name ?? "Unknown"}`;
-            return (
-              <div key={p.id} className="rounded-2xl border border-border bg-card p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-semibold">{payee}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      ZMW {Number(p.amount).toFixed(2)} · {p.method_code} · requested{" "}
-                      {new Date(p.requested_at).toLocaleString()}
-                    </p>
-                    <p className="mt-1 break-all text-xs text-muted-foreground">
-                      Destination: {p.destination}
-                    </p>
-                  </div>
-                  <span className="w-fit rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-semibold text-yellow-500">
-                    Pending review
-                  </span>
-                </div>
-                <label className="mt-4 block text-xs font-medium text-muted-foreground">
-                  Review note (optional)
-                  <input
-                    value={notes[p.id] ?? ""}
-                    onChange={(event) =>
-                      setNotes((current) => ({ ...current, [p.id]: event.target.value }))
-                    }
-                    maxLength={1000}
-                    placeholder="Visible in the audit trail"
-                    className="mt-1 w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    disabled={review.isPending}
-                    onClick={() => confirmReview(p.id, "approved")}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
-                  >
-                    <Check className="size-3" /> Approve review
-                  </button>
-                  <button
-                    disabled={review.isPending}
-                    onClick={() => confirmReview(p.id, "rejected")}
-                    className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
-                  >
-                    <X className="size-3" /> Reject
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Approved / Disbursed</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            ZMW {totalApprovedAmount.toFixed(2)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Successfully approved</p>
         </div>
-      )}
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+          <p className="text-xs font-medium text-destructive">Rejected / Cancelled</p>
+          <p className="mt-1 text-2xl font-bold text-destructive">
+            ZMW {totalRejectedAmount.toFixed(2)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Declined requests</p>
+        </div>
+      </div>
 
-      {payouts.filter((p: any) => p.status !== "pending").length > 0 && (
+      {/* Pending Payouts List */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Requests Awaiting Action ({pending.length})
+        </h3>
+        {pending.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6">
+            <CheckCircle2 className="size-5 text-primary" />
+            <p className="text-sm text-muted-foreground">No payout requests await review right now.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pending.map((p: any) => {
+              const payee = p.label?.name
+                ? `Label: ${p.label.name}`
+                : `Artist: ${p.artist?.name ?? "Unknown"}`;
+              return (
+                <div key={p.id} className="rounded-2xl border border-border bg-card p-5 space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground text-base">{payee}</span>
+                        {p.artist?.id && (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            ID: {p.artist.id.slice(0, 8)}…
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="rounded-lg bg-secondary/50 p-2">
+                          <span className="text-muted-foreground block">Requested Amount</span>
+                          <span className="font-bold text-sm text-foreground">
+                            ZMW {Number(p.amount).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-secondary/50 p-2">
+                          <span className="text-muted-foreground block">Method (Gateway)</span>
+                          <span className="font-medium text-foreground">{p.method_code}</span>
+                        </div>
+                        <div className="rounded-lg bg-secondary/50 p-2">
+                          <span className="text-muted-foreground block">Destination</span>
+                          <span className="font-mono text-foreground">{p.destination}</span>
+                        </div>
+                        <div className="rounded-lg bg-secondary/50 p-2">
+                          <span className="text-muted-foreground block">Requested At</span>
+                          <span className="text-foreground">
+                            {new Date(p.requested_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="w-fit rounded-full bg-yellow-500/15 px-3 py-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                      Pending review
+                    </span>
+                  </div>
+
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Review note / audit comment (optional)
+                    <input
+                      value={notes[p.id] ?? ""}
+                      onChange={(event) =>
+                        setNotes((current) => ({ ...current, [p.id]: event.target.value }))
+                      }
+                      maxLength={1000}
+                      placeholder="e.g. Bank ref #12345, verified artist phone..."
+                      className="mt-1 w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </label>
+
+                  <div className="flex gap-2 pt-1 border-t border-border">
+                    <button
+                      disabled={review.isPending}
+                      onClick={() => confirmReview(p.id, "approved")}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Check className="size-3.5" /> Approve Payout
+                    </button>
+                    <button
+                      disabled={review.isPending}
+                      onClick={() => confirmReview(p.id, "rejected")}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-4 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                    >
+                      <X className="size-3.5" /> Reject Request
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Reviewed / Payout History */}
+      {nonPending.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="border-b border-border px-5 py-3 text-sm font-semibold">
-            Reviewed requests
+          <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+            <div className="text-sm font-semibold">Reviewed &amp; Processed Requests ({nonPending.length})</div>
+            <div className="flex gap-1">
+              {(["all", "approved", "rejected"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setHistoryFilter(tab)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                    historyFilter === tab
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="divide-y divide-border">
-            {payouts
-              .filter((p: any) => p.status !== "pending")
-              .map((p: any) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3 text-sm"
-                >
-                  <span>{p.label?.name ?? p.artist?.name ?? "Unknown payee"}</span>
-                  <span className="text-muted-foreground">ZMW {Number(p.amount).toFixed(2)}</span>
-                  <span className="capitalize text-muted-foreground">{p.status}</span>
-                </div>
-              ))}
+            {filteredHistory.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">No records match filter.</div>
+            ) : (
+              filteredHistory.map((p: any) => {
+                const isApproved = ["approved", "paid", "completed"].includes(p.status);
+                return (
+                  <div
+                    key={p.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {p.label?.name ? `Label: ${p.label.name}` : p.artist?.name ?? "Unknown artist"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {p.destination} · {p.method_code} · {new Date(p.requested_at).toLocaleDateString()}
+                        {p.notes && ` · Note: "${p.notes}"`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-foreground">
+                        ZMW {Number(p.amount).toFixed(2)}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                          isApproved
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : "bg-destructive/15 text-destructive"
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

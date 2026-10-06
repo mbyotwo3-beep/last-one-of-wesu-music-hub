@@ -39,6 +39,7 @@ import {
   upsertFeaturedSlot,
   removeFeaturedSlot,
 } from "@/lib/features.functions";
+import { AdminFinancials } from "@/components/AdminFinancials";
 
 export const Route = createFileRoute("/superadmin")({
   head: () => ({ meta: [{ title: "Superadmin — Wesu+" }] }),
@@ -56,7 +57,7 @@ function SuperadminRoute() {
 }
 
 type Tab =
-  "overview" | "users" | "payments" | "settings" | "payouts" | "labels" | "featured" | "audit";
+  "overview" | "users" | "payments" | "settings" | "payouts" | "labels" | "featured" | "audit" | "financials";
 
 function SuperadminPage() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -67,6 +68,7 @@ function SuperadminPage() {
     { id: "payouts", label: "Payout Decisions", icon: Wallet },
     { id: "labels", label: "Labels", icon: Building2 },
     { id: "featured", label: "Featured", icon: Star },
+    { id: "financials", label: "💰 Financial Analytics", icon: CreditCard },
     { id: "settings", label: "Settings", icon: SettingsIcon },
     { id: "audit", label: "Audit Log", icon: FileText },
   ];
@@ -104,6 +106,7 @@ function SuperadminPage() {
         {tab === "payouts" && <PayoutsTab />}
         {tab === "labels" && <LabelsTab />}
         {tab === "featured" && <FeaturedTab />}
+        {tab === "financials" && <AdminFinancials />}
         {tab === "settings" && <SettingsTab />}
         {tab === "audit" && <AuditTab />}
       </div>

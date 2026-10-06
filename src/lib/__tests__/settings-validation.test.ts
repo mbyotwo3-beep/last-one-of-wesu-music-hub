@@ -5,7 +5,7 @@ describe("platform settings validation (misconfig breaks flows globally)", () =>
   it("accepts sane site settings", () => {
     expect(
       validateSettingsValue("site", {
-        url: "https://www.wesuplusly.com",
+        url: "https://www.wesuplus.com",
         commission_pct: 20,
         support_email: "support@wesu.app",
         mobile_app_url: "",

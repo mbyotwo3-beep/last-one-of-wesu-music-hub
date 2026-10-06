@@ -3,7 +3,7 @@ import { parseAuthCallbackUrl } from "@/integrations/supabase/auth-deep-link";
 
 describe("native auth deep-link parsing", () => {
   it("ignores non-callback URLs", () => {
-    expect(parseAuthCallbackUrl("https://www.wesuplusly.com/dashboard").isLoginCallback).toBe(
+    expect(parseAuthCallbackUrl("https://www.wesuplus.com/dashboard").isLoginCallback).toBe(
       false,
     );
   });

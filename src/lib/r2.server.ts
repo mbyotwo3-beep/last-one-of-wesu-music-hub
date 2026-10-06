@@ -19,8 +19,9 @@ const R2_ENDPOINT = "https://231415d20c628abc20c285627e045eb0.r2.cloudflarestora
 const R2_BUCKET = "wesu";
 
 function credentials() {
-  const accessKeyId = process.env["R2_ACCESS_KEY_ID"];
-  const secretAccessKey = process.env["R2_SECRET_ACCESS_KEY"];
+  const envObj = ((globalThis as any).__env__ ?? {}) as Record<string, string | undefined>;
+  const accessKeyId = process.env["R2_ACCESS_KEY_ID"] || envObj["R2_ACCESS_KEY_ID"];
+  const secretAccessKey = process.env["R2_SECRET_ACCESS_KEY"] || envObj["R2_SECRET_ACCESS_KEY"];
   if (!accessKeyId || !secretAccessKey) return null;
   return { accessKeyId, secretAccessKey };
 }

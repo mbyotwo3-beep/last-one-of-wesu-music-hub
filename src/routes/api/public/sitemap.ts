@@ -28,7 +28,7 @@ async function origin() {
     const siteConfig = await getSiteConfigServer();
     return (process.env["APP_URL"] || siteConfig.url).replace(/\/+$/, "");
   } catch {
-    return (process.env["APP_URL"] || "https://www.wesuplusly.com").replace(/\/+$/, "");
+    return (process.env["APP_URL"] || "https://www.wesuplus.com").replace(/\/+$/, "");
   }
 }
 
