@@ -184,6 +184,97 @@ export const listPendingArtists = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const listAllArtists = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d?: { status?: string; search?: string }) => d || {})
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let query = supabaseAdmin
+      .from("artists")
+      .select("id,name,bio,genre,status,verified,created_at,user_id")
+      .order("created_at", { ascending: false });
+
+    if (data?.status && data.status !== "all") {
+      query = query.eq("status", data.status);
+    }
+    if (data?.search && data.search.trim()) {
+      query = query.ilike("name", `%${data.search.trim()}%`);
+    }
+
+    const { data: artists, error } = await query.limit(500);
+    if (error) throw new Error(error.message);
+    return artists ?? [];
+  });
+
+export const suspendArtist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; reason?: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Get artist's user_id
+    const { data: artist, error: fetchErr } = await supabaseAdmin
+      .from("artists")
+      .select("user_id")
+      .eq("id", data.id)
+      .single();
+    if (fetchErr || !artist) throw new Error("Artist not found");
+
+    // Set status to suspended
+    const { error } = await supabaseAdmin
+      .from("artists")
+      .update({ status: "suspended" } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    // Revoke the artist role so they lose artist access immediately
+    await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", artist.user_id)
+      .eq("role", "artist");
+
+    await audit(context.userId, "artist.suspended", "artist", data.id, {
+      reason: data.reason ?? null,
+    });
+    return { ok: true };
+  });
+
+export const unsuspendArtist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: artist, error: fetchErr } = await supabaseAdmin
+      .from("artists")
+      .select("user_id")
+      .eq("id", data.id)
+      .single();
+    if (fetchErr || !artist) throw new Error("Artist not found");
+
+    // Restore to approved
+    const { error } = await supabaseAdmin
+      .from("artists")
+      .update({ status: "approved" } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    // Re-grant the artist role
+    await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: artist.user_id, role: "artist" } as any, {
+        onConflict: "user_id,role",
+      });
+
+    await audit(context.userId, "artist.unsuspended", "artist", data.id);
+    return { ok: true };
+  });
+
 export const moderateArtist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { id: string; status: "approved" | "rejected"; verified?: boolean }) => d)

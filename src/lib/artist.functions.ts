@@ -96,11 +96,11 @@ export const applyAsArtist = createServerFn({ method: "POST" })
       .select("id, status")
       .eq("user_id", userId)
       .maybeSingle();
-    if (existing && existing.status !== "rejected") {
+    if (existing && existing.status !== "rejected" && existing.status !== "suspended") {
       return { ok: true, status: existing.status, id: existing.id };
     }
 
-    if (existing && existing.status === "rejected") {
+    if (existing && (existing.status === "rejected" || existing.status === "suspended")) {
       const { data: row, error } = await supabase
         .from("artists")
         .update({
@@ -113,7 +113,8 @@ export const applyAsArtist = createServerFn({ method: "POST" })
         .select("id, status")
         .single();
       if (error) throw new Error(error.message);
-      await audit(supabase, userId, "artist.reapply", "artist", row!.id, {
+      const action = existing.status === "suspended" ? "artist.reapply_after_suspension" : "artist.reapply";
+      await audit(supabase, userId, action, "artist", row!.id, {
         terms_version: termsVersion,
         terms_accepted_at: termsAcceptedAt,
       });

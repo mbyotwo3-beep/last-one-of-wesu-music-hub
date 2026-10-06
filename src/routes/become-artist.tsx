@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Mic2, Clock, CheckCircle2, XCircle, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { GenreSelect } from "@/components/GenreSelect";
@@ -110,14 +110,51 @@ function Page() {
     );
   }
 
+  const suspended = artist?.status === "suspended";
   const rejected = artist?.status === "rejected";
+
+  if (suspended && !form.name) {
+    // Show suspension notice first; user must explicitly click to re-apply
+    return (
+      <div className="max-w-xl mx-auto px-6 py-16 text-center">
+        <div className="inline-flex items-center justify-center size-14 rounded-full bg-orange-500/10 mb-4">
+          <Ban className="size-6 text-orange-500" />
+        </div>
+        <h1 className="text-3xl font-bold mb-2">Account Suspended</h1>
+        <p className="text-muted-foreground mb-6">
+          Your artist account has been suspended by our moderation team. You may re-apply by
+          agreeing to our updated Terms &amp; Conditions and submitting a new application for
+          review.
+        </p>
+        <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-5 mb-8 text-left">
+          <p className="text-sm font-semibold text-orange-500 mb-2">Before you re-apply:</p>
+          <ul className="text-sm text-muted-foreground space-y-1.5 list-disc list-inside">
+            <li>Review our Artist Terms &amp; Conditions carefully</li>
+            <li>Ensure your content complies with our community guidelines</li>
+            <li>Understand that repeated violations may result in permanent removal</li>
+          </ul>
+        </div>
+        <button
+          onClick={() => setForm({ ...form, name: artist?.name ?? " " })}
+          className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:brightness-110 transition-all"
+        >
+          I Understand — Re-apply
+        </button>
+        <div className="mt-4">
+          <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xl mx-auto px-6 py-16">
       <div className="flex items-center gap-3 mb-6">
         <Mic2 className="size-6 text-primary" />
         <h1 className="text-3xl font-bold">
-          {rejected ? "Reapply as an Artist" : "Become an Artist"}
+          {suspended ? "Re-apply After Suspension" : rejected ? "Reapply as an Artist" : "Become an Artist"}
         </h1>
       </div>
       {rejected && (
@@ -125,6 +162,16 @@ function Page() {
           <XCircle className="size-5 text-destructive shrink-0 mt-0.5" />
           <div className="text-sm">
             Your previous application was not approved. Update your details and submit again.
+          </div>
+        </div>
+      )}
+      {suspended && (
+        <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex gap-3">
+          <Ban className="size-5 text-orange-500 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            Your account was previously suspended. By submitting this application and agreeing to
+            our Terms &amp; Conditions, you acknowledge you will not breach our platform rules.
+            Repeated violations may result in permanent removal.
           </div>
         </div>
       )}

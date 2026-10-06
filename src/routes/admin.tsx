@@ -5,7 +5,6 @@ import {
   Users,
   Music,
   Shield,
-  BarChart3,
   Check,
   X,
   Building2,
@@ -16,9 +15,15 @@ import {
   CreditCard,
   Trash2,
   Search,
-  Filter,
   Play,
   Pause,
+  Ban,
+  RotateCcw,
+  ChevronRight,
+  DollarSign,
+  Wallet,
+  ArrowLeft,
+  BadgeCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -34,7 +39,10 @@ import {
   listPendingAlbums,
   moderateAlbum,
   listPendingArtists,
+  listAllArtists,
   moderateArtist,
+  suspendArtist,
+  unsuspendArtist,
   listPendingVerifications,
   moderateArtistVerification,
   listPendingLabels,
@@ -60,6 +68,7 @@ import { HeroCarouselBuilder } from "@/components/HeroCarouselBuilder";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { MediaGallery } from "@/components/MediaGallery";
 import { AdminFinancials } from "@/components/AdminFinancials";
+import { getArtistFinancialsById } from "@/lib/financials.functions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — Wesu+" }] }),
@@ -980,9 +989,61 @@ function SongMod() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Artists moderation (applications only)
+// Artists moderation — Pending applications + Full Artist List
 // ─────────────────────────────────────────────────────────────
 function ArtistMod() {
+  const [subTab, setSubTab] = useState<"pending" | "all">("pending");
+  const [drillArtistId, setDrillArtistId] = useState<string | null>(null);
+  const [drillArtistName, setDrillArtistName] = useState<string>("");
+
+  if (drillArtistId) {
+    return (
+      <ArtistFinancialDrillDown
+        artistId={drillArtistId}
+        artistName={drillArtistName}
+        onBack={() => setDrillArtistId(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-border pb-3">
+        <button
+          onClick={() => setSubTab("pending")}
+          className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+            subTab === "pending"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Pending Applications
+        </button>
+        <button
+          onClick={() => setSubTab("all")}
+          className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+            subTab === "all"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          All Artists
+        </button>
+      </div>
+      {subTab === "pending" && <PendingArtistApplications />}
+      {subTab === "all" && (
+        <AllArtistsList
+          onDrillDown={(id, name) => {
+            setDrillArtistId(id);
+            setDrillArtistName(name);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PendingArtistApplications() {
   const qc = useQueryClient();
   const list = useServerFn(listPendingArtists);
   const mod = useServerFn(moderateArtist);
@@ -1001,10 +1062,13 @@ function ArtistMod() {
     mutationFn: mod,
     onSuccess: (_, variables) => {
       toast.success(
-        `Artist application ${variables.data.status === "approved" ? "approved" : "rejected"} successfully`,
+        `Artist application ${
+          variables.data.status === "approved" ? "approved" : "rejected"
+        } successfully`,
       );
       qc.invalidateQueries({ queryKey: ["pending-artists"] });
       qc.invalidateQueries({ queryKey: ["pending-artists-count"] });
+      qc.invalidateQueries({ queryKey: ["all-artists"] });
       qc.invalidateQueries({ queryKey: ["artist-diagnostics"] });
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
@@ -1066,6 +1130,424 @@ function ArtistMod() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AllArtistsList({
+  onDrillDown,
+}: {
+  onDrillDown: (id: string, name: string) => void;
+}) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listAllArtists);
+  const suspendFn = useServerFn(suspendArtist);
+  const unsuspendFn = useServerFn(unsuspendArtist);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [suspendReason, setSuspendReason] = useState<Record<string, string>>({});
+  const [expandSuspend, setExpandSuspend] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["all-artists", statusFilter, debouncedSearch],
+    queryFn: () => listFn({ data: { status: statusFilter, search: debouncedSearch } }),
+    retry: false,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["all-artists"] });
+    qc.invalidateQueries({ queryKey: ["pending-artists"] });
+    qc.invalidateQueries({ queryKey: ["pending-artists-count"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    qc.invalidateQueries({ queryKey: ["artist-diagnostics"] });
+  };
+
+  const suspendMut = useMutation({
+    mutationFn: suspendFn,
+    onSuccess: (_, vars) => {
+      toast.success("Artist account suspended.");
+      setExpandSuspend(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(`Suspend failed: ${(e as Error).message}`),
+  });
+
+  const unsuspendMut = useMutation({
+    mutationFn: unsuspendFn,
+    onSuccess: () => {
+      toast.success("Artist account reinstated.");
+      invalidate();
+    },
+    onError: (e) => toast.error(`Reinstate failed: ${(e as Error).message}`),
+  });
+
+  const artists = data ?? [];
+
+  function statusBadge(status: string) {
+    const map: Record<string, string> = {
+      approved: "bg-emerald-500/15 text-emerald-500",
+      pending: "bg-yellow-500/15 text-yellow-500",
+      rejected: "bg-destructive/15 text-destructive",
+      suspended: "bg-orange-500/15 text-orange-500",
+    };
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+          map[status] ?? "bg-secondary text-muted-foreground"
+        }`}
+      >
+        {status === "approved" && <BadgeCheck className="size-2.5" />}
+        {status === "suspended" && <Ban className="size-2.5" />}
+        {status === "pending" && <Clock className="size-2.5" />}
+        {status === "rejected" && <X className="size-2.5" />}
+        {status}
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-bold">All Artists ({artists.length})</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 rounded-lg bg-secondary border border-border text-xs w-48 sm:w-64 focus:outline-none focus:border-primary"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs text-foreground cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+      </div>
+
+      {isLoading && <div className="text-muted-foreground text-sm">Loading artists…</div>}
+      {error && (
+        <div className="text-destructive text-sm">Error: {(error as Error).message}</div>
+      )}
+
+      {!isLoading && artists.length === 0 && (
+        <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
+          <Users className="size-5 text-muted-foreground" />
+          <p className="text-muted-foreground text-sm">No artists match your filters.</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {artists.map((a: any) => (
+          <div
+            key={a.id}
+            className="bg-card border border-border rounded-xl overflow-hidden"
+          >
+            <div className="flex flex-wrap items-center gap-3 p-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm">{a.name}</p>
+                  {statusBadge(a.status)}
+                  {a.verified && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-400">
+                      <BadgeCheck className="size-2.5" /> Verified
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {a.genre ?? "No genre"} · Joined {new Date(a.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* View Financial Drill-Down */}
+                <button
+                  onClick={() => onDrillDown(a.id, a.name)}
+                  className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors font-semibold"
+                  title="View full revenue & payout data for this artist"
+                >
+                  <DollarSign className="size-3" /> Financials
+                  <ChevronRight className="size-3" />
+                </button>
+
+                {/* Suspend / Unsuspend */}
+                {a.status === "suspended" ? (
+                  <button
+                    disabled={unsuspendMut.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Reinstate ${a.name}'s account? They will regain full artist access.`,
+                        )
+                      ) {
+                        unsuspendMut.mutate({ data: { id: a.id } });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-500 cursor-pointer hover:bg-emerald-500/25 transition-colors font-semibold"
+                  >
+                    <RotateCcw className="size-3" /> Reinstate
+                  </button>
+                ) : a.status === "approved" ? (
+                  <button
+                    onClick={() =>
+                      setExpandSuspend(expandSuspend === a.id ? null : a.id)
+                    }
+                    className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-orange-500/15 text-orange-500 cursor-pointer hover:bg-orange-500/25 transition-colors font-semibold"
+                  >
+                    <Ban className="size-3" /> Suspend
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Suspension reason input (inline) */}
+            {expandSuspend === a.id && (
+              <div className="border-t border-border bg-orange-500/5 p-4 flex flex-col gap-3">
+                <p className="text-sm font-semibold text-orange-500 flex items-center gap-2">
+                  <Ban className="size-4" /> Suspend {a.name}'s Account
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This will immediately revoke the artist's access. They will be required to
+                  re-apply and agree to Terms &amp; Conditions before being reviewed again.
+                </p>
+                <textarea
+                  rows={2}
+                  placeholder="Reason for suspension (visible in audit log)…"
+                  value={suspendReason[a.id] ?? ""}
+                  onChange={(e) =>
+                    setSuspendReason((r) => ({ ...r, [a.id]: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm resize-none focus:outline-none focus:border-orange-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    disabled={suspendMut.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Confirm suspension of ${a.name}? This will revoke their access immediately.`,
+                        )
+                      ) {
+                        suspendMut.mutate({
+                          data: { id: a.id, reason: suspendReason[a.id] },
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 text-xs px-4 py-2 rounded-full bg-orange-500 text-white cursor-pointer hover:bg-orange-600 transition-colors font-semibold disabled:opacity-50"
+                  >
+                    <Ban className="size-3" /> Confirm Suspension
+                  </button>
+                  <button
+                    onClick={() => setExpandSuspend(null)}
+                    className="text-xs px-3 py-2 rounded-full bg-secondary text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Artist Financial Drill-Down (admin view)
+// ─────────────────────────────────────────────────────────────
+function ArtistFinancialDrillDown({
+  artistId,
+  artistName,
+  onBack,
+}: {
+  artistId: string;
+  artistName: string;
+  onBack: () => void;
+}) {
+  const getFinancials = useServerFn(getArtistFinancialsById);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["admin-artist-financials", artistId],
+    queryFn: () => getFinancials({ data: { artistId } }),
+    retry: false,
+  });
+
+  const fmt = (n: number) => `ZMW ${n.toFixed(2)}`;
+
+  return (
+    <div className="space-y-6">
+      {/* Back button + header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="size-4" /> Back to Artists
+        </button>
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <DollarSign className="size-6 text-primary" />
+          {artistName} — Financial Overview
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Complete revenue, sales, and payout history for this artist.
+        </p>
+      </div>
+
+      {isLoading && <div className="text-muted-foreground">Loading financial data…</div>}
+      {error && (
+        <div className="text-destructive">Error: {(error as Error).message}</div>
+      )}
+
+      {data && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground">Total Earned</p>
+              <p className="text-2xl font-bold text-primary mt-1">{fmt(data.totalEarned ?? 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{data.purchaseCount ?? 0} sale(s)</p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground">Total Paid Out</p>
+              <p className="text-2xl font-bold text-emerald-500 mt-1">{fmt(data.totalPaidOut ?? 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Approved &amp; disbursed</p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground">Available Balance</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{fmt(data.availableBalance ?? 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Ready to withdraw</p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground">Pending Payout Requests</p>
+              <p className="text-2xl font-bold text-yellow-500 mt-1">{fmt(data.totalPending ?? 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Awaiting approval</p>
+            </div>
+          </div>
+
+          {/* Track Sales */}
+          {data.songEarnings && data.songEarnings.length > 0 && (
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <Music className="size-4 text-primary" /> Track Sales
+              </h3>
+              <div className="space-y-2">
+                {data.songEarnings.map((t: any) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{t.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.purchaseCount ?? 0} purchase(s) · {t.plays ?? 0} play(s)
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-primary">{fmt(t.earned ?? 0)}</p>
+                      <p className="text-xs text-muted-foreground">K{t.price ?? 0} / unit</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
+
+          {/* Payout History */}
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Wallet className="size-4 text-primary" /> Payout History
+            </h3>
+            {!data.payouts || data.payouts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No payout requests yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.payouts.map((p: any) => (
+                  <div
+                    key={p.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-border last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">{fmt(Number(p.amount))}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Requested: {new Date(p.requested_at).toLocaleDateString()}
+                        {p.processed_at
+                          ? ` · Processed: ${new Date(p.processed_at).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                      {p.notes && (
+                        <p className="text-xs text-muted-foreground italic mt-0.5">{p.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {(p.method_code ?? "").replace(/_/g, " ").toUpperCase() || "—"}
+                      </span>
+                      {/* Status badge */}
+                      {(() => {
+                        const s = p.status;
+                        const cls =
+                          s === "approved" || s === "paid" || s === "completed"
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : s === "pending"
+                              ? "bg-yellow-500/15 text-yellow-500"
+                              : "bg-destructive/15 text-destructive";
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+                          >
+                            {s}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Earnings summary note */}
+          <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3 text-xs text-muted-foreground">
+            <strong>Balance breakdown:</strong> Total Earned{" "}
+            <span className="text-foreground font-semibold">{fmt(data.totalEarned ?? 0)}</span>
+            {" − "}
+            Paid Out{" "}
+            <span className="text-foreground font-semibold">{fmt(data.totalPaidOut ?? 0)}</span>
+            {" = "}
+            Available{" "}
+            <span className="text-primary font-semibold">{fmt(data.availableBalance ?? 0)}</span>
+            {(data.totalPending ?? 0) > 0 && (
+              <>
+                {" (includes "}
+                <span className="text-yellow-500 font-semibold">
+                  {fmt(data.totalPending)}
+                </span>
+                {" in pending requests)"}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
