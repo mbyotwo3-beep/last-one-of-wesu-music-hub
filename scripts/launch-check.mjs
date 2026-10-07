@@ -170,24 +170,42 @@ if (!env.url || !env.key) {
   wrn("no .env credentials — skipping catalog count");
 } else {
   const h = { apikey: env.key, Authorization: `Bearer ${env.key}` };
-  const count = async (table, cols) => {
+  const rows = async (table, cols) => {
     try {
       const r = await fetch(`${env.url}/rest/v1/${table}?select=${cols}&limit=500`, { headers: h });
       if (!r.ok) return null;
-      const rows = await r.json();
-      return Array.isArray(rows) ? rows.length : 0;
+      const body = await r.json();
+      return Array.isArray(body) ? body : [];
     } catch { return null; }
   };
-  const songs = await count("songs", "id,title,price,audio_url,cover_url,status");
-  const albums = await count("albums", "id,status");
-  const artists = await count("artists", "id,status");
-  if (songs === null) wrn("songs table not readable with the anon key");
-  else {
+  const songRows = await rows("songs", "id,title,price,audio_url,cover_url,status");
+  const albumRows = await rows("albums", "id,status");
+  const artistRows = await rows("artists", "id,status");
+  if (songRows === null) {
+    wrn("songs table not readable with the anon key");
+  } else {
+    // The anon key only sees what the public shelves expose, so these are the
+    // numbers a LISTENER sees — not total rows. A song still pending approval
+    // is invisible here, which is the point: it isn't selling anything yet.
+    const detail = (rs) => {
+      const out = {};
+      for (const r of rs) out[r.status ?? "?"] = (out[r.status ?? "?"] ?? 0) + 1;
+      return Object.entries(out).map(([k, v]) => `${k} ${v}`).join(", ") || "none visible";
+    };
+    console.log(`  INFO  songs:    ${detail(songRows)}`);
+    console.log(`  INFO  albums:   ${detail(albumRows ?? [])}`);
+    console.log(`  INFO  artists:  ${detail(artistRows ?? [])}`);
+    const incomplete = songRows.filter((s) => !s.audio_url || !s.cover_url).length;
+    if (incomplete) wrn(`${incomplete} song(s) missing audio_url or cover_url`);
+
+    const songs = songRows.length;
+    const albums = (albumRows ?? []).length;
+    const artists = (artistRows ?? []).length;
     // Thresholds: a catalog thinner than this cannot beat Spotify on choice,
     // and thin paid-only catalogs lose listeners before they ever convert.
     songs < 50 ? bad(`only ${songs} song(s) — too few to keep anyone`) : ok(`${songs} songs`);
-    (albums ?? 0) < 5 ? bad(`only ${albums ?? 0} album(s) — album buying is unusable`) : ok(`${albums} albums`);
-    (artists ?? 0) < 10 ? wrn(`only ${artists ?? 0} artist(s)`) : ok(`${artists} artists`);
+    albums < 5 ? bad(`only ${albums} album(s) — album buying is unusable`) : ok(`${albums} albums`);
+    artists < 10 ? wrn(`only ${artists} artist(s)`) : ok(`${artists} artists`);
   }
 }
 
