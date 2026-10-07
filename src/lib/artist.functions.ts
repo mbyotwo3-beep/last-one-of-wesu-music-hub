@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isStaffUser } from "./roles";
 import { normalizeGenre } from "./genres";
+import type { MediaDeleteReport } from "./media.server";
 
 // Best-effort audit; RLS may block insert for regular users — never fail the
 // user's action because of this. SUPABASE_SERVICE_ROLE_KEY is not available on
@@ -355,44 +356,47 @@ export const deleteSong = createServerFn({ method: "POST" })
       /* ignore */
     }
 
-    // 4. Clean up audio and cover art files from storage (best-effort)
-    try {
-      if (song.audio_url) {
-        const { r2Delete, isR2Configured } = await import("./r2.server");
-        if (isR2Configured()) await r2Delete("song-audio", song.audio_url);
-        await supabaseAdmin.storage.from("song-audio").remove([song.audio_url]);
-      }
-      if (song.cover_url) {
-        // Only delete cover art if no other song or album is using it
-        const { data: sharedSong } = await supabaseAdmin
-          .from("songs")
-          .select("id")
-          .eq("cover_url", song.cover_url)
-          .neq("id", song.id)
-          .limit(1)
-          .maybeSingle();
-
-        const { data: sharedAlbum } = await supabaseAdmin
-          .from("albums")
-          .select("id")
-          .eq("cover_url", song.cover_url)
-          .limit(1)
-          .maybeSingle();
-
-        if (!sharedSong && !sharedAlbum) {
-          const { deleteStoredMedia } = await import("./media.server");
-          await deleteStoredMedia("album-art", song.cover_url);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // 5. Delete the song row (cascades to likes, playlist_songs, saved_tracks, play_history, song_collaborators)
+    // 4. Remove the row FIRST, then the files. The cover-art shared check
+    //    has to run after the row is gone, or this song itself always counts
+    //    as a user of its own artwork and the photo is never removed.
     const { error: delError } = await supabaseAdmin.from("songs").delete().eq("id", song.id);
 
     if (delError) {
       throw new Error(delError.message);
+    }
+
+    // 5. Clean up the audio file and the cover art, and REPORT it. This used
+    //    to be wrapped in one bare catch, so a moderator saw "deleted
+    //    successfully" while the photo and audio were still being served.
+    const mediaReport: MediaDeleteReport[] = [];
+    const { deleteMediaWithReport } = await import("./media.server");
+
+    if (song.audio_url) {
+      const r = await deleteMediaWithReport("song-audio", song.audio_url);
+      if (r) mediaReport.push(r);
+    }
+
+    if (song.cover_url) {
+      // Only remove artwork no other song or album still points at.
+      const { data: sharedSong } = await supabaseAdmin
+        .from("songs")
+        .select("id")
+        .eq("cover_url", song.cover_url)
+        .neq("id", song.id)
+        .limit(1)
+        .maybeSingle();
+
+      const { data: sharedAlbum } = await supabaseAdmin
+        .from("albums")
+        .select("id")
+        .eq("cover_url", song.cover_url)
+        .limit(1)
+        .maybeSingle();
+
+      if (!sharedSong && !sharedAlbum) {
+        const r = await deleteMediaWithReport("album-art", song.cover_url);
+        if (r) mediaReport.push(r);
+      }
     }
 
     // 6. Audit log
@@ -403,7 +407,15 @@ export const deleteSong = createServerFn({ method: "POST" })
       reason: data.reason ?? null,
     });
 
-    return { ok: true, id: song.id, title: song.title };
+    return {
+      ok: true,
+      id: song.id,
+      title: song.title,
+      // Anything not fully removed is named, so the moderator can retry or
+      // escalate rather than assume the content is gone.
+      media: mediaReport,
+      media_failures: mediaReport.filter((m) => !m.ok).map((m) => m.path),
+    };
   });
 
 // ---------- Albums ----------
@@ -817,33 +829,27 @@ export const deleteAlbum = createServerFn({ method: "POST" })
       throw new Error(delError.message);
     }
 
-    // 9. Best-effort storage cleanup AFTER commit, only when no other
-    // song/album still references the path.
-    try {
-      const { r2Delete, isR2Configured } = await import("./r2.server");
-      const { deleteStoredMedia } = await import("./media.server");
-      const useR2 = isR2Configured();
-      for (const p of audioPaths) {
-        try {
-          if (useR2) await r2Delete("song-audio", p);
-          await supabaseAdmin.storage.from("song-audio").remove([p]);
-        } catch {
-          /* ignore per-file */
-        }
+    // 9. Remove the audio and the photos, and REPORT each one. This used
+    //    to be wrapped in per-file bare catches, so an admin deleting an album
+    //    for breaching the terms was told "deleted successfully" while its
+    //    cover photo and every track were still being served.
+    const mediaReport: MediaDeleteReport[] = [];
+    const { deleteMediaWithReport } = await import("./media.server");
+
+    for (const p of audioPaths) {
+      const r = await deleteMediaWithReport("song-audio", p);
+      if (r) mediaReport.push(r);
+    }
+    for (const p of coverPaths) {
+      // Never take artwork another song or album still points at.
+      const [{ data: s1 }, { data: s2 }] = await Promise.all([
+        supabaseAdmin.from("songs").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+        supabaseAdmin.from("albums").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+      ]);
+      if (!s1 && !s2) {
+        const r = await deleteMediaWithReport("album-art", p);
+        if (r) mediaReport.push(r);
       }
-      for (const p of coverPaths) {
-        try {
-          const [{ data: s1 }, { data: s2 }] = await Promise.all([
-            supabaseAdmin.from("songs").select("id").eq("cover_url", p).limit(1).maybeSingle(),
-            supabaseAdmin.from("albums").select("id").eq("cover_url", p).limit(1).maybeSingle(),
-          ]);
-          if (!s1 && !s2) await deleteStoredMedia("album-art", p);
-        } catch {
-          /* ignore per-file */
-        }
-      }
-    } catch (err) {
-      console.warn("[Album Delete] storage cleanup failed:", err);
     }
 
     // 10. Audit log
@@ -854,7 +860,15 @@ export const deleteAlbum = createServerFn({ method: "POST" })
       deleted_by_role: isStaff ? "staff" : "artist",
     });
 
-    return { ok: true, id: data.id, title: album.title, deletedSongs: songIds.length };
+    return {
+      ok: true,
+      id: data.id,
+      title: album.title,
+      deletedSongs: songIds.length,
+      media: mediaReport,
+      // Named, not swallowed: the moderator must know if anything survived.
+      media_failures: mediaReport.filter((m) => !m.ok).map((m) => m.path),
+    };
   });
 
 export const updateAlbum = createServerFn({ method: "POST" })

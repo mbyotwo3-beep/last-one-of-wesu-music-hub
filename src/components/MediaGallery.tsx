@@ -52,8 +52,9 @@ export function MediaGallery() {
 
   const deleteM = useMutation({
     mutationFn: (vars: { bucket: string; path: string }) => deleteFileFn({ data: vars }),
-    onSuccess: () => {
-      toast.success("🗑️ File deleted successfully!");
+    onSuccess: (res: any) => {
+      if (res?.warning) toast.warning(res.warning);
+      else toast.success("🗑️ File deleted");
       refetch();
       setSelectedFile(null);
     },
@@ -94,11 +95,11 @@ export function MediaGallery() {
   const handleDownload = () => {
     if (!selectedFile) return;
     const { data } = supabase.storage.from(selectedBucket).getPublicUrl(selectedFile.name);
-    void openExternalUrl(data.publicUrl);
+    void openExternalUrl(selectedFile.url ?? data.publicUrl);
   };
 
   return (
-    <RoleGate require="superadmin">
+    <RoleGate require="admin">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -176,21 +177,30 @@ export function MediaGallery() {
                     : "border-border hover:border-primary/50"
                 }`}
               >
-                {/* Preview */}
-                {file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                {/* Real thumbnail where the object is publicly reachable. The
+                    old markup rebuilt the URL client-side from a path the
+                    client cannot resolve, so thumbnails never rendered. */}
+                {file.kind === "image" && file.url ? (
                   <img
-                    src={
-                      supabase.storage.from(file.bucket_id).getPublicUrl(file.name).data.publicUrl
-                    }
+                    src={file.url}
                     alt={file.name}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      // A broken artwork upload should show its icon, not a
+                      // broken-image glyph that hides the file entirely.
+                      e.currentTarget.style.display = "none";
+                      e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                    }}
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                    {getFileIcon(file.name)}
-                  </div>
-                )}
+                ) : null}
+                <div
+                  className={`w-full h-full flex items-center justify-center text-muted-foreground ${
+                    file.kind === "image" && file.url ? "hidden" : ""
+                  }`}
+                >
+                  {getFileIcon(file.name)}
+                </div>
 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -216,8 +226,16 @@ export function MediaGallery() {
           <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 md:p-6 z-50">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-lg bg-secondary flex items-center justify-center">
-                  {getFileIcon(selectedFile.name)}
+                <div className="w-16 h-16 rounded-lg bg-secondary flex items-center justify-center overflow-hidden shrink-0">
+                  {selectedFile.kind === "image" && selectedFile.url ? (
+                    <img
+                      src={selectedFile.url}
+                      alt={selectedFile.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    getFileIcon(selectedFile.name)
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold">{selectedFile.name}</h3>

@@ -297,6 +297,53 @@ export const moderateSong = createServerFn({ method: "POST" })
  * These give staff the missing capability: create a playlist, published and
  * public, then fill it from the approved catalogue.
  */
+/**
+ * Every album on the platform, with its track count.
+ *
+ * The moderation queue only surfaced albums awaiting approval, so an admin had
+ * no way to remove an album that was ALREADY published and then breached the
+ * terms — the exact case that matters. This is that list.
+ */
+export const listAllAlbumsAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d?: { status?: string; search?: string }) => d || {})
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let query = supabaseAdmin
+      .from("albums")
+      .select("id,title,created_at,status,price,cover_url,release_date,artist:artists(id,name)")
+      .order("created_at", { ascending: false });
+
+    if (data?.status && data.status !== "all") query = query.eq("status", data.status);
+    if (data?.search?.trim()) {
+      // `%` and `_` are wildcards in ilike; a literal title must stay literal.
+      const safe = data.search
+        .trim()
+        .replace(/\\/g, "\\\\")
+        .replace(/%/g, "\\%")
+        .replace(/_/g, "\\_");
+      query = query.ilike("title", `%${safe}%`);
+    }
+
+    const { data: albums, error } = await query.limit(500);
+    if (error) throw new Error(error.message);
+    const rows = albums ?? [];
+    if (!rows.length) return [];
+
+    const { data: tracks } = await supabaseAdmin
+      .from("songs")
+      .select("album_id")
+      .in("album_id", rows.map((a) => a.id));
+    const counts = new Map<string, number>();
+    for (const t of tracks ?? []) {
+      counts.set(t.album_id as string, (counts.get(t.album_id as string) ?? 0) + 1);
+    }
+
+    return rows.map((a) => ({ ...a, track_count: counts.get(a.id) ?? 0 }));
+  });
+
 export const listEditorialPlaylists = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

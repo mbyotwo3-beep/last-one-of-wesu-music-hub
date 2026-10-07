@@ -104,3 +104,65 @@ export async function deleteStoredMedia(bucket: MediaBucket, path: string): Prom
     console.warn(`[Storage Cleanup] Failed to delete ${path} from Supabase bucket ${bucket}:`, err);
   }
 }
+
+/** What actually happened to one stored file. */
+export interface MediaDeleteReport {
+  path: string;
+  bucket: string;
+  r2: "deleted" | "failed" | "not-configured";
+  supabase: "deleted" | "failed" | "skipped";
+  ok: boolean;
+}
+
+/**
+ * Deleting a song or album must take its photo and audio with it, and the
+ * moderator has to be able to SEE that it did.
+ *
+ * The old path swallowed every failure inside a bare `catch { }`, so an admin
+ * clicked Delete, saw "deleted successfully", and the artwork was still being
+ * served from object storage. This reports per file instead of pretending.
+ */
+export async function deleteMediaWithReport(
+  bucket: MediaBucket,
+  path: string | null | undefined,
+): Promise<MediaDeleteReport | null> {
+  if (!path || typeof path !== "string") return null;
+  // External URL: nothing of ours to remove.
+  if (/^https?:\/\//i.test(path)) return null;
+
+  const report: MediaDeleteReport = {
+    path,
+    bucket,
+    r2: "not-configured",
+    supabase: "skipped",
+    ok: true,
+  };
+
+  if (isR2Configured()) {
+    try {
+      const { r2Delete } = await import("./r2.server");
+      await r2Delete(bucket, path);
+      report.r2 = "deleted";
+    } catch {
+      report.r2 = "failed";
+      report.ok = false;
+    }
+  }
+
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
+    if (error) throw error;
+    report.supabase = "deleted";
+  } catch {
+    report.supabase = "failed";
+    report.ok = false;
+  }
+
+  if (!report.ok) {
+    console.warn(
+      `[Storage Cleanup] ${path} in ${bucket}: r2=${report.r2} supabase=${report.supabase}`,
+    );
+  }
+  return report;
+}

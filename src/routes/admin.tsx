@@ -40,6 +40,7 @@ import {
   deleteSong,
   moderateSong,
   listPendingAlbums,
+  listAllAlbumsAdmin,
   moderateAlbum,
   listEditorialPlaylists,
   listApprovedSongsForCuration,
@@ -456,8 +457,16 @@ function Overview({
 function AlbumMod() {
   const qc = useQueryClient();
   const listFn = useServerFn(listPendingAlbums);
+  const listAllFn = useServerFn(listAllAlbumsAdmin);
   const modFn = useServerFn(moderateAlbum);
   const delFn = useServerFn(deleteAlbum);
+
+  // "Pending" only ever listed albums awaiting approval. Deleting something
+  // that breached the terms means deleting something ALREADY published, and
+  // that had no list at all.
+  const [subTab, setSubTab] = useState<"pending" | "all">("pending");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const pendingQ = useQuery({
     queryKey: ["pending-albums"],
@@ -465,10 +474,19 @@ function AlbumMod() {
     retry: false,
   });
 
+  const allQ = useQuery({
+    queryKey: ["all-platform-albums", statusFilter, searchTerm],
+    queryFn: () => listAllFn({ data: { status: statusFilter, search: searchTerm } }),
+    retry: false,
+    enabled: subTab === "all",
+  });
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["pending-albums"] });
+    qc.invalidateQueries({ queryKey: ["all-platform-albums"] });
     qc.invalidateQueries({ queryKey: ["pending-albums-count"] });
     qc.invalidateQueries({ queryKey: ["home-discover"] });
+    qc.invalidateQueries({ queryKey: ["albums"] });
     qc.invalidateQueries({ queryKey: ["recent-albums"] });
   };
 
@@ -490,7 +508,16 @@ function AlbumMod() {
   const delMutation = useMutation({
     mutationFn: delFn,
     onSuccess: (res: any) => {
-      toast.success(`Album "${res.title}" deleted from platform`);
+      const files = res?.media?.length ?? 0;
+      const failed = res?.media_failures ?? [];
+      toast.success(
+        `Album "${res.title}" deleted with ${res?.deletedSongs ?? 0} track(s) and ${files} file(s)`,
+      );
+      if (failed.length) {
+        toast.error(`Still on storage, remove manually in Media Gallery:` + failed.join(", "));
+      }
+      qc.invalidateQueries({ queryKey: ["storage-files"] });
+      qc.invalidateQueries({ queryKey: ["recent-albums"] });
       invalidate();
     },
     onError: (error) => toast.error(`Delete failed: ${(error as Error).message}`),
@@ -498,104 +525,216 @@ function AlbumMod() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Albums awaiting approval ({pendingQ.data?.length ?? 0})
-      </h2>
-      {pendingQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {pendingQ.data?.length === 0 && (
-        <p className="text-sm text-muted-foreground">No albums awaiting approval.</p>
-      )}
-      {(() => {
-        // Lead with the albums whose tracks are ALREADY live but which the
-        // album is still unpublished — those are invisible to every listener
-        // and were previously impossible to approve from here.
-        const rows = (pendingQ.data ?? []) as any[];
-        const stranded = rows.filter((a) => a.stranded);
-        const rest = rows.filter((a) => !a.stranded);
-        const renderRow = (a: any) => (
-          <div
-            key={a.id}
-            className={`flex flex-wrap items-center gap-3 p-3 rounded-xl border ${
-              a.stranded ? "bg-amber-500/5 border-amber-500/30" : "bg-card border-border"
-            }`}
+      <h2 className="text-lg font-semibold">Albums moderation</h2>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setSubTab("pending")}
+          className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+            subTab === "pending"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Awaiting Approval ({pendingQ.data?.length ?? 0})
+        </button>
+        <button
+          onClick={() => setSubTab("all")}
+          className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
+            subTab === "all"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          All Platform Albums
+        </button>
+      </div>
+
+      {subTab === "all" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search album title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 pr-3 py-1.5 rounded-lg bg-secondary border border-border text-xs w-48 sm:w-60 focus:outline-none focus:border-primary"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs text-foreground cursor-pointer"
           >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{a.title}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {a.artist?.name ?? "Unknown"} {a.price != null ? `• K${Number(a.price)}` : ""}
-                {a.track_total ? (
-                  <>
-                    {" • "}
-                    {a.track_approved}/{a.track_total} tracks live
-                  </>
-                ) : null}
-              </p>
-              {/* A draft album was excluded from this queue entirely, so a
+            <option value="all">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="draft">Draft</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+      )}
+      {subTab === "all" ? (
+        <>
+          {allQ.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading albums…</p>
+          ) : (allQ.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No albums match.</p>
+          ) : (
+            <div className="space-y-2">
+              {(allQ.data ?? []).map((a: any) => (
+                <div
+                  key={a.id}
+                  className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-card border border-border"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{a.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {a.artist?.name ?? "Unknown"} • {a.track_count ?? 0} track
+                      {a.track_count === 1 ? "" : "s"}
+                      {a.price != null && Number(a.price) > 0 ? ` • K${Number(a.price)}` : ""}
+                      {" • "}
+                      <span className="font-semibold">{a.status}</span>
+                    </p>
+                  </div>
+                  <button
+                    disabled={modMutation.isPending}
+                    onClick={() =>
+                      modMutation.mutate({
+                        data: {
+                          id: a.id,
+                          status: a.status === "approved" ? "taken_down" : "approved",
+                        },
+                      })
+                    }
+                    className="px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50"
+                  >
+                    {a.status === "approved" ? "Take down" : "Approve"}
+                  </button>
+                  <button
+                    disabled={delMutation.isPending}
+                    onClick={() => {
+                      const n = a.track_count ?? 0;
+                      if (
+                        window.confirm(
+                          `Permanently delete "${a.title}"?` +
+                            (n
+                              ? `\n\nThis also deletes all ${n} track(s), their audio files and cover photos. This cannot be undone.`
+                              : "\n\nThis cannot be undone."),
+                        )
+                      ) {
+                        delMutation.mutate({ data: { id: a.id } });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3" /> Delete permanently
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {pendingQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {pendingQ.data?.length === 0 && (
+            <p className="text-sm text-muted-foreground">No albums awaiting approval.</p>
+          )}
+          {(() => {
+            // Lead with the albums whose tracks are ALREADY live but which the
+            // album is still unpublished — those are invisible to every listener
+            // and were previously impossible to approve from here.
+            const rows = (pendingQ.data ?? []) as any[];
+            const stranded = rows.filter((a) => a.stranded);
+            const rest = rows.filter((a) => !a.stranded);
+            const renderRow = (a: any) => (
+              <div
+                key={a.id}
+                className={`flex flex-wrap items-center gap-3 p-3 rounded-xl border ${
+                  a.stranded ? "bg-amber-500/5 border-amber-500/30" : "bg-card border-border"
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{a.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {a.artist?.name ?? "Unknown"} {a.price != null ? `• K${Number(a.price)}` : ""}
+                    {a.track_total ? (
+                      <>
+                        {" • "}
+                        {a.track_approved}/{a.track_total} tracks live
+                      </>
+                    ) : null}
+                  </p>
+                  {/* A draft album was excluded from this queue entirely, so a
                   finished release could never be approved — say what state it
                   is in and that Approve publishes the whole album. */}
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                status: <span className="font-semibold">{a.status}</span>
-                {a.status === "draft"
-                  ? " — never submitted for review, but its tracks are already live. Approve to publish the album."
-                  : a.stranded
-                    ? " — tracks are live but the album is not, so nobody can open or buy it. Approve to fix."
-                    : ""}
-              </p>
-            </div>
-            <button
-              onClick={() => modMutation.mutate({ data: { id: a.id, status: "approved" } })}
-              disabled={modMutation.isPending}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 cursor-pointer"
-            >
-              <Check className="size-3" /> Approve
-            </button>
-            <button
-              onClick={() => {
-                if (
-                  window.confirm(`Reject album "${a.title}"? The artist will need to resubmit.`)
-                ) {
-                  modMutation.mutate({ data: { id: a.id, status: "rejected" } });
-                }
-              }}
-              disabled={modMutation.isPending}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50 cursor-pointer"
-            >
-              <X className="size-3" /> Reject
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm(`Delete album "${a.title}" and all its songs?`)) {
-                  delMutation.mutate({ data: { id: a.id } });
-                }
-              }}
-              disabled={delMutation.isPending}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold disabled:opacity-50 cursor-pointer"
-            >
-              <Trash2 className="size-3" /> Delete
-            </button>
-          </div>
-        );
-        return (
-          <div key="groups" className="space-y-4">
-            {stranded.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-amber-500">
-                  Stranded — tracks are live but the album is not. Nobody can open or buy these.
-                </p>
-                {stranded.map(renderRow)}
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    status: <span className="font-semibold">{a.status}</span>
+                    {a.status === "draft"
+                      ? " — never submitted for review, but its tracks are already live. Approve to publish the album."
+                      : a.stranded
+                        ? " — tracks are live but the album is not, so nobody can open or buy it. Approve to fix."
+                        : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => modMutation.mutate({ data: { id: a.id, status: "approved" } })}
+                  disabled={modMutation.isPending}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  <Check className="size-3" /> Approve
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(`Reject album "${a.title}"? The artist will need to resubmit.`)
+                    ) {
+                      modMutation.mutate({ data: { id: a.id, status: "rejected" } });
+                    }
+                  }}
+                  disabled={modMutation.isPending}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  <X className="size-3" /> Reject
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete album "${a.title}" and all its songs?`)) {
+                      delMutation.mutate({ data: { id: a.id } });
+                    }
+                  }}
+                  disabled={delMutation.isPending}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  <Trash2 className="size-3" /> Delete
+                </button>
               </div>
-            )}
-            {rest.length > 0 && (
-              <div className="space-y-2">
+            );
+            return (
+              <div key="groups" className="space-y-4">
                 {stranded.length > 0 && (
-                  <p className="text-xs font-semibold text-muted-foreground">Awaiting review</p>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-amber-500">
+                      Stranded — tracks are live but the album is not. Nobody can open or buy these.
+                    </p>
+                    {stranded.map(renderRow)}
+                  </div>
                 )}
-                {rest.map(renderRow)}
+                {rest.length > 0 && (
+                  <div className="space-y-2">
+                    {stranded.length > 0 && (
+                      <p className="text-xs font-semibold text-muted-foreground">Awaiting review</p>
+                    )}
+                    {rest.map(renderRow)}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })()}
+            );
+          })()}
+        </>
+      )}
     </div>
   );
 }
@@ -955,14 +1094,25 @@ function SongMod() {
 
   const deleteMutation = useMutation({
     mutationFn: del,
-    onSuccess: (res) => {
-      toast.success(`Song "${res.title}" deleted from platform`);
+    onSuccess: (res: any) => {
+      const files = res?.media?.length ?? 0;
+      const failed = res?.media_failures ?? [];
+      toast.success(
+        `Song "${res.title}" deleted — ${files} file(s) removed` +
+          (failed.length ? `${failed.length} could NOT be removed` : ""),
+      );
+      // Never claim the artwork is gone when it isn't: that is the whole point
+      // of deleting something for breaching the terms.
+      if (failed.length) {
+        toast.error(`Still on storage, remove manually in Media Gallery:` + failed.join(", "));
+      }
       setSongToDelete(null);
       setDeleteReason("");
       qc.invalidateQueries({ queryKey: ["pending-songs"] });
       qc.invalidateQueries({ queryKey: ["pending-songs-count"] });
       qc.invalidateQueries({ queryKey: ["all-platform-songs"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["storage-files"] });
       invalidateHomeCaches();
     },
     onError: (error) => toast.error(`Delete failed: ${(error as Error).message}`),
