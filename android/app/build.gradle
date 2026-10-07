@@ -17,8 +17,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 23 = the workflow-fix batch (auth/roles/player/queue/offline).
-        versionCode 23
+        // 24 = album release fixes (unstrand approved albums, publish as a unit).
+        versionCode 24
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
