@@ -369,16 +369,46 @@ export const getRecentAlbums = createServerFn({ method: "GET" }).handler(async (
   return data ?? [];
 });
 
+/**
+ * Public/editorial playlists, with their track count.
+ *
+ * `is_public = true` alone used to return playlists with no songs on them, so
+ * a listener tapped a tile, landed on an empty page, and concluded playlists
+ * were broken. An inner join on playlist_songs means a playlist only appears
+ * once it actually has something in it. Also carries the count so the shelf
+ * can say "12 songs" instead of nothing.
+ */
 export const getPublicPlaylists = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("playlists")
-    .select("id,name,description,cover_url,created_at")
+    .select(
+      "id,name,description,cover_url,created_at," +
+        "playlist_songs(song_id,song:songs(id,cover_url,duration,title))",
+    )
     .eq("is_public", true)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(60);
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  return (data ?? []).map((pl: any) => {
+    const entries = (pl.playlist_songs ?? []) as any[];
+    return {
+      id: pl.id,
+      name: pl.name,
+      description: pl.description,
+      cover_url: pl.cover_url ?? null,
+      created_at: pl.created_at,
+      track_count: entries.length,
+      // Fall back to a mosaic of the first four covers so a playlist with no
+      // uploaded artwork still looks like something.
+      mosaic: entries
+        .slice(0, 4)
+        .map((e) => e?.song?.cover_url)
+        .filter(Boolean),
+      total_duration: entries.reduce((sum, e) => sum + Number(e?.song?.duration ?? 0), 0),
+    };
+  });
 });
 
 /**
@@ -514,7 +544,13 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .limit(12),
     supabase
       .from("playlists")
-      .select("id,name,description,cover_url")
+      // Join the tracks so the home shelf only shows playlists that actually
+      // have something in them — an empty tile on the homepage read as a broken
+      // feature. Also feeds PlaylistCover a mosaic instead of a placeholder.
+      .select(
+        "id,name,description,cover_url," +
+          "playlist_songs(song_id,song:songs(id,cover_url,duration))",
+      )
       .eq("is_public", true)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -550,7 +586,25 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
     trending: trending.data ?? [],
     topArtists: artists.data ?? [],
     recentAlbums: albums.data ?? [],
-    editorialPlaylists: playlists.data ?? [],
+    // Flatten to what the tile component needs, and drop playlists with no
+    // tracks: an editorial tile that opens onto an empty page is worse than
+    // no tile at all.
+    editorialPlaylists: (playlists.data ?? [])
+      .map((pl: any) => {
+        const entries = (pl.playlist_songs ?? []) as any[];
+        return {
+          id: pl.id,
+          name: pl.name,
+          description: pl.description ?? null,
+          cover_url: pl.cover_url ?? null,
+          track_count: entries.length,
+          mosaic: entries
+            .slice(0, 4)
+            .map((e) => e?.song?.cover_url)
+            .filter(Boolean),
+        };
+      })
+      .filter((pl: { track_count: number }) => pl.track_count > 0),
     moods,
     genres: Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ListMusic, Plus, Trash2, Play, Pause } from "lucide-react";
-import { RoleGate } from "@/components/RoleGate";
 import { createPlaylist, deletePlaylist } from "@/lib/listener.functions";
+import { getPublicPlaylists } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,12 +15,18 @@ import { PlaylistCover } from "@/components/PlaylistCover";
 import { usePlayer } from "@/stores/player";
 
 export const Route = createFileRoute("/playlists")({
-  head: () => ({ meta: [{ title: "My Playlists — Wesu+" }] }),
-  component: () => (
-    <RoleGate require="user">
-      <Page />
-    </RoleGate>
-  ),
+  head: () => ({
+    meta: [
+      { title: "Playlists — Wesu+" },
+      { name: "description", content: "Browse editorial playlists on Wesu+." },
+    ],
+  }),
+  // Deliberately NOT role-gated. This required a signed-in user, so an
+  // anonymous visitor tapping "Playlists" in the nav was bounced to sign-in
+  // for a page of editorial playlists they need no account to see — Spotify
+  // shows these to everyone. Own playlists still need an account; that is
+  // handled per-section inside the page.
+  component: Page,
   errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
@@ -60,12 +67,18 @@ function Page() {
 
   const createM = useMutation({
     mutationFn: createFn,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       setShowCreate(false);
       setNewPlaylist({ name: "", description: "", make_public: false });
-      toast.success("Playlist created successfully");
+      // RLS only lets staff publish. Saying so is the difference between
+      // "your playlist is private" and a silent no-op.
+      if (res?.publish_requested_but_denied) {
+        toast.success("Playlist created as private — only Wesu+ staff can publish playlists");
+      } else {
+        toast.success("Playlist created successfully");
+      }
     },
     onError: (error) => {
       toast.error(`Failed to create playlist: ${error.message}`);
@@ -130,6 +143,70 @@ function Page() {
     }
   };
 
+  // Editorial playlists: public, browsable, no account needed. These were
+  // the playlists visitors actually expect (Spotify's equivalents) and they
+  // used to be unreachable from this page entirely — the route required
+  // sign-in and then listed only YOUR playlists.
+  const { data: editorial = [] } = useOfflineList("lists:editorial-playlists", {
+    queryKey: ["editorial-playlists"],
+    queryFn: () => getPublicPlaylists(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Anonymous visitors have no "my playlists" to show. Say so and point at
+  // the catalogue instead of rendering an empty account-shaped page.
+  if (!user) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 pb-32">
+        <div className="flex items-center gap-3 mb-2">
+          <ListMusic className="size-6 text-primary" />
+          <h1 className="text-3xl font-bold">Playlists</h1>
+        </div>
+        <p className="text-sm text-muted-foreground mb-8">
+          Curated playlists from Wesu+. Create your own once you sign in.
+        </p>
+
+        {editorial.length === 0 ? (
+          <div className="py-16 border border-dashed border-border rounded-2xl text-center text-muted-foreground">
+            No public playlists yet — browse the catalogue in the meantime.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            {editorial.map((pl: any) => (
+              <Link
+                key={pl.id}
+                to="/playlists/$id"
+                params={{ id: pl.id }}
+                className="group block min-w-0"
+              >
+                <PlaylistCover
+                  covers={pl.cover_url ? [pl.cover_url] : (pl.mosaic ?? [])}
+                  alt={pl.name}
+                  className="aspect-square w-full rounded-xl"
+                />
+                <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                  {pl.name}
+                </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {pl.description || "Wesu+ editorial"}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-10">
+          <Link
+            to="/browse"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            Browse music
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
   if (isError)
     return (
@@ -191,7 +268,8 @@ function Page() {
                 checked={newPlaylist.make_public}
                 onChange={(e) => setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })}
               />
-              Public — anyone with the link can open it
+              Public — shareable with anyone who has the link. Only Wesu+ staff can publish
+              editorial playlists, so yours will be private.
             </label>
             <div className="flex gap-2">
               <button
@@ -211,6 +289,34 @@ function Page() {
             </div>
           </form>
         </div>
+      )}
+
+      {editorial.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold mb-4">Editorial Playlists</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            {editorial.map((pl: any) => (
+              <Link
+                key={pl.id}
+                to="/playlists/$id"
+                params={{ id: pl.id }}
+                className="group block min-w-0"
+              >
+                <PlaylistCover
+                  covers={pl.cover_url ? [pl.cover_url] : (pl.mosaic ?? [])}
+                  alt={pl.name}
+                  className="aspect-square w-full rounded-xl"
+                />
+                <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                  {pl.name}
+                </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {pl.description || "Wesu+ editorial"}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="grid gap-3">

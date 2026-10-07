@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
+import { friendlyError } from "@/lib/friendly-error";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  Plus,
   TrendingUp,
   CreditCard,
   Trash2,
@@ -39,6 +41,13 @@ import {
   moderateSong,
   listPendingAlbums,
   moderateAlbum,
+  listEditorialPlaylists,
+  listApprovedSongsForCuration,
+  createEditorialPlaylist,
+  addSongsToEditorialPlaylist,
+  removeSongFromEditorialPlaylist,
+  setPlaylistPublished,
+  deleteEditorialPlaylist,
   listPendingArtists,
   listAllArtists,
   moderateArtist,
@@ -90,6 +99,7 @@ type Tab =
   | "overview"
   | "songs"
   | "albums"
+  | "playlists"
   | "artists"
   | "verifications"
   | "labels"
@@ -150,6 +160,7 @@ function AdminPage() {
     { id: "overview", label: "Overview" },
     { id: "songs", label: "Songs", badge: pendingSongsQ.data?.length },
     { id: "albums", label: "Albums", badge: pendingAlbumsQ.data?.length },
+    { id: "playlists", label: "Editorial Playlists" },
     { id: "artists", label: "Artists", badge: pendingArtistsQ.data?.length },
     { id: "verifications", label: "Verifications", badge: pendingVerifsQ.data?.length },
     { id: "labels", label: "Labels", badge: pendingLabelsQ.data?.length },
@@ -209,6 +220,7 @@ function AdminPage() {
         )}
         {tab === "songs" && <SongMod />}
         {tab === "albums" && <AlbumMod />}
+        {tab === "playlists" && <EditorialPlaylistsTab />}
         {tab === "artists" && <ArtistMod />}
         {tab === "verifications" && <VerificationMod />}
         {tab === "labels" && <LabelMod />}
@@ -588,6 +600,276 @@ function AlbumMod() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Editorial playlists: the only way a public playlist can exist.
+//
+// Listeners cannot publish one (RLS requires is_staff), so without this tab
+// the public playlist surface was permanently empty. Create, fill from the
+// approved catalogue, publish, unpublish.
+// ─────────────────────────────────────────────────────────────
+function EditorialPlaylistsTab() {
+  const qc = useQueryClient();
+  const toast_ = toast;
+  const listFn = useServerFn(listEditorialPlaylists);
+  const songsFn = useServerFn(listApprovedSongsForCuration);
+  const createPlaylistFn = useServerFn(createEditorialPlaylist);
+  const addSongsFn = useServerFn(addSongsToEditorialPlaylist);
+  const removeSongFn = useServerFn(removeSongFromEditorialPlaylist);
+  const publishFn = useServerFn(setPlaylistPublished);
+  const deleteFn = useServerFn(deleteEditorialPlaylist);
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [songSearch, setSongSearch] = useState("");
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["editorial-playlists"] });
+    qc.invalidateQueries({ queryKey: ["editorial-playlists-count"] });
+    // Public shelves cache playlists; drop them so a new list shows up.
+    qc.invalidateQueries({ queryKey: ["browse-playlists"] });
+    qc.invalidateQueries({ queryKey: ["home-discover"] });
+    qc.invalidateQueries({ queryKey: ["editorial-playlists"] });
+  };
+
+  const listsQ = useQuery({
+    queryKey: ["editorial-playlists"],
+    queryFn: () => listFn(),
+    retry: 1,
+  });
+  const songsQ = useQuery({
+    queryKey: ["curation-songs"],
+    queryFn: () => songsFn(),
+    retry: 1,
+    staleTime: 60_000,
+  });
+
+  const createM = useMutation({
+    mutationFn: createPlaylistFn,
+    onSuccess: (res: any) => {
+      invalidate();
+      setName("");
+      setDescription("");
+      toast_.success(
+        res?.track_count
+          ? `Playlist published with ${res.track_count} track(s)`
+          : "Playlist created and published — add some songs",
+      );
+    },
+    onError: (e) => toast_.error(friendlyError(e, "Could not create the playlist")),
+  });
+
+  const addM = useMutation({
+    mutationFn: addSongsFn,
+    onSuccess: (res: any) => {
+      invalidate();
+      if (res?.added) toast_.success(`Added ${res.added} track(s)`);
+      else toast_.info("Those tracks are already in this playlist");
+    },
+    onError: (e) => toast_.error(friendlyError(e, "Could not add tracks")),
+  });
+
+  const removeM = useMutation({
+    mutationFn: removeSongFn,
+    onSuccess: () => invalidate(),
+    onError: (e) => toast_.error(friendlyError(e, "Could not remove the track")),
+  });
+
+  const publishM = useMutation({
+    mutationFn: publishFn,
+    onSuccess: (_r: any, v: any) => {
+      invalidate();
+      toast_.success(v.data.is_public ? "Published" : "Hidden from listeners");
+    },
+    onError: (e) => toast_.error(friendlyError(e, "Could not change visibility")),
+  });
+
+  const deleteM = useMutation({
+    mutationFn: deleteFn,
+    onSuccess: () => {
+      invalidate();
+      toast_.success("Playlist deleted");
+    },
+    onError: (e) => toast_.error(friendlyError(e, "Could not delete the playlist")),
+  });
+
+  const rows = (listsQ.data ?? []) as any[];
+  const active = rows.find((r) => r.id === pickerFor) ?? null;
+  const approved = (songsQ.data ?? []) as any[];
+  const inActive = new Set<string>(active?.song_ids ?? []);
+  const visibleSongs = approved
+    .filter((s) => !inActive.has(s.id))
+    .filter((s) =>
+      songSearch.trim()
+        ? `${s.title} ${s.artist?.name ?? ""}`
+            .toLowerCase()
+            .includes(songSearch.trim().toLowerCase())
+        : true,
+    )
+    .slice(0, 40);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+        <h3 className="font-semibold">Create an editorial playlist</h3>
+        <p className="text-xs text-muted-foreground">
+          Published playlists appear on the homepage shelf, in Browse, and at /playlists for
+          everyone — signed in or not. Listeners cannot publish their own.
+        </p>
+        <input
+          placeholder="Playlist name"
+          maxLength={120}
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          placeholder="Description (optional)"
+          maxLength={200}
+          className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <button
+          disabled={createM.isPending || !name.trim()}
+          onClick={() => createM.mutate({ data: { name, description } })}
+          className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+        >
+          {createM.isPending ? "Creating…" : "Create & publish"}
+        </button>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-3">Your editorial playlists ({rows.length})</h3>
+        {listsQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!listsQ.isLoading && rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            None yet. Create one above — this is the only way a public playlist can exist.
+          </p>
+        )}
+        <div className="space-y-3">
+          {rows.map((pl) => (
+            <div key={pl.id} className="bg-card border border-border rounded-2xl p-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate">{pl.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pl.track_count} track{pl.track_count === 1 ? "" : "s"} •{" "}
+                    {pl.is_public ? (
+                      <span className="text-primary font-medium">Published</span>
+                    ) : (
+                      <span className="text-amber-500 font-medium">Hidden</span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPickerFor(pickerFor === pl.id ? null : pl.id)}
+                  className="px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold"
+                >
+                  {pickerFor === pl.id ? "Close" : "Add tracks"}
+                </button>
+                <button
+                  disabled={publishM.isPending}
+                  onClick={() =>
+                    publishM.mutate({ data: { playlist_id: pl.id, is_public: !pl.is_public } })
+                  }
+                  className="px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold disabled:opacity-50"
+                >
+                  {pl.is_public ? "Unpublish" : "Publish"}
+                </button>
+                <button
+                  disabled={deleteM.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Delete "${pl.name}" and its ${pl.track_count} track(s)?`)) {
+                      deleteM.mutate({ data: { playlist_id: pl.id } });
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </div>
+
+              {pickerFor === pl.id && active && (
+                <div className="border-t border-border pt-3 space-y-3">
+                  <input
+                    placeholder="Search approved songs…"
+                    className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
+                    value={songSearch}
+                    onChange={(e) => setSongSearch(e.target.value)}
+                  />
+                  {songsQ.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading songs…</p>
+                  ) : visibleSongs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {approved.length === 0
+                        ? "No approved songs yet — approve songs first."
+                        : "No matches."}
+                    </p>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto space-y-1">
+                      {visibleSongs.map((s) => (
+                        <button
+                          key={s.id}
+                          disabled={addM.isPending}
+                          onClick={() =>
+                            addM.mutate({ data: { playlist_id: pl.id, song_ids: [s.id] } })
+                          }
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-accent/40 text-left disabled:opacity-50 min-h-[44px]"
+                        >
+                          <span className="text-sm truncate flex-1">{s.title}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[40%]">
+                            {s.artist?.name ?? "Unknown"}
+                          </span>
+                          <Plus className="size-4 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {pl.track_count > 0 && (
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    TRACKS ({pl.track_count})
+                  </p>
+                  <div className="space-y-1">
+                    {approved
+                      .filter((s) => (pl.song_ids ?? []).includes(s.id))
+                      .map((s) => (
+                        <div
+                          key={s.id}
+                          className="flex items-center gap-3 p-2 rounded-lg text-sm min-h-[44px]"
+                        >
+                          <span className="truncate flex-1">{s.title}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[40%]">
+                            {s.artist?.name ?? "Unknown"}
+                          </span>
+                          <button
+                            disabled={removeM.isPending}
+                            onClick={() =>
+                              removeM.mutate({
+                                data: { playlist_id: pl.id, song_id: s.id },
+                              })
+                            }
+                            className="p-2 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            aria-label={`Remove ${s.title} from playlist`}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 // ─────────────────────────────────────────────────────────────
 // Songs moderation & platform-wide song management
 // ─────────────────────────────────────────────────────────────

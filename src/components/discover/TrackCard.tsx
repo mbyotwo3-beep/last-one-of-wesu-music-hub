@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { PriceTag } from "@/components/PriceTag";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { PlaylistCover } from "@/components/PlaylistCover";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -316,34 +317,47 @@ export interface PlaylistTileData {
   name: string;
   description?: string | null;
   cover_url?: string | null;
+  /** Track count, so a tile can say "12 songs" instead of nothing. */
+  track_count?: number;
+  /** Cover paths for the 2x2 mosaic when the playlist has no own artwork. */
+  mosaic?: string[];
 }
 
 export function PlaylistTile({ playlist }: { playlist: PlaylistTileData }) {
+  const { id, name, description, cover_url, track_count, mosaic } = playlist;
   return (
     <div className="group text-left w-full relative cursor-pointer">
-      <Link to="/playlists/$id" params={{ id: playlist.id }} className="block cursor-pointer">
-        <StorageImage
-          bucket="album-art"
-          path={playlist.cover_url ?? null}
-          alt={playlist.name}
-          className="aspect-square w-full rounded-xl overflow-hidden bg-card ring-1 ring-white/5 object-cover transition-transform group-hover:scale-[1.02]"
+      <Link to="/playlists/$id" params={{ id }} className="block cursor-pointer">
+        {/* PlaylistCover, not StorageImage: a playlist with no uploaded cover
+            previously rendered as an empty grey square, which on a shelf of
+            real artwork read as a broken image. */}
+        <PlaylistCover
+          covers={cover_url ? [cover_url] : (mosaic ?? [])}
+          alt={name}
+          className="aspect-square w-full rounded-xl ring-1 ring-white/5 transition-transform group-hover:scale-[1.02]"
         />
         <p className="mt-2 text-sm font-semibold truncate group-hover:text-primary transition-colors">
-          {playlist.name}
+          {name}
         </p>
-        {playlist.description ? (
-          <p className="text-xs text-muted-foreground line-clamp-2">{playlist.description}</p>
+        {track_count ? (
+          <p className="text-xs text-muted-foreground">
+            {track_count} {track_count === 1 ? "song" : "songs"}
+          </p>
+        ) : description ? (
+          <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
         ) : (
           <p className="text-xs text-muted-foreground">Playlist</p>
         )}
       </Link>
       <div className="absolute top-2 right-2">
+        {/* `max-md:opacity-100`: a phone has no hover, so on the home shelf this
+            was invisible but still tappable over the artwork. */}
         <ShareMenu
-          playlistId={playlist.id}
-          playlistName={playlist.name}
+          playlistId={id}
+          playlistName={name}
           type="playlist"
           icon="more"
-          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 max-md:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
     </div>

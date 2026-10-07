@@ -224,20 +224,37 @@ export const createPlaylist = createServerFn({ method: "POST" })
     if (description && description.length > 1_000) {
       throw new Error("Playlist description must be at most 1,000 characters");
     }
+
+    // A listener CANNOT publish a public playlist: the RLS policy
+    // "Users can manage own playlists" (migration 20260903) allows
+    // is_public = true only when private.is_staff(auth.uid()). Ticking the
+    // "Public" box therefore failed the whole INSERT with a raw row-level
+    // security error — the playlist was never created and the user saw
+    // database text. Detect it here and create a private list instead, telling
+    // the caller what happened so the UI can say so.
+    const staff = await isStaffUser(context.supabase, context.userId);
+    const wantsPublic = data.make_public === true;
+    const isPublic = wantsPublic && staff;
+
     const { data: row, error } = await context.supabase
       .from("playlists")
       .insert({
         user_id: context.userId,
         name,
         description,
-        // Anyone may publish a public playlist (staff
-        // editorial lists are just public playlists curated by staff).
-        is_public: data.make_public === true,
+        is_public: isPublic,
       } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    return { ok: true, id: row!.id };
+    return {
+      ok: true,
+      id: row!.id,
+      is_public: isPublic,
+      // The caller uses this to explain "made private" instead of silently
+      // ignoring what the user asked for.
+      publish_requested_but_denied: wantsPublic && !staff,
+    };
   });
 
 export const deletePlaylist = createServerFn({ method: "POST" })

@@ -284,6 +284,248 @@ export const moderateSong = createServerFn({ method: "POST" })
     return { ok: true, albumApproved: !!albumId };
   });
 
+/**
+ * Editorial playlist curation (staff only).
+ *
+ * The platform had no way for staff to CREATE a public playlist, and RLS
+ * deliberately stops listeners from doing it (migration 20260903: is_public
+ * requires is_staff). Those two facts together mean the public playlist
+ * surface could never contain anything: every "Public" tick in the app failed
+ * with a row-level security error, and there was no admin route to create one.
+ * So playlists showed nothing, permanently.
+ *
+ * These give staff the missing capability: create a playlist, published and
+ * public, then fill it from the approved catalogue.
+ */
+export const listEditorialPlaylists = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Staff-owned playlists: the public surface is exactly this set, per the
+    // "Anyone can read editorial playlists" RLS policy.
+    const { data: mine } = await supabaseAdmin
+      .from("playlists")
+      .select("id,name,description,cover_url,is_public,created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false });
+
+    const rows = mine ?? [];
+    if (!rows.length) return [];
+
+    const { data: entries } = await supabaseAdmin
+      .from("playlist_songs")
+      .select("playlist_id,song_id")
+      .in(
+        "playlist_id",
+        rows.map((r) => r.id),
+      );
+
+    const byPlaylist = new Map<string, string[]>();
+    for (const e of entries ?? []) {
+      const list = byPlaylist.get(e.playlist_id as string) ?? [];
+      list.push(e.song_id as string);
+      byPlaylist.set(e.playlist_id as string, list);
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      song_ids: byPlaylist.get(r.id) ?? [],
+      track_count: (byPlaylist.get(r.id) ?? []).length,
+    }));
+  });
+
+/** Approved songs, for the "add to playlist" picker. Staff only. */
+export const listApprovedSongsForCuration = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("songs")
+      .select("id,title,cover_url,price,genre,artist:artists(id,name)")
+      .eq("status", "approved")
+      .order("title", { ascending: true })
+      .limit(300);
+    return data ?? [];
+  });
+
+export const createEditorialPlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (d: { name: string; description?: string; song_ids?: string[]; publish?: boolean }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const name = data.name?.trim();
+    if (!name) throw new Error("Playlist name is required");
+    if (name.length > 120) throw new Error("Playlist name must be at most 120 characters");
+
+    const { data: row, error } = await supabaseAdmin
+      .from("playlists")
+      .insert({
+        user_id: context.userId,
+        name,
+        description: data.description?.trim() || null,
+        // Default to published: a staff playlist nobody can see is the exact
+        // failure this whole change exists to remove.
+        is_public: data.publish !== false,
+      } as any)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    const songIds = [...new Set((data.song_ids ?? []).filter(Boolean))];
+    if (songIds.length) {
+      const { error: psErr } = await supabaseAdmin
+        .from("playlist_songs")
+        .insert(
+          songIds.map((song_id, position) => ({ playlist_id: row!.id, song_id, position })) as any,
+        );
+      if (psErr) throw new Error(psErr.message);
+    }
+
+    await audit(context.userId, "playlist.create_editorial", "playlist", row!.id, {
+      name,
+      tracks: songIds.length,
+    });
+    return { ok: true, id: row!.id, track_count: songIds.length };
+  });
+
+/** Append songs to a staff playlist. Duplicates and blanks are ignored. */
+export const addSongsToEditorialPlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string; song_ids: string[] }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: pl } = await supabaseAdmin
+      .from("playlists")
+      .select("id,user_id")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (!pl) throw new Error("Playlist not found");
+    if (pl.user_id !== context.userId) {
+      throw new Error("You can only edit playlists you created");
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from("playlist_songs")
+      .select("song_id")
+      .eq("playlist_id", data.playlist_id);
+    const have = new Set((existing ?? []).map((r) => r.song_id as string));
+    const fresh = [...new Set((data.song_ids ?? []).filter((id) => id && !have.has(id)))];
+    if (!fresh.length) return { ok: true, added: 0 };
+
+    const { error } = await supabaseAdmin.from("playlist_songs").insert(
+      fresh.map((song_id, i) => ({
+        playlist_id: data.playlist_id,
+        song_id,
+        position: (existing?.length ?? 0) + i,
+      })) as any,
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true, added: fresh.length };
+  });
+
+export const removeSongFromEditorialPlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string; song_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: pl } = await supabaseAdmin
+      .from("playlists")
+      .select("id,user_id")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (!pl) throw new Error("Playlist not found");
+    if (pl.user_id !== context.userId) {
+      throw new Error("You can only edit playlists you created");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("playlist_songs")
+      .delete()
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", data.song_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const setPlaylistPublished = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string; is_public: boolean }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: pl } = await supabaseAdmin
+      .from("playlists")
+      .select("id,user_id")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (!pl) throw new Error("Playlist not found");
+    if (pl.user_id !== context.userId) {
+      throw new Error("You can only change playlists you created");
+    }
+
+    // Publishing an empty playlist shows an empty tile to every visitor.
+    if (data.is_public) {
+      const { count } = await supabaseAdmin
+        .from("playlist_songs")
+        .select("song_id", { count: "exact", head: true })
+        .eq("playlist_id", data.playlist_id);
+      if (!count) throw new Error("Add at least one song before publishing");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("playlists")
+      .update({ is_public: data.is_public } as any)
+      .eq("id", data.playlist_id);
+    if (error) throw new Error(error.message);
+    await audit(
+      context.userId,
+      data.is_public ? "playlist.publish" : "playlist.unpublish",
+      "playlist",
+      data.playlist_id,
+    );
+    return { ok: true };
+  });
+
+export const deleteEditorialPlaylist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { playlist_id: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // `name`, not `title`: playlists have no title column.
+    const { data: pl } = await supabaseAdmin
+      .from("playlists")
+      .select("id,user_id,name")
+      .eq("id", data.playlist_id)
+      .maybeSingle();
+    if (!pl) throw new Error("Playlist not found");
+    if (pl.user_id !== context.userId) {
+      throw new Error("You can only delete playlists you created");
+    }
+
+    // playlist_songs rows are removed explicitly: relying on ON DELETE CASCADE
+    // works only if the FK was declared with it, and a stale join here is what
+    // makes an "empty" playlist still look populated.
+    await supabaseAdmin.from("playlist_songs").delete().eq("playlist_id", data.playlist_id);
+    const { error } = await supabaseAdmin.from("playlists").delete().eq("id", data.playlist_id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "playlist.delete", "playlist", data.playlist_id, {
+      name: pl.name,
+    });
+    return { ok: true };
+  });
+
 export const listPendingArtists = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
