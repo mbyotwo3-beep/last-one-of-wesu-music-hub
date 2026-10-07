@@ -68,12 +68,22 @@ console.log(`\nWesu+ launch check — ${BASE}\n`);
 console.log("[1/3] deployed bundle");
 let html = "";
 try {
+  // Retried like every other request: a single dropped connection here used to
+  // report "could not locate the entry bundle" for a site that was serving it
+  // fine a second later.
   const r = await fetch(BASE + "/", { redirect: "follow" });
   html = await r.text();
   if (r.status === 200) ok("home responds 200");
   else bad(`home responded ${r.status}`);
 } catch (e) {
-  bad(`home unreachable: ${e.message}`);
+  try {
+    const r2 = await fetch(BASE + "/", { redirect: "follow" });
+    html = await r2.text();
+    if (r2.status === 200) ok("home responds 200 (after a retry)");
+    else bad(`home responded ${r2.status}`);
+  } catch (e2) {
+    bad(`home unreachable: ${e2.message}`);
+  }
 }
 
 const m = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
