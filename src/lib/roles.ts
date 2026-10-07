@@ -23,7 +23,11 @@ type RoleClient = {
 };
 
 async function hasAnyRole(client: RoleClient, userId: string, roles: string[]) {
-  const { data, error } = await client.from("user_roles").select("role").eq("user_id", userId).in("role", roles);
+  const { data, error } = await client
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .in("role", roles);
   if (error) throw new Error(error.message);
   return (data?.length ?? 0) > 0;
 }

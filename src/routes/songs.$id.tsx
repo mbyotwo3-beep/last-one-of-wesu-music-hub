@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Music2, Play, Pause, ShoppingBag, Heart, ArrowLeft } from "lucide-react";
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/songs/$id")({
     ],
   }),
   component: SongPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Song not found.</div>,
 });
 

@@ -37,8 +37,7 @@ export function resolveHeroCta(args: {
   isNative: boolean;
 }): { mode: HeroCtaMode; url: string } {
   const url = args.link || "/";
-  const isExternal =
-    args.external === true || /^https?:\/\//i.test(url) || !url.startsWith("/");
+  const isExternal = args.external === true || /^https?:\/\//i.test(url) || !url.startsWith("/");
   if (!isExternal) return { mode: "spa", url };
   if (args.isNative) return { mode: "in-app", url };
   return { mode: args.target === "_blank" ? "new-tab" : "same-tab", url };

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, ArrowRight, Music } from "lucide-react";
 import { useIsNative } from "@/hooks/use-platform";
+import { routeErrorComponent } from "@/components/RouteError";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
@@ -12,6 +14,8 @@ export const Route = createFileRoute("/forgot-password")({
     ],
   }),
   component: ForgotPasswordPage,
+  errorComponent: routeErrorComponent("This page didn't load"),
+  notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function ForgotPasswordPage() {
@@ -25,12 +29,16 @@ function ForgotPasswordPage() {
   // dashboard redirect URLs.
   const isNative = useIsNative();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function send() {
+    const addr = email.trim();
+    if (!addr) {
+      setError("Enter the email address on your account.");
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(addr, {
         redirectTo: isNative
           ? "com.wesu.music://login-callback?type=recovery"
           : window.location.hostname.endsWith("wesuplus.com")
@@ -40,14 +48,23 @@ function ForgotPasswordPage() {
       if (error) throw error;
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(friendlyError(err, "We couldn't send the reset link. Please try again."));
     } finally {
       setLoading(false);
     }
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void send();
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12">
+    // Same top-anchored phone layout as /auth (see the note there): vertical
+    // centring inside a min-h-screen child that already sits under the fixed
+    // header and above the tab bar pushed the card ~58px below centre, made
+    // the page always scroll, and put "Back to sign in" under the tab bar.
+    <div className="px-6 pt-10 pb-12 flex justify-center md:min-h-screen md:items-center md:py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-primary/10 mb-4">
@@ -63,6 +80,25 @@ function ForgotPasswordPage() {
           <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-sm text-center">
             Check <span className="font-semibold">{email}</span> for a password reset link.
             {isNative && " Tap it on this device — it opens right back in the app."}
+            {/* No way back out of this state previously: a typo'd address or a
+                link that never arrived meant going back via the browser. */}
+            <div className="mt-4 pt-4 border-t border-primary/20 flex flex-col sm:flex-row gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => setSent(false)}
+                className="px-4 py-2 rounded-full bg-secondary text-sm font-semibold min-h-[44px]"
+              >
+                Use a different email
+              </button>
+              <button
+                type="button"
+                onClick={() => void send()}
+                disabled={loading}
+                className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold min-h-[44px] disabled:opacity-50"
+              >
+                {loading ? "Sending…" : "Resend link"}
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

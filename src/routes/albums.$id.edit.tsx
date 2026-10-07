@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import {
   queryOptions,
   useSuspenseQuery,
@@ -60,7 +61,7 @@ export const Route = createFileRoute("/albums/$id/edit")({
     ],
   }),
   component: AlbumEditPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Album not found.</div>,
 });
 

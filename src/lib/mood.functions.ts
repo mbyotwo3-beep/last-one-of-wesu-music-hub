@@ -31,7 +31,9 @@ const SCHEMA = {
 /** Recommend catalog songs for a described mood via Lovable AI Gateway. Public. */
 export const recommendByMood = createServerFn({ method: "POST" })
   .validator((d: { prompt: string }) => {
-    const prompt = String(d?.prompt ?? "").trim().slice(0, 600);
+    const prompt = String(d?.prompt ?? "")
+      .trim()
+      .slice(0, 600);
     if (prompt.length < 3) throw new Error("Tell us a bit more about your mood.");
     return { prompt };
   })
@@ -48,7 +50,8 @@ export const recommendByMood = createServerFn({ method: "POST" })
       .limit(300);
     if (error) throw new Error(error.message);
     const catalog = (songs ?? []) as any[];
-    if (catalog.length === 0) return { summary: "The catalog is empty right now.", picks: [] as MoodPick[] };
+    if (catalog.length === 0)
+      return { summary: "The catalog is empty right now.", picks: [] as MoodPick[] };
 
     const lines = catalog
       .map(

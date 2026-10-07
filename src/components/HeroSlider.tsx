@@ -40,15 +40,15 @@ export function HeroSlider({ slides }: HeroSliderProps) {
 
   const handlePlay = (slide: FeaturedSlide, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    
+
     const isCurrentTrack = currentTrackId === slide.id;
-    
+
     if (isCurrentTrack) {
       // Just toggle play/pause if it's the same track
       togglePlay();
       return;
     }
-    
+
     // Single-track queue (not bare setTrack) so Next/Prev and the queue
     // screen keep working instead of jumping into a stale queue.
     setQueue(
@@ -92,7 +92,9 @@ export function HeroSlider({ slides }: HeroSliderProps) {
           <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-2 md:mb-3">
             {currentSlide.title}
           </h2>
-          <p className="text-xs sm:text-sm md:text-lg lg:text-xl text-zinc-300 mb-4 md:mb-6">{currentSlide.subtitle}</p>
+          <p className="text-xs sm:text-sm md:text-lg lg:text-xl text-zinc-300 mb-4 md:mb-6">
+            {currentSlide.subtitle}
+          </p>
           <button
             onClick={(e) => handlePlay(currentSlide, e)}
             className="inline-flex items-center gap-1.5 px-4 py-2 sm:px-6 sm:py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-xs sm:text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"

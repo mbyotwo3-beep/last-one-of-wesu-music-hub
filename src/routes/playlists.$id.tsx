@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
@@ -51,7 +52,7 @@ import { isUuid } from "@/lib/route-params";
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
   component: Page,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Playlist not found</div>,
 });
 

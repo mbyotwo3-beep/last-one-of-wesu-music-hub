@@ -126,7 +126,10 @@ export interface LencoMobileMoneyResult {
  * collection API accepts only `mtn`, `airtel`, or `zamtel`.
  */
 export function normalizeLencoOperator(operator: string): "mtn" | "airtel" | "zamtel" {
-  const value = operator.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  const value = operator
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
   if (value === "mtn" || value === "mtn-zambia" || value === "mtn-zm") return "mtn";
   if (value === "airtel" || value === "airtel-zambia" || value === "airtel-zm") {
     return "airtel";

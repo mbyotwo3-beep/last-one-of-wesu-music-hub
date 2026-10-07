@@ -27,7 +27,10 @@ export function aggregateAnalytics(
   days: number,
   songMeta: Map<string, any> = new Map(),
 ): AnalyticsData {
-  const tracks = new Map<string, { id: string; title: string; artistName: string; streams: number; seconds: number }>();
+  const tracks = new Map<
+    string,
+    { id: string; title: string; artistName: string; streams: number; seconds: number }
+  >();
   const artists = new Map<string, { id: string; name: string; streams: number }>();
   const listeners = new Set<string>();
   const daysSeen = new Set<string>();
@@ -79,14 +82,19 @@ export function aggregateAnalytics(
     streams: rows.length,
     uniqueListeners: listeners.size,
     uniqueSongs: tracks.size,
-    minutesListened: Math.round((rows.reduce((sum, row) => sum + Math.max(0, Number(row.progress_seconds ?? 0)), 0) / 60) * 10) / 10,
+    minutesListened:
+      Math.round(
+        (rows.reduce((sum, row) => sum + Math.max(0, Number(row.progress_seconds ?? 0)), 0) / 60) *
+          10,
+      ) / 10,
     activeDays: daysSeen.size,
     daily,
     topTracks: Array.from(tracks.values())
       .sort((a, b) => b.streams - a.streams || b.seconds - a.seconds)
       .slice(0, 10)
       .map((track) => ({ ...track, minutes: Math.round((track.seconds / 60) * 10) / 10 })),
-    topArtists: Array.from(artists.values()).sort((a, b) => b.streams - a.streams).slice(0, 10),
+    topArtists: Array.from(artists.values())
+      .sort((a, b) => b.streams - a.streams)
+      .slice(0, 10),
   };
 }
-

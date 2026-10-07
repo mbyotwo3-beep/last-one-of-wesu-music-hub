@@ -2,8 +2,16 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Trash2, Image, FileAudio, FileVideo, Download, Search,
-  HardDrive, AlertTriangle, RefreshCw, X,
+  Trash2,
+  Image,
+  FileAudio,
+  FileVideo,
+  Download,
+  Search,
+  HardDrive,
+  AlertTriangle,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { openExternalUrl } from "@/lib/external-url";
@@ -32,15 +40,18 @@ export function MediaGallery() {
     retry: 1,
   });
 
-  const { data: files, isLoading: filesLoading, refetch } = useQuery({
+  const {
+    data: files,
+    isLoading: filesLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["storage-files", selectedBucket],
     queryFn: () => listFilesFn({ data: { bucket: selectedBucket } }),
     retry: 1,
   });
 
   const deleteM = useMutation({
-    mutationFn: (vars: { bucket: string; path: string }) =>
-      deleteFileFn({ data: vars }),
+    mutationFn: (vars: { bucket: string; path: string }) => deleteFileFn({ data: vars }),
     onSuccess: () => {
       toast.success("🗑️ File deleted successfully!");
       refetch();
@@ -49,30 +60,29 @@ export function MediaGallery() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filteredFiles = files?.filter((file) =>
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) ?? [];
+  const filteredFiles =
+    files?.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase())) ?? [];
 
   const getFileIcon = (filename: string) => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '')) {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext || "")) {
       return <Image className="size-5" />;
     }
-    if (['mp3', 'wav', 'ogg', 'flac', 'aac'].includes(ext || '')) {
+    if (["mp3", "wav", "ogg", "flac", "aac"].includes(ext || "")) {
       return <FileAudio className="size-5" />;
     }
-    if (['mp4', 'webm', 'mov', 'avi'].includes(ext || '')) {
+    if (["mp4", "webm", "mov", "avi"].includes(ext || "")) {
       return <FileVideo className="size-5" />;
     }
     return <HardDrive className="size-5" />;
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
   const handleDelete = () => {
@@ -83,9 +93,7 @@ export function MediaGallery() {
 
   const handleDownload = () => {
     if (!selectedFile) return;
-    const { data } = supabase.storage
-      .from(selectedBucket)
-      .getPublicUrl(selectedFile.name);
+    const { data } = supabase.storage.from(selectedBucket).getPublicUrl(selectedFile.name);
     void openExternalUrl(data.publicUrl);
   };
 
@@ -105,7 +113,7 @@ export function MediaGallery() {
             disabled={filesLoading}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-accent text-sm"
           >
-            <RefreshCw className={`size-4 ${filesLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${filesLoading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
@@ -123,11 +131,13 @@ export function MediaGallery() {
           >
             {bucketsLoading ? (
               <option>Loading buckets...</option>
-            ) : buckets?.map((bucket: { id: string; name: string; public: boolean }) => (
-              <option key={bucket.id} value={bucket.id}>
-                {bucket.name} {bucket.public ? '(Public)' : '(Private)'}
-              </option>
-            ))}
+            ) : (
+              buckets?.map((bucket: { id: string; name: string; public: boolean }) => (
+                <option key={bucket.id} value={bucket.id}>
+                  {bucket.name} {bucket.public ? "(Public)" : "(Private)"}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
@@ -169,7 +179,9 @@ export function MediaGallery() {
                 {/* Preview */}
                 {file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                   <img
-                    src={supabase.storage.from(file.bucket_id).getPublicUrl(file.name).data.publicUrl}
+                    src={
+                      supabase.storage.from(file.bucket_id).getPublicUrl(file.name).data.publicUrl
+                    }
                     alt={file.name}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -251,7 +263,8 @@ export function MediaGallery() {
           <div className="text-sm">
             <p className="font-semibold text-yellow-500">Warning</p>
             <p className="text-muted-foreground mt-1">
-              Deleting files is permanent. Make sure the file is not being used by any songs, albums, or hero slides before deleting.
+              Deleting files is permanent. Make sure the file is not being used by any songs,
+              albums, or hero slides before deleting.
             </p>
           </div>
         </div>

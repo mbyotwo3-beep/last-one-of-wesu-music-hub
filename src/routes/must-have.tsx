@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { getFeaturedAlbums } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { StorageImage } from "@/components/StorageImage";
@@ -6,7 +7,7 @@ import { StorageImage } from "@/components/StorageImage";
 export const Route = createFileRoute("/must-have")({
   head: () => ({ meta: [{ title: "Must-Have Albums — Wesu+" }] }),
   component: Page,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12">Not found</div>,
 });
 

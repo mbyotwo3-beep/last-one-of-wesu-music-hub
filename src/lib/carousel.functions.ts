@@ -28,10 +28,7 @@ export interface Carousel {
 async function assertStaff(supabase: any, userId: string) {
   // Read the caller's own roles through their RLS-scoped client. The staff
   // helper itself lives in the private schema and is not callable over the API.
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
   const roles = (data ?? []).map((r: { role: string }) => r.role);
   if (!roles.includes("admin") && !roles.includes("superadmin")) {
@@ -128,10 +125,7 @@ export const updateCarousel = createServerFn({ method: "POST" })
     if (data.show_all_link !== undefined) patch.show_all_link = data.show_all_link;
     if (data.position !== undefined) patch.position = data.position;
     if (data.active !== undefined) patch.active = data.active;
-    const { error } = await supabaseAdmin
-      .from("home_carousels")
-      .update(patch)
-      .eq("id", data.id);
+    const { error } = await supabaseAdmin.from("home_carousels").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -143,10 +137,7 @@ export const deleteCarousel = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("home_carousels")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await supabaseAdmin.from("home_carousels").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -224,10 +215,7 @@ export const deleteCarouselItem = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("home_carousel_items")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await supabaseAdmin.from("home_carousel_items").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

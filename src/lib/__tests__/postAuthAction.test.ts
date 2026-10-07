@@ -96,9 +96,7 @@ describe("mergePendingAction", () => {
   });
 
   it("works with no stash (plain email login)", () => {
-    expect(
-      mergePendingAction({ action: "like", itemId: "s1", itemType: "song" }, null),
-    ).toEqual({
+    expect(mergePendingAction({ action: "like", itemId: "s1", itemType: "song" }, null)).toEqual({
       action: "like",
       artistId: undefined,
       itemId: "s1",
@@ -124,5 +122,22 @@ describe("safeAppRedirect", () => {
     expect(safeAppRedirect("https://evil.example/phish")).toBe("/dashboard");
     expect(safeAppRedirect("//evil.example/x")).toBe("/dashboard");
     expect(safeAppRedirect(undefined)).toBe("/dashboard");
+  });
+
+  // The mobile tab bar renders on /auth itself, so tapping "Library" while
+  // already on the sign-in form produced ?redirect=/auth. Signing in then
+  // navigated back to /auth: authenticated but stuck on the login form, with
+  // a soft loop (press Sign In → /auth again).
+  it("never lands on the auth route", () => {
+    expect(safeAppRedirect("/auth")).toBe("/dashboard");
+    expect(safeAppRedirect("/auth/")).toBe("/dashboard");
+    expect(safeAppRedirect("/auth?redirect=/library")).toBe("/dashboard");
+    expect(safeAppRedirect("/auth#top")).toBe("/dashboard");
+  });
+
+  it("still allows paths that merely start with the same letters", () => {
+    expect(safeAppRedirect("/authors")).toBe("/authors");
+    expect(safeAppRedirect("/authorship")).toBe("/authorship");
+    expect(safeAppRedirect("/library?tab=albums")).toBe("/library?tab=albums");
   });
 });

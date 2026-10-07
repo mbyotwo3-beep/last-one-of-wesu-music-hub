@@ -12,19 +12,11 @@ export function SkeletonHeroCarousel() {
 }
 
 export function SkeletonAlbumArt({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`aspect-square rounded-xl bg-muted/30 animate-pulse ${className}`}
-    />
-  );
+  return <div className={`aspect-square rounded-xl bg-muted/30 animate-pulse ${className}`} />;
 }
 
 export function SkeletonArtistAvatar({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`aspect-square rounded-full bg-muted/30 animate-pulse ${className}`}
-    />
-  );
+  return <div className={`aspect-square rounded-full bg-muted/30 animate-pulse ${className}`} />;
 }
 
 export function SkeletonTrackRow() {
@@ -43,17 +35,11 @@ export function SkeletonTrackRow() {
 }
 
 export function SkeletonText({ className = "" }: { className?: string }) {
-  return (
-    <div className={`h-4 bg-muted/30 rounded animate-pulse ${className}`} />
-  );
+  return <div className={`h-4 bg-muted/30 rounded animate-pulse ${className}`} />;
 }
 
 export function SkeletonButton({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`h-10 w-24 bg-muted/30 rounded-full animate-pulse ${className}`}
-    />
-  );
+  return <div className={`h-10 w-24 bg-muted/30 rounded-full animate-pulse ${className}`} />;
 }
 
 export function SkeletonHorizontalShelf() {

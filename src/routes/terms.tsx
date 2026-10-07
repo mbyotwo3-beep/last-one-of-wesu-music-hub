@@ -32,8 +32,7 @@ function TermsIndexPage() {
             Terms &amp; Conditions
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Choose the terms that apply to you. Wesu+ has separate terms for
-            artists and listeners.
+            Choose the terms that apply to you. Wesu+ has separate terms for artists and listeners.
           </p>
         </div>
       </div>
@@ -54,9 +53,8 @@ function TermsIndexPage() {
 
             <h2 className="text-xl font-bold mb-2">For Artists</h2>
             <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-              Upload fees, revenue splits, content rights, dispute resolution,
-              and everything artists need to know about distributing music on
-              Wesu+.
+              Upload fees, revenue splits, content rights, dispute resolution, and everything
+              artists need to know about distributing music on Wesu+.
             </p>
 
             <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">
@@ -78,9 +76,8 @@ function TermsIndexPage() {
 
             <h2 className="text-xl font-bold mb-2">For Listeners</h2>
             <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-              Personal use policy, account security, payments, copyright
-              responsibilities, and acceptable use guidelines for Wesu+
-              listeners.
+              Personal use policy, account security, payments, copyright responsibilities, and
+              acceptable use guidelines for Wesu+ listeners.
             </p>
 
             <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">

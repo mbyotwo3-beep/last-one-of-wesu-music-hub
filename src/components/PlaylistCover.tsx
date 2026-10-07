@@ -47,7 +47,9 @@ export function PlaylistCover({
     );
   }
   return (
-    <div className={`flex items-center justify-center bg-secondary/80 border border-border ${className}`}>
+    <div
+      className={`flex items-center justify-center bg-secondary/80 border border-border ${className}`}
+    >
       <ListMusic className="w-1/3 h-1/3 max-w-10 max-h-10 text-muted-foreground" />
     </div>
   );

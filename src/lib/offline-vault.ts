@@ -14,8 +14,18 @@
  */
 
 const DB_NAME = "wesu-offline-vault";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const TRACKS_STORE = "tracks";
+/**
+ * Metadata-only mirror of TRACKS_STORE (no ciphertext, no artwork bytes).
+ *
+ * Listing downloads used to `getAll()` the tracks store, which deserialises
+ * every encrypted audio blob into RAM just to read a title. /downloads fired
+ * that twice on mount (list + usage), so opening the page with a full vault
+ * allocated roughly twice the vault size — up to ~3 GB on a phone. That is the
+ * "downloads page won't open" failure. This store is what lists now read.
+ */
+const META_STORE = "meta";
 const DEVICE_STORE = "device";
 const DEVICE_KEY_ID = "aes-gcm-256";
 /** Hard cap so one device can't fill its disk (bounded offline cache). */
@@ -67,6 +77,9 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(DEVICE_STORE)) {
           db.createObjectStore(DEVICE_STORE, { keyPath: "id" });
         }
+        if (!db.objectStoreNames.contains(META_STORE)) {
+          db.createObjectStore(META_STORE, { keyPath: "songId" });
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => {
@@ -99,19 +112,49 @@ function tx<T>(
  * USE it for encrypt/decrypt but can never read the raw key bytes out, and
  * the ciphertext in IndexedDB is useless on any other device or app.
  */
+let deviceKeyPromise: Promise<CryptoKey> | null = null;
+
+/**
+ * Read-then-create is not atomic, so two things could each decide the key was
+ * missing: a genuine first run, and a transient IndexedDB read error (the old
+ * code caught every error and treated it as "no key exists"). Generating a
+ * replacement key there silently invalidated the ENTIRE vault — every download
+ * then failed to decrypt with "this download is corrupted". Two first-time
+ * downloads racing (the playlist bulk loop does exactly this) had the same
+ * effect.
+ *
+ * Now: a real read failure propagates instead of faking an empty vault, and a
+ * single in-flight promise serialises first-run creation.
+ */
 async function getDeviceKey(): Promise<CryptoKey> {
-  const existing = await tx<{ id: string; key: CryptoKey } | undefined>(
-    DEVICE_STORE,
-    "readonly",
-    (s) => s.get(DEVICE_KEY_ID),
-  ).catch(() => undefined);
-  if (existing?.key) return existing.key;
-  const key = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
-  await tx(DEVICE_STORE, "readwrite", (s) => s.put({ id: DEVICE_KEY_ID, key }));
-  return key;
+  if (deviceKeyPromise) return deviceKeyPromise;
+  deviceKeyPromise = (async () => {
+    let existing: { id: string; key: CryptoKey } | undefined;
+    try {
+      existing = await tx<{ id: string; key: CryptoKey } | undefined>(
+        DEVICE_STORE,
+        "readonly",
+        (s) => s.get(DEVICE_KEY_ID),
+      );
+    } catch {
+      // Unreachable store or blocked storage. Guessing here would replace the
+      // key and corrupt every existing download, so fail loudly instead.
+      throw new Error("Offline storage is unavailable on this device");
+    }
+    if (existing?.key) return existing.key;
+    const key = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    await tx(DEVICE_STORE, "readwrite", (s) => s.put({ id: DEVICE_KEY_ID, key }));
+    return key;
+  })();
+  try {
+    return await deviceKeyPromise;
+  } catch (err) {
+    deviceKeyPromise = null;
+    throw err;
+  }
 }
 
 function randomIv(): Uint8Array {
@@ -161,8 +204,11 @@ export function decideStaleVaultPlayback(args: {
 /** List downloaded tracks (metadata only — never decrypts audio). */
 export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
   if (!supported()) return [];
+  await ensureMetaBackfill();
   try {
-    const recs = await tx<VaultRecord[]>(TRACKS_STORE, "readonly", (s) => s.getAll());
+    // Read the metadata mirror: no ciphertext is deserialised, so listing a
+    // full vault costs kilobytes rather than gigabytes.
+    const recs = await tx<VaultTrackMeta[]>(META_STORE, "readonly", (s) => s.getAll());
     return recs
       .map((r) => ({
         songId: r.songId,
@@ -176,6 +222,47 @@ export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
       .sort((a, b) => b.downloadedAt - a.downloadedAt);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Rows written before the metadata mirror existed have no META entry. Rebuild
+ * them once (a full read, but only ever once per device) so upgrading users
+ * don't find their downloads page suddenly empty.
+ */
+let metaBackfillDone = false;
+async function ensureMetaBackfill(): Promise<void> {
+  if (metaBackfillDone || !supported()) return;
+  try {
+    const ids = (await tx<IDBValidKey[]>(TRACKS_STORE, "readonly", (s) =>
+      s.getAllKeys(),
+    )) as string[];
+    if (!ids.length) {
+      metaBackfillDone = true;
+      return;
+    }
+    const known = new Set(
+      (await tx<IDBValidKey[]>(META_STORE, "readonly", (s) => s.getAllKeys())).map(String),
+    );
+    const missing = ids.filter((id) => !known.has(String(id)));
+    for (const id of missing) {
+      const rec = await tx<VaultRecord | undefined>(TRACKS_STORE, "readonly", (s) => s.get(id));
+      if (!rec) continue;
+      await tx(META_STORE, "readwrite", (s) =>
+        s.put({
+          songId: rec.songId,
+          title: rec.title,
+          artistName: rec.artistName,
+          coverUrl: rec.coverUrl,
+          mime: rec.mime,
+          size: rec.size ?? 0,
+          downloadedAt: rec.downloadedAt ?? 0,
+        }),
+      );
+    }
+    metaBackfillDone = true;
+  } catch {
+    /* leave the flag false so a later attempt can retry */
   }
 }
 
@@ -232,7 +319,11 @@ export async function getVaultArtObjectUrl(songId: string): Promise<string | nul
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;
   try {
-    const key = await tx<unknown>(TRACKS_STORE, "readonly", (s) => s.getKey(songId) as IDBRequest<unknown>);
+    const key = await tx<unknown>(
+      TRACKS_STORE,
+      "readonly",
+      (s) => s.getKey(songId) as IDBRequest<unknown>,
+    );
     return key != null;
   } catch {
     return false;
@@ -251,8 +342,11 @@ export async function getVaultTrackIds(): Promise<string[]> {
 
 export async function getVaultUsage(): Promise<{ trackCount: number; bytes: number }> {
   if (!supported()) return { trackCount: 0, bytes: 0 };
+  await ensureMetaBackfill();
   try {
-    const recs = await tx<VaultRecord[]>(TRACKS_STORE, "readonly", (s) => s.getAll());
+    // Same reason as listVaultMeta: sum sizes from the mirror, never touch the
+    // audio blobs.
+    const recs = await tx<VaultTrackMeta[]>(META_STORE, "readonly", (s) => s.getAll());
     return {
       trackCount: recs.length,
       bytes: recs.reduce((sum, r) => sum + (r.size || 0), 0),
@@ -319,6 +413,11 @@ export async function saveTrackToVault(
   };
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.put(record));
+    // Mirror the metadata so listing never reads the ciphertext.
+    const { data: _data, artwork: _artwork, ...meta } = record;
+    void _data;
+    void _artwork;
+    await tx(META_STORE, "readwrite", (s) => s.put(meta));
   } catch (err: any) {
     if (err?.name === "QuotaExceededError") {
       throw new Error("Not enough device storage for this download");
@@ -334,10 +433,14 @@ export async function removeTrackFromVault(songId: string): Promise<void> {
   revokeOfflineObjectUrl(songId);
   revokeVaultArtUrl(songId);
   if (!supported() || !songId) return;
+  // Deliberately NOT swallowing: callers toast "Removed from this device"
+  // unconditionally and their error branches were unreachable, so a failed
+  // delete was reported as success and the song reappeared after a reload.
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.delete(songId));
+    await tx(META_STORE, "readwrite", (s) => s.delete(songId));
   } catch {
-    /* best effort */
+    throw new Error("Could not remove this download. Try again.");
   }
 }
 

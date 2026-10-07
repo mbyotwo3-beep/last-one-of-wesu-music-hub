@@ -8,7 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -53,6 +53,24 @@ function FxRateHydrator() {
     }
   }, [data, setZmwPerUsd]);
   return null;
+}
+
+/**
+ * Viewport width below Tailwind's `lg` breakpoint. Starts as `true` so the
+ * server render matches the first client render (a phone-sized toast set); a
+ * desktop visitor gets one layout shift instead, which is harmless.
+ */
+function useIsPhone(): boolean {
+  const [isPhone, setIsPhone] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsPhone(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isPhone;
 }
 
 function NotFoundComponent() {
@@ -224,6 +242,9 @@ function RootComponent() {
   // STABILITY: single stable tree — Outlet + audio engine never unmount on
   // resize/rotate. Responsive switching is CSS-only (hidden lg:*) so upload
   // File objects, form state, and playback survive breakpoint changes.
+  // (Toast placement is the one exception — it needs a JS media query because
+  // Sonner takes a `position` prop, not a class.)
+  const isPhone = useIsPhone();
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -266,7 +287,10 @@ function RootComponent() {
             </div>
           </div>
         </div>
-        <Toaster position="top-right" />
+        {/* Bottom-centre on phones: at top-right a ~356px toast covered the
+            logo and theme toggle for its whole lifetime. Desktop keeps the
+            corner placement. */}
+        <Toaster position={isPhone ? "bottom-center" : "top-right"} />
       </ThemeProvider>
     </QueryClientProvider>
   );

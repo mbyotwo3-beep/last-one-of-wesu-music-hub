@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions, useSuspenseQuery, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/checkout")({
     context.queryClient.ensureQueryData(methodsQO);
   },
   component: CheckoutRoute,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 

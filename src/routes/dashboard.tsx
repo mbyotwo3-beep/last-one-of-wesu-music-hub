@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Headphones, Heart, ListMusic, ShoppingBag } from "lucide-react";
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/dashboard")({
     meta: [{ title: "My Dashboard — Wesu+" }],
   }),
   component: DashboardRoute,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -85,7 +86,8 @@ function DashboardPage() {
     return (
       <div className="p-12 text-center">
         <p className="text-destructive mb-2">
-          Couldn't load your library{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+          Couldn't load your library
+          {(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
         </p>
         <button
           onClick={() => refetch()}

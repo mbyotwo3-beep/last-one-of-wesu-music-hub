@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOfflineList } from "@/hooks/use-offline-list";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/library")({
       <LibraryRoute />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -592,7 +593,12 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
             <Play className="size-4 fill-current" />
           )}
         </button>
-        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        <DownloadButton
+          songId={song.id}
+          title={song.title}
+          coverUrl={song.cover_url}
+          artistName={song.artists?.name ?? "Unknown artist"}
+        />
         <ShareMenu
           songId={song.id}
           songTitle={song.title}
@@ -692,7 +698,12 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
             <Play className="size-4 fill-current" />
           )}
         </button>
-        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        <DownloadButton
+          songId={song.id}
+          title={song.title}
+          coverUrl={song.cover_url}
+          artistName={song.artists?.name ?? "Unknown artist"}
+        />
         <ShareMenu
           songId={song.id}
           songTitle={song.title}

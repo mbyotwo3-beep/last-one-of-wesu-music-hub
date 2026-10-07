@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/artist-dashboard")({
       <ArtistDashboardPage />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 

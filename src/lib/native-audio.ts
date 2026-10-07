@@ -476,6 +476,13 @@ export async function seekNative(id: string, seconds: number): Promise<void> {
 
 /** Volume 0..1 for the native asset. No-op on failure. */
 export async function setNativeVolume(id: string, volume: number): Promise<void> {
+  // Mark this as OUR command. The reconciler uses the last-command timestamp
+  // to avoid re-adopting a stale `playing` right after a user action; a volume
+  // change is such an action, and without this a mute could be undone.
+  markNativeCommand();
+  // configure() is idempotent and must have run: setVolume on an unconfigured
+  // session is what left the slider at 100% playing at ~0.01.
+  await configureNativeAudio();
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     // The plugin documents 0.1–1.0; a 0.01 floor keeps mute effectively

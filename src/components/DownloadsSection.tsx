@@ -58,6 +58,8 @@ function VaultCover({ songId, path, alt }: { songId: string; path: string | null
 export function DownloadsSection() {
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { data: tracks } = useQuery({
     // Prefix-matched by touchVaultQueries(["vault-track"]) so every
@@ -72,7 +74,12 @@ export function DownloadsSection() {
     staleTime: 30_000,
   });
 
-  if (!isVaultSupported()) return null;
+  // IndexedDB only exists in the browser, so the old `if (!isVaultSupported())
+  // return null` AFTER the hooks made SSR render nothing and the client's first
+  // paint render the whole section — a hydration mismatch plus a flash of an
+  // empty downloads page. Gate on "mounted" instead, so both sides render the
+  // same thing first.
+  if (!mounted || !isVaultSupported()) return null;
   const list = tracks ?? [];
   const mb = ((usage?.bytes ?? 0) / 1048576).toFixed(1);
 

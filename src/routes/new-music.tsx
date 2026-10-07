@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { getNewReleases } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { TrackCard } from "@/components/discover/TrackCard";
@@ -6,7 +7,7 @@ import { TrackCard } from "@/components/discover/TrackCard";
 export const Route = createFileRoute("/new-music")({
   head: () => ({ meta: [{ title: "New Music — Wesu+" }] }),
   component: Page,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12">Not found</div>,
 });
 

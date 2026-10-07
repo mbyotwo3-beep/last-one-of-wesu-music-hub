@@ -15,7 +15,9 @@ async function readRows(supabase: any, query: (q: any) => any) {
   const result = await query(
     supabase
       .from("play_history")
-      .select("song_id,user_id,played_at,progress_seconds,songs:song_id(id,title,artist_id,artists:artist_id(id,name))")
+      .select(
+        "song_id,user_id,played_at,progress_seconds,songs:song_id(id,title,artist_id,artists:artist_id(id,name))",
+      )
       .gte("played_at", since())
       .order("played_at", { ascending: false })
       .limit(20000),
@@ -24,8 +26,7 @@ async function readRows(supabase: any, query: (q: any) => any) {
   return result.data ?? [];
 }
 
-const empty = (scope: AnalyticsData["scope"]): AnalyticsData =>
-  aggregateAnalytics([], scope, DAYS);
+const empty = (scope: AnalyticsData["scope"]): AnalyticsData => aggregateAnalytics([], scope, DAYS);
 
 export const getMyListenerAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -96,4 +97,3 @@ export const getPlatformAnalytics = createServerFn({ method: "GET" })
     const rows = await readRows(admin, (q) => q);
     return aggregateAnalytics(rows, "platform", DAYS);
   });
-

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import {
   queryOptions,
   useSuspenseQuery,
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/artists/$id")({
     ],
   }),
   component: ArtistPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Artist not found.</div>,
 });
 
@@ -459,7 +460,12 @@ function ArtistTopSongRow({
             <ShoppingBag className="size-4" />
           </Link>
         )}
-        <DownloadButton songId={s.id} title={s.title} coverUrl={s.cover_url} />
+        <DownloadButton
+          songId={s.id}
+          title={s.title}
+          coverUrl={s.cover_url}
+          artistName={artistName}
+        />
         <button
           onClick={(e) => {
             e.stopPropagation();

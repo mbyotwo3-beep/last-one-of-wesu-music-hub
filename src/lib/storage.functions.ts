@@ -11,10 +11,7 @@ export interface StorageFile {
 }
 
 async function assertSuperadmin(supabase: any, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error(error.message);
   const roles = (data ?? []).map((r: { role: string }) => r.role);
   if (!roles.includes("superadmin")) {
@@ -30,8 +27,7 @@ export const listStorageFiles = createServerFn({ method: "GET" })
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: files, error } = await (supabaseAdmin as any)
-      .storage
+    const { data: files, error } = await (supabaseAdmin as any).storage
       .from(data.bucket)
       .list("", { limit: 1000 });
 
@@ -54,10 +50,7 @@ export const deleteStorageFile = createServerFn({ method: "POST" })
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any)
-      .storage
-      .from(data.bucket)
-      .remove([data.path]);
+    const { error } = await (supabaseAdmin as any).storage.from(data.bucket).remove([data.path]);
 
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -70,9 +63,7 @@ export const listStorageBuckets = createServerFn({ method: "GET" })
     await assertSuperadmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: buckets, error } = await (supabaseAdmin as any)
-      .storage
-      .listBuckets();
+    const { data: buckets, error } = await (supabaseAdmin as any).storage.listBuckets();
 
     if (error) throw new Error(error.message);
 

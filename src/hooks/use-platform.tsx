@@ -52,8 +52,8 @@ export function useIsMobile(): boolean {
       setIsMobile(isMobileUA || isSmallScreen);
     };
 
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   return isMobile;

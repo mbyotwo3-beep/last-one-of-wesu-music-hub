@@ -126,17 +126,13 @@ function PrivacyPage() {
             Your Data
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-            Privacy Policy
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Privacy Policy</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            How Wesu+ collects, uses, and protects your personal information
-            across the website and mobile apps.
+            How Wesu+ collects, uses, and protects your personal information across the website and
+            mobile apps.
           </p>
 
-          <p className="mt-6 text-xs text-muted-foreground/60">
-            Last updated: September 2026
-          </p>
+          <p className="mt-6 text-xs text-muted-foreground/60">Last updated: September 2026</p>
         </div>
       </div>
 
@@ -161,12 +157,8 @@ function PrivacyPage() {
                 </div>
 
                 <div className="flex-1 min-w-0 pt-1">
-                  <h2 className="text-base font-semibold mb-1.5">
-                    {clause.title}
-                  </h2>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
-                    {clause.content}
-                  </p>
+                  <h2 className="text-base font-semibold mb-1.5">{clause.title}</h2>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{clause.content}</p>
                 </div>
               </div>
             );

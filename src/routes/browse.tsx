@@ -422,7 +422,12 @@ function TrackListRow({
       <span className="text-xs text-muted-foreground hidden sm:inline">
         {(song.play_count ?? 0).toLocaleString()} plays
       </span>
-      <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+      <DownloadButton
+        songId={song.id}
+        title={song.title}
+        coverUrl={song.cover_url}
+        artistName={song.artist?.name ?? "Unknown artist"}
+      />
       <ShareMenu
         songId={song.id}
         songTitle={song.title}

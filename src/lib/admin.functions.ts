@@ -95,7 +95,9 @@ export const listPendingSongs = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("songs")
-      .select("id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)")
+      .select(
+        "id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)",
+      )
       .eq("status", "pending")
       .order("created_at", { ascending: false });
     return data ?? [];
@@ -110,7 +112,9 @@ export const listAllSongsAdmin = createServerFn({ method: "GET" })
 
     let query = supabaseAdmin
       .from("songs")
-      .select("id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)")
+      .select(
+        "id,title,created_at,status,price,genre,play_count,duration,cover_url,audio_url,artist:artists(id,name)",
+      )
       .order("created_at", { ascending: false });
 
     if (data?.status && data.status !== "all") {
@@ -336,7 +340,10 @@ export const moderateArtistVerification = createServerFn({ method: "POST" })
       verification_status: isApprove ? "verified" : "rejected",
     };
 
-    const { error } = await supabaseAdmin.from("artists").update(patch as any).eq("id", data.id);
+    const { error } = await supabaseAdmin
+      .from("artists")
+      .update(patch as any)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
 
     await audit(context.userId, `artist.verification.${data.decision}`, "artist", data.id);
@@ -378,11 +385,11 @@ export const moderateLabel = createServerFn({ method: "POST" })
       if (owner?.owner_user_id) {
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
-          .upsert(
-            { user_id: owner.owner_user_id, role: "label" } as any,
-            { onConflict: "user_id,role" },
-          );
-        if (roleError) throw new Error(`Label was approved but role assignment failed: ${roleError.message}`);
+          .upsert({ user_id: owner.owner_user_id, role: "label" } as any, {
+            onConflict: "user_id,role",
+          });
+        if (roleError)
+          throw new Error(`Label was approved but role assignment failed: ${roleError.message}`);
       }
     }
     await audit(context.userId, `label.${data.status}`, "label", data.id);
@@ -398,7 +405,9 @@ export const listPayoutsForStaff = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("payouts")
-      .select("id,amount,method_code,destination,status,notes,requested_at,processed_at,artist:artists(name),label:labels(name)")
+      .select(
+        "id,amount,method_code,destination,status,notes,requested_at,processed_at,artist:artists(name),label:labels(name)",
+      )
       .order("requested_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
@@ -411,7 +420,8 @@ export const reviewPayout = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertStaff(context.supabase, context.userId);
     const notes = data.notes?.trim() || null;
-    if (notes && notes.length > 1_000) throw new Error("Payout note must be at most 1,000 characters");
+    if (notes && notes.length > 1_000)
+      throw new Error("Payout note must be at most 1,000 characters");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: payout, error } = await supabaseAdmin
       .from("payouts")
@@ -451,10 +461,10 @@ export const getArtistDiagnostics = createServerFn({ method: "GET" })
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getDiagnosticInfo, formatDiagnosticReport } = await import("./artist-status-utils");
-    
+
     const info = await getDiagnosticInfo(supabaseAdmin);
     const report = formatDiagnosticReport(info);
-    
+
     return {
       info,
       report,

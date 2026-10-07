@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/albums/")({
     context.queryClient.ensureQueryData(albumsQO).catch(() => {});
   },
   component: AlbumsPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 

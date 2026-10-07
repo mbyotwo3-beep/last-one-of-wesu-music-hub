@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { ArrowLeft } from "lucide-react";
 import { DownloadsSection } from "@/components/DownloadsSection";
 
@@ -18,13 +19,17 @@ export const Route = createFileRoute("/downloads")({
     ],
   }),
   component: DownloadsPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function DownloadsPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
+    // pb-32 on lg: the desktop PlayerBar is fixed at bottom-3 h-20 (~92px) and
+    // downloads carried no bottom clearance, so the last row's delete button
+    // sat underneath it — on the very page the player links to when a
+    // download can't be streamed.
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12 lg:pb-32">
       <Link
         to="/"
         className="text-sm font-medium text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 cursor-pointer transition-colors"

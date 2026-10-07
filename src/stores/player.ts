@@ -3,9 +3,12 @@ import { persist } from "zustand/middleware";
 import { primeAudio, getAudio } from "@/lib/audio";
 import { emitNativeSeek, setNativeSeekHook } from "@/lib/native-audio";
 import {
+  addToShuffleDeck,
   buildShuffleDeck,
   insertIndexForPlayNext,
   pickNextIndex,
+  rebuildShuffleDeck,
+  remapShuffleDeck,
   type RepeatMode,
   type ShuffleDeck,
 } from "@/stores/play-order";
@@ -140,6 +143,10 @@ export const usePlayer = create<PlayerState>()(
           playing: !!t,
           progressSeconds: 0,
           isPreview: false,
+          // A previous track's failure must not turn this one's Play button
+          // into a retry: togglePlay read the stale error and restarted from
+          // 0:00 instead of pausing.
+          error: null,
         }));
       },
       setAudioUrl: (url) =>
@@ -147,7 +154,15 @@ export const usePlayer = create<PlayerState>()(
 
       setQueue: (tracks, startIndex = 0) => {
         if (!tracks.length) {
-          set({ queue: [], queueIndex: 0, track: null, playing: false, progressSeconds: 0 });
+          set({
+            queue: [],
+            queueIndex: 0,
+            track: null,
+            playing: false,
+            progressSeconds: 0,
+            shuffleDeck: null,
+            error: null,
+          });
           return;
         }
         // Clamp out-of-bounds callers instead of storing a queueIndex with no track.
@@ -165,14 +180,24 @@ export const usePlayer = create<PlayerState>()(
           selectionId: track ? state.selectionId + 1 : state.selectionId,
           playing: !!track,
           progressSeconds: 0,
+          // The old deck indexes the PREVIOUS queue. Left in place, the next
+          // skip drew an index that no longer existed.
+          shuffleDeck: rebuildShuffleDeck(state.shuffle, tracks.length, safeIndex),
+          error: null,
         }));
       },
 
       addToQueue: (track) => {
         if (track) primeAudio();
-        set((state) => ({
-          queue: [...state.queue, track],
-        }));
+        set((state) => {
+          const at = state.queue.length;
+          return {
+            queue: [...state.queue, track],
+            // Appending does not move existing positions, so the deck stays
+            // valid — but the new track has to be reachable under shuffle.
+            shuffleDeck: addToShuffleDeck(state.shuffleDeck, at),
+          };
+        });
       },
 
       removeFromQueue: (index) => {
@@ -195,7 +220,15 @@ export const usePlayer = create<PlayerState>()(
             };
           }
           const newQueueIndex = state.queueIndex > index ? state.queueIndex - 1 : state.queueIndex;
-          return { queue: newQueue, queueIndex: newQueueIndex };
+          return {
+            queue: newQueue,
+            queueIndex: newQueueIndex,
+            // Removing a row shifts every later position down by one, so a deck
+            // still pointing at the old numbers could draw past the end.
+            shuffleDeck: remapShuffleDeck(state.shuffleDeck, (i) =>
+              i === index ? null : i > index ? i - 1 : i,
+            ),
+          };
         });
       },
 
@@ -209,7 +242,14 @@ export const usePlayer = create<PlayerState>()(
           const at = insertIndexForPlayNext(state.queue.length, state.queueIndex);
           const queue = [...state.queue];
           queue.splice(at, 0, track);
-          return { queue };
+          return {
+            queue,
+            // Everything from `at` onwards shifted right by one.
+            shuffleDeck: addToShuffleDeck(
+              remapShuffleDeck(state.shuffleDeck, (i) => (i >= at ? i + 1 : i)),
+              at,
+            ),
+          };
         });
       },
 
@@ -256,7 +296,13 @@ export const usePlayer = create<PlayerState>()(
           if (queueIndex === from) index = to;
           else if (from < queueIndex && to >= queueIndex) index = queueIndex - 1;
           else if (from > queueIndex && to <= queueIndex) index = queueIndex + 1;
-          return { queue: next, queueIndex: index };
+          // A reorder moves rows between two positions, so the deck's stored
+          // numbers no longer describe anything. Rebuild it.
+          return {
+            queue: next,
+            queueIndex: index,
+            shuffleDeck: rebuildShuffleDeck(state.shuffle, next.length, index),
+          };
         });
       },
 
@@ -323,6 +369,13 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           playing: true,
           isPreview: false,
+          // Same reason as setTrack: a stale error turned the next Play tap
+          // into a retry instead of a pause.
+          error: null,
+          // The deck's `current` is the row that was playing; it is no longer.
+          shuffleDeck: state.shuffleDeck
+            ? { ...state.shuffleDeck, current: prev }
+            : state.shuffleDeck,
         }));
       },
 
@@ -453,6 +506,9 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           nowPlayingOpen: false,
           isPreview: false,
+          // Left set, the NEXT track's Play button was a retry: tapping pause
+          // restarted the song instead of pausing it.
+          error: null,
         });
       },
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: v === 0 }),

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/superadmin")({
       <SuperadminRoute />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -57,7 +58,15 @@ function SuperadminRoute() {
 }
 
 type Tab =
-  "overview" | "users" | "payments" | "settings" | "payouts" | "labels" | "featured" | "audit" | "financials";
+  | "overview"
+  | "users"
+  | "payments"
+  | "settings"
+  | "payouts"
+  | "labels"
+  | "featured"
+  | "audit"
+  | "financials";
 
 function SuperadminPage() {
   const [tab, setTab] = useState<Tab>("overview");

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { Play } from "lucide-react";
 import { getTrendingSongs } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
@@ -10,7 +11,7 @@ import { ShareMenu } from "@/components/ShareMenu";
 export const Route = createFileRoute("/hot-tracks")({
   head: () => ({ meta: [{ title: "Hot Tracks — Wesu+" }] }),
   component: Page,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12">Not found</div>,
 });
 

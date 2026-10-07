@@ -1,10 +1,4 @@
-import {
-  isR2Configured,
-  r2Exists,
-  r2Put,
-  r2SignedGetUrl,
-  type MediaBucket,
-} from "./r2.server";
+import { isR2Configured, r2Exists, r2Put, r2SignedGetUrl, type MediaBucket } from "./r2.server";
 
 /**
  * Single read path for stored media.
@@ -34,16 +28,20 @@ async function signSupabaseUrl(
   opts: { expiresIn?: number; download?: string },
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  
+
   // Image buckets are public (album-art, artist-images, user-avatars, hero-images, label-images)
   // Audio bucket (song-audio) is private and requires signed URLs
-  const publicBuckets = ["album-art", "artist-images", "user-avatars", "hero-images", "label-images"];
-  
+  const publicBuckets = [
+    "album-art",
+    "artist-images",
+    "user-avatars",
+    "hero-images",
+    "label-images",
+  ];
+
   if (publicBuckets.includes(bucket)) {
     // Use public URL for images to support multiple domains
-    const { data } = supabaseAdmin.storage
-      .from(bucket)
-      .getPublicUrl(path);
+    const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error("Unable to get media URL");
     // Add download parameter if needed
     if (opts.download) {
@@ -53,11 +51,15 @@ async function signSupabaseUrl(
     }
     return data.publicUrl;
   }
-  
+
   // Use signed URL for private buckets (song-audio)
   const { data, error } = await supabaseAdmin.storage
     .from(bucket)
-    .createSignedUrl(path, opts.expiresIn ?? 3600, opts.download ? { download: opts.download } : undefined);
+    .createSignedUrl(
+      path,
+      opts.expiresIn ?? 3600,
+      opts.download ? { download: opts.download } : undefined,
+    );
   if (error || !data?.signedUrl) throw new Error(error?.message ?? "Unable to sign media URL");
   return data.signedUrl;
 }
@@ -102,4 +104,3 @@ export async function deleteStoredMedia(bucket: MediaBucket, path: string): Prom
     console.warn(`[Storage Cleanup] Failed to delete ${path} from Supabase bucket ${bucket}:`, err);
   }
 }
-

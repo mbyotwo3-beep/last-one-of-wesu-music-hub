@@ -62,6 +62,13 @@ export function useSavedTrack(songId: string | null | undefined) {
       qc.invalidateQueries({ queryKey: ["saved-tracks", user?.id] });
       qc.invalidateQueries({ queryKey: ["my-overview", user?.id] });
       qc.invalidateQueries({ queryKey: ["library", user?.id] });
+      // /liked-songs lists under its own key. Without this the optimistic
+      // heart emptied but the row stayed on screen until the 30s staleTime
+      // expired — the page looked like the un-save had failed.
+      qc.invalidateQueries({ queryKey: ["liked-songs", user?.id] });
+      // Prefix invalidate: the player bar and any shelf that hides saved
+      // tracks filter on the generic key.
+      qc.invalidateQueries({ queryKey: ["saved-track-ids"] });
     },
   });
 
@@ -74,7 +81,12 @@ export function useSavedTrack(songId: string | null | undefined) {
         const currentPath = window.location.pathname + window.location.search;
         navigate({
           to: "/auth",
-          search: { redirect: currentPath, action: "like", itemId: songId ?? undefined, itemType: "song" },
+          search: {
+            redirect: currentPath,
+            action: "like",
+            itemId: songId ?? undefined,
+            itemType: "song",
+          },
         });
         return;
       }

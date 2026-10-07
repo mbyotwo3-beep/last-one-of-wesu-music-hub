@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 /**
@@ -19,6 +19,28 @@ const MAX_BYTES = 400_000;
 
 export function readOnlineStatus(): boolean {
   return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+/**
+ * Subscribes to connectivity. `readOnlineStatus()` was called during render with
+ * no listener, so `online` froze at mount value: losing signal mid-session left
+ * the snapshot branch unevaluated until some unrelated re-render — the "the
+ * list vanished when I went offline" symptom this hook exists to prevent.
+ */
+export function useOnlineStatus(): boolean {
+  const [online, setOnline] = useState(readOnlineStatus);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setOnline(readOnlineStatus());
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
 }
 
 export function saveSnapshot(key: string, data: unknown): void {
@@ -68,7 +90,7 @@ export function useOfflineList<T>(
   key: string,
   options: OfflineListOptions<T>,
 ): OfflineListResult<T> {
-  const online = readOnlineStatus();
+  const online = useOnlineStatus();
   const query = useQuery({
     queryKey: options.queryKey,
     queryFn: options.queryFn,

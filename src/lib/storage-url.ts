@@ -48,8 +48,7 @@ let batchSigner: BatchSigner = async (items) => signImageUrls({ data: { items } 
 
 /** Test-only override so unit tests can assert batching without network. */
 export function __setBatchSigner(signer: BatchSigner | null) {
-  batchSigner =
-    signer ?? (async (items) => signImageUrls({ data: { items } }));
+  batchSigner = signer ?? (async (items) => signImageUrls({ data: { items } }));
 }
 
 function scheduleBatchFlush() {

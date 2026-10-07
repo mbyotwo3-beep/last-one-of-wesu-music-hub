@@ -1,4 +1,13 @@
-import { Loader2, Pause, Play, SkipForward, SkipBack, Radio, ListMusic } from "lucide-react";
+import {
+  Loader2,
+  Pause,
+  Play,
+  SkipForward,
+  SkipBack,
+  Radio,
+  ListMusic,
+  AlertTriangle,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
@@ -23,6 +32,9 @@ export function MiniPlayer() {
   const skipPrev = usePlayer((s) => s.skipPrev);
   const openNowPlaying = usePlayer((s) => s.openNowPlaying);
   const isPreview = usePlayer((s) => s.isPreview);
+  const error = usePlayer((s) => s.error);
+  const retry = usePlayer((s) => s.retry);
+  const exitSong = usePlayer((s) => s.exitSong);
   const queue = usePlayer((s) => s.queue);
   const queueIndex = usePlayer((s) => s.queueIndex);
   const [showQueue, setShowQueue] = useState(false);
@@ -45,6 +57,33 @@ export function MiniPlayer() {
       className="fixed bottom-16 inset-x-0 z-40"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
+      {/* PlayerBar is hidden on phones (lg:block), so before this the only
+          signal of a failed track on the APK was the play triangle flipping —
+          no message anywhere. A retry + dismiss the listener can actually use. */}
+      {error && (
+        <div className="mx-2 mb-1 flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/15 border border-red-500/30">
+          <AlertTriangle className="size-3.5 text-red-400 shrink-0" />
+          <span className="text-[11px] text-red-300 leading-tight flex-1 min-w-0 truncate">
+            {error}
+          </span>
+          <button
+            type="button"
+            onClick={retry}
+            className="shrink-0 text-[11px] font-semibold text-red-200 px-2 py-1.5 rounded-full hover:bg-red-500/20 min-h-[32px]"
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={exitSong}
+            aria-label="Dismiss"
+            className="shrink-0 text-[11px] font-semibold text-red-200/80 px-2 py-1.5 rounded-full hover:bg-red-500/20 min-h-[32px]"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {isPreview && (
         <div className="mx-2 mb-1 flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 text-[11px]">
           <span className="flex items-center gap-1.5 text-amber-400 font-medium">
@@ -145,7 +184,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={skipPrev}
-              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label="Previous"
             >
               <SkipBack className="size-4 fill-white/80" />
@@ -154,7 +193,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={togglePlay}
-              className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label={playing ? "Pause" : "Play"}
             >
               {playing ? (
@@ -169,7 +208,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={skipNext}
-              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label="Next"
             >
               <SkipForward className="size-4 fill-white/80" />
@@ -178,7 +217,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={() => setShowQueue(!showQueue)}
-              className="w-9 h-9 flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer rounded-full hover:bg-white/10"
               aria-label="Queue"
             >
               <ListMusic className="size-4 fill-white/80" />

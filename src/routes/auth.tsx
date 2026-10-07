@@ -75,9 +75,9 @@ function AuthPage() {
   const acceptInviteFn = useServerFn(acceptInvitation);
 
   // Only same-origin paths are valid redirect targets — anything else
-  // (absolute URLs, protocol-relative) falls back to the dashboard.
-  const safeRedirect =
-    redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : undefined;
+  // (absolute URLs, protocol-relative, /auth itself) falls back to the
+  // dashboard. safeAppRedirect owns that decision so /auth can't sneak in.
+  const safeRedirect = redirect ? safeAppRedirect(redirect) : undefined;
 
   // Invitation links survive email-confirmation signups (which create no
   // session yet) via sessionStorage, and are consumed once after auth.
@@ -126,12 +126,16 @@ function AuthPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Enter advances/submits — but never from a <button>. Cancelling the
+  // keydown also cancels the button's activation, so pressing Enter on
+  // "show password" or a terms link submitted the form instead (and on a
+  // disabled submit button did nothing at all).
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const form = e.currentTarget as HTMLFormElement;
-      form.requestSubmit();
-    }
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, [role='button']")) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLFormElement).requestSubmit();
   };
 
   // Keyboard-open viewports (and adjustPan shells) can leave the focused
@@ -153,8 +157,15 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
+        if (!agreedToTerms) {
+          setError("You must agree to the Terms & Conditions to create an account.");
+          setLoading(false);
+          return;
+        }
         // Email-confirmation round-trips wipe the query string — stash the
-        // intent so it replays after the user confirms and signs in.
+        // intent so it replays after the user confirms and signs in. Stashed
+        // only once the terms gate passes: doing it first left an unconsumed
+        // follow/save/invite in sessionStorage for every rejected attempt.
         stashPendingAction(sessionStorage, {
           action,
           artistId,
@@ -163,11 +174,6 @@ function AuthPage() {
           redirect,
           invite,
         });
-        if (!agreedToTerms) {
-          setError("You must agree to the Terms & Conditions to create an account.");
-          setLoading(false);
-          return;
-        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -185,7 +191,20 @@ function AuthPage() {
             // fires wesu:signed-in, which replays the stashed intent.
             emailRedirectTo: isNative
               ? "com.wesu.music://login-callback"
-              : `${window.location.origin}${safeRedirect || "/dashboard"}`,
+              : // Back to /auth, not straight to the destination: the confirm
+                // link is a fresh page load, and only /auth's mount effect
+                // replays the stashed intent (like/follow/save). Sending them
+                // to /artists/x meant the action was never performed.
+                (() => {
+                  const u = new URL("/auth", window.location.origin);
+                  u.searchParams.set("redirect", safeRedirect || "/dashboard");
+                  if (action) u.searchParams.set("action", action);
+                  if (artistId) u.searchParams.set("artistId", artistId);
+                  if (itemId) u.searchParams.set("itemId", itemId);
+                  if (itemType) u.searchParams.set("itemType", itemType);
+                  if (invite) u.searchParams.set("invite", invite);
+                  return u.toString();
+                })(),
           },
         });
         if (error) throw error;
@@ -477,8 +496,21 @@ function AuthPage() {
                       redirect,
                       invite,
                     });
+                    // Come back to /auth with the full intent in the query
+                    // string. Google returns to `redirect_uri` and wipes
+                    // everything else, so pointing this at window.location
+                    // (the bare origin) meant the mount effect below never
+                    // re-ran and the like/follow/save silently never
+                    // happened — the user just landed on the homepage.
+                    const returnTo = new URL("/auth", window.location.origin);
+                    if (safeRedirect) returnTo.searchParams.set("redirect", safeRedirect);
+                    if (action) returnTo.searchParams.set("action", action);
+                    if (artistId) returnTo.searchParams.set("artistId", artistId);
+                    if (itemId) returnTo.searchParams.set("itemId", itemId);
+                    if (itemType) returnTo.searchParams.set("itemType", itemType);
+                    if (invite) returnTo.searchParams.set("invite", invite);
                     const result = await lovable.auth.signInWithOAuth("google", {
-                      redirect_uri: window.location.origin,
+                      redirect_uri: returnTo.toString(),
                     });
                     if (result.error) {
                       setError(

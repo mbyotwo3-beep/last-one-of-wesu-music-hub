@@ -161,23 +161,25 @@ function CheckoutSuccessPage() {
       if (ids.length > 0) {
         void Promise.all(ids.map((id) => evict(id).catch(() => {})));
       } else if (t?.item_type === "album" && t?.item_id) {
-        void Promise.resolve(supabase
-          .from("songs")
-          .select("id")
-          .eq("album_id", t.item_id)
-          .then(({ data }) =>
-            Promise.all(((data ?? []) as any[]).map((s) => evict(s.id).catch(() => {}))),
-          ))
-          .catch(() => {});
+        void Promise.resolve(
+          supabase
+            .from("songs")
+            .select("id")
+            .eq("album_id", t.item_id)
+            .then(({ data }) =>
+              Promise.all(((data ?? []) as any[]).map((s) => evict(s.id).catch(() => {}))),
+            ),
+        ).catch(() => {});
       } else if (t?.item_type === "playlist" && t?.item_id) {
-        void Promise.resolve(supabase
-          .from("playlist_songs")
-          .select("song_id")
-          .eq("playlist_id", t.item_id)
-          .then(({ data }) =>
-            Promise.all(((data ?? []) as any[]).map((s) => evict(s.song_id).catch(() => {}))),
-          ))
-          .catch(() => {});
+        void Promise.resolve(
+          supabase
+            .from("playlist_songs")
+            .select("song_id")
+            .eq("playlist_id", t.item_id)
+            .then(({ data }) =>
+              Promise.all(((data ?? []) as any[]).map((s) => evict(s.song_id).catch(() => {}))),
+            ),
+        ).catch(() => {});
       }
     } catch {
       /* ignore */

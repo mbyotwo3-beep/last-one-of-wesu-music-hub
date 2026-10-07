@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { Mic, Radio, Sparkles, ArrowLeft, Headphones } from "lucide-react";
 
 export const Route = createFileRoute("/podcast")({
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/podcast")({
     ],
   }),
   component: PodcastPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center text-destructive">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -38,11 +39,10 @@ function PodcastPage() {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary">
             <Sparkles className="size-3" /> Coming Soon
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Wesu+ Podcasts
-          </h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Wesu+ Podcasts</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            We are curating the finest Zambian and African podcasts, conversations, and cultural talk shows. Stay tuned as we launch stories and audio discussions.
+            We are curating the finest Zambian and African podcasts, conversations, and cultural
+            talk shows. Stay tuned as we launch stories and audio discussions.
           </p>
         </div>
 
@@ -53,14 +53,13 @@ function PodcastPage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Are you a podcaster?</p>
-              <p className="text-xs text-muted-foreground">Distribute your show on Wesu+ to thousands of listeners across Zambia and beyond.</p>
+              <p className="text-xs text-muted-foreground">
+                Distribute your show on Wesu+ to thousands of listeners across Zambia and beyond.
+              </p>
             </div>
           </div>
           <div className="pt-2 text-center">
-            <Link
-              to="/contact"
-              className="text-xs font-medium text-primary hover:underline"
-            >
+            <Link to="/contact" className="text-xs font-medium text-primary hover:underline">
               Get in touch with our partnerships team &rarr;
             </Link>
           </div>

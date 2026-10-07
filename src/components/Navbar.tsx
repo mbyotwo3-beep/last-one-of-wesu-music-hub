@@ -1,15 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, memo } from "react";
-import {
-  Search,
-  LogOut,
-  UserCircle,
-  Shield,
-  Menu,
-  X,
-  FileText,
-  Mic2,
-} from "lucide-react";
+import { Search, LogOut, UserCircle, Shield, Menu, X, FileText, Mic2 } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";

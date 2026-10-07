@@ -273,8 +273,9 @@ function QueuePage() {
                 e.stopPropagation();
                 removeFromQueue(index);
               }}
-              className="p-2 rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition"
+              className="p-2.5 min-w-[44px] min-h-[44px] rounded-full hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition flex items-center justify-center"
               title="Remove from queue"
+              aria-label={`Remove ${queueTrack.title} from queue`}
             >
               <Trash2 className="size-4" />
             </button>
@@ -282,8 +283,9 @@ function QueuePage() {
             {/* Play button */}
             <button
               onClick={() => playTrack(index)}
-              className="p-2 rounded-full hover:bg-white/10 transition"
+              className="p-2.5 min-w-[44px] min-h-[44px] rounded-full hover:bg-white/10 transition flex items-center justify-center"
               title="Play this track"
+              aria-label={`Play ${queueTrack.title}`}
             >
               {queueIndex === index && playing ? (
                 <Pause className="size-4 fill-current" />

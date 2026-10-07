@@ -19,8 +19,7 @@ export function GenreSelect({ value, onChange, id, className }: GenreSelectProps
       value={MUSIC_GENRES.includes(value as any) ? value : ""}
       onChange={(e) => onChange(e.target.value)}
       className={
-        className ??
-        "mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
+        className ?? "mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
       }
     >
       <option value="">— Pick a category —</option>

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/albums/$id")({
     ],
   }),
   component: AlbumPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">Failed: {error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Album not found.</div>,
 });
 

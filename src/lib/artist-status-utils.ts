@@ -1,6 +1,6 @@
 /**
  * Artist Status Utilities
- * 
+ *
  * Helper functions to diagnose and fix artist visibility issues.
  * These are utility functions for debugging and should be called via server functions.
  */
@@ -24,9 +24,7 @@ export interface ArtistStatusReport {
 /**
  * Get a comprehensive report of all artists and their statuses
  */
-export async function getArtistStatusReport(
-  supabase: SupabaseClient
-): Promise<ArtistStatusReport> {
+export async function getArtistStatusReport(supabase: SupabaseClient): Promise<ArtistStatusReport> {
   // Get counts by status
   const [approvedRes, pendingRes, rejectedRes, pendingListRes] = await Promise.all([
     supabase.from("artists").select("id", { count: "exact", head: true }).eq("status", "approved"),
@@ -55,10 +53,7 @@ export async function getArtistStatusReport(
 /**
  * Check if an artist has the 'artist' role in user_roles table
  */
-export async function checkArtistRole(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<boolean> {
+export async function checkArtistRole(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data } = await supabase
     .from("user_roles")
     .select("role")
@@ -122,7 +117,9 @@ export async function getDiagnosticInfo(supabase: SupabaseClient) {
 /**
  * Format diagnostic report as human-readable text
  */
-export function formatDiagnosticReport(info: Awaited<ReturnType<typeof getDiagnosticInfo>>): string {
+export function formatDiagnosticReport(
+  info: Awaited<ReturnType<typeof getDiagnosticInfo>>,
+): string {
   const lines = [
     "=== ARTIST STATUS DIAGNOSTIC REPORT ===",
     "",

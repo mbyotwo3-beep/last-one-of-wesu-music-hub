@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -77,7 +78,7 @@ export const Route = createFileRoute("/admin")({
       <AdminRoute />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -1136,11 +1137,7 @@ function PendingArtistApplications() {
   );
 }
 
-function AllArtistsList({
-  onDrillDown,
-}: {
-  onDrillDown: (id: string, name: string) => void;
-}) {
+function AllArtistsList({ onDrillDown }: { onDrillDown: (id: string, name: string) => void }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listAllArtists);
   const suspendFn = useServerFn(suspendArtist);
@@ -1244,9 +1241,7 @@ function AllArtistsList({
       </div>
 
       {isLoading && <div className="text-muted-foreground text-sm">Loading artists…</div>}
-      {error && (
-        <div className="text-destructive text-sm">Error: {(error as Error).message}</div>
-      )}
+      {error && <div className="text-destructive text-sm">Error: {(error as Error).message}</div>}
 
       {!isLoading && artists.length === 0 && (
         <div className="flex items-center gap-3 p-6 bg-card border border-border rounded-2xl">
@@ -1257,10 +1252,7 @@ function AllArtistsList({
 
       <div className="space-y-2">
         {artists.map((a: any) => (
-          <div
-            key={a.id}
-            className="bg-card border border-border rounded-xl overflow-hidden"
-          >
+          <div key={a.id} className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="flex flex-wrap items-center gap-3 p-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1306,9 +1298,7 @@ function AllArtistsList({
                   </button>
                 ) : a.status === "approved" ? (
                   <button
-                    onClick={() =>
-                      setExpandSuspend(expandSuspend === a.id ? null : a.id)
-                    }
+                    onClick={() => setExpandSuspend(expandSuspend === a.id ? null : a.id)}
                     className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-orange-500/15 text-orange-500 cursor-pointer hover:bg-orange-500/25 transition-colors font-semibold"
                   >
                     <Ban className="size-3" /> Suspend
@@ -1331,9 +1321,7 @@ function AllArtistsList({
                   rows={2}
                   placeholder="Reason for suspension (visible in audit log)…"
                   value={suspendReason[a.id] ?? ""}
-                  onChange={(e) =>
-                    setSuspendReason((r) => ({ ...r, [a.id]: e.target.value }))
-                  }
+                  onChange={(e) => setSuspendReason((r) => ({ ...r, [a.id]: e.target.value }))}
                   className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm resize-none focus:outline-none focus:border-orange-500"
                 />
                 <div className="flex gap-2">
@@ -1414,9 +1402,7 @@ function ArtistFinancialDrillDown({
       </div>
 
       {isLoading && <div className="text-muted-foreground">Loading financial data…</div>}
-      {error && (
-        <div className="text-destructive">Error: {(error as Error).message}</div>
-      )}
+      {error && <div className="text-destructive">Error: {(error as Error).message}</div>}
 
       {data && (
         <div className="space-y-6">
@@ -1425,21 +1411,29 @@ function ArtistFinancialDrillDown({
             <div className="bg-card border border-border rounded-2xl p-4">
               <p className="text-xs text-muted-foreground">Total Earned</p>
               <p className="text-2xl font-bold text-primary mt-1">{fmt(data.totalEarned ?? 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{data.purchaseCount ?? 0} sale(s)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {data.purchaseCount ?? 0} sale(s)
+              </p>
             </div>
             <div className="bg-card border border-border rounded-2xl p-4">
               <p className="text-xs text-muted-foreground">Total Paid Out</p>
-              <p className="text-2xl font-bold text-emerald-500 mt-1">{fmt(data.totalPaidOut ?? 0)}</p>
+              <p className="text-2xl font-bold text-emerald-500 mt-1">
+                {fmt(data.totalPaidOut ?? 0)}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">Approved &amp; disbursed</p>
             </div>
             <div className="bg-card border border-border rounded-2xl p-4">
               <p className="text-xs text-muted-foreground">Available Balance</p>
-              <p className="text-2xl font-bold text-foreground mt-1">{fmt(data.availableBalance ?? 0)}</p>
+              <p className="text-2xl font-bold text-foreground mt-1">
+                {fmt(data.availableBalance ?? 0)}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">Ready to withdraw</p>
             </div>
             <div className="bg-card border border-border rounded-2xl p-4">
               <p className="text-xs text-muted-foreground">Pending Payout Requests</p>
-              <p className="text-2xl font-bold text-yellow-500 mt-1">{fmt(data.totalPending ?? 0)}</p>
+              <p className="text-2xl font-bold text-yellow-500 mt-1">
+                {fmt(data.totalPending ?? 0)}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">Awaiting approval</p>
             </div>
           </div>
@@ -1471,8 +1465,6 @@ function ArtistFinancialDrillDown({
               </div>
             </div>
           )}
-
-
 
           {/* Payout History */}
           <div className="bg-card border border-border rounded-2xl p-5">
@@ -1541,9 +1533,7 @@ function ArtistFinancialDrillDown({
             {(data.totalPending ?? 0) > 0 && (
               <>
                 {" (includes "}
-                <span className="text-yellow-500 font-semibold">
-                  {fmt(data.totalPending)}
-                </span>
+                <span className="text-yellow-500 font-semibold">{fmt(data.totalPending)}</span>
                 {" in pending requests)"}
               </>
             )}
@@ -1793,7 +1783,10 @@ function PayoutMod() {
   const pending = payouts.filter((p: any) => p.status === "pending");
   const nonPending = payouts.filter((p: any) => p.status !== "pending");
 
-  const totalPendingAmount = pending.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+  const totalPendingAmount = pending.reduce(
+    (sum: number, p: any) => sum + Number(p.amount || 0),
+    0,
+  );
   const totalApprovedAmount = payouts
     .filter((p: any) => ["approved", "paid", "completed"].includes(p.status))
     .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
@@ -1813,22 +1806,27 @@ function PayoutMod() {
       <div>
         <h2 className="text-xl font-bold">Payout Moderation &amp; Review</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review artist payout requests before funds are disbursed. Approving records internal approval.
-          Payments are fulfilled via integrated mobile money / payment rails (Lenco internal gateway).
+          Review artist payout requests before funds are disbursed. Approving records internal
+          approval. Payments are fulfilled via integrated mobile money / payment rails (Lenco
+          internal gateway).
         </p>
       </div>
 
       {/* Summary metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
-          <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">Awaiting Review</p>
+          <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
+            Awaiting Review
+          </p>
           <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
             ZMW {totalPendingAmount.toFixed(2)}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{pending.length} pending requests</p>
         </div>
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Approved / Disbursed</p>
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            Approved / Disbursed
+          </p>
           <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
             ZMW {totalApprovedAmount.toFixed(2)}
           </p>
@@ -1851,7 +1849,9 @@ function PayoutMod() {
         {pending.length === 0 ? (
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6">
             <CheckCircle2 className="size-5 text-primary" />
-            <p className="text-sm text-muted-foreground">No payout requests await review right now.</p>
+            <p className="text-sm text-muted-foreground">
+              No payout requests await review right now.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1939,7 +1939,9 @@ function PayoutMod() {
       {nonPending.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-            <div className="text-sm font-semibold">Reviewed &amp; Processed Requests ({nonPending.length})</div>
+            <div className="text-sm font-semibold">
+              Reviewed &amp; Processed Requests ({nonPending.length})
+            </div>
             <div className="flex gap-1">
               {(["all", "approved", "rejected"] as const).map((tab) => (
                 <button
@@ -1958,7 +1960,9 @@ function PayoutMod() {
           </div>
           <div className="divide-y divide-border">
             {filteredHistory.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">No records match filter.</div>
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                No records match filter.
+              </div>
             ) : (
               filteredHistory.map((p: any) => {
                 const isApproved = ["approved", "paid", "completed"].includes(p.status);
@@ -1969,10 +1973,13 @@ function PayoutMod() {
                   >
                     <div>
                       <p className="font-medium text-foreground">
-                        {p.label?.name ? `Label: ${p.label.name}` : p.artist?.name ?? "Unknown artist"}
+                        {p.label?.name
+                          ? `Label: ${p.label.name}`
+                          : (p.artist?.name ?? "Unknown artist")}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {p.destination} · {p.method_code} · {new Date(p.requested_at).toLocaleDateString()}
+                        {p.destination} · {p.method_code} ·{" "}
+                        {new Date(p.requested_at).toLocaleDateString()}
                         {p.notes && ` · Note: "${p.notes}"`}
                       </p>
                     </div>

@@ -8,7 +8,18 @@
  * NO Lenco branding — payment methods are shown as MTN/Airtel/Zamtel or
  * "Wesu+ Payment" from the artist's perspective.
  */
-import { TrendingUp, DollarSign, Wallet, ArrowDownCircle, Clock, CheckCircle2, XCircle, Music, BarChart3, AlertCircle } from "lucide-react";
+import {
+  TrendingUp,
+  DollarSign,
+  Wallet,
+  ArrowDownCircle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Music,
+  BarChart3,
+  AlertCircle,
+} from "lucide-react";
 
 interface PayoutItem {
   id: string;
@@ -109,7 +120,20 @@ function MonthlyChart({ data }: { data: MonthlyEntry[] }) {
       {data.map((entry) => {
         const pct = Math.max(4, (entry.amount / max) * 100);
         const [, month] = entry.month.split("-");
-        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
         const label = monthNames[parseInt(month, 10) - 1] ?? month;
         return (
           <div key={entry.month} className="flex-1 flex flex-col items-center gap-1 group relative">
@@ -195,14 +219,13 @@ export function EarningsSection({ data, isLoading }: Props) {
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {earningCards.map((card) => (
-            <div
-              key={card.label}
-              className={`rounded-xl p-4 ${card.bg} border border-border/40`}
-            >
+            <div key={card.label} className={`rounded-xl p-4 ${card.bg} border border-border/40`}>
               <card.icon className={`size-4 mb-2 ${card.color}`} />
               <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
               <p className="text-xs font-semibold text-foreground mt-0.5">{card.label}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{card.description}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+                {card.description}
+              </p>
             </div>
           ))}
         </div>
@@ -285,7 +308,9 @@ export function EarningsSection({ data, isLoading }: Props) {
                       src={song.coverUrl}
                       alt=""
                       className="w-8 h-8 rounded-lg object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                     />
                   ) : (
                     <Music className="size-4 text-primary" />
@@ -294,11 +319,14 @@ export function EarningsSection({ data, isLoading }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{song.title}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {song.plays.toLocaleString()} plays · {song.purchaseCount} purchase{song.purchaseCount !== 1 ? "s" : ""} · {fmt(song.price)} each
+                    {song.plays.toLocaleString()} plays · {song.purchaseCount} purchase
+                    {song.purchaseCount !== 1 ? "s" : ""} · {fmt(song.price)} each
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${song.earned > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                  <p
+                    className={`text-sm font-bold ${song.earned > 0 ? "text-primary" : "text-muted-foreground"}`}
+                  >
                     {fmt(song.earned)}
                   </p>
                   {!hasSongRevenue && (
@@ -332,10 +360,13 @@ export function EarningsSection({ data, isLoading }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{album.title}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {album.purchaseCount} purchase{album.purchaseCount !== 1 ? "s" : ""} · {fmt(album.price)} album price
+                    {album.purchaseCount} purchase{album.purchaseCount !== 1 ? "s" : ""} ·{" "}
+                    {fmt(album.price)} album price
                   </p>
                 </div>
-                <p className={`text-sm font-bold shrink-0 ${album.earned > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                <p
+                  className={`text-sm font-bold shrink-0 ${album.earned > 0 ? "text-primary" : "text-muted-foreground"}`}
+                >
                   {fmt(album.earned)}
                 </p>
               </div>
@@ -379,7 +410,8 @@ export function EarningsSection({ data, isLoading }: Props) {
                     {payout.paymentMethod} · {payout.destination}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Requested {new Date(payout.requestedAt).toLocaleDateString("en-ZM", {
+                    Requested{" "}
+                    {new Date(payout.requestedAt).toLocaleDateString("en-ZM", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",

@@ -159,9 +159,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const selectionId = usePlayer((s) => s.selectionId);
   // Manual retry counter: pressing play on a failed track re-runs resolution
-  // instead of sitting on a dead source.
+  // instead of sitting on a dead source. Tracks the STORE's retryNonce too —
+  // it was dead state before (retry() bumped it and nothing read it), so a
+  // retry triggered from the store (the MiniPlayer error strip, togglePlay
+  // after a failure) never re-ran resolution at all.
   const [retryNonce, setRetryNonce] = useState(0);
   const appliedRetryRef = useRef(0);
+  const storeRetryNonce = usePlayer((s) => s.retryNonce);
+  useEffect(() => {
+    if (storeRetryNonce === 0) return;
+    appliedRetryRef.current = storeRetryNonce;
+    setRetryNonce((n) => n + 1);
+  }, [storeRetryNonce]);
   // The selection the engine has loaded (or is loading). Keyed off the
   // store's selectionId — NOT the track id — so re-selecting the same song
   // (queue duplicates, retry after failure) always reloads.
@@ -234,9 +243,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   const durationRef = useRef<number>(0);
   const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { data: meta } = useTrackMeta(track?.id);
+  // The track-meta query resolves AFTER the load effect has already run (its
+  // deps don't include `meta`), so reading `meta` there showed the PREVIOUS
+  // track's album title on the lock screen and the previous track's price in
+  // the "Buy this track" banner. Gate them on the id the data belongs to: while
+  // it doesn't match, the caller shows nothing rather than the wrong value.
+  const metaTrackId = (meta as { id?: string } | undefined)?.id;
+  const metaForTrack = !!track && metaTrackId === track.id;
+  const albumTitle: string | undefined = metaForTrack
+    ? ((meta?.albums?.title ?? meta?.album_title) as string | undefined)
+    : undefined;
   const artistId: string | undefined = meta?.artists?.id ?? meta?.artist_id;
   const albumId: string | undefined = meta?.albums?.id ?? meta?.album_id;
-  const trackPrice: number = Number(meta?.price ?? 0);
+  // Same id gate as albumTitle — the "Buy this track" banner must not quote the
+  // previous track's price for the frame or two before the query lands.
+  const trackPrice: number = metaForTrack ? Number(meta?.price ?? 0) : 0;
   const { isSaved: liked, toggle: toggleLike } = useSavedTrack(track?.id);
 
   // One-time native hygiene: drop staged temp files orphaned by an app
@@ -446,12 +467,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       // background playback exist. Otherwise nothing new to load.
       if (resolvedForUserRef.current !== (user?.id ?? null) && usePlayer.getState().isPreview) {
         // fall through to re-resolve
-      } else if (!(
-        flippedToNative &&
-        currentTrackIdRef.current &&
-        track.audioUrl !== undefined &&
-        track.audioUrl !== null
-      )) {
+      } else if (
+        !(
+          flippedToNative &&
+          currentTrackIdRef.current &&
+          track.audioUrl !== undefined &&
+          track.audioUrl !== null
+        )
+      ) {
         return;
       }
     }
@@ -716,7 +739,10 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 }
               }
               if (!isCurrentTrack()) return;
-              const albumTitle = (meta as any)?.albums?.title ?? (meta as any)?.album_title;
+              // Already id-gated above: never show the previous track's album.
+              const albumTitle = metaForTrack
+                ? ((meta as any)?.albums?.title ?? (meta as any)?.album_title)
+                : undefined;
               // Pre-warmed by the prefetch below: never preload twice (the
               // plugin rejects duplicate asset ids, which used to knock the
               // engine onto the fallback path and kill follow-on previews).
@@ -934,8 +960,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
           cleanupEvents();
           setLoading(false);
           setAudioUrl(null);
+          // Evict BEFORE showing the error. Only the native path used to drop
+          // a cached signed URL on failure, so on the web a dead URL (expired,
+          // 403) stayed cached for its full TTL: pressing play re-read the same
+          // URL, burned both retries and failed identically — three taps and no
+          // recovery for up to 15 minutes.
+          evictCachedAudioUrlForUser(track!.id, user?.id ?? null);
           setError("Failed to load audio. Please try again.");
-          if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+          usePlayer.getState().setError("Failed to load audio. Please try again.");
+          // Deliberately NOT togglePlay(): with the store error set, that is a
+          // retry, not a pause — it would flip playing straight back to true
+          // and reload the same track. The native path leaves playing true on
+          // purpose so the button reads as "tap to try again"; do the same.
         };
         audio.addEventListener("canplay", onCanPlay);
         audio.addEventListener("play", onPlay);
@@ -980,11 +1016,16 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // signed-URL endpoint threw, which can contain the expiring media URL
         // and is never actionable for a listener. Log it, show plain words.
         console.error("[player] load failed", err);
+        // A load that fails after retries usually failed BECAUSE the URL was
+        // stale. Drop it so the next tap resolves a fresh signed URL instead
+        // of replaying a dead one for the rest of the cache TTL.
+        evictCachedAudioUrlForUser(track!.id, user?.id ?? null);
         setError("Couldn't play this track. Check your connection and try again.");
         usePlayer
           .getState()
           .setError("Couldn't play this track. Check your connection and try again.");
-        if (usePlayer.getState().playing) usePlayer.getState().togglePlay();
+        // No togglePlay here either: the store error makes it a retry, which
+        // would immediately reload the URL we just discarded.
       }
     }
     loadUrl();
@@ -995,7 +1036,7 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     // background), guarded by the flip check above so steady state never
     // reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.id, selectionId, retryNonce, user?.id, isNative]);
+  }, [track?.id, selectionId, retryNonce, storeRetryNonce, user?.id, isNative]);
 
   // Backfill missing cover art for the current track + queue. Not every
   // play entry point builds a complete track object, so some queue rows
@@ -1383,10 +1424,23 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         navigator.mediaSession.setActionHandler("seekto", (details) => {
           const audio = getAudio();
           if (details.seekTime != null) {
-            if (audio && audio.src && !audio.src.startsWith("data:")) {
-              audio.currentTime = details.seekTime;
-            }
+            // Route through the store FIRST: it clamps to the real duration.
+            // Writing audio.currentTime directly (as this did) let the OS send
+            // an out-of-range value, which throws InvalidStateError on some
+            // engines and left `playing: true` on a dead element.
             st().seekTo(details.seekTime);
+            if (audio && audio.src && !audio.src.startsWith("data:")) {
+              const dur = Number.isFinite(audio.duration) ? (audio.duration as number) : 0;
+              const target =
+                dur > 0
+                  ? Math.max(0, Math.min(details.seekTime, dur))
+                  : Math.max(0, details.seekTime);
+              try {
+                audio.currentTime = target;
+              } catch {
+                /* the store already applied a safe position */
+              }
+            }
           }
         });
         try {

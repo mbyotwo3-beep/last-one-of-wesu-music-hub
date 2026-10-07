@@ -108,16 +108,10 @@ export function CarouselShelf({ carousel }: Props) {
         {carousel.items.map((item) => {
           const href = item.link_url ?? "";
           const external = /^https?:\/\//i.test(href);
-          const cardClass =
-            "group flex-none w-36 md:w-44 snap-start cursor-pointer";
+          const cardClass = "group flex-none w-36 md:w-44 snap-start cursor-pointer";
           if (isInternalLink(href)) {
             return (
-              <Link
-                key={item.id}
-                to={href as any}
-                className={cardClass}
-                aria-label={item.title}
-              >
+              <Link key={item.id} to={href as any} className={cardClass} aria-label={item.title}>
                 <CarouselCard item={item} />
               </Link>
             );

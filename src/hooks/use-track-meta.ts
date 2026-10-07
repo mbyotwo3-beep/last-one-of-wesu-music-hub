@@ -14,7 +14,9 @@ export function useTrackMeta(songId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("songs")
-        .select("id, artist_id, album_id, price, artists:artist_id(id,name), albums:album_id(id,title)")
+        .select(
+          "id, artist_id, album_id, price, artists:artist_id(id,name), albums:album_id(id,title)",
+        )
         .eq("id", songId!)
         .maybeSingle();
       if (error) return null;

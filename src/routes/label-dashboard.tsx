@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/label-dashboard")({
       <Page />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -564,9 +565,7 @@ function Payouts({ labelId }: { labelId: string }) {
             onChange={(e) => setForm({ ...form, destination: e.target.value })}
           />
           {m.error && <p className="text-sm text-destructive">{(m.error as Error).message}</p>}
-          {m.isSuccess && (
-            <p className="text-sm text-primary">Submitted — pending review.</p>
-          )}
+          {m.isSuccess && <p className="text-sm text-primary">Submitted — pending review.</p>}
           <button
             disabled={!eligible || m.isPending}
             className="w-full px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"

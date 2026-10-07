@@ -24,8 +24,7 @@ interface StorageLike {
   removeItem(key: string): void;
 }
 
-const asString = (v: unknown): string | undefined =>
-  typeof v === "string" ? v : undefined;
+const asString = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
 /** Stash the intent before leaving /auth (OAuth redirect, signup submit). */
 export function stashPendingAction(storage: StorageLike | undefined, a: PendingAction): void {
@@ -84,7 +83,20 @@ export function hasPendingAction(a: PendingAction): boolean {
   return !!(a.action || a.invite || a.redirect);
 }
 
-/** Same-origin app paths only — anything else falls back to the dashboard. */
+/**
+ * Same-origin app paths only — anything else falls back to the dashboard.
+ *
+ * /auth (and anything under it) is also rejected: the sign-in form is rendered
+ * on EVERY route via BottomTabBar, so on a phone the Library tab navigates to
+ * /auth?redirect=/library while the user is already on /auth. That produced
+ * ?redirect=/auth, and after signing in the user was navigated to /auth again
+ * — authenticated but sitting on the login form, with a soft loop (press
+ * Sign In → /auth again). Landing anywhere on the auth route is never a
+ * useful destination.
+ */
 export function safeAppRedirect(raw: string | undefined): string {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  const path = raw.split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
+  if (path === "/auth") return "/dashboard";
+  return raw;
 }

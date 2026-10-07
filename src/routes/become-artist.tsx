@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,6 +11,7 @@ import { applyAsArtist } from "@/lib/artist.functions";
 import { getMyArtistOverview } from "@/lib/user.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { TermsConsent } from "@/components/TermsConsent";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/become-artist")({
   head: () => ({ meta: [{ title: "Become an Artist — Wesu+" }] }),
@@ -18,7 +20,7 @@ export const Route = createFileRoute("/become-artist")({
       <Page />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -28,10 +30,18 @@ function Page() {
   const apply = useServerFn(applyAsArtist);
   const fetchOverview = useServerFn(getMyArtistOverview);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["my-artist-overview"],
+  const {
+    data,
+    isLoading,
+    isError,
+    error: overviewError,
+    refetch,
+  } = useQuery({
+    // Scoped by user: this key was the only query on the page without it.
+    queryKey: ["my-artist-overview", user?.id],
     queryFn: () => fetchOverview(),
     enabled: !!user,
+    retry: 1,
   });
 
   const m = useMutation({
@@ -41,7 +51,7 @@ function Page() {
       refetch();
     },
     onError: (error) => {
-      toast.error(`Failed to submit application: ${(error as Error).message}`);
+      toast.error(`Failed to submit application: ${friendlyError(error)}`);
     },
   });
   const [form, setForm] = useState({ name: "", bio: "", genre: "" });
@@ -63,6 +73,35 @@ function Page() {
 
   if (isLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading…</div>;
+  }
+
+  // Without this branch a failed overview resolved to data === undefined, so
+  // artist === undefined and the page fell through to the APPLICATION FORM —
+  // for someone already approved or pending review. Submitting then no-ops
+  // server-side while toasting "application submitted".
+  if (isError) {
+    return (
+      <div className="max-w-xl mx-auto px-6 py-16 text-center">
+        <h1 className="text-2xl font-bold mb-2">We couldn't check your artist status</h1>
+        <p className="text-muted-foreground mb-6">
+          {friendlyError(overviewError, "Please check your connection and try again.")}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={() => refetch()}
+            className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+          >
+            Try again
+          </button>
+          <Link
+            to="/dashboard"
+            className="px-5 py-2.5 rounded-full bg-secondary font-semibold inline-block"
+          >
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const artist = data?.artist;
@@ -135,7 +174,7 @@ function Page() {
           </ul>
         </div>
         <button
-          onClick={() => setForm({ ...form, name: artist?.name ?? " " })}
+          onClick={() => setForm({ ...form, name: artist?.name ?? "" })}
           className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:brightness-110 transition-all"
         >
           I Understand — Re-apply
@@ -154,7 +193,11 @@ function Page() {
       <div className="flex items-center gap-3 mb-6">
         <Mic2 className="size-6 text-primary" />
         <h1 className="text-3xl font-bold">
-          {suspended ? "Re-apply After Suspension" : rejected ? "Reapply as an Artist" : "Become an Artist"}
+          {suspended
+            ? "Re-apply After Suspension"
+            : rejected
+              ? "Reapply as an Artist"
+              : "Become an Artist"}
         </h1>
       </div>
       {rejected && (
@@ -193,10 +236,7 @@ function Page() {
         </label>
         <label className="block text-sm">
           Genre
-          <GenreSelect
-            value={form.genre}
-            onChange={(v) => setForm({ ...form, genre: v })}
-          />
+          <GenreSelect value={form.genre} onChange={(v) => setForm({ ...form, genre: v })} />
         </label>
         <label className="block text-sm">
           Bio

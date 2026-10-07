@@ -90,7 +90,20 @@ function PayoutStatusBadge({ status }: { status: string }) {
 function MiniMonthlyChart({ data }: { data: { month: string; amount: number }[] }) {
   if (!data || data.length === 0) return null;
   const max = Math.max(...data.map((d) => d.amount), 1);
-  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
 
   return (
     <div className="flex items-end gap-1 h-16">
@@ -137,8 +150,10 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
     staleTime: 60_000,
   });
 
-  if (isLoading) return <div className="text-muted-foreground text-sm">Loading financial data…</div>;
-  if (error) return <div className="text-destructive text-sm">Error: {(error as Error).message}</div>;
+  if (isLoading)
+    return <div className="text-muted-foreground text-sm">Loading financial data…</div>;
+  if (error)
+    return <div className="text-destructive text-sm">Error: {(error as Error).message}</div>;
   if (!data) return null;
 
   const summaryCards = [
@@ -242,8 +257,8 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          Payouts are processed via the platform's payment gateway. Each approved payout request
-          is fulfilled and the amount is deducted from the artist's available balance.
+          Payouts are processed via the platform's payment gateway. Each approved payout request is
+          fulfilled and the amount is deducted from the artist's available balance.
         </p>
       </div>
 
@@ -264,11 +279,13 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="size-4 text-yellow-500" />
             <h3 className="font-semibold text-sm text-yellow-500">
-              {data.pendingPayoutCount} Pending Payout Request{data.pendingPayoutCount !== 1 ? "s" : ""} — Action Needed
+              {data.pendingPayoutCount} Pending Payout Request
+              {data.pendingPayoutCount !== 1 ? "s" : ""} — Action Needed
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            The following payout requests are awaiting staff review. Go to the Payouts tab to approve or reject them.
+            The following payout requests are awaiting staff review. Go to the Payouts tab to
+            approve or reject them.
           </p>
           <div className="space-y-2">
             {(data.pendingPayoutItems ?? []).slice(0, 5).map((p: any) => (
@@ -281,13 +298,17 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
                     {p.label?.name ?? p.artist?.name ?? "Unknown"}
                   </span>
                   {p.label && (
-                    <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">label</span>
+                    <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">
+                      label
+                    </span>
                   )}
                   <p className="text-[10px] text-muted-foreground">
                     {p.method_code} · {new Date(p.requested_at).toLocaleDateString()}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-yellow-500">{fmt(Number(p.amount ?? 0))}</span>
+                <span className="text-sm font-bold text-yellow-500">
+                  {fmt(Number(p.amount ?? 0))}
+                </span>
               </div>
             ))}
           </div>
@@ -325,18 +346,19 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
                 </tr>
               )}
               {(artists ?? []).map((a: any) => (
-                <tr
-                  key={a.artistId}
-                  className="hover:bg-accent/40 transition-colors group"
-                >
+                <tr key={a.artistId} className="hover:bg-accent/40 transition-colors group">
                   <td className="p-3">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{a.artistName}</span>
                       {a.verified && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">✓</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                          ✓
+                        </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{a.purchaseCount} sale{a.purchaseCount !== 1 ? "s" : ""}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {a.purchaseCount} sale{a.purchaseCount !== 1 ? "s" : ""}
+                    </p>
                   </td>
                   <td className="p-3 text-right font-semibold text-primary">
                     {fmtShort(a.totalEarned)}
@@ -346,7 +368,9 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
                   </td>
                   <td className="p-3 text-right">
                     {a.totalPending > 0 ? (
-                      <span className="text-yellow-500 font-medium">{fmtShort(a.totalPending)}</span>
+                      <span className="text-yellow-500 font-medium">
+                        {fmtShort(a.totalPending)}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -392,7 +416,10 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
           </div>
           <div className="divide-y divide-border">
             {data.approvedPayoutItems.slice(0, 10).map((p: any) => (
-              <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+              >
                 <div>
                   <span className="text-sm font-medium">
                     {p.label?.name ?? p.artist?.name ?? "Unknown payee"}
@@ -405,7 +432,9 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-emerald-500">{fmt(Number(p.amount ?? 0))}</span>
+                  <span className="text-sm font-bold text-emerald-500">
+                    {fmt(Number(p.amount ?? 0))}
+                  </span>
                   <PayoutStatusBadge status={p.status} />
                 </div>
               </div>
@@ -430,8 +459,10 @@ function ArtistDrillDown({ artistId, onBack }: { artistId: string; onBack: () =>
     staleTime: 60_000,
   });
 
-  if (isLoading) return <div className="text-muted-foreground text-sm">Loading artist financials…</div>;
-  if (error) return <div className="text-destructive text-sm">Error: {(error as Error).message}</div>;
+  if (isLoading)
+    return <div className="text-muted-foreground text-sm">Loading artist financials…</div>;
+  if (error)
+    return <div className="text-destructive text-sm">Error: {(error as Error).message}</div>;
   if (!data) return null;
 
   const cards = [
@@ -542,10 +573,18 @@ function ArtistDrillDown({ artistId, onBack }: { artistId: string; onBack: () =>
             )}
           </div>
           <div className="flex flex-wrap gap-3 mt-2 text-[10px]">
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500 inline-block" /> Paid</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-yellow-500 inline-block" /> Pending</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-destructive/60 inline-block" /> Rejected</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-primary inline-block" /> Available</span>
+            <span className="flex items-center gap-1">
+              <span className="size-2 rounded-full bg-emerald-500 inline-block" /> Paid
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-2 rounded-full bg-yellow-500 inline-block" /> Pending
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-2 rounded-full bg-destructive/60 inline-block" /> Rejected
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-2 rounded-full bg-primary inline-block" /> Available
+            </span>
           </div>
         </div>
       )}
@@ -583,14 +622,17 @@ function ArtistDrillDown({ artistId, onBack }: { artistId: string; onBack: () =>
                       <PayoutStatusBadge status={p.status} />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      <span className="font-medium text-foreground">Gateway code:</span> {p.method_code}
+                      <span className="font-medium text-foreground">Gateway code:</span>{" "}
+                      {p.method_code}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">Destination:</span> {p.destination}
+                      <span className="font-medium text-foreground">Destination:</span>{" "}
+                      {p.destination}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Requested: {new Date(p.requested_at).toLocaleString()}
-                      {p.processed_at && ` · Processed: ${new Date(p.processed_at).toLocaleString()}`}
+                      {p.processed_at &&
+                        ` · Processed: ${new Date(p.processed_at).toLocaleString()}`}
                     </p>
                     {p.notes && (
                       <p className="text-xs italic text-muted-foreground mt-1">Note: {p.notes}</p>
@@ -615,10 +657,13 @@ function ArtistDrillDown({ artistId, onBack }: { artistId: string; onBack: () =>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{s.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {s.plays.toLocaleString()} plays · {s.purchaseCount} purchase{s.purchaseCount !== 1 ? "s" : ""} · ZMW {s.price.toFixed(2)} each
+                    {s.plays.toLocaleString()} plays · {s.purchaseCount} purchase
+                    {s.purchaseCount !== 1 ? "s" : ""} · ZMW {s.price.toFixed(2)} each
                   </p>
                 </div>
-                <p className={`text-sm font-bold shrink-0 ${s.earned > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                <p
+                  className={`text-sm font-bold shrink-0 ${s.earned > 0 ? "text-primary" : "text-muted-foreground"}`}
+                >
                   {fmt(s.earned)}
                 </p>
               </div>
@@ -638,12 +683,7 @@ export function AdminFinancials() {
   const [drillArtistId, setDrillArtistId] = useState<string | null>(null);
 
   if (drillArtistId) {
-    return (
-      <ArtistDrillDown
-        artistId={drillArtistId}
-        onBack={() => setDrillArtistId(null)}
-      />
-    );
+    return <ArtistDrillDown artistId={drillArtistId} onBack={() => setDrillArtistId(null)} />;
   }
 
   return <PlatformOverview onDrillDown={setDrillArtistId} />;

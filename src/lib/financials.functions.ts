@@ -29,7 +29,11 @@ function formatMethodForArtist(code: string): string {
   if (normalized.includes("mtn")) return "MTN Mobile Money";
   if (normalized.includes("airtel")) return "Airtel Money";
   if (normalized.includes("zamtel")) return "Zamtel Kwacha";
-  if (normalized.includes("card") || normalized.includes("visa") || normalized.includes("mastercard"))
+  if (
+    normalized.includes("card") ||
+    normalized.includes("visa") ||
+    normalized.includes("mastercard")
+  )
     return "Card Payment";
   if (normalized.includes("bank")) return "Bank Transfer";
   return "Wesu+ Payment";
@@ -114,35 +118,39 @@ export const getMyEarningsDetail = createServerFn({ method: "GET" })
       .reduce((s, p) => s + Number(p.amount ?? 0), 0);
     const availableBalance = Math.max(0, totalEarned - committed);
 
-    const songEarnings = (songs ?? []).map((song) => {
-      const sp = purchases.filter((p) => p.song_id === song.id);
-      const earned = sp.reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      return {
-        id: song.id,
-        title: song.title,
-        coverUrl: song.cover_url,
-        price: Number(song.price ?? 0),
-        plays: song.play_count ?? 0,
-        status: song.status,
-        purchaseCount: sp.length,
-        earned,
-        createdAt: song.created_at,
-      };
-    }).sort((a, b) => b.earned - a.earned);
+    const songEarnings = (songs ?? [])
+      .map((song) => {
+        const sp = purchases.filter((p) => p.song_id === song.id);
+        const earned = sp.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+        return {
+          id: song.id,
+          title: song.title,
+          coverUrl: song.cover_url,
+          price: Number(song.price ?? 0),
+          plays: song.play_count ?? 0,
+          status: song.status,
+          purchaseCount: sp.length,
+          earned,
+          createdAt: song.created_at,
+        };
+      })
+      .sort((a, b) => b.earned - a.earned);
 
-    const albumEarnings = (albums ?? []).map((album) => {
-      const ap = purchases.filter((p) => p.album_id === album.id);
-      const earned = ap.reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      return {
-        id: album.id,
-        title: album.title,
-        coverUrl: album.cover_url,
-        price: Number(album.price ?? 0),
-        purchaseCount: ap.length,
-        earned,
-        createdAt: album.created_at,
-      };
-    }).sort((a, b) => b.earned - a.earned);
+    const albumEarnings = (albums ?? [])
+      .map((album) => {
+        const ap = purchases.filter((p) => p.album_id === album.id);
+        const earned = ap.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+        return {
+          id: album.id,
+          title: album.title,
+          coverUrl: album.cover_url,
+          price: Number(album.price ?? 0),
+          purchaseCount: ap.length,
+          earned,
+          createdAt: album.created_at,
+        };
+      })
+      .sort((a, b) => b.earned - a.earned);
 
     const monthlyMap: Record<string, number> = {};
     for (const p of purchases) {
@@ -230,7 +238,9 @@ export const getPlatformFinancials = createServerFn({ method: "GET" })
         .order("requested_at", { ascending: false }),
       supabaseAdmin
         .from("payouts")
-        .select("id, amount, processed_at, method_code, status, artist:artists(id, name), label:labels(id, name)")
+        .select(
+          "id, amount, processed_at, method_code, status, artist:artists(id, name), label:labels(id, name)",
+        )
         .in("status", ["approved", "paid", "completed"])
         .order("processed_at", { ascending: false })
         .limit(50),
@@ -303,8 +313,14 @@ export const getAllArtistFinancials = createServerFn({ method: "GET" })
       await Promise.all([
         supabaseAdmin.from("songs").select("id, artist_id"),
         supabaseAdmin.from("albums").select("id, artist_id"),
-        supabaseAdmin.from("purchases").select("id, amount, song_id, album_id").eq("status", "completed"),
-        supabaseAdmin.from("payouts").select("id, amount, status, artist_id, requested_at").order("requested_at", { ascending: false }),
+        supabaseAdmin
+          .from("purchases")
+          .select("id, amount, song_id, album_id")
+          .eq("status", "completed"),
+        supabaseAdmin
+          .from("payouts")
+          .select("id, amount, status, artist_id, requested_at")
+          .order("requested_at", { ascending: false }),
       ]);
 
     const artistSongs: Record<string, Set<string>> = {};
@@ -331,9 +347,15 @@ export const getAllArtistFinancials = createServerFn({ method: "GET" })
       const myPayouts = (allPayouts ?? []).filter((p) => p.artist_id === artist.id);
 
       const totalEarned = myPurchases.reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      const totalPaidOut = myPayouts.filter((p) => PAID.includes(p.status)).reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      const totalPending = myPayouts.filter((p) => PENDING.includes(p.status)).reduce((s, p) => s + Number(p.amount ?? 0), 0);
-      const committed = myPayouts.filter((p) => p.status !== "rejected").reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      const totalPaidOut = myPayouts
+        .filter((p) => PAID.includes(p.status))
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      const totalPending = myPayouts
+        .filter((p) => PENDING.includes(p.status))
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      const committed = myPayouts
+        .filter((p) => p.status !== "rejected")
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0);
       const availableBalance = Math.max(0, totalEarned - committed);
 
       return {
@@ -412,24 +434,34 @@ export const getArtistFinancialsById = createServerFn({ method: "GET" })
     const PENDING = ["pending", "processing"];
 
     const totalEarned = purchases.reduce((s, p) => s + Number(p.amount ?? 0), 0);
-    const totalPaidOut = allPayouts.filter((p) => PAID.includes(p.status)).reduce((s, p) => s + Number(p.amount ?? 0), 0);
-    const totalPending = allPayouts.filter((p) => PENDING.includes(p.status)).reduce((s, p) => s + Number(p.amount ?? 0), 0);
-    const totalRejected = allPayouts.filter((p) => p.status === "rejected").reduce((s, p) => s + Number(p.amount ?? 0), 0);
-    const committed = allPayouts.filter((p) => p.status !== "rejected").reduce((s, p) => s + Number(p.amount ?? 0), 0);
+    const totalPaidOut = allPayouts
+      .filter((p) => PAID.includes(p.status))
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+    const totalPending = allPayouts
+      .filter((p) => PENDING.includes(p.status))
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+    const totalRejected = allPayouts
+      .filter((p) => p.status === "rejected")
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+    const committed = allPayouts
+      .filter((p) => p.status !== "rejected")
+      .reduce((s, p) => s + Number(p.amount ?? 0), 0);
     const availableBalance = Math.max(0, totalEarned - committed);
 
-    const songEarnings = (songs ?? []).map((song) => {
-      const sp = purchases.filter((p) => p.song_id === song.id);
-      return {
-        id: song.id,
-        title: song.title,
-        price: Number(song.price ?? 0),
-        plays: song.play_count ?? 0,
-        status: song.status,
-        purchaseCount: sp.length,
-        earned: sp.reduce((s, p) => s + Number(p.amount ?? 0), 0),
-      };
-    }).sort((a, b) => b.earned - a.earned);
+    const songEarnings = (songs ?? [])
+      .map((song) => {
+        const sp = purchases.filter((p) => p.song_id === song.id);
+        return {
+          id: song.id,
+          title: song.title,
+          price: Number(song.price ?? 0),
+          plays: song.play_count ?? 0,
+          status: song.status,
+          purchaseCount: sp.length,
+          earned: sp.reduce((s, p) => s + Number(p.amount ?? 0), 0),
+        };
+      })
+      .sort((a, b) => b.earned - a.earned);
 
     const monthlyMap: Record<string, number> = {};
     for (const p of purchases) {

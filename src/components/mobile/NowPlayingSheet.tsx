@@ -70,6 +70,8 @@ export function NowPlayingSheet() {
 
   const touchStartY = useRef(0);
   const touchCurrentY = useRef(0);
+  /** Gesture began inside a scroller/seek control — don't drive the sheet. */
+  const touchIgnored = useRef(false);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const dur = isPreview ? 15 : (track?.durationSeconds ?? 0);
@@ -111,13 +113,37 @@ export function NowPlayingSheet() {
     seekTo(dragProgress);
   }
 
-  // Swipe down to dismiss
+  // Swipe down to dismiss — but only from the header. These handlers sit on the
+  // sheet root, which contains the queue list and the seek bar: a downward
+  // flick inside the queue dragged the whole sheet down and a scrub with slight
+  // drift dismissed it. Track whether the gesture started inside a scroller.
+  function inScrollable(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el || typeof el.closest !== "function") return false;
+    if (el.closest("[data-sheet-swipe-ignore]")) return true;
+    // Any ancestor that can scroll vertically owns the gesture.
+    let node: HTMLElement | null = el;
+    while (node && node !== sheetRef.current) {
+      if (node.scrollHeight > node.clientHeight + 1) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   function onTouchStart(e: React.TouchEvent) {
+    if (inScrollable(e.target)) {
+      touchIgnored.current = true;
+      touchStartY.current = 0;
+      touchCurrentY.current = 0;
+      return;
+    }
+    touchIgnored.current = false;
     touchStartY.current = e.touches[0].clientY;
     touchCurrentY.current = e.touches[0].clientY;
   }
 
   function onTouchMove(e: React.TouchEvent) {
+    if (touchIgnored.current) return;
     touchCurrentY.current = e.touches[0].clientY;
     const delta = touchCurrentY.current - touchStartY.current;
     if (delta > 0 && sheetRef.current) {
@@ -133,6 +159,7 @@ export function NowPlayingSheet() {
     if (delta > 80) {
       closeNowPlaying();
     }
+    touchIgnored.current = false;
     touchStartY.current = 0;
     touchCurrentY.current = 0;
   }
@@ -316,18 +343,28 @@ export function NowPlayingSheet() {
         )}
 
         {/* Seek bar */}
-        <div className="px-6 mb-1 shrink-0">
+        <div className="px-6 mb-1 shrink-0" data-sheet-swipe-ignore>
           <div
-            className="relative h-10 flex items-center cursor-pointer group"
+            className="relative h-10 flex items-center cursor-pointer group touch-none"
             onClick={handleSeekClick}
             onTouchStart={handleSeekTouchStart}
             onTouchMove={handleSeekTouchMove}
             onTouchEnd={handleSeekTouchEnd}
             role="slider"
+            tabIndex={0}
             aria-valuemin={0}
             aria-valuemax={dur}
             aria-valuenow={displayProgress}
             aria-label="Seek"
+            onKeyDown={(e) => {
+              // Keyboard seek: the slider was focusable-looking but had no
+              // tabIndex and no key handler, so it could not be moved at all.
+              if (e.key === "ArrowRight") seekTo(displayProgress + 5);
+              else if (e.key === "ArrowLeft") seekTo(displayProgress - 5);
+              else if (e.key === "Home") seekTo(0);
+              else return;
+              e.preventDefault();
+            }}
           >
             <div className="w-full h-1 bg-white/20 rounded-full">
               <div
@@ -418,7 +455,7 @@ export function NowPlayingSheet() {
 
         {/* Queue Display */}
         {showQueue && (
-          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
+          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0" data-sheet-swipe-ignore>
             <h3 className="text-lg font-semibold text-white mb-4">Queue</h3>
             {queue.length === 0 ? (
               <p className="text-sm text-white/60">Queue is empty</p>

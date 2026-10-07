@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, Play, Pause, Shuffle, Music2, ArrowLeft, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/liked-songs")({
       <LikedSongsRoute />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -109,8 +110,17 @@ function Page() {
 
   const handleShuffle = () => {
     if (safeLikedSongs.length === 0) return;
-    const shuffled = [...songTracks].sort(() => Math.random() - 0.5);
+    // Fisher-Yates: `sort(() => Math.random() - 0.5)` is measurably non-uniform
+    // (comparator bias) and, more importantly, this never told the store
+    // shuffle was on — so the shuffle indicator stayed off on the player while
+    // the order was random.
+    const shuffled = [...songTracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     player.setQueue(shuffled, 0);
+    if (!player.shuffle) player.toggleShuffle();
   };
 
   if (isLoading) {
@@ -342,17 +352,25 @@ function LikedSongRow({
 
       {/* Action buttons */}
       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-        <DownloadButton songId={song.id} title={song.title} coverUrl={song.cover_url} />
+        <DownloadButton
+          songId={song.id}
+          title={song.title}
+          coverUrl={song.cover_url}
+          artistName={song.artists?.name ?? "Unknown artist"}
+        />
 
+        {/* `md:` on the hover reveal + pointer-events-none: a phone has no
+            hover, so these were invisible but live — a stray tap silently
+            un-liked the song or opened the share sheet. */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             toggle();
           }}
-          className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+          className={`p-2.5 rounded-full transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center ${
             isSaved
               ? "text-red-500 hover:text-red-600"
-              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 md:opacity-0 focus-visible:opacity-100 max-md:opacity-100 max-md:pointer-events-none max-md:group-hover:pointer-events-auto"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -366,7 +384,7 @@ function LikedSongRow({
           artistId={song.artist_id}
           artistName={song.artists?.name}
           type="song"
-          className="relative z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="relative z-20 opacity-0 group-hover:opacity-100 transition-opacity max-md:opacity-100 max-md:pointer-events-none max-md:group-hover:pointer-events-auto"
         />
       </div>
     </div>

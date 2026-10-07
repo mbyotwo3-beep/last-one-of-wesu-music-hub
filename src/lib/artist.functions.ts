@@ -113,7 +113,8 @@ export const applyAsArtist = createServerFn({ method: "POST" })
         .select("id, status")
         .single();
       if (error) throw new Error(error.message);
-      const action = existing.status === "suspended" ? "artist.reapply_after_suspension" : "artist.reapply";
+      const action =
+        existing.status === "suspended" ? "artist.reapply_after_suspension" : "artist.reapply";
       await audit(supabase, userId, action, "artist", row!.id, {
         terms_version: termsVersion,
         terms_accepted_at: termsAcceptedAt,

@@ -67,7 +67,11 @@ export const getRecentlyPlayed = createServerFn({ method: "GET" })
       seen.add(id);
       const s = (r as any).songs;
       if (!s) continue;
-      rows.push({ ...s, played_at: (r as any).played_at, progress_seconds: (r as any).progress_seconds });
+      rows.push({
+        ...s,
+        played_at: (r as any).played_at,
+        progress_seconds: (r as any).progress_seconds,
+      });
       if (rows.length >= 12) break;
     }
     return rows;

@@ -50,9 +50,7 @@ export const MUSIC_GENRES = [
 export type MusicGenre = (typeof MUSIC_GENRES)[number];
 
 /** Lowercase key (single-spaced) → canonical value. */
-const CANONICAL_BY_KEY = new Map<string, string>(
-  MUSIC_GENRES.map((g) => [g.toLowerCase(), g]),
-);
+const CANONICAL_BY_KEY = new Map<string, string>(MUSIC_GENRES.map((g) => [g.toLowerCase(), g]));
 
 /** Common aliases → canonical value (all lowercase, single-spaced keys). */
 const GENRE_ALIASES: Record<string, string> = {
@@ -73,7 +71,7 @@ const GENRE_ALIASES: Record<string, string> = {
   lofi: "Lo-Fi",
   "gospel music": "Gospel",
   gospels: "Gospel",
-  "hiphop": "Hip Hop",
+  hiphop: "Hip Hop",
   "hip-hop": "Hip Hop",
   rap: "Hip Hop",
   "r n b": "R&B",
@@ -89,7 +87,7 @@ const GENRE_ALIASES: Record<string, string> = {
   "ama piano": "Amapiano",
   dancehall: "Dancehall",
   "dance hall": "Dancehall",
-  "spokenword": "Spoken Word",
+  spokenword: "Spoken Word",
   "spoken-word": "Spoken Word",
   trad: "Traditional",
   traditional: "Traditional",

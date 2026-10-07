@@ -1,8 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { UserCircle, Pencil, MapPin, Mail, Calendar, Mic2, LogOut, ArrowLeft, Camera } from "lucide-react";
+import {
+  UserCircle,
+  Pencil,
+  MapPin,
+  Mail,
+  Calendar,
+  Mic2,
+  LogOut,
+  ArrowLeft,
+  Camera,
+} from "lucide-react";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,7 +31,7 @@ export const Route = createFileRoute("/profile")({
       <ProfileRoute />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -43,11 +54,7 @@ function Page() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    Promise.resolve(supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle())
+    Promise.resolve(supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle())
       .then(({ data }) => {
         if (cancelled) return;
         if (data) {
@@ -194,9 +201,7 @@ function Page() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div className="p-3.5 bg-secondary/50 rounded-xl">
                 <span className="text-xs text-muted-foreground block">Full Name</span>
-                <span className="font-semibold text-foreground">
-                  {form.full_name || "Not set"}
-                </span>
+                <span className="font-semibold text-foreground">{form.full_name || "Not set"}</span>
               </div>
               <div className="p-3.5 bg-secondary/50 rounded-xl">
                 <span className="text-xs text-muted-foreground block">Email Address</span>
@@ -206,9 +211,7 @@ function Page() {
               </div>
               <div className="p-3.5 bg-secondary/50 rounded-xl">
                 <span className="text-xs text-muted-foreground block">Location</span>
-                <span className="font-semibold text-foreground">
-                  {form.location || "Not set"}
-                </span>
+                <span className="font-semibold text-foreground">{form.location || "Not set"}</span>
               </div>
               <div className="p-3.5 bg-secondary/50 rounded-xl">
                 <span className="text-xs text-muted-foreground block">Account Role</span>
@@ -320,9 +323,7 @@ function Page() {
                     }}
                   />
                 </label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG or WEBP up to 5MB
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WEBP up to 5MB</p>
               </div>
             </div>
 
@@ -358,9 +359,7 @@ function Page() {
             </label>
 
             {m.error && (
-              <p className="text-sm text-destructive font-medium">
-                {(m.error as Error).message}
-              </p>
+              <p className="text-sm text-destructive font-medium">{(m.error as Error).message}</p>
             )}
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
@@ -385,4 +384,3 @@ function Page() {
     </div>
   );
 }
-

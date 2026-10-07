@@ -1,7 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Lock, ArrowRight, Music } from "lucide-react";
+import { Lock, ArrowRight, Music, Loader2 } from "lucide-react";
+import { routeErrorComponent } from "@/components/RouteError";
+import { friendlyError } from "@/lib/friendly-error";
+
+/**
+ * Did this page load FROM a password-recovery link?
+ *
+ * Read once at module scope, before React mounts, because the Supabase
+ * client parses the callback URL at import time and the PASSWORD_RECOVERY
+ * notification it emits can be missed by a later effect subscription.
+ * Only `type=recovery` counts — a plain signed-in visitor with no link must
+ * never see a password form.
+ */
+const LANDED_ON_RECOVERY_LINK = (() => {
+  if (typeof window === "undefined") return false;
+  const url = `${window.location.hash}${window.location.search}`;
+  return /type=recovery/.test(url);
+})();
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
@@ -11,6 +28,8 @@ export const Route = createFileRoute("/reset-password")({
     ],
   }),
   component: ResetPasswordPage,
+  errorComponent: routeErrorComponent("This page didn't load"),
+  notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function ResetPasswordPage() {
@@ -41,13 +60,25 @@ function ResetPasswordPage() {
     } catch {
       /* ignore */
     }
+    // The PASSWORD_RECOVERY event can fire BEFORE this effect subscribes:
+    // the Supabase client auto-initialises at module-import time and dispatches
+    // recovery from a setTimeout(…, 0) inside _initialize. Whichever task
+    // source wins, a valid link could be reported as "invalid or expired".
+    //
+    // Captured at MODULE scope (this module is imported before React mounts,
+    // and the auth client's URL parsing happens at import time too) so the
+    // fact that this load came from a recovery link cannot be lost. The
+    // Supabase implicit/PKCE callback carries it as `type=recovery` in either
+    // the hash or the query string.
+    if (LANDED_ON_RECOVERY_LINK) setReady(true);
+
     // Expired/used links never fire — stop hanging on "Verifying…" forever.
     const t = setTimeout(() => {
       setReady((r) => {
         if (!r) setExpired(true);
         return r;
       });
-    }, 15000);
+    }, 8000);
     timers.current.push(t);
     return () => {
       sub.subscription.unsubscribe();

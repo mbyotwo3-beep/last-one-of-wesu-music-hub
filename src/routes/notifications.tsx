@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Bell, Check, Heart, User, Music } from "lucide-react";
 import { RoleGate } from "@/components/RoleGate";
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/notifications")({
       <Page />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -23,7 +24,13 @@ function Page() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: rows, isLoading, isError, error, refetch } = useQuery({
+  const {
+    data: rows,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["notifications", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -158,7 +165,8 @@ function Page() {
         <div className="text-center py-16">
           <Bell className="size-12 mx-auto mb-4 opacity-40" />
           <p className="text-destructive mb-2">
-            Couldn't load notifications{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+            Couldn't load notifications
+            {(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
           </p>
           <button
             onClick={() => refetch()}

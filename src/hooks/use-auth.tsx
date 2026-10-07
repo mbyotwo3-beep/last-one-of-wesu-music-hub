@@ -71,8 +71,13 @@ function getSnapshot(): { user: User | null; loading: boolean } {
 }
 
 // Server snapshot — always logged out / loading to avoid hydration mismatch.
+// Must be a STABLE reference: useSyncExternalStore compares consecutive
+// calls during hydration and logs "getServerSnapshot should be cached to avoid
+// an infinite loop" when a fresh object comes back each time. This app is
+// server-rendered, so that fired on every page load.
+const SERVER_SNAPSHOT: { user: User | null; loading: boolean } = { user: null, loading: true };
 function getServerSnapshot(): { user: User | null; loading: boolean } {
-  return { user: null, loading: true };
+  return SERVER_SNAPSHOT;
 }
 
 export function useAuth() {

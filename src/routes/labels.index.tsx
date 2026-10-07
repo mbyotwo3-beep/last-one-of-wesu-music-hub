@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listApprovedLabels } from "@/lib/labels.functions";
 
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/labels/")({
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(labelsQuery),
   component: LabelsPage,
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 

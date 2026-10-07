@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { routeErrorComponent } from "@/components/RouteError";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/playlists")({
       <Page />
     </RoleGate>
   ),
-  errorComponent: ({ error }) => <div className="p-12 text-center">{error.message}</div>,
+  errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
@@ -34,7 +35,13 @@ function Page() {
   const [newPlaylist, setNewPlaylist] = useState({ name: "", description: "", make_public: false });
 
   // Fetch Playlists with songs for playback
-  const { data: playlists, isLoading, isError, error, refetch } = useQuery({
+  const {
+    data: playlists,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["my-playlists", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -182,9 +189,7 @@ function Page() {
               <input
                 type="checkbox"
                 checked={newPlaylist.make_public}
-                onChange={(e) =>
-                  setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })
-                }
+                onChange={(e) => setNewPlaylist({ ...newPlaylist, make_public: e.target.checked })}
               />
               Public — anyone with the link can open it
             </label>
@@ -307,9 +312,7 @@ function Page() {
 
                   <button
                     onClick={() => {
-                      if (
-                        window.confirm(`Delete "${playlist.name}"? This can't be undone.`)
-                      ) {
+                      if (window.confirm(`Delete "${playlist.name}"? This can't be undone.`)) {
                         deleteM.mutate({ data: { id: playlist.id } });
                       }
                     }}

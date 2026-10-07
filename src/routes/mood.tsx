@@ -12,9 +12,15 @@ export const Route = createFileRoute("/mood")({
   head: () => ({
     meta: [
       { title: "Mood Mix — AI song picks | Wesu+" },
-      { name: "description", content: "Describe your mood and get matching songs from the Wesu+ catalog." },
+      {
+        name: "description",
+        content: "Describe your mood and get matching songs from the Wesu+ catalog.",
+      },
       { property: "og:title", content: "Mood Mix — AI song picks | Wesu+" },
-      { property: "og:description", content: "Describe your mood and get matching songs from the Wesu+ catalog." },
+      {
+        property: "og:description",
+        content: "Describe your mood and get matching songs from the Wesu+ catalog.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -79,7 +85,11 @@ function MoodPage() {
           ))}
         </div>
         <Button type="submit" disabled={m.isPending || prompt.trim().length < 3}>
-          {m.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          {m.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Sparkles className="size-4" />
+          )}
           {m.isPending ? "Finding songs…" : "Get my mix"}
         </Button>
       </form>
@@ -97,20 +107,43 @@ function MoodPage() {
             )}
           </div>
           {picks.length === 0 ? (
-            <p className="text-muted-foreground">No matching songs found — try describing it differently.</p>
+            <p className="text-muted-foreground">
+              No matching songs found — try describing it differently.
+            </p>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden">
               {picks.map((t, i) => (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-accent">
-                  <button type="button" onClick={() => setQueue(queue, i)} aria-label={`Play ${t.title}`} className="shrink-0">
-                    <StorageImage bucket="album-art" path={t.cover_url} alt={t.title} className="size-12 rounded object-cover" />
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-accent"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setQueue(queue, i)}
+                    aria-label={`Play ${t.title}`}
+                    className="shrink-0"
+                  >
+                    <StorageImage
+                      bucket="album-art"
+                      path={t.cover_url}
+                      alt={t.title}
+                      className="size-12 rounded object-cover"
+                    />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <Link to="/songs/$id" params={{ id: t.id }} className="font-medium truncate block hover:underline">
+                    <Link
+                      to="/songs/$id"
+                      params={{ id: t.id }}
+                      className="font-medium truncate block hover:underline"
+                    >
                       {t.title}
                     </Link>
                     {t.artist && (
-                      <Link to="/artists/$id" params={{ id: t.artist.id }} className="text-sm text-muted-foreground hover:underline">
+                      <Link
+                        to="/artists/$id"
+                        params={{ id: t.artist.id }}
+                        className="text-sm text-muted-foreground hover:underline"
+                      >
                         {t.artist.name}
                       </Link>
                     )}

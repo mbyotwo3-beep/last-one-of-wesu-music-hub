@@ -89,3 +89,58 @@ export function pickNextIndex(state: {
 export function insertIndexForPlayNext(queueLength: number, queueIndex: number): number {
   return Math.min(queueLength, queueIndex + 1);
 }
+
+/**
+ * Re-point a shuffle deck after the queue changed underneath it.
+ *
+ * The deck stores raw queue positions, so every queue mutation can invalidate
+ * it. Inserting, removing or reordering rows without remapping left the deck
+ * pointing at positions that no longer existed: skipNext then drew e.g. 37 from
+ * a 3-song queue, queue[37] was undefined, and the store kept
+ * `track: undefined` with `playing: true` — no bar, no MiniPlayer, silence.
+ *
+ * `map` returns the NEW position of an old one, or null when that row is gone.
+ * Already-consumed entries are remapped too so deck-exhaustion bookkeeping
+ * (repeat / stop) still works.
+ */
+export function remapShuffleDeck(
+  deck: ShuffleDeck | null,
+  map: (index: number) => number | null,
+): ShuffleDeck | null {
+  if (!deck) return null;
+  const order: number[] = [];
+  for (const index of deck.order) {
+    const next = map(index);
+    if (next === null || next < 0) continue;
+    order.push(next);
+  }
+  const mappedCurrent = deck.current === null ? null : map(deck.current);
+  return {
+    order,
+    cursor: Math.min(deck.cursor, order.length),
+    current: mappedCurrent === null || mappedCurrent < 0 ? null : mappedCurrent,
+  };
+}
+
+/** A fresh deck for a queue that no longer matches the old one. */
+export function rebuildShuffleDeck(
+  shuffle: boolean,
+  queueLength: number,
+  current: number | null,
+): ShuffleDeck | null {
+  return shuffle ? buildShuffleDeck(queueLength, current) : null;
+}
+
+/**
+ * Add a freshly inserted position to the remaining (unplayed) part of a deck at
+ * a random spot, so "play next" is actually reachable under shuffle instead of
+ * being invisible until the deck runs dry.
+ */
+export function addToShuffleDeck(deck: ShuffleDeck | null, index: number): ShuffleDeck | null {
+  if (!deck) return null;
+  const remaining = deck.order.length - deck.cursor;
+  const at = deck.cursor + (remaining > 0 ? Math.floor(Math.random() * (remaining + 1)) : 0);
+  const order = deck.order.slice();
+  order.splice(at, 0, index);
+  return { ...deck, order };
+}

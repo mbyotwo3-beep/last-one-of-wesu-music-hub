@@ -21,8 +21,7 @@ type TermsConsentProps = {
 const terms = {
   listener: {
     title: "Listener Terms & Conditions",
-    intro:
-      "These terms explain how you may use Wesu+ to stream and purchase music.",
+    intro: "These terms explain how you may use Wesu+ to stream and purchase music.",
     route: "/terms-listener" as const,
     points: [
       "Music streamed or purchased on Wesu+ is for your personal, non-commercial use.",

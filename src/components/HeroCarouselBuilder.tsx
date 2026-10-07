@@ -283,19 +283,19 @@ function HeroSlideCard({
                 onUpdate(data);
                 setEditing(false);
               }}
-                onCancel={() => {
-                  setEditing(false);
-                  setFormData({
-                    title: slide.title,
-                    description: slide.description,
-                    image_url: slide.image_url,
-                    video_url: slide.video_url ?? "",
-                    cta_text: slide.cta_text,
-                    cta_link: slide.cta_link,
-                    cta_external: slide.cta_external ?? false,
-                    link_target: (slide as any).link_target ?? "_self",
-                  });
-                }}
+              onCancel={() => {
+                setEditing(false);
+                setFormData({
+                  title: slide.title,
+                  description: slide.description,
+                  image_url: slide.image_url,
+                  video_url: slide.video_url ?? "",
+                  cta_text: slide.cta_text,
+                  cta_link: slide.cta_link,
+                  cta_external: slide.cta_external ?? false,
+                  link_target: (slide as any).link_target ?? "_self",
+                });
+              }}
               isPending={isPending}
             />
           ) : (
@@ -603,9 +603,7 @@ function HeroSlideForm({
 
       {/* Link target: same tab, or new tab on web / in-app browser on native */}
       <div>
-        <label className="block text-xs text-muted-foreground mb-2">
-          Link opens in
-        </label>
+        <label className="block text-xs text-muted-foreground mb-2">Link opens in</label>
         <select
           value={(formData as any).link_target ?? "_self"}
           onChange={(e) => setFormData({ ...formData, link_target: e.target.value } as any)}

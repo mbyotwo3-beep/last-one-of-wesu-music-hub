@@ -69,7 +69,12 @@ export function useSavedAlbum(albumId: string | null | undefined) {
         const currentPath = window.location.pathname + window.location.search;
         navigate({
           to: "/auth",
-          search: { redirect: currentPath, action: "save", itemId: albumId ?? undefined, itemType: "album" },
+          search: {
+            redirect: currentPath,
+            action: "save",
+            itemId: albumId ?? undefined,
+            itemType: "album",
+          },
         });
         return;
       }
