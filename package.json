@@ -14,7 +14,9 @@
     "test:watch": "vitest",
     "postinstall": "node scripts/apply-native-audio-patch.mjs",
     "launch:check": "node scripts/launch-check.mjs",
-    "import:catalogue": "node scripts/import-catalogue.mjs"
+    "import:catalogue": "node scripts/import-catalogue.mjs",
+    "verify:ci-install": "node scripts/verify-ci-install.mjs",
+    "prebuild": "node scripts/verify-ci-install.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
