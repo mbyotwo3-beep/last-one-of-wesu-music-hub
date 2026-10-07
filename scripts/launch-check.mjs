@@ -10,6 +10,25 @@
  */
 const BASE = process.env.SMOKE_BASE ?? "https://www.wesuplus.com";
 
+/**
+ * fetch with retries. Node's fetch drops connections under a burst of ~30
+ * parallel requests against a CDN, which produced phantom "route → ERR" and
+ * "could not fetch bundles" failures on every run — the check looked broken
+ * while the site was fine. Sequential-ish, bounded, and retried.
+ */
+async function grab(url, tries = 5) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await (await fetch(url, { redirect: "follow" })).text();
+    } catch (e) {
+      last = e;
+      await new Promise((r) => setTimeout(r, 700 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 const ROUTES = [
   "/", "/artists", "/albums", "/hot-tracks", "/new-music", "/must-have",
   "/browse", "/search?q=test", "/library", "/downloads", "/queue",
@@ -25,6 +44,13 @@ const BUNDLE_MARKERS = [
   ["notification permission ask", "wesu:notif-asked"],
   ["battery optimisation nudge", "Keep music playing when the screen is off"],
   ["public downloads route", "My downloads"],
+  // Shipped with the workflow-fix batch — the fixes users report as "the
+  // site doesn't work". Losing any of these on a redeploy is a silent
+  // regression, so they are asserted like the rest.
+  ["friendly auth errors", "already exists with that email"],
+  ["playback failure surfaces on phones", "sheet-swipe-ignore"],
+  ["role gate explains itself", "You need a different account type"],
+  ["shuffle deck follows queue edits", "wesu-player"],
 ];
 
 // Copy that must NOT come back (a removed feature).
@@ -59,22 +85,44 @@ if (!m) {
   // every chunk the pages reference. Reading only the entry produced false
   // "missing" reports for anything behind a route split.
   const chunks = new Set([m[0]]);
-  for (const p of ["/", "/artists", "/albums", "/library", "/downloads", "/hot-tracks"]) {
+  for (const p of ROUTES) {
     try {
-      const t = await (await fetch(BASE + p, { redirect: "follow" })).text();
+      const t = await grab(BASE + p);
       for (const c of t.matchAll(/assets\/[A-Za-z0-9_.\-]+\.js/g)) chunks.add(c[0]);
     } catch { /* a route we already report on below */ }
   }
   let all = "";
+  const fetched = new Set();
   try {
-    for (const c of chunks) {
-      all += await (await fetch(BASE + "/" + c)).text();
+    // Route HTML only names the chunks a given page needs. Anything behind a
+    // dynamic import (a component the page loads on interaction) is referenced
+    // from inside another chunk instead, so follow one level of those too —
+    // otherwise markers live in files this scan never opened and every check
+    // reports a false "MISSING from live bundle".
+    const queue = [...chunks];
+    while (queue.length && fetched.size < 400) {
+      const c = queue.shift();
+      if (fetched.has(c)) continue;
+      fetched.add(c);
+      const body = await grab(BASE + "/" + c);
+      all += body;
+      for (const im of body.matchAll(/(?:\.\/)?assets\/([A-Za-z0-9_.\-]+\.js)/g)) {
+        const next = "assets/" + im[1];
+        if (!fetched.has(next) && !chunks.has(next)) queue.push(next);
+      }
+      for (const im of body.matchAll(/from\s*"\.\/([A-Za-z0-9_.\-]+\.js)"/g)) {
+        const next = "assets/" + im[1];
+        if (!fetched.has(next)) queue.push(next);
+      }
     }
   } catch (e) {
     bad(`could not fetch bundles: ${e.message}`);
   }
   if (all) {
-    ok(`scanned ${chunks.size} chunk(s)`);
+    ok(`scanned ${fetched.size} chunk(s) reachable from the site HTML`);
+    // A partial scan must not be reported as a regression: if nothing loaded,
+    // say the scan was incomplete rather than "feature missing".
+    if (fetched.size < 5) wrn(`only ${fetched.size} chunk(s) reachable — scan may be incomplete`);
     for (const [name, needle] of BUNDLE_MARKERS) {
       all.includes(needle) ? ok(`shipped: ${name}`) : bad(`MISSING from live bundle: ${name}`);
     }
@@ -87,17 +135,17 @@ if (!m) {
 // ---- 2. Every route renders --------------------------------------
 console.log("\n[2/3] routes");
 const ERROR_TEXT = /Internal Server Error|Application error|Nothing found|__unhandled/i;
-const results = await Promise.all(
-  ROUTES.map(async (p) => {
-    try {
-      const r = await fetch(BASE + p, { redirect: "follow" });
-      const t = await r.text();
-      return { p, s: r.status, err: ERROR_TEXT.test(t) };
-    } catch (e) {
-      return { p, s: "ERR", err: true, msg: e.message };
-    }
-  }),
-);
+// Sequential, not Promise.all: a 27-request burst was what made connections
+// drop in the first place, and the failures looked like broken routes.
+const results = [];
+for (const p of ROUTES) {
+  try {
+    const t = await grab(BASE + p);
+    results.push({ p, s: 200, err: ERROR_TEXT.test(t) });
+  } catch (e2) {
+    results.push({ p, s: "ERR", err: true, msg: e2.message });
+  }
+}
 for (const r of results) {
   if (r.err) bad(`${r.p} → ${r.s === 200 ? "error page" : r.s}`);
   else if (r.s !== 200) wrn(`${r.p} → ${r.s}`);
