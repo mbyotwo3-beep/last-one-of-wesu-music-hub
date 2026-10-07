@@ -130,35 +130,65 @@ export const listAllSongsAdmin = createServerFn({ method: "GET" })
     return songs ?? [];
   });
 
+/**
+ * Every album that is NOT approved, whatever state it is in.
+ *
+ * This used to filter status = 'pending', which was the single reason a
+ * finished release could be invisible forever: an artist uploads, the songs
+ * get approved individually, but the album row is still 'draft' — a state the
+ * old query excluded, so the admin queue never showed it and there was no way
+ * to approve it. Public album pages filter status='approved', so those tracks
+ * existed, played, and showed a price, but no listener could ever open or buy
+ * the album. Twelve paid tracks were sitting in exactly that state.
+ *
+ * Also returns per-album track counts so the queue can say "12 tracks, 12
+ * approved" instead of making a moderator open each one.
+ */
 export const listPendingAlbums = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin
+    const { data: albums } = await supabaseAdmin
       .from("albums")
       .select("id,title,created_at,status,price,genre,cover_url,artist:artists(id,name)")
-      .eq("status", "pending")
+      // Anything not live yet. 'draft' included deliberately — see the note.
+      .neq("status", "approved")
       .order("created_at", { ascending: false });
-    return data ?? [];
+
+    const rows = albums ?? [];
+    if (!rows.length) return [];
+
+    const { data: tracks } = await supabaseAdmin
+      .from("songs")
+      .select("id,album_id,status")
+      .in(
+        "album_id",
+        rows.map((a) => a.id),
+      );
+
+    const counts = new Map<string, { total: number; approved: number; pending: number }>();
+    for (const r of rows) counts.set(r.id, { total: 0, approved: 0, pending: 0 });
+    for (const t of tracks ?? []) {
+      const c = counts.get(t.album_id as string);
+      if (!c) continue;
+      c.total++;
+      if (t.status === "approved") c.approved++;
+      if (t.status === "pending") c.pending++;
+    }
+
+    return rows.map((a) => ({
+      ...a,
+      track_total: counts.get(a.id)?.total ?? 0,
+      track_approved: counts.get(a.id)?.approved ?? 0,
+      track_pending: counts.get(a.id)?.pending ?? 0,
+      // An album whose tracks are all live but which is still not approved is
+      // the exact shape of the bug above. Flag it so the queue leads with it.
+      stranded: a.status !== "approved" && (counts.get(a.id)?.approved ?? 0) > 0,
+    }));
   });
 
 export { deleteSong } from "./artist.functions";
-
-export const moderateSong = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((d: { id: string; status: "approved" | "rejected" | "taken_down" }) => d)
-  .handler(async ({ context, data }) => {
-    await assertStaff(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("songs")
-      .update({ status: data.status } as any)
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await audit(context.userId, `song.${data.status}`, "song", data.id);
-    return { ok: true };
-  });
 
 export const moderateAlbum = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -171,8 +201,87 @@ export const moderateAlbum = createServerFn({ method: "POST" })
       .update({ status: data.status } as any)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-    await audit(context.userId, `album.${data.status}`, "album", data.id);
-    return { ok: true };
+
+    // Approving a release publishes it as one unit, like Spotify — the
+    // artist's tracks were submitted with the album and reviewed as it. Only
+    // 'pending' tracks move: never touch already-approved ones (that would
+    // silently re-publish something taken down) and never touch drafts the
+    // artist is still editing.
+    let songsApproved = 0;
+    if (data.status === "approved") {
+      const { error: songErr } = await supabaseAdmin
+        .from("songs")
+        .update({ status: "approved" } as any)
+        .eq("album_id", data.id)
+        .eq("status", "pending");
+      if (songErr) throw new Error(songErr.message);
+      const { count } = await supabaseAdmin
+        .from("songs")
+        .select("id", { count: "exact", head: true })
+        .eq("album_id", data.id)
+        .eq("status", "approved");
+      songsApproved = count ?? 0;
+    }
+
+    await audit(context.userId, `album.${data.status}`, "album", data.id, {
+      songs_approved: songsApproved,
+    });
+    return { ok: true, songsApproved };
+  });
+
+/**
+ * Approve one track and, when it belongs to an album, keep the album in step.
+ *
+ * A moderator approving the 12th track of a release previously left the album
+ * row unapproved, so the public album page 404'd while every track was live
+ * and buyable on its own. Approving the album here means "one action makes the
+ * release live", which is what a moderator means by clicking Approve.
+ */
+export const moderateSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; status: "approved" | "rejected" | "taken_down" }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: song, error: songReadErr } = await supabaseAdmin
+      .from("songs")
+      .select("id, album_id, title")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (songReadErr) throw new Error(songReadErr.message);
+    if (!song) throw new Error("Song not found");
+
+    const { error } = await supabaseAdmin
+      .from("songs")
+      .update({ status: data.status } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    let albumId: string | null = null;
+    if (data.status === "approved" && song.album_id) {
+      albumId = song.album_id as string;
+      // Only promote the album when nothing on it is still awaiting review —
+      // approving a release track-by-track should not publish a half-reviewed
+      // album, and must not fight the album-level Approve button.
+      const { count: stillPending } = await supabaseAdmin
+        .from("songs")
+        .select("id", { count: "exact", head: true })
+        .eq("album_id", albumId)
+        .eq("status", "pending");
+      if (!stillPending) {
+        await supabaseAdmin
+          .from("albums")
+          .update({ status: "approved" } as any)
+          .eq("id", albumId)
+          .neq("status", "approved");
+      }
+    }
+
+    await audit(context.userId, `song.${data.status}`, "song", data.id, {
+      album_auto_approved: !!albumId,
+    });
+    return { ok: true, albumApproved: !!albumId };
   });
 
 export const listPendingArtists = createServerFn({ method: "GET" })

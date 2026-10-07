@@ -219,9 +219,16 @@ function AlbumPage() {
 
   const playShuffle = async () => {
     if (data.songs.length === 0) return;
-    const shuffled = [...albumTracks].sort(() => Math.random() - 0.5);
-
+    // Fisher-Yates, not `sort(() => Math.random() - 0.5)`: that comparator is
+    // measurably non-uniform. Also tell the store shuffle is on, or the
+    // indicator on the player stays off while the order is random.
+    const shuffled = [...albumTracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     setQueue(shuffled, 0);
+    if (!usePlayer.getState().shuffle) usePlayer.getState().toggleShuffle();
   };
 
   const handlePlaySong = (song: any, index: number) => {
@@ -315,18 +322,12 @@ function AlbumPage() {
 
               {/* Add to Queue button */}
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (data.songs.length === 0) return;
-                  const tracks = data.songs.map((s) => ({
-                    id: s.id,
-                    title: s.title,
-                    artistName: artist?.name ?? "Unknown",
-                    coverUrl: album.cover_url,
-                    durationSeconds: s.duration,
-                  }));
-                  tracks.forEach((track) => {
-                    usePlayer.getState().addToQueue(track);
-                  });
+                  // Reuse albumTracks: it carries `price`, which the inline
+                  // copy did not, so an album queued this way lost the price
+                  // and the Buy banner for those tracks.
+                  albumTracks.forEach((track) => usePlayer.getState().addToQueue(track));
                   toast.success(`Added ${data.songs.length} songs to queue`);
                 }}
                 disabled={data.songs.length === 0}

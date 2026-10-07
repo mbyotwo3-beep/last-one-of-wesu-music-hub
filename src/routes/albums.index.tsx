@@ -58,10 +58,16 @@ function AlbumsPage() {
                   />
                 </div>
                 <p className="font-semibold text-sm truncate">{a.title}</p>
+                {/* Single line: artist • N songs. The old layout spent three
+                    rows on artist + price, so on a phone only one tile fit
+                    above the fold. */}
                 <p className="text-xs text-muted-foreground truncate">
                   {(a.artist as { name?: string } | null)?.name ?? "Unknown"}
+                  {a.track_count ? ` • ${a.track_count} song${a.track_count === 1 ? "" : "s"}` : ""}
                 </p>
-                <p className="text-xs text-primary font-bold mt-1">{formatPrice(a.price)}</p>
+                <p className="text-xs text-primary font-bold mt-1">
+                  {formatPrice(a.effective_price ?? a.price)}
+                </p>
               </Link>
             ))}
           </div>

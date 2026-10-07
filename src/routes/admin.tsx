@@ -462,8 +462,14 @@ function AlbumMod() {
 
   const modMutation = useMutation({
     mutationFn: modFn,
-    onSuccess: (_, variables) => {
-      toast.success(`Album ${variables.data.status} successfully`);
+    onSuccess: (res: any, variables) => {
+      // Approving a release now publishes its tracks too — say so, otherwise
+      // it looks like nothing happened to the 12 songs.
+      const extra =
+        variables.data.status === "approved" && res?.songsApproved
+          ? ` (${res.songsApproved} track(s) published)`
+          : "";
+      toast.success(`Album ${variables.data.status} successfully${extra}`);
       invalidate();
     },
     onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
@@ -480,21 +486,48 @@ function AlbumMod() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Pending Albums ({pendingQ.data?.length ?? 0})</h2>
+      <h2 className="text-lg font-semibold">
+        Albums awaiting approval ({pendingQ.data?.length ?? 0})
+      </h2>
       {pendingQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {pendingQ.data?.length === 0 && (
         <p className="text-sm text-muted-foreground">No albums awaiting approval.</p>
       )}
-      <div className="space-y-2">
-        {(pendingQ.data ?? []).map((a: any) => (
+      {(() => {
+        // Lead with the albums whose tracks are ALREADY live but which the
+        // album is still unpublished — those are invisible to every listener
+        // and were previously impossible to approve from here.
+        const rows = (pendingQ.data ?? []) as any[];
+        const stranded = rows.filter((a) => a.stranded);
+        const rest = rows.filter((a) => !a.stranded);
+        const renderRow = (a: any) => (
           <div
             key={a.id}
-            className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-card border border-border"
+            className={`flex flex-wrap items-center gap-3 p-3 rounded-xl border ${
+              a.stranded ? "bg-amber-500/5 border-amber-500/30" : "bg-card border-border"
+            }`}
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{a.title}</p>
               <p className="text-xs text-muted-foreground truncate">
                 {a.artist?.name ?? "Unknown"} {a.price != null ? `• K${Number(a.price)}` : ""}
+                {a.track_total ? (
+                  <>
+                    {" • "}
+                    {a.track_approved}/{a.track_total} tracks live
+                  </>
+                ) : null}
+              </p>
+              {/* A draft album was excluded from this queue entirely, so a
+                  finished release could never be approved — say what state it
+                  is in and that Approve publishes the whole album. */}
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                status: <span className="font-semibold">{a.status}</span>
+                {a.status === "draft"
+                  ? " — never submitted for review, but its tracks are already live. Approve to publish the album."
+                  : a.stranded
+                    ? " — tracks are live but the album is not, so nobody can open or buy it. Approve to fix."
+                    : ""}
               </p>
             </div>
             <button
@@ -529,8 +562,28 @@ function AlbumMod() {
               <Trash2 className="size-3" /> Delete
             </button>
           </div>
-        ))}
-      </div>
+        );
+        return (
+          <div key="groups" className="space-y-4">
+            {stranded.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-amber-500">
+                  Stranded — tracks are live but the album is not. Nobody can open or buy these.
+                </p>
+                {stranded.map(renderRow)}
+              </div>
+            )}
+            {rest.length > 0 && (
+              <div className="space-y-2">
+                {stranded.length > 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground">Awaiting review</p>
+                )}
+                {rest.map(renderRow)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

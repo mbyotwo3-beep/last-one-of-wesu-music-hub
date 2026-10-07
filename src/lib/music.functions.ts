@@ -125,16 +125,60 @@ export const globalSearch = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * What an album costs, and how long it runs.
+ *
+ * The album row's own `price` is optional, so an artist who uploaded a release
+ * without setting one produced a K0 "free" album tile that led nowhere — the
+ * shelf quoted a price the checkout could not honour. An explicit album price
+ * always wins (artists legitimately discount a bundle); otherwise the tracks
+ * are summed, so the number on the tile is the number they will pay.
+ */
+export function summariseAlbum(a: {
+  price?: number | string | null;
+  songs?: { price?: number | string | null; duration?: number | null }[] | null;
+}): { track_count: number; total_duration: number; effective_price: number } {
+  const tracks = a.songs ?? [];
+  const explicit = Number(a.price ?? 0) > 0;
+  return {
+    track_count: tracks.length,
+    total_duration: tracks.reduce((sum, t) => sum + (t.duration ?? 0), 0),
+    effective_price: explicit
+      ? Number(a.price)
+      : tracks.reduce((s, t) => s + Number(t.price ?? 0), 0),
+  };
+}
+
 export const listAlbums = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
+  // Only albums with at least one APPROVED track: `!inner` on the songs, so an
+  // album whose tracks are all still in review cannot appear as an empty shell.
   const { data, error } = await supabase
     .from("albums")
-    .select("id,title,cover_url,price,release_date,genre,artist:artists(id,name)")
+    .select(
+      "id,title,cover_url,price,release_date,genre,artist:artists(id,name)," +
+        "songs!inner(id,price,status,duration)",
+    )
     .eq("status", "approved")
+    .eq("songs.status", "approved")
     .order("release_date", { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  // The generated Database types predate this nested select, so the relation is
+  // untyped here. Shape it once rather than casting at every call site.
+  type AlbumRow = {
+    id: string;
+    title: string;
+    cover_url: string | null;
+    price?: number | string | null;
+    release_date?: string | null;
+    genre?: string | null;
+    artist?: { id: string; name: string } | null;
+    songs?: { id: string; price?: number | string | null; duration?: number | null }[] | null;
+  };
+
+  return ((data ?? []) as unknown as AlbumRow[]).map((a) => ({ ...a, ...summariseAlbum(a) }));
 });
 
 export const listArtists = createServerFn({ method: "GET" }).handler(async () => {
