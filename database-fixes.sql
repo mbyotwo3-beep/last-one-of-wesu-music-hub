@@ -262,6 +262,27 @@ EXCEPTION
     CHECK (status IN ('draft', 'pending', 'approved', 'rejected'));
 END $$;
 
+-- 21. Update artists status constraint to include 'suspended'
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'artists_status_check' 
+    AND conrelid = 'public.artists'::regclass
+  ) THEN
+    ALTER TABLE public.artists DROP CONSTRAINT artists_status_check;
+  END IF;
+
+  ALTER TABLE public.artists 
+  ADD CONSTRAINT artists_status_check 
+  CHECK (status IN ('pending', 'approved', 'rejected', 'suspended'));
+EXCEPTION
+  WHEN others THEN
+    ALTER TABLE public.artists 
+    ADD CONSTRAINT artists_status_check 
+    CHECK (status IN ('pending', 'approved', 'rejected', 'suspended'));
+END $$;
+
 -- Add track_number column to songs if it doesn't exist
 ALTER TABLE public.songs ADD COLUMN IF NOT EXISTS track_number integer;
 
