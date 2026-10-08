@@ -17,8 +17,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 27 = albums list as releases (not as individual songs).
-        versionCode 27
+        // 28 = post-CVE framework upgrade (react-start 1.168.60) + co-lead credits.
+        versionCode 28
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
