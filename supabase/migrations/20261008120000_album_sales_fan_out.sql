@@ -175,17 +175,22 @@ $$;
 -- album branch no longer allocates), so deleting them moves no money — but the
 -- artist's payouts for the duplicated sales stay, because those live in
 -- revenue_splits against the transactions, not against these rows.
+--
+-- DISTINCT ON, not MIN(id): Postgres has no min()/max() aggregate for uuid, so
+-- the obvious grouping form does not exist and 42883 is the result. DISTINCT ON
+-- keeps one row per (user_id, album_id) — the earliest receipt — and its ORDER
+-- BY must lead with exactly the DISTINCT ON expressions.
 DELETE FROM public.purchases p
 WHERE p.album_id IS NOT NULL
   AND p.status = 'completed'
   AND p.song_id IS NULL
   AND p.id NOT IN (
-    SELECT MIN(d.id)
+    SELECT DISTINCT ON (d.user_id, d.album_id) d.id
       FROM public.purchases d
      WHERE d.album_id IS NOT NULL
        AND d.status = 'completed'
        AND d.song_id IS NULL
-     GROUP BY d.user_id, d.album_id
+     ORDER BY d.user_id, d.album_id, d.created_at, d.id
   );
 
 CREATE UNIQUE INDEX IF NOT EXISTS purchases_completed_album_uniq
