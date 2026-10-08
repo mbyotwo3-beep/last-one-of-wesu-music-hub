@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { listSavedTrackIds, saveTrack, unsaveTrack } from "@/lib/saved-tracks.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { nextSavedIds, shouldSaveTrack } from "@/lib/liked-songs-state";
 import { toast } from "sonner";
 
 /**
@@ -27,22 +28,23 @@ export function useSavedTrack(songId: string | null | undefined) {
   const isSaved = !!(songId && idsQ.data?.includes(songId));
 
   const mutation = useMutation({
-    mutationFn: async () => {
+    // `shouldSave` is the decision made at tap time, before any optimistic
+    // write. It must NOT be re-derived from the cache in here: React Query runs
+    // onMutate before mutationFn, so by the time this ran, the cache already
+    // reflected the tap and re-reading it produced the opposite intent. That
+    // inverted this button — pressing like called unsave, and the server
+    // truthfully reported it, so the toast said "Removed from Liked Songs".
+    mutationFn: async (shouldSave: boolean) => {
       if (!songId) return;
-      // Read intent from the live cache, not the render closure — rapid
-      // double-taps would otherwise send the same action twice.
-      const current = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? idsQ.data ?? [];
-      if (current.includes(songId)) {
-        return unsaveFn({ data: { song_id: songId } });
-      }
-      return saveFn({ data: { song_id: songId } });
+      return shouldSave
+        ? saveFn({ data: { song_id: songId } })
+        : unsaveFn({ data: { song_id: songId } });
     },
-    onMutate: async () => {
+    onMutate: async (shouldSave: boolean) => {
       if (!songId) return;
       await qc.cancelQueries({ queryKey: ["saved-track-ids", user?.id] });
       const prev = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? [];
-      const next = isSaved ? prev.filter((id) => id !== songId) : [...prev, songId];
-      qc.setQueryData(["saved-track-ids", user?.id], next);
+      qc.setQueryData(["saved-track-ids", user?.id], nextSavedIds(prev, songId, shouldSave));
       return { prev };
     },
     onError: (error, _v, ctx) => {
@@ -90,7 +92,14 @@ export function useSavedTrack(songId: string | null | undefined) {
         });
         return;
       }
-      if (!mutation.isPending) mutation.mutate();
+      if (!songId) return;
+      // Decide the intent HERE, at tap time, while the cache still describes
+      // reality — before onMutate rewrites it. Reading the live cache rather
+      // than the render closure still means two taps in one tick compute
+      // opposite intents. The decision then travels as the mutation variable
+      // instead of being re-derived downstream.
+      const current = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? idsQ.data ?? [];
+      if (!mutation.isPending) mutation.mutate(shouldSaveTrack(current, songId));
     },
     loading: mutation.isPending,
   };
