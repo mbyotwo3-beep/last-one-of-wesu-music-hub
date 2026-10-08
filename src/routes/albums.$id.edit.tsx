@@ -296,6 +296,29 @@ function AlbumEditPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
+      {/* Say plainly what state this release is in. Artists uploaded a
+          release and landed here with no idea it was still a private draft —
+          nothing goes live until one submit, which is the whole point of
+          treating an album as one unit rather than a bag of songs. */}
+      {album.status === "draft" && (
+        <div className="mb-6 p-4 rounded-xl border border-primary/30 bg-primary/5">
+          <p className="text-sm font-semibold text-primary mb-1">This album is not published yet</p>
+          <p className="text-xs text-muted-foreground">
+            All {tracks.length} track{tracks.length === 1 ? "" : "s"} go out together as one release
+            once you submit. Nothing is visible to listeners until then.
+          </p>
+        </div>
+      )}
+      {album.status === "pending" && (
+        <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+          <p className="text-sm font-semibold text-amber-600 mb-1">Submitted for review</p>
+          <p className="text-xs text-muted-foreground">
+            The whole release is queued together. The album and its {tracks.length} track
+            {tracks.length === 1 ? "" : "s"} publish together when it is approved.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">

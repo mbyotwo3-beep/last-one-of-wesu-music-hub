@@ -20,10 +20,14 @@ export const getFeaturedAlbums = createServerFn({ method: "GET" }).handler(async
 
 export const getNewReleases = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getPublicSupabase();
+  // SINGLES ONLY. This is a release shelf: a 12-track album listing as twelve
+  // separate "new releases" is how the catalogue stopped reading like Spotify.
+  // Album tracks are reached through the album itself (see release-shelf.ts).
   const { data, error } = await supabase
     .from("songs")
     .select("id,title,duration,price,cover_url,artist:artists(id,name)")
     .eq("status", "approved")
+    .is("album_id", null)
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw new Error(error.message);
@@ -522,12 +526,15 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .from("songs")
       .select("id,title,duration,price,cover_url,artist:artists(id,name)")
       .eq("status", "approved")
+      // Release shelf, so singles only — album tracks belong to their album.
+      .is("album_id", null)
       .order("created_at", { ascending: false })
       .limit(12),
     supabase
       .from("songs")
       .select("id,title,play_count,price,cover_url,duration,artist:artists(id,name)")
       .eq("status", "approved")
+      // A chart ranks individual plays, so album tracks DO belong here.
       .order("play_count", { ascending: false })
       .limit(10),
     supabase
