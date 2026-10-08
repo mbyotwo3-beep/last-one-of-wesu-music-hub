@@ -632,6 +632,11 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
               .eq("user_id", context.userId)
               .eq("album_id", albumId)
               .eq("status", "completed")
+              // An album purchase writes a receipt row AND one row per track,
+              // all carrying album_id. maybeSingle() without limit(1) throws on
+              // that second row, which would fail playback for everyone who
+              // bought an album. This is an existence check, so one row is enough.
+              .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
@@ -700,6 +705,9 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
               .eq("user_id", context.userId)
               .eq("album_id", song.album_id)
               .eq("status", "completed")
+              // Same reason as the playback check: one row per track plus a
+              // receipt all match this album, so cap it at one.
+              .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);

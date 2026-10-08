@@ -1309,6 +1309,22 @@ function UploadWizard() {
 
       // Upload each song sequentially in the exact ordered arrangement chosen by the artist
       const createdTrackIds: string[] = [];
+
+      // The "album price" field is the price of the WHOLE release, but this loop
+      // used to write that same figure onto every track. With albums banded at
+      // K150-250 and singles at K10-100, a 12-track upload produced 12 tracks
+      // each selling for the full album price — a K2400 singles catalogue
+      // attached to a K200 release. Per-track prices exist for buyers who take
+      // one song off the album, so they get an even share of the album price,
+      // held inside the single-track band.
+      const trackPrice =
+        price > 0
+          ? Math.min(
+              SINGLE_MAX,
+              Math.max(SINGLE_MIN, Math.round(price / Math.max(tracks.length, 1))),
+            )
+          : 0;
+
       for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
         const entry = tracks[trackIdx];
         const trackTitle = entry.title.trim() || entry.file.name.replace(/\.[^.]+$/, "");
@@ -1336,7 +1352,7 @@ function UploadWizard() {
             title: trackTitle,
             audio_url,
             cover_url,
-            price,
+            price: trackPrice,
             album_id: album.id,
             has_feature: doFeatureInvite || doFeatureDirect,
             has_label: doLabelInvite,
@@ -2326,7 +2342,9 @@ function UploadWizard() {
                   onChange={(e) => setPrice(Number(e.target.value))}
                 />
                 <span className="text-xs text-muted-foreground">
-                  0 for free, or K{ALBUM_MIN}–K{ALBUM_MAX}. Each track inherits this price.
+                  0 for free, or K{ALBUM_MIN}–K{ALBUM_MAX} for the whole album. Buyers who take a
+                  single track off it pay an even share of this, between K{SINGLE_MIN} and K
+                  {SINGLE_MAX}.
                 </span>
               </label>
               {price === 0 && (

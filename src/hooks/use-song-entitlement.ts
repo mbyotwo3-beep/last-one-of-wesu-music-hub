@@ -30,6 +30,7 @@ export function useSongEntitlement(
           .eq("user_id", user!.id)
           .eq("song_id", songId!)
           .eq("status", "completed")
+          .limit(1)
           .maybeSingle(),
         albumId
           ? supabase
@@ -38,6 +39,11 @@ export function useSongEntitlement(
               .eq("user_id", user!.id)
               .eq("album_id", albumId)
               .eq("status", "completed")
+              // Album fulfilment writes a receipt row plus one row per track,
+              // all with album_id set. maybeSingle() would throw on the second
+              // one and leave the track looking unpurchased — the Buy button
+              // would come back after the listener had already paid.
+              .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);

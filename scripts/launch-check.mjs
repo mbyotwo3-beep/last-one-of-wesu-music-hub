@@ -51,6 +51,14 @@ const BUNDLE_MARKERS = [
   ["playback failure surfaces on phones", "sheet-swipe-ignore"],
   ["role gate explains itself", "You need a different account type"],
   ["shuffle deck follows queue edits", "wesu-player"],
+  // Album selling. The album page's Buy button is gated on the shared
+  // sellable-price rule; if that import is ever dropped and the raw column
+  // comes back, unpriced-but-paid albums lose their only purchase path again.
+  ["album sellable price rule", "effective_price"],
+  // The album page now states a derived release price. Its absence means the
+  // page is reading the raw albums.price column again, which hid the Buy
+  // button entirely on an album priced only by its tracks.
+  ["album page states derived price", " the album"],
 ];
 
 // Copy that must NOT come back (a removed feature).

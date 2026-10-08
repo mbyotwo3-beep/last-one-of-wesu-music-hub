@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { getAlbumWithSongs } from "@/lib/music.functions";
+import { albumSellablePrice, getAlbumWithSongs } from "@/lib/music.functions";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
@@ -287,6 +287,13 @@ function AlbumPage() {
             {data.songs.length} {data.songs.length === 1 ? "song" : "songs"}
             {totalDuration > 0 ? ` • ${formatTotalRuntime(totalDuration)}` : ""}
             {album.release_date ? ` • ${new Date(album.release_date).getFullYear()}` : ""}
+            {/* State the release price even when it is derived from the tracks,
+                so the number here matches the shelf tile and the checkout. */}
+            {Number(album.price ?? 0) <= 0 &&
+              albumSellablePrice({ price: album.price, songs: data.songs }) > 0 &&
+              ` • ${formatPrice(
+                albumSellablePrice({ price: album.price, songs: data.songs }),
+              )} the album`}
           </p>
 
           {/* Primary Action Buttons (Apple Music style) */}
@@ -349,15 +356,20 @@ function AlbumPage() {
               />
             </div>
 
-            {/* Buy Album button if priced */}
-            {Number(album.price) > 0 && (
+            {/* Buy Album button if priced. The gate and the label must use the same
+                sellable-price rule as the shelf and the checkout — gating on the
+                raw `album.price` column hid the button entirely on an album
+                whose price is derived from its tracks. getAlbumWithSongs returns
+                tracks as a sibling array, so they are passed in explicitly. */}
+            {albumSellablePrice({ price: album.price, songs: data.songs }) > 0 && (
               <Link
                 to="/checkout"
                 search={{ item: "album", id: album.id }}
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-6 rounded-full bg-secondary hover:bg-accent border border-border text-sm font-semibold transition-colors cursor-pointer"
               >
                 <ShoppingBag className="size-4 text-primary" />
-                Buy Album — {formatPrice(album.price)}
+                Buy Album —{" "}
+                {formatPrice(albumSellablePrice({ price: album.price, songs: data.songs }))}
               </Link>
             )}
           </div>

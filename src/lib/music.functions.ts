@@ -130,6 +130,30 @@ export const globalSearch = createServerFn({ method: "GET" })
   });
 
 /**
+ * What an album costs.
+ *
+ * One authoritative answer, used by the shelf, the album page, the checkout and
+ * the charge. They used to disagree: `summariseAlbum` summed the tracks for the
+ * grid tile, while the Buy button's gate, the checkout line item and
+ * `initiatePayment` all read the raw `albums.price` column. An album with a
+ * NULL/0 price therefore advertised a summed price on the shelf, showed no Buy
+ * button at all, and rejected a direct API call with "Unable to determine
+ * price" — the tile and the till quoted different numbers for one product.
+ *
+ * An explicit album price always wins (artists legitimately discount a
+ * bundle); otherwise the tracks are summed.
+ */
+export function albumSellablePrice(a: {
+  price?: number | string | null;
+  songs?: { price?: number | string | null }[] | null;
+}): number {
+  const explicit = Number(a.price ?? 0);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const sum = (a.songs ?? []).reduce((s, t) => s + Number(t.price ?? 0), 0);
+  return Number.isFinite(sum) && sum > 0 ? sum : 0;
+}
+
+/**
  * What an album costs, and how long it runs.
  *
  * The album row's own `price` is optional, so an artist who uploaded a release
@@ -143,13 +167,10 @@ export function summariseAlbum(a: {
   songs?: { price?: number | string | null; duration?: number | null }[] | null;
 }): { track_count: number; total_duration: number; effective_price: number } {
   const tracks = a.songs ?? [];
-  const explicit = Number(a.price ?? 0) > 0;
   return {
     track_count: tracks.length,
     total_duration: tracks.reduce((sum, t) => sum + (t.duration ?? 0), 0),
-    effective_price: explicit
-      ? Number(a.price)
-      : tracks.reduce((s, t) => s + Number(t.price ?? 0), 0),
+    effective_price: albumSellablePrice(a),
   };
 }
 
@@ -326,12 +347,19 @@ export const getPurchasableItem = createServerFn({ method: "GET" })
     }
     const { data: row, error } = await supabase
       .from("albums")
-      .select("id,title,price,cover_url,artist:artists(id,name)")
+      .select("id,title,price,cover_url,artist:artists(id,name),songs(id,price,status)")
       .eq("id", data.id)
       .eq("status", "approved")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row;
+    if (!row) return row;
+
+    // Charge the album's sellable price, not the raw column. Returning the raw
+    // `price` here made the checkout total disagree with the shelf whenever the
+    // two rules differed, and with an unpriced album the checkout said "this
+    // item is free" for something the grid had just priced.
+    const approved = (row.songs ?? []).filter((s: any) => s?.status === "approved");
+    return { ...row, price: albumSellablePrice({ price: row.price, songs: approved }) };
   });
 
 // ---------- Payment Methods ----------

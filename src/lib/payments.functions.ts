@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { computePlaylistMissing, type PlaylistMissingSong } from "@/lib/listener.functions";
+import { albumSellablePrice } from "@/lib/music.functions";
 
 type PurchaseItemType = "song" | "album";
 
@@ -63,7 +64,8 @@ async function resumeOrRedriveCollection(args: {
  * checkout is the same answer that would have been reached after paying:
  *   - a free item needs nothing bought,
  *   - a single song is owned via a completed `purchases` row,
- *   - an album is owned when every track on it is owned.
+ *   - an album is owned via a completed album-level `purchases` row, or when
+ *     every paid track on it is owned individually.
  */
 export async function alreadyOwnsItem(
   supabase: { from: (t: string) => any },
@@ -90,7 +92,28 @@ export async function alreadyOwnsItem(
     return !!owned;
   }
 
-  // Album: every track must be owned. A partially-owned album is still
+  // Album: buying the release grants every track on it, so an album-level
+  // purchase IS ownership.
+  //
+  // This check was missing, and album fulfilment wrote no per-track rows, so a
+  // buyer who had just paid for an album looked like they owned none of it and
+  // was charged again on the second click. The per-track walk below covers
+  // albums bought track-by-track; this covers the bundle.
+  const { data: albumPurchase } = await supabase
+    .from("purchases")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("album_id", itemId)
+    .eq("status", "completed")
+    // Scoped to the album receipt. Album fulfilment also writes one row per
+    // track with album_id set, so without this filter a bought album matches
+    // N+1 rows and maybeSingle() throws instead of answering.
+    .is("song_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (albumPurchase) return true;
+
+  // Otherwise: every track must be owned. A partially-owned album is still
   // purchasable — the tracks they are missing are what they are buying.
   const { data: tracks } = await supabase
     .from("songs")
@@ -351,21 +374,33 @@ export const initiatePayment = createServerFn({ method: "POST" })
     const { supabase, userId, claims } = context;
 
     // -- Authoritative price lookup (RLS-safe: uses caller's client) --
+    // Both branches filter on status='approved'. They used not to, so a crafted
+    // POST naming a draft or rejected release passed the price lookup, took the
+    // buyer's money, and wrote an entitlement for something they cannot see.
     let authoritativeAmount: number | null = null;
     if (data.item_type === "song") {
       const { data: row } = await supabase
         .from("songs")
         .select("price,title")
         .eq("id", data.item_id)
+        .eq("status", "approved")
         .maybeSingle();
       authoritativeAmount = row?.price != null ? Number(row.price) : null;
     } else if (data.item_type === "album") {
       const { data: row } = await supabase
         .from("albums")
-        .select("price,title")
+        .select("price,title,songs(id,price,status)")
         .eq("id", data.item_id)
+        .eq("status", "approved")
         .maybeSingle();
-      authoritativeAmount = row?.price != null ? Number(row.price) : null;
+      if (row) {
+        // Same rule the shelf and the checkout display. Charging the raw
+        // `albums.price` column instead meant an album with no price of its own
+        // was quoted at the sum of its tracks on the grid and then refused at
+        // the till.
+        const approved = (row.songs ?? []).filter((s: any) => s?.status === "approved");
+        authoritativeAmount = albumSellablePrice({ price: row.price, songs: approved });
+      }
     }
     if (
       authoritativeAmount == null ||

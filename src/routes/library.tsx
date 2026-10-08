@@ -132,12 +132,26 @@ function Page() {
       if (!user?.id) return [];
       const { data } = await supabase
         .from("purchases")
-        .select("songs(*, artists(name))")
+        .select("song_id,songs(*, artists(name))")
         .eq("user_id", user.id)
         .eq("status", "completed")
-        .is("album_id", null)
+        // Keyed on song_id, not album_id. Album fulfilment writes one purchase
+        // row per track and sets album_id on each, so the old `.is("album_id",
+        // null)` filter silently excluded every track a buyer got with an album
+        // — buying a 12-track release put none of it in the library.
+        .not("song_id", "is", null)
         .order("created_at", { ascending: false });
-      return (data ?? []).map((item: any) => item.songs).filter(hasId);
+      // The same track can appear twice (bought on its own, then again inside
+      // an album). Collapse by id, keeping the first.
+      const seen = new Set<string>();
+      return (data ?? [])
+        .map((item: any) => item.songs)
+        .filter(hasId)
+        .filter((song: any) => {
+          if (seen.has(song.id)) return false;
+          seen.add(song.id);
+          return true;
+        });
     },
     enabled: !!user?.id,
     staleTime: 30_000,
@@ -159,7 +173,17 @@ function Page() {
         .eq("status", "completed")
         .not("album_id", "is", null)
         .order("created_at", { ascending: false });
-      return (data ?? []).map((item: any) => item.albums).filter(hasId);
+      // Every per-track row of an album purchase also carries album_id, so this
+      // query returns the release once per track. Collapse by id.
+      const seen = new Set<string>();
+      return (data ?? [])
+        .map((item: any) => item.albums)
+        .filter(hasId)
+        .filter((album: any) => {
+          if (seen.has(album.id)) return false;
+          seen.add(album.id);
+          return true;
+        });
     },
     enabled: !!user?.id,
     staleTime: 30_000,
