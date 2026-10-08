@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPayment } from "@/lib/payments.functions";
+import { friendlyError } from "@/lib/friendly-error";
 
 type SuccessSearch = {
   ref?: string;
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/checkout/success")({
           My Library
         </Link>
       </div>
-      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
     </div>
   ),
   notFoundComponent: () => (

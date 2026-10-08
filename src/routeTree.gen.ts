@@ -9,241 +9,61 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TermsListenerRouteImport } from './routes/terms-listener'
-import { Route as TermsArtistRouteImport } from './routes/terms-artist'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SuperadminRouteImport } from './routes/superadmin'
-import { Route as SongsRouteImport } from './routes/songs'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
-import { Route as QueueRouteImport } from './routes/queue'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as PodcastRouteImport } from './routes/podcast'
-import { Route as PlaylistsRouteImport } from './routes/playlists'
-import { Route as NowPlayingRouteImport } from './routes/now-playing'
-import { Route as NotificationsRouteImport } from './routes/notifications'
-import { Route as NewMusicRouteImport } from './routes/new-music'
-import { Route as MustHaveRouteImport } from './routes/must-have'
-import { Route as MoodRouteImport } from './routes/mood'
-import { Route as LikedSongsRouteImport } from './routes/liked-songs'
-import { Route as LibraryRouteImport } from './routes/library'
-import { Route as LabelDashboardRouteImport } from './routes/label-dashboard'
-import { Route as HotTracksRouteImport } from './routes/hot-tracks'
-import { Route as GetAppRouteImport } from './routes/get-app'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as DownloadsRouteImport } from './routes/downloads'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CollabsRouteImport } from './routes/collabs'
-import { Route as CheckoutRouteImport } from './routes/checkout'
-import { Route as BrowseRouteImport } from './routes/browse'
-import { Route as BecomeArtistRouteImport } from './routes/become-artist'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as ArtistStudioRouteImport } from './routes/artist-studio'
-import { Route as ArtistProfileEditRouteImport } from './routes/artist-profile-edit'
-import { Route as ArtistDashboardRouteImport } from './routes/artist-dashboard'
-import { Route as ApplyLabelRouteImport } from './routes/apply-label'
-import { Route as AlbumsRouteImport } from './routes/albums'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LabelsIndexRouteImport } from './routes/labels.index'
-import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AlbumsRouteImport } from './routes/albums'
+import { Route as ApplyLabelRouteImport } from './routes/apply-label'
+import { Route as ArtistDashboardRouteImport } from './routes/artist-dashboard'
+import { Route as ArtistProfileEditRouteImport } from './routes/artist-profile-edit'
+import { Route as ArtistStudioRouteImport } from './routes/artist-studio'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BecomeArtistRouteImport } from './routes/become-artist'
+import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CollabsRouteImport } from './routes/collabs'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DownloadsRouteImport } from './routes/downloads'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as GetAppRouteImport } from './routes/get-app'
+import { Route as HotTracksRouteImport } from './routes/hot-tracks'
+import { Route as LabelDashboardRouteImport } from './routes/label-dashboard'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as LikedSongsRouteImport } from './routes/liked-songs'
+import { Route as MoodRouteImport } from './routes/mood'
+import { Route as MustHaveRouteImport } from './routes/must-have'
+import { Route as NewMusicRouteImport } from './routes/new-music'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as NowPlayingRouteImport } from './routes/now-playing'
+import { Route as PlaylistsRouteImport } from './routes/playlists'
+import { Route as PodcastRouteImport } from './routes/podcast'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as QueueRouteImport } from './routes/queue'
+import { Route as RecentlyAddedRouteImport } from './routes/recently-added'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as SongsRouteImport } from './routes/songs'
+import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TermsArtistRouteImport } from './routes/terms-artist'
+import { Route as TermsListenerRouteImport } from './routes/terms-listener'
 import { Route as AlbumsIndexRouteImport } from './routes/albums.index'
-import { Route as SongsIdRouteImport } from './routes/songs.$id'
-import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
-import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
-import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
-import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AlbumsIdRouteImport } from './routes/albums.$id'
-import { Route as ApiPublicSitemapRouteImport } from './routes/api/public/sitemap'
-import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
+import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
+import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
+import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
+import { Route as LabelsIndexRouteImport } from './routes/labels.index'
+import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
+import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
+import { Route as SongsIdRouteImport } from './routes/songs.$id'
 import { Route as AlbumsIdEditRouteImport } from './routes/albums.$id.edit'
+import { Route as ApiPublicLencoWebhookRouteImport } from './routes/api/public/lenco-webhook'
+import { Route as ApiPublicSitemapRouteImport } from './routes/api/public/sitemap'
 
-const TermsListenerRoute = TermsListenerRouteImport.update({
-  id: '/terms-listener',
-  path: '/terms-listener',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsArtistRoute = TermsArtistRouteImport.update({
-  id: '/terms-artist',
-  path: '/terms-artist',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SuperadminRoute = SuperadminRouteImport.update({
-  id: '/superadmin',
-  path: '/superadmin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SongsRoute = SongsRouteImport.update({
-  id: '/songs',
-  path: '/songs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RecentlyAddedRoute = RecentlyAddedRouteImport.update({
-  id: '/recently-added',
-  path: '/recently-added',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const QueueRoute = QueueRouteImport.update({
-  id: '/queue',
-  path: '/queue',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PodcastRoute = PodcastRouteImport.update({
-  id: '/podcast',
-  path: '/podcast',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlaylistsRoute = PlaylistsRouteImport.update({
-  id: '/playlists',
-  path: '/playlists',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NowPlayingRoute = NowPlayingRouteImport.update({
-  id: '/now-playing',
-  path: '/now-playing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationsRoute = NotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewMusicRoute = NewMusicRouteImport.update({
-  id: '/new-music',
-  path: '/new-music',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MustHaveRoute = MustHaveRouteImport.update({
-  id: '/must-have',
-  path: '/must-have',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MoodRoute = MoodRouteImport.update({
-  id: '/mood',
-  path: '/mood',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LikedSongsRoute = LikedSongsRouteImport.update({
-  id: '/liked-songs',
-  path: '/liked-songs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LibraryRoute = LibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LabelDashboardRoute = LabelDashboardRouteImport.update({
-  id: '/label-dashboard',
-  path: '/label-dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HotTracksRoute = HotTracksRouteImport.update({
-  id: '/hot-tracks',
-  path: '/hot-tracks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GetAppRoute = GetAppRouteImport.update({
-  id: '/get-app',
-  path: '/get-app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DownloadsRoute = DownloadsRouteImport.update({
-  id: '/downloads',
-  path: '/downloads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CollabsRoute = CollabsRouteImport.update({
-  id: '/collabs',
-  path: '/collabs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutRoute = CheckoutRouteImport.update({
-  id: '/checkout',
-  path: '/checkout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrowseRoute = BrowseRouteImport.update({
-  id: '/browse',
-  path: '/browse',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BecomeArtistRoute = BecomeArtistRouteImport.update({
-  id: '/become-artist',
-  path: '/become-artist',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArtistStudioRoute = ArtistStudioRouteImport.update({
-  id: '/artist-studio',
-  path: '/artist-studio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArtistProfileEditRoute = ArtistProfileEditRouteImport.update({
-  id: '/artist-profile-edit',
-  path: '/artist-profile-edit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ArtistDashboardRoute = ArtistDashboardRouteImport.update({
-  id: '/artist-dashboard',
-  path: '/artist-dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApplyLabelRoute = ApplyLabelRouteImport.update({
-  id: '/apply-label',
-  path: '/apply-label',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AlbumsRoute = AlbumsRouteImport.update({
-  id: '/albums',
-  path: '/albums',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -251,19 +71,189 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AlbumsRoute = AlbumsRouteImport.update({
+  id: '/albums',
+  path: '/albums',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LabelsIndexRoute = LabelsIndexRouteImport.update({
-  id: '/labels/',
-  path: '/labels/',
+const ApplyLabelRoute = ApplyLabelRouteImport.update({
+  id: '/apply-label',
+  path: '/apply-label',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
-  id: '/artists/',
-  path: '/artists/',
+const ArtistDashboardRoute = ArtistDashboardRouteImport.update({
+  id: '/artist-dashboard',
+  path: '/artist-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtistProfileEditRoute = ArtistProfileEditRouteImport.update({
+  id: '/artist-profile-edit',
+  path: '/artist-profile-edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtistStudioRoute = ArtistStudioRouteImport.update({
+  id: '/artist-studio',
+  path: '/artist-studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BecomeArtistRoute = BecomeArtistRouteImport.update({
+  id: '/become-artist',
+  path: '/become-artist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowseRoute = BrowseRouteImport.update({
+  id: '/browse',
+  path: '/browse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollabsRoute = CollabsRouteImport.update({
+  id: '/collabs',
+  path: '/collabs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadsRoute = DownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GetAppRoute = GetAppRouteImport.update({
+  id: '/get-app',
+  path: '/get-app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HotTracksRoute = HotTracksRouteImport.update({
+  id: '/hot-tracks',
+  path: '/hot-tracks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabelDashboardRoute = LabelDashboardRouteImport.update({
+  id: '/label-dashboard',
+  path: '/label-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LikedSongsRoute = LikedSongsRouteImport.update({
+  id: '/liked-songs',
+  path: '/liked-songs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MoodRoute = MoodRouteImport.update({
+  id: '/mood',
+  path: '/mood',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MustHaveRoute = MustHaveRouteImport.update({
+  id: '/must-have',
+  path: '/must-have',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewMusicRoute = NewMusicRouteImport.update({
+  id: '/new-music',
+  path: '/new-music',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NowPlayingRoute = NowPlayingRouteImport.update({
+  id: '/now-playing',
+  path: '/now-playing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaylistsRoute = PlaylistsRouteImport.update({
+  id: '/playlists',
+  path: '/playlists',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PodcastRoute = PodcastRouteImport.update({
+  id: '/podcast',
+  path: '/podcast',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QueueRoute = QueueRouteImport.update({
+  id: '/queue',
+  path: '/queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecentlyAddedRoute = RecentlyAddedRouteImport.update({
+  id: '/recently-added',
+  path: '/recently-added',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SongsRoute = SongsRouteImport.update({
+  id: '/songs',
+  path: '/songs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperadminRoute = SuperadminRouteImport.update({
+  id: '/superadmin',
+  path: '/superadmin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsArtistRoute = TermsArtistRouteImport.update({
+  id: '/terms-artist',
+  path: '/terms-artist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsListenerRoute = TermsListenerRouteImport.update({
+  id: '/terms-listener',
+  path: '/terms-listener',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlbumsIndexRoute = AlbumsIndexRouteImport.update({
@@ -271,19 +261,19 @@ const AlbumsIndexRoute = AlbumsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AlbumsRoute,
 } as any)
-const SongsIdRoute = SongsIdRouteImport.update({
+const AlbumsIdRoute = AlbumsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => SongsRoute,
+  getParentRoute: () => AlbumsRoute,
 } as any)
-const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PlaylistsRoute,
+const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
+  id: '/artists/',
+  path: '/artists/',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const LabelsSlugRoute = LabelsSlugRouteImport.update({
-  id: '/labels/$slug',
-  path: '/labels/$slug',
+const ArtistsIdRoute = ArtistsIdRouteImport.update({
+  id: '/artists/$id',
+  path: '/artists/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
@@ -291,30 +281,40 @@ const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   path: '/success',
   getParentRoute: () => CheckoutRoute,
 } as any)
-const ArtistsIdRoute = ArtistsIdRouteImport.update({
-  id: '/artists/$id',
-  path: '/artists/$id',
+const LabelsIndexRoute = LabelsIndexRouteImport.update({
+  id: '/labels/',
+  path: '/labels/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AlbumsIdRoute = AlbumsIdRouteImport.update({
+const LabelsSlugRoute = LabelsSlugRouteImport.update({
+  id: '/labels/$slug',
+  path: '/labels/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => AlbumsRoute,
+  getParentRoute: () => PlaylistsRoute,
 } as any)
-const ApiPublicSitemapRoute = ApiPublicSitemapRouteImport.update({
-  id: '/api/public/sitemap',
-  path: '/api/public/sitemap',
-  getParentRoute: () => rootRouteImport,
+const SongsIdRoute = SongsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SongsRoute,
+} as any)
+const AlbumsIdEditRoute = AlbumsIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => AlbumsIdRoute,
 } as any)
 const ApiPublicLencoWebhookRoute = ApiPublicLencoWebhookRouteImport.update({
   id: '/api/public/lenco-webhook',
   path: '/api/public/lenco-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AlbumsIdEditRoute = AlbumsIdEditRouteImport.update({
-  id: '/edit',
-  path: '/edit',
-  getParentRoute: () => AlbumsIdRoute,
+const ApiPublicSitemapRoute = ApiPublicSitemapRouteImport.update({
+  id: '/api/public/sitemap',
+  path: '/api/public/sitemap',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -687,263 +687,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/terms-listener': {
-      id: '/terms-listener'
-      path: '/terms-listener'
-      fullPath: '/terms-listener'
-      preLoaderRoute: typeof TermsListenerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms-artist': {
-      id: '/terms-artist'
-      path: '/terms-artist'
-      fullPath: '/terms-artist'
-      preLoaderRoute: typeof TermsArtistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/superadmin': {
-      id: '/superadmin'
-      path: '/superadmin'
-      fullPath: '/superadmin'
-      preLoaderRoute: typeof SuperadminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/songs': {
-      id: '/songs'
-      path: '/songs'
-      fullPath: '/songs'
-      preLoaderRoute: typeof SongsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/recently-added': {
-      id: '/recently-added'
-      path: '/recently-added'
-      fullPath: '/recently-added'
-      preLoaderRoute: typeof RecentlyAddedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/queue': {
-      id: '/queue'
-      path: '/queue'
-      fullPath: '/queue'
-      preLoaderRoute: typeof QueueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/podcast': {
-      id: '/podcast'
-      path: '/podcast'
-      fullPath: '/podcast'
-      preLoaderRoute: typeof PodcastRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/playlists': {
-      id: '/playlists'
-      path: '/playlists'
-      fullPath: '/playlists'
-      preLoaderRoute: typeof PlaylistsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/now-playing': {
-      id: '/now-playing'
-      path: '/now-playing'
-      fullPath: '/now-playing'
-      preLoaderRoute: typeof NowPlayingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notifications': {
-      id: '/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof NotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/new-music': {
-      id: '/new-music'
-      path: '/new-music'
-      fullPath: '/new-music'
-      preLoaderRoute: typeof NewMusicRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/must-have': {
-      id: '/must-have'
-      path: '/must-have'
-      fullPath: '/must-have'
-      preLoaderRoute: typeof MustHaveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mood': {
-      id: '/mood'
-      path: '/mood'
-      fullPath: '/mood'
-      preLoaderRoute: typeof MoodRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/liked-songs': {
-      id: '/liked-songs'
-      path: '/liked-songs'
-      fullPath: '/liked-songs'
-      preLoaderRoute: typeof LikedSongsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/library': {
-      id: '/library'
-      path: '/library'
-      fullPath: '/library'
-      preLoaderRoute: typeof LibraryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/label-dashboard': {
-      id: '/label-dashboard'
-      path: '/label-dashboard'
-      fullPath: '/label-dashboard'
-      preLoaderRoute: typeof LabelDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hot-tracks': {
-      id: '/hot-tracks'
-      path: '/hot-tracks'
-      fullPath: '/hot-tracks'
-      preLoaderRoute: typeof HotTracksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/get-app': {
-      id: '/get-app'
-      path: '/get-app'
-      fullPath: '/get-app'
-      preLoaderRoute: typeof GetAppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/downloads': {
-      id: '/downloads'
-      path: '/downloads'
-      fullPath: '/downloads'
-      preLoaderRoute: typeof DownloadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/collabs': {
-      id: '/collabs'
-      path: '/collabs'
-      fullPath: '/collabs'
-      preLoaderRoute: typeof CollabsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout': {
-      id: '/checkout'
-      path: '/checkout'
-      fullPath: '/checkout'
-      preLoaderRoute: typeof CheckoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browse': {
-      id: '/browse'
-      path: '/browse'
-      fullPath: '/browse'
-      preLoaderRoute: typeof BrowseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/become-artist': {
-      id: '/become-artist'
-      path: '/become-artist'
-      fullPath: '/become-artist'
-      preLoaderRoute: typeof BecomeArtistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/artist-studio': {
-      id: '/artist-studio'
-      path: '/artist-studio'
-      fullPath: '/artist-studio'
-      preLoaderRoute: typeof ArtistStudioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/artist-profile-edit': {
-      id: '/artist-profile-edit'
-      path: '/artist-profile-edit'
-      fullPath: '/artist-profile-edit'
-      preLoaderRoute: typeof ArtistProfileEditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/artist-dashboard': {
-      id: '/artist-dashboard'
-      path: '/artist-dashboard'
-      fullPath: '/artist-dashboard'
-      preLoaderRoute: typeof ArtistDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/apply-label': {
-      id: '/apply-label'
-      path: '/apply-label'
-      fullPath: '/apply-label'
-      preLoaderRoute: typeof ApplyLabelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/albums': {
-      id: '/albums'
-      path: '/albums'
-      fullPath: '/albums'
-      preLoaderRoute: typeof AlbumsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -953,25 +701,263 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/albums': {
+      id: '/albums'
+      path: '/albums'
+      fullPath: '/albums'
+      preLoaderRoute: typeof AlbumsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/labels/': {
-      id: '/labels/'
-      path: '/labels'
-      fullPath: '/labels/'
-      preLoaderRoute: typeof LabelsIndexRouteImport
+    '/apply-label': {
+      id: '/apply-label'
+      path: '/apply-label'
+      fullPath: '/apply-label'
+      preLoaderRoute: typeof ApplyLabelRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/artists/': {
-      id: '/artists/'
-      path: '/artists'
-      fullPath: '/artists/'
-      preLoaderRoute: typeof ArtistsIndexRouteImport
+    '/artist-dashboard': {
+      id: '/artist-dashboard'
+      path: '/artist-dashboard'
+      fullPath: '/artist-dashboard'
+      preLoaderRoute: typeof ArtistDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artist-profile-edit': {
+      id: '/artist-profile-edit'
+      path: '/artist-profile-edit'
+      fullPath: '/artist-profile-edit'
+      preLoaderRoute: typeof ArtistProfileEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artist-studio': {
+      id: '/artist-studio'
+      path: '/artist-studio'
+      fullPath: '/artist-studio'
+      preLoaderRoute: typeof ArtistStudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/become-artist': {
+      id: '/become-artist'
+      path: '/become-artist'
+      fullPath: '/become-artist'
+      preLoaderRoute: typeof BecomeArtistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browse': {
+      id: '/browse'
+      path: '/browse'
+      fullPath: '/browse'
+      preLoaderRoute: typeof BrowseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collabs': {
+      id: '/collabs'
+      path: '/collabs'
+      fullPath: '/collabs'
+      preLoaderRoute: typeof CollabsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/downloads': {
+      id: '/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof DownloadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/get-app': {
+      id: '/get-app'
+      path: '/get-app'
+      fullPath: '/get-app'
+      preLoaderRoute: typeof GetAppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hot-tracks': {
+      id: '/hot-tracks'
+      path: '/hot-tracks'
+      fullPath: '/hot-tracks'
+      preLoaderRoute: typeof HotTracksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/label-dashboard': {
+      id: '/label-dashboard'
+      path: '/label-dashboard'
+      fullPath: '/label-dashboard'
+      preLoaderRoute: typeof LabelDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/liked-songs': {
+      id: '/liked-songs'
+      path: '/liked-songs'
+      fullPath: '/liked-songs'
+      preLoaderRoute: typeof LikedSongsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mood': {
+      id: '/mood'
+      path: '/mood'
+      fullPath: '/mood'
+      preLoaderRoute: typeof MoodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/must-have': {
+      id: '/must-have'
+      path: '/must-have'
+      fullPath: '/must-have'
+      preLoaderRoute: typeof MustHaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/new-music': {
+      id: '/new-music'
+      path: '/new-music'
+      fullPath: '/new-music'
+      preLoaderRoute: typeof NewMusicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/now-playing': {
+      id: '/now-playing'
+      path: '/now-playing'
+      fullPath: '/now-playing'
+      preLoaderRoute: typeof NowPlayingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playlists': {
+      id: '/playlists'
+      path: '/playlists'
+      fullPath: '/playlists'
+      preLoaderRoute: typeof PlaylistsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/podcast': {
+      id: '/podcast'
+      path: '/podcast'
+      fullPath: '/podcast'
+      preLoaderRoute: typeof PodcastRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/queue': {
+      id: '/queue'
+      path: '/queue'
+      fullPath: '/queue'
+      preLoaderRoute: typeof QueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recently-added': {
+      id: '/recently-added'
+      path: '/recently-added'
+      fullPath: '/recently-added'
+      preLoaderRoute: typeof RecentlyAddedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/songs': {
+      id: '/songs'
+      path: '/songs'
+      fullPath: '/songs'
+      preLoaderRoute: typeof SongsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/superadmin': {
+      id: '/superadmin'
+      path: '/superadmin'
+      fullPath: '/superadmin'
+      preLoaderRoute: typeof SuperadminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-artist': {
+      id: '/terms-artist'
+      path: '/terms-artist'
+      fullPath: '/terms-artist'
+      preLoaderRoute: typeof TermsArtistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-listener': {
+      id: '/terms-listener'
+      path: '/terms-listener'
+      fullPath: '/terms-listener'
+      preLoaderRoute: typeof TermsListenerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/albums/': {
@@ -981,25 +967,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlbumsIndexRouteImport
       parentRoute: typeof AlbumsRoute
     }
-    '/songs/$id': {
-      id: '/songs/$id'
+    '/albums/$id': {
+      id: '/albums/$id'
       path: '/$id'
-      fullPath: '/songs/$id'
-      preLoaderRoute: typeof SongsIdRouteImport
-      parentRoute: typeof SongsRoute
+      fullPath: '/albums/$id'
+      preLoaderRoute: typeof AlbumsIdRouteImport
+      parentRoute: typeof AlbumsRoute
     }
-    '/playlists/$id': {
-      id: '/playlists/$id'
-      path: '/$id'
-      fullPath: '/playlists/$id'
-      preLoaderRoute: typeof PlaylistsIdRouteImport
-      parentRoute: typeof PlaylistsRoute
+    '/artists/': {
+      id: '/artists/'
+      path: '/artists'
+      fullPath: '/artists/'
+      preLoaderRoute: typeof ArtistsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/labels/$slug': {
-      id: '/labels/$slug'
-      path: '/labels/$slug'
-      fullPath: '/labels/$slug'
-      preLoaderRoute: typeof LabelsSlugRouteImport
+    '/artists/$id': {
+      id: '/artists/$id'
+      path: '/artists/$id'
+      fullPath: '/artists/$id'
+      preLoaderRoute: typeof ArtistsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/success': {
@@ -1009,26 +995,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutSuccessRouteImport
       parentRoute: typeof CheckoutRoute
     }
-    '/artists/$id': {
-      id: '/artists/$id'
-      path: '/artists/$id'
-      fullPath: '/artists/$id'
-      preLoaderRoute: typeof ArtistsIdRouteImport
+    '/labels/': {
+      id: '/labels/'
+      path: '/labels'
+      fullPath: '/labels/'
+      preLoaderRoute: typeof LabelsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/albums/$id': {
-      id: '/albums/$id'
+    '/labels/$slug': {
+      id: '/labels/$slug'
+      path: '/labels/$slug'
+      fullPath: '/labels/$slug'
+      preLoaderRoute: typeof LabelsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playlists/$id': {
+      id: '/playlists/$id'
       path: '/$id'
-      fullPath: '/albums/$id'
-      preLoaderRoute: typeof AlbumsIdRouteImport
-      parentRoute: typeof AlbumsRoute
+      fullPath: '/playlists/$id'
+      preLoaderRoute: typeof PlaylistsIdRouteImport
+      parentRoute: typeof PlaylistsRoute
     }
-    '/api/public/sitemap': {
-      id: '/api/public/sitemap'
-      path: '/api/public/sitemap'
-      fullPath: '/api/public/sitemap'
-      preLoaderRoute: typeof ApiPublicSitemapRouteImport
-      parentRoute: typeof rootRouteImport
+    '/songs/$id': {
+      id: '/songs/$id'
+      path: '/$id'
+      fullPath: '/songs/$id'
+      preLoaderRoute: typeof SongsIdRouteImport
+      parentRoute: typeof SongsRoute
+    }
+    '/albums/$id/edit': {
+      id: '/albums/$id/edit'
+      path: '/edit'
+      fullPath: '/albums/$id/edit'
+      preLoaderRoute: typeof AlbumsIdEditRouteImport
+      parentRoute: typeof AlbumsIdRoute
     }
     '/api/public/lenco-webhook': {
       id: '/api/public/lenco-webhook'
@@ -1037,12 +1037,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicLencoWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/albums/$id/edit': {
-      id: '/albums/$id/edit'
-      path: '/edit'
-      fullPath: '/albums/$id/edit'
-      preLoaderRoute: typeof AlbumsIdEditRouteImport
-      parentRoute: typeof AlbumsIdRoute
+    '/api/public/sitemap': {
+      id: '/api/public/sitemap'
+      path: '/api/public/sitemap'
+      fullPath: '/api/public/sitemap'
+      preLoaderRoute: typeof ApiPublicSitemapRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

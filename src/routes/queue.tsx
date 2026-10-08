@@ -8,6 +8,7 @@ import { IncrementalList } from "@/components/IncrementalList";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/queue")({
   head: () => ({
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/queue")({
       >
         Try again
       </button>
-      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
     </div>
   ),
   notFoundComponent: () => (

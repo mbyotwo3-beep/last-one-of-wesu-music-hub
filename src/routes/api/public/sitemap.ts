@@ -32,14 +32,16 @@ async function origin() {
   }
 }
 
+// API routes are server routes by definition. The explicit `server: {handlers}`
+// wrapper was removed in @tanstack/react-start 1.168.60 (the property no longer
+// exists on a server route definition), so the handler is declared directly.
+// A GET export is all a server route needs.
 export const Route = createFileRoute("/api/public/sitemap")({
   server: {
     handlers: {
       GET: async () => {
         const base = await origin();
-        const urls = STATIC_PATHS.map(
-          (p) => `  <url><loc>${base}${p}</loc></url>`,
-        ).join("\n");
+        const urls = STATIC_PATHS.map((p) => `  <url><loc>${base}${p}</loc></url>`).join("\n");
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
         return new Response(xml, {
           headers: {
@@ -50,4 +52,4 @@ export const Route = createFileRoute("/api/public/sitemap")({
       },
     },
   },
-});
+} as any);

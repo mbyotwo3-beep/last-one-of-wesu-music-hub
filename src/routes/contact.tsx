@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mail, MapPin, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitSupportMessage, validateSupportMessage } from "@/lib/contact.functions";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/contact")({
       >
         Try again
       </button>
-      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
     </div>
   ),
   notFoundComponent: () => (

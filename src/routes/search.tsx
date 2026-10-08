@@ -9,6 +9,7 @@ import { Music, Disc3, Mic2 } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { friendlyError } from "@/lib/friendly-error";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/search")({
   },
   component: SearchPage,
   errorComponent: ({ error }) => (
-    <div className="p-8 text-sm text-destructive">Search failed: {error.message}</div>
+    <div className="p-8 text-sm text-destructive">Search failed: {friendlyError(error)}</div>
   ),
   notFoundComponent: () => <div className="p-8">Nothing here.</div>,
 });
@@ -123,7 +124,7 @@ function SearchPage() {
       ) : isError ? (
         <div className="text-center py-10">
           <p className="text-destructive mb-2">
-            Search failed{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+            Search failed{friendlyError(error) ? `: ${friendlyError(error)}` : ""}.
           </p>
           <button
             onClick={() => refetch()}

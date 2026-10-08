@@ -3,6 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { Smartphone, Download, ArrowLeft, Music2, WifiOff } from "lucide-react";
 import { getSiteConfig } from "@/lib/pricing.functions";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
+import { friendlyError } from "@/lib/friendly-error";
 
 const siteQO = queryOptions({
   queryKey: ["site-config"],
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/get-app")({
       >
         Try again
       </button>
-      {error?.message ? <p className="text-xs text-muted-foreground">{error.message}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
     </div>
   ),
   notFoundComponent: () => (
