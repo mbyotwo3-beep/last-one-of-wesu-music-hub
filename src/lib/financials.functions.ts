@@ -140,12 +140,17 @@ export const getMyEarningsDetail = createServerFn({ method: "GET" })
       .map((album) => {
         const ap = purchases.filter((p) => p.album_id === album.id);
         const earned = ap.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+        // Count the album receipts (song_id null), not the rows. Album
+        // fulfilment writes one row per track carrying this album_id, so
+        // counting them would report a single sale of a 12-track release as
+        // 12 purchases.
+        const receipts = ap.filter((p) => !p.song_id);
         return {
           id: album.id,
           title: album.title,
           coverUrl: album.cover_url,
           price: Number(album.price ?? 0),
-          purchaseCount: ap.length,
+          purchaseCount: receipts.length,
           earned,
           createdAt: album.created_at,
         };
