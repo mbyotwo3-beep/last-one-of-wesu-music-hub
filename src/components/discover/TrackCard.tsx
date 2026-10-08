@@ -228,7 +228,7 @@ export function AlbumTile({ album }: { album: AlbumTileData }) {
           artistName={album.artist?.name}
           type="album"
           icon="more"
-          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 max-sm:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
       {album.artist?.id ? (
@@ -278,7 +278,7 @@ export function ArtistTile({ artist }: { artist: ArtistTileData }) {
           artistName={artist.name}
           type="artist"
           icon="more"
-          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 max-sm:opacity-100 transition-opacity p-1.5 rounded-full bg-black/50 backdrop-blur hover:scale-110 cursor-pointer relative z-20"
         />
       </div>
     </div>

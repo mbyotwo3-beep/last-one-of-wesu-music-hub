@@ -395,7 +395,7 @@ function PlatformOverview({ onDrillDown }: { onDrillDown: (artistId: string) => 
                   <td className="p-3 text-right">
                     <button
                       onClick={() => onDrillDown(a.artistId)}
-                      className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors opacity-0 group-hover:opacity-100 max-sm:opacity-100 cursor-pointer"
                     >
                       Details →
                     </button>

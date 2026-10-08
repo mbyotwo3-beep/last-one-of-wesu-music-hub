@@ -179,10 +179,14 @@ function SongRow({
             e.stopPropagation();
             toggle();
           }}
-          className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+          className={`p-1.5 rounded-full transition-colors cursor-pointer shrink-0 ${
             isSaved
               ? "text-red-500 hover:text-red-600"
-              : "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+              : // max-sm:opacity-100 is not optional here. Without it the button
+                // stayed at opacity 0 on a touch device, where there is no hover
+                // to reveal it — invisible, but still occupying its slot in the
+                // row and still swallowing taps meant for the track.
+                "text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
           }`}
           title={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
           aria-label={isSaved ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -196,11 +200,13 @@ function SongRow({
           artistId={s.artist?.id}
           artistName={s.artist?.name}
           type="song"
-          className="relative z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="relative z-20 opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100 transition-opacity"
         />
 
+        {/* max-sm:opacity-100: without it the owner could not reorder a playlist on a
+            phone at all — there is no hover to reveal the arrows. */}
         {isOwner && onMove && (
-          <span className="flex flex-col shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="flex flex-col shrink-0 opacity-0 group-hover:opacity-100 max-sm:opacity-100 transition-opacity">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -233,7 +239,7 @@ function SongRow({
               e.stopPropagation();
               onRemove(s.id);
             }}
-            className="p-1.5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100"
             aria-label="Remove from playlist"
             title="Remove from playlist"
           >

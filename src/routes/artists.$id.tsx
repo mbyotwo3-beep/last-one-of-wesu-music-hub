@@ -14,16 +14,7 @@ import {
   toggleFollow,
   getSimilarArtists,
 } from "@/lib/follow.functions";
-import {
-  CheckCircle2,
-  Play,
-  Pause,
-  UserPlus,
-  UserCheck,
-  UserMinus,
-  ShoppingBag,
-  Heart,
-} from "lucide-react";
+import { CheckCircle2, Play, Pause, UserPlus, UserCheck, UserMinus, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
@@ -420,46 +411,51 @@ function ArtistTopSongRow({
   const isPlayingThisTrack = playing && currentTrackId === s.id;
 
   return (
-    <div className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+    <div className="w-full flex items-center gap-2 sm:gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group">
       <button
         onClick={onPlay}
-        className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer"
+        className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 text-left cursor-pointer"
       >
         {isPlayingThisTrack ? (
-          <Pause className="w-6 text-sm size-4 fill-current text-primary" />
+          <Pause className="w-6 text-sm size-4 shrink-0 fill-current text-primary" />
         ) : (
           <>
-            <span className="w-6 text-sm text-muted-foreground group-hover:hidden">{i + 1}</span>
-            <Play className="w-6 text-sm hidden group-hover:block size-4 fill-current text-primary" />
+            {/* The row number is decorative and the cover already carries the
+                artwork. On a 360px phone it spent 32px on a digit and pushed
+                the title into the price. */}
+            <span className="hidden sm:block w-6 text-sm text-muted-foreground group-hover:hidden">
+              {i + 1}
+            </span>
+            <Play className="hidden sm:block w-6 text-sm group-hover:block size-4 shrink-0 fill-current text-primary" />
           </>
         )}
         <StorageImage
           bucket="album-art"
           path={s.cover_url}
           alt={s.title}
-          className="size-10 rounded-md overflow-hidden bg-card object-cover"
+          className="size-9 sm:size-10 rounded-md overflow-hidden bg-card object-cover shrink-0"
         />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
             {s.title}
           </p>
-          <p className="text-xs text-muted-foreground">
+          {/* truncate is the fix for the overlap. Without it a six-figure play
+              count ("1,234,567 plays") had no width constraint at all and
+              painted straight over the price sitting beside it on a phone. */}
+          <p className="text-xs text-muted-foreground truncate tabular-nums">
             {(s.play_count ?? 0).toLocaleString()} plays
           </p>
         </div>
       </button>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-xs font-semibold text-muted-foreground">{formatPrice(s.price)}</span>
-        {Number(s.price ?? 0) > 0 && (
-          <Link
-            to="/checkout"
-            search={{ item: "song", id: s.id }}
-            className="p-2 rounded-full bg-secondary hover:bg-accent transition-colors cursor-pointer"
-            aria-label={`Buy ${s.title}`}
-          >
-            <ShoppingBag className="size-4" />
-          </Link>
-        )}
+      {/* shrink-0 + min-w-0: the text column gives ground, the icon targets never
+          do, and neither may ever overlap the other. */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+        <span className="text-xs font-semibold text-muted-foreground tabular-nums truncate">
+          {formatPrice(s.price)}
+        </span>
+        {/* The separate ShoppingBag link is gone. DownloadButton already becomes
+            a Buy link for an unowned paid song, so this row carried two buy
+            affordances and spent 40px on the duplicate. */}
         <DownloadButton
           songId={s.id}
           title={s.title}
@@ -471,7 +467,7 @@ function ArtistTopSongRow({
             e.stopPropagation();
             toggle();
           }}
-          className="opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100 transition-opacity"
+          className="grid size-8 shrink-0 place-items-center rounded-full opacity-0 group-hover:opacity-100 max-sm:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer"
           aria-label={isSaved ? "Unlike" : "Like"}
         >
           <Heart

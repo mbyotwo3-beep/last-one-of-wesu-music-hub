@@ -18,7 +18,8 @@
     "import:catalogue": "node scripts/import-catalogue.mjs",
     "verify:ci-install": "node scripts/verify-ci-install.mjs",
     "verify:no-known-vulns": "node scripts/verify-no-known-vulns.mjs",
-    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs"
+    "verify:hover-controls": "node scripts/check-hover-only-controls.mjs",
+    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
