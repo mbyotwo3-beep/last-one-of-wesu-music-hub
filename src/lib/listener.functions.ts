@@ -385,14 +385,26 @@ export const updatePlaylist = createServerFn({ method: "POST" })
       }
       patch.description = description;
     }
-    if (data.is_public !== undefined) patch.is_public = !!data.is_public;
-    if (Object.keys(patch).length === 0) return { ok: true };
+    // Same rule createPlaylist applies, and for the same reason. The RLS policy
+    // "Users can manage own playlists" allows is_public = true only when
+    // private.is_staff(auth.uid()). Without this downgrade, ticking "Public" put
+    // is_public = true in the patch, Postgres rejected the whole UPDATE with a
+    // row-level security error, and because name/description ride in the same
+    // patch the listener lost the name and description they had just edited in
+    // that same dialog. They had to untick the box and save a second time.
+    let publishRequestedButDenied = false;
+    if (data.is_public !== undefined) {
+      const staff = await isStaffUser(context.supabase, context.userId);
+      publishRequestedButDenied = !!data.is_public && !staff;
+      patch.is_public = !!data.is_public && staff;
+    }
+    if (Object.keys(patch).length === 0) return { ok: true, publish_requested_but_denied: false };
     const { error } = await context.supabase
       .from("playlists")
       .update(patch as any)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, publish_requested_but_denied: publishRequestedButDenied };
   });
 
 export const movePlaylistSong = createServerFn({ method: "POST" })

@@ -24,7 +24,7 @@ import { useUserRoles } from "@/hooks/use-roles";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { signOutEverywhere } from "@/lib/sign-out";
 
@@ -113,21 +113,28 @@ export function BottomTabBar() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [userPlaylists, setUserPlaylists] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    if (!user) {
-      setUserPlaylists([]);
-      return;
-    }
-    supabase
-      .from("playlists")
-      .select("id, name")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(8)
-      .then(({ data }) => setUserPlaylists(data ?? []));
-  }, [user]);
+  // React Query, not useState + useEffect. With raw state there was no query
+  // key, so nothing could invalidate it: a playlist created from the track menu
+  // never appeared here until the app was fully reloaded. The .then had no
+  // error branch either, so a failed fetch left the list looking empty and the
+  // sheet offered "Create a playlist…" to someone with twenty of them.
+  const { data: userPlaylists } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["my-playlist-names", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from("playlists")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
 
   const tabs = computeTabs();
 
@@ -359,22 +366,24 @@ export function BottomTabBar() {
                 <span className="text-sm font-medium">Liked Songs</span>
               </button>
             )}
-            {/* Dynamic user playlists */}
-            {userPlaylists.length > 0 ? (
-              userPlaylists.map((pl) => (
-                <button
-                  key={pl.id}
-                  onClick={() => {
-                    navigate({ to: "/playlists/$id", params: { id: pl.id } });
-                    setMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-                >
-                  <ListMusic className="size-5" />
-                  <span className="text-sm font-medium truncate">{pl.name}</span>
-                </button>
-              ))
-            ) : user ? (
+            {/* Dynamic user playlists. The create entry stays alongside them rather than
+                being replaced by them: it used to vanish the moment the
+                listener owned a single playlist, leaving no way to reach a
+                create screen from this menu at all. */}
+            {(userPlaylists ?? []).map((pl) => (
+              <button
+                key={pl.id}
+                onClick={() => {
+                  navigate({ to: "/playlists/$id", params: { id: pl.id } });
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+              >
+                <ListMusic className="size-5" />
+                <span className="text-sm font-medium truncate">{pl.name}</span>
+              </button>
+            ))}
+            {user ? (
               <button
                 onClick={() => {
                   navigate({ to: "/playlists" });

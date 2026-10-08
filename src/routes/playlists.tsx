@@ -70,6 +70,7 @@ function Page() {
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       setShowCreate(false);
       setNewPlaylist({ name: "", description: "", make_public: false });
       // RLS only lets staff publish. Saying so is the difference between
@@ -90,6 +91,7 @@ function Page() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       toast.success("Playlist deleted successfully");
     },
     onError: (error) => {

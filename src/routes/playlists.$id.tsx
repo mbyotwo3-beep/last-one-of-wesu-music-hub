@@ -48,6 +48,8 @@ import { IncrementalList } from "@/components/IncrementalList";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { isUuid } from "@/lib/route-params";
+import { useUserRoles } from "@/hooks/use-roles";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/playlists/$id")({
   head: () => ({ meta: [{ title: "Playlist — Wesu+" }] }),
@@ -257,6 +259,7 @@ function Page() {
   const removeFn = useServerFn(removeFromPlaylist);
   const getAccessFn = useServerFn(getPlaylistAccess);
   const { user } = useAuth();
+  const { isStaff } = useUserRoles();
 
   const { data, isLoading } = useQuery({
     queryKey: ["playlist", id],
@@ -336,6 +339,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["playlist", id] });
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       toast.success("Removed from playlist");
     },
   });
@@ -397,13 +401,20 @@ function Page() {
 
   const updateM = useMutation({
     mutationFn: updateFn,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       setEditing(false);
       qc.invalidateQueries({ queryKey: ["playlist", id] });
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
-      toast.success("Playlist updated");
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
+      if (res?.publish_requested_but_denied) {
+        // The server kept it private rather than failing the save, so the name
+        // and description they edited are kept too.
+        toast.info("Only Wesu+ staff can publish playlists, so this stayed private.");
+      } else {
+        toast.success("Playlist updated");
+      }
     },
-    onError: (e) => toast.error(`Update failed: ${(e as Error).message}`),
+    onError: (e) => toast.error(friendlyError(e)),
   });
 
   const moveM = useMutation({
@@ -595,14 +606,26 @@ function Page() {
                 maxLength={1000}
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm"
               />
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className="flex items-start gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
+                  className="mt-1"
                   checked={editPublic}
                   onChange={(e) => setEditPublic(e.target.checked)}
                 />
-                <Globe className="size-4 text-muted-foreground" />
-                Public — anyone with the link can open it, followers welcome
+                <span>
+                  <span className="inline-flex items-center gap-2">
+                    <Globe className="size-4 text-muted-foreground" />
+                    Public
+                  </span>
+                  {/* This promised followers, which no listener playlist can
+                      have: only staff-owned playlists are public. */}
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    {isStaff
+                      ? "Anyone with the link can open it, followers welcome."
+                      : "Only Wesu+ staff can publish editorial playlists. Yours stays private either way."}
+                  </span>
+                </span>
               </label>
               <div className="flex gap-2">
                 <button

@@ -335,7 +335,10 @@ export const listAllAlbumsAdmin = createServerFn({ method: "GET" })
     const { data: tracks } = await supabaseAdmin
       .from("songs")
       .select("album_id")
-      .in("album_id", rows.map((a) => a.id));
+      .in(
+        "album_id",
+        rows.map((a) => a.id),
+      );
     const counts = new Map<string, number>();
     for (const t of tracks ?? []) {
       counts.set(t.album_id as string, (counts.get(t.album_id as string) ?? 0) + 1);
@@ -462,17 +465,28 @@ export const addSongsToEditorialPlaylist = createServerFn({ method: "POST" })
 
     const { data: existing } = await supabaseAdmin
       .from("playlist_songs")
-      .select("song_id")
+      .select("song_id,position")
       .eq("playlist_id", data.playlist_id);
     const have = new Set((existing ?? []).map((r) => r.song_id as string));
     const fresh = [...new Set((data.song_ids ?? []).filter((id) => id && !have.has(id)))];
     if (!fresh.length) return { ok: true, added: 0 };
 
+    // MAX(position) + 1, not COUNT + i.
+    //
+    // Removing a track from the middle of a 10-track list leaves a gap —
+    // positions 0,2,3,...,9 — because removeFromPlaylist deliberately does not
+    // renumber. COUNT then says 9, so the next track added landed on position 9
+    // alongside the track already there. There is no unique index on
+    // (playlist_id, position), so the duplicate was accepted silently and every
+    // ORDER BY position returned those two rows in arbitrary order.
+    const startPosition =
+      (existing ?? []).reduce((max, r) => Math.max(max, Number(r.position ?? -1)), -1) + 1;
+
     const { error } = await supabaseAdmin.from("playlist_songs").insert(
       fresh.map((song_id, i) => ({
         playlist_id: data.playlist_id,
         song_id,
-        position: (existing?.length ?? 0) + i,
+        position: startPosition + i,
       })) as any,
     );
     if (error) throw new Error(error.message);

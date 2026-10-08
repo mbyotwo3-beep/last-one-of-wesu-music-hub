@@ -21,6 +21,7 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
 import { addToPlaylist, createPlaylist } from "@/lib/listener.functions";
 import { getSongArtists } from "@/lib/music.functions";
+import { friendlyError } from "@/lib/friendly-error";
 import { copyTextToClipboard } from "@/lib/external-url";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -73,8 +74,21 @@ export function ShareMenu({
   const appendToQueue = usePlayer((s) => s.addToQueue);
   const { isSaved, toggle } = useSavedTrack(songId);
 
-  const { data: playlists, error: playlistsError } = useQuery({
-    queryKey: ["my-playlists", user?.id],
+  const {
+    data: playlists,
+    error: playlistsError,
+    isLoading: playlistsLoading,
+  } = useQuery({
+    // Its OWN key, deliberately not ["my-playlists", user.id].
+    //
+    // This picker only needs id and name, but /playlists and /library need the
+    // full rows including playlist_songs. Sharing one key meant whichever query
+    // refetched last won the cache: this one has no staleTime, so it always
+    // refetched on mount and rewrote the shared entry as id/name-only. Both
+    // pages then read `playlist.playlist_songs` as undefined and rendered every
+    // playlist as "0 songs", with a disabled Play button and a blank cover.
+    // AppleMusicSidebar already dodged this with "my-playlists-sidebar".
+    queryKey: ["my-playlist-names", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       const { data } = await supabase
@@ -85,40 +99,61 @@ export function ShareMenu({
       return data ?? [];
     },
     enabled: !!user?.id,
+    staleTime: 60_000,
   });
 
   const { data: songArtists } = useQuery({
     queryKey: ["song-artists", songId],
     queryFn: () => getSongArtistsFn({ data: { song_id: songId! } }),
-    enabled: !!songId && type === "song",
+    // Only needed for the menu items, so only fetch once the menu is open.
+    // Eagerly this fired 3 queries per mounted ShareMenu, and a 30-track page
+    // mounts 30 of them — 90 round-trips before the user tapped anything.
+    enabled: !!songId && type === "song" && isOpen,
   });
 
   const addToPlaylistMutation = useMutation({
     mutationFn: addToPlaylistFn,
     onSuccess: (result, variables) => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       qc.invalidateQueries({ queryKey: ["playlist", variables.data.playlist_id] });
+      // The dashboard counts playlists from its own query and has no staleTime,
+      // so without this the stat and its "No playlists yet" copy stay stale
+      // after a create.
+      qc.invalidateQueries({ queryKey: ["my-overview"] });
       if (result?.alreadyInPlaylist) {
         toast.info("Song already in playlist");
       } else {
         toast.success("Added to playlist");
       }
+      setNewPlaylistName("");
       setShowPlaylistModal(false);
     },
-    onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
+    // friendlyError, not `${error.message}`. The duplicate-add race loses on a
+    // UNIQUE constraint and the raw Postgres text was landing in the toast.
+    onError: (error) => toast.error(friendlyError(error)),
   });
 
   const createPlaylistMutation = useMutation({
     mutationFn: createPlaylistFn,
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
+      qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
+      qc.invalidateQueries({ queryKey: ["my-overview"] });
+      if (data.publish_requested_but_denied) {
+        toast.info("Only Wesu+ staff can publish playlists. Made it private.");
+      }
       if (songId) {
         addToPlaylistMutation.mutate({ data: { playlist_id: data.id, song_id: songId } });
+      } else {
+        setNewPlaylistName("");
       }
     },
-    onError: (error) => toast.error(`Failed: ${(error as Error).message}`),
+    onError: (error) => toast.error(friendlyError(error)),
   });
 
   const handleLike = () => {
@@ -134,6 +169,29 @@ export function ShareMenu({
     toggle();
   };
   const toggleLike = handleLike;
+
+  /** Close the picker and forget the half-typed name. */
+  const closePlaylistModal = () => {
+    setShowPlaylistModal(false);
+    // Kept between opens before, so the next add-to-playlist opened pre-filled
+    // with the previous name and auto-focused it — a stray Enter then created a
+    // second playlist with that same name.
+    setNewPlaylistName("");
+  };
+
+  // Escape closed the menu and the picker. On a phone the picker is a full-screen
+  // modal with no other way out but the ✕, which read as "stuck".
+  useEffect(() => {
+    if (!showPlaylistModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closePlaylistModal();
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [showPlaylistModal]);
 
   const handleAddToPlaylistClick = () => {
     if (!user) {
@@ -547,12 +605,19 @@ export function ShareMenu({
 
       {showPlaylistModal &&
         createPortal(
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
-            <div className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl">
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4"
+            onClick={() => closePlaylistModal()}
+          >
+            <div
+              className="bg-card rounded-lg p-6 w-full max-w-md shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-foreground text-lg">Add to playlist</h3>
                 <button
-                  onClick={() => setShowPlaylistModal(false)}
+                  onClick={() => closePlaylistModal()}
+                  aria-label="Close"
                   className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                   <X className="size-5" />
@@ -562,18 +627,34 @@ export function ShareMenu({
               <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
                 {playlistsError && (
                   <p className="text-sm text-destructive px-4 py-2">
-                    Couldn't load playlists
-                    {(playlistsError as Error)?.message
-                      ? `: ${(playlistsError as Error).message}`
-                      : ""}
-                    .
+                    Couldn&apos;t load playlists. Please try again.
                   </p>
                 )}
+
+                {/* Loading and empty both used to render the same blank box,
+                    so a new listener could not tell a slow network from having
+                    no playlists — and neither explained itself. */}
+                {!playlistsError && playlistsLoading && (
+                  <p className="text-sm text-muted-foreground px-4 py-3">Loading your playlists…</p>
+                )}
+
+                {!playlistsError && !playlistsLoading && (playlists?.length ?? 0) === 0 && (
+                  <div className="px-4 py-3">
+                    <p className="text-sm text-foreground font-medium">No playlists yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Create one below and this song will be added to it.
+                    </p>
+                  </div>
+                )}
+
                 {playlists?.map((p: any) => (
                   <button
                     key={p.id}
+                    // Guarded: without it a double-tap fired two requests and
+                    // toasted "Added to playlist" twice.
+                    disabled={addToPlaylistMutation.isPending}
                     onClick={() => handleAddToPlaylist(p.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-accent transition-colors cursor-pointer text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-md hover:bg-accent transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-default"
                   >
                     <ListMusic className="size-4 text-muted-foreground" />
                     <span className="text-foreground">{p.name}</span>
@@ -601,7 +682,7 @@ export function ShareMenu({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowPlaylistModal(false)}
+                      onClick={() => closePlaylistModal()}
                       className="px-6 py-3 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold hover:bg-accent transition-colors cursor-pointer"
                     >
                       Cancel

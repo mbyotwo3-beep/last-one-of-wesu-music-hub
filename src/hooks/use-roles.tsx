@@ -51,5 +51,9 @@ export function useUserRoles() {
     isAdmin: roles.includes("admin") || roles.includes("superadmin"),
     isSuperAdmin: roles.includes("superadmin"),
     isLabel: roles.includes("label"),
+    // Staff is what "can publish an editorial playlist" means — admin or
+    // superadmin. `isAdmin` already covers exactly that, but naming the
+    // capability here keeps callers from having to re-derive it.
+    isStaff: roles.includes("admin") || roles.includes("superadmin"),
   };
 }
