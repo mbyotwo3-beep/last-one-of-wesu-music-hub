@@ -203,17 +203,25 @@ export const moderateAlbum = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     // Approving a release publishes it as one unit, like Spotify — the
-    // artist's tracks were submitted with the album and reviewed as it. Only
-    // 'pending' tracks move: never touch already-approved ones (that would
-    // silently re-publish something taken down) and never touch drafts the
-    // artist is still editing.
+    // artist's tracks were submitted with the album and reviewed as it.
+    //
+    // Both 'pending' AND 'draft' tracks move. Approving only 'pending' published
+    // nothing at all, because releases used to be uploaded with their tracks as
+    // 'draft': the album flipped to approved, listAlbums requires at least one
+    // approved track, so the approved album stayed invisible. The only working
+    // route was approving each track separately, which presented the release as
+    // a dozen unrelated singles. Releases uploaded before the upload wizard
+    // switched to 'pending' still have draft tracks, so both states are needed.
+    //
+    // Never touches 'rejected' — a track pulled for a T&C breach must stay down
+    // even when the rest of the release is published.
     let songsApproved = 0;
     if (data.status === "approved") {
       const { error: songErr } = await supabaseAdmin
         .from("songs")
         .update({ status: "approved" } as any)
         .eq("album_id", data.id)
-        .eq("status", "pending");
+        .in("status", ["pending", "draft"]);
       if (songErr) throw new Error(songErr.message);
       const { count } = await supabaseAdmin
         .from("songs")
@@ -264,11 +272,16 @@ export const moderateSong = createServerFn({ method: "POST" })
       // Only promote the album when nothing on it is still awaiting review —
       // approving a release track-by-track should not publish a half-reviewed
       // album, and must not fight the album-level Approve button.
+      //
+      // Counts 'draft' as well as 'pending'. Releases uploaded before the wizard
+      // submitted them as 'pending' still have draft tracks, and checking only
+      // 'pending' found none of them, so approving the FIRST track promoted the
+      // album on its own and left an approved album with a single track in it.
       const { count: stillPending } = await supabaseAdmin
         .from("songs")
         .select("id", { count: "exact", head: true })
         .eq("album_id", albumId)
-        .eq("status", "pending");
+        .in("status", ["pending", "draft"]);
       if (!stillPending) {
         await supabaseAdmin
           .from("albums")

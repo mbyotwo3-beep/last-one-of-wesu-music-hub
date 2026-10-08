@@ -127,14 +127,6 @@ function CheckoutSuccessPage() {
           .maybeSingle();
         return data;
       }
-      if (t.item_type === "playlist") {
-        const { data } = await supabase
-          .from("playlists")
-          .select("id,name")
-          .eq("id", t.item_id)
-          .maybeSingle();
-        return data;
-      }
       return null;
     },
   });
@@ -151,8 +143,13 @@ function CheckoutSuccessPage() {
     });
     // Drop any cached preview URL for the purchased song — otherwise the
     // next play serves the stale 15s preview instead of the unlocked track.
-    // Albums and playlist bundles unlock many songs: evict every member id
-    // so none of them replays a cached preview.
+    // An album unlocks many songs: evict every member id so none of them
+    // replays a cached 15-second preview. Reads `songs`, which is
+    // world-readable, so the RLS on the caller's client does not block it.
+    // (The playlist equivalent was removed with playlist purchasing — it read
+    // playlist_songs through the caller's client, which RLS denies for a
+    // playlist they do not own, so the eviction silently did nothing and a
+    // buyer who had paid still heard previews.)
     try {
       const t = transaction as any;
       const ids: string[] = [];
@@ -169,16 +166,6 @@ function CheckoutSuccessPage() {
             .eq("album_id", t.item_id)
             .then(({ data }) =>
               Promise.all(((data ?? []) as any[]).map((s) => evict(s.id).catch(() => {}))),
-            ),
-        ).catch(() => {});
-      } else if (t?.item_type === "playlist" && t?.item_id) {
-        void Promise.resolve(
-          supabase
-            .from("playlist_songs")
-            .select("song_id")
-            .eq("playlist_id", t.item_id)
-            .then(({ data }) =>
-              Promise.all(((data ?? []) as any[]).map((s) => evict(s.song_id).catch(() => {}))),
             ),
         ).catch(() => {});
       }
@@ -259,11 +246,8 @@ function CheckoutSuccessPage() {
   const handleSuccessRedirect = () => {
     // Albums have a detail route. Songs currently live in Library, so never
     // navigate to the legacy /songs path (which redirects to Browse).
-    // Playlist bundles return to the now-unlocked shared playlist.
     if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/albums/$id", params: { id: tx.item_id } });
-    } else if (tx?.item_type === "playlist" && tx?.item_id) {
-      navigate({ to: "/playlists/$id", params: { id: tx.item_id } });
     } else {
       navigate({ to: "/library" });
     }
@@ -275,8 +259,6 @@ function CheckoutSuccessPage() {
       navigate({ to: "/checkout", search: { item: "song", id: tx.item_id } });
     } else if (tx?.item_type === "album" && tx?.item_id) {
       navigate({ to: "/checkout", search: { item: "album", id: tx.item_id } });
-    } else if (tx?.item_type === "playlist" && tx?.item_id) {
-      navigate({ to: "/checkout", search: { item: "playlist", id: tx.item_id } });
     } else {
       navigate({ to: "/library" });
     }

@@ -59,6 +59,14 @@ const BUNDLE_MARKERS = [
   // page is reading the raw albums.price column again, which hid the Buy
   // button entirely on an album priced only by its tracks.
   ["album page states derived price", " the album"],
+  // Playlists are NOT a product. Songs and albums are. These must stay ABSENT:
+  // if either returns, a "pay to unlock this playlist" flow has been
+  // reintroduced, which also made private playlists purchasable by UUID.
+];
+
+const MUST_NOT_SHIP = [
+  ["no playlist unlock panel", "Unlock this shared playlist"],
+  ["no playlist bundle checkout", "Continue to checkout — ZMW"],
 ];
 
 // Copy that must NOT come back (a removed feature).
@@ -143,6 +151,11 @@ if (!m) {
     if (fetched.size < 5) wrn(`only ${fetched.size} chunk(s) reachable — scan may be incomplete`);
     for (const [name, needle] of BUNDLE_MARKERS) {
       all.includes(needle) ? ok(`shipped: ${name}`) : bad(`MISSING from live bundle: ${name}`);
+    }
+    for (const [name, needle] of MUST_NOT_SHIP) {
+      all.includes(needle)
+        ? bad(`SHIPPED but should not exist: ${name}`)
+        : ok(`removed: ${name}`);
     }
     for (const [name, needle] of FORBIDDEN) {
       all.includes(needle) ? bad(`regressed copy live: ${name}`) : ok(`removed: ${name}`);

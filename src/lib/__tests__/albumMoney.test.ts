@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { allocateBundleTotal, bundleIsFulfillable, buildBundle } from "@/lib/money-invariants";
+import { allocateBundleTotal, bundleIsFulfillable } from "@/lib/money-invariants";
 import { albumSellablePrice, summariseAlbum } from "@/lib/music.functions";
 
 describe("albumSellablePrice", () => {
@@ -154,12 +154,13 @@ describe("allocateBundleTotal", () => {
 });
 
 describe("a bundle that would grant nothing must be refused", () => {
-  it("rejects an empty bundle rather than settling a payment for nothing", () => {
+  it("rejects an empty grant list rather than settling a payment for nothing", () => {
     expect(bundleIsFulfillable([])).toBe(false);
-    expect(bundleIsFulfillable(buildBundle([]))).toBe(false);
   });
 
-  it("accepts a real bundle", () => {
-    expect(bundleIsFulfillable(buildBundle([{ song_id: "a", amount: 10 }]))).toBe(true);
+  it("accepts a real grant list", () => {
+    expect(bundleIsFulfillable(allocateBundleTotal(100, [{ song_id: "a", weight: 10 }]))).toBe(
+      true,
+    );
   });
 });

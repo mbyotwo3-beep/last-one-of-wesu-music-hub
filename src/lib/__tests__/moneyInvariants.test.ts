@@ -1,44 +1,48 @@
+/**
+ * Money invariants for album fulfilment.
+ *
+ * This file used to cover buildBundle and playlistTotal, both of which priced a
+ * playlist as a single purchasable bundle. Playlists are not a product — paid
+ * tracks in one are bought individually or through their album — so those
+ * helpers and the checkout that used them were removed.
+ *
+ * What replaces them is the album equivalent, and the same failure it was
+ * written to prevent is still live: a bundle that resolves to nothing must
+ * refuse rather than let the transaction settle as "completed" with the money
+ * taken and no entitlement granted.
+ */
 import { describe, expect, it } from "vitest";
-import { buildBundle, bundleIsFulfillable, playlistTotal } from "@/lib/money-invariants";
 
-describe("playlist payment fulfilment", () => {
-  it("rejects an empty or malformed bundle instead of settling with nothing granted", () => {
-    // The original bug: an absent snapshot produced [], the loop never ran,
-    // and the transaction was marked completed — money taken, no purchases.
-    expect(bundleIsFulfillable(buildBundle(undefined))).toBe(false);
-    expect(bundleIsFulfillable(buildBundle(null))).toBe(false);
-    expect(bundleIsFulfillable(buildBundle([]))).toBe(false);
-    expect(bundleIsFulfillable(buildBundle([{ amount: 10 }]))).toBe(false);
-    expect(bundleIsFulfillable(buildBundle([null, {}]))).toBe(false);
+import { allocateBundleTotal, bundleIsFulfillable } from "@/lib/money-invariants";
+
+describe("an album grant must never be empty", () => {
+  it("refuses an empty grant list", () => {
+    // The original bug, in album form: the loop never ran and the transaction
+    // was marked completed — money taken, no purchases.
+    expect(bundleIsFulfillable([])).toBe(false);
+    expect(bundleIsFulfillable(allocateBundleTotal(0, [{ song_id: "a", weight: 10 }]))).toBe(false);
   });
 
-  it("accepts a well-formed bundle and drops rows without a song id", () => {
-    const bundle = buildBundle([
-      { song_id: "a", amount: 10 },
-      { song_id: "b", amount: "20.5" },
-      { song_id: 42, amount: 99 },
-      { amount: 5 },
+  it("refuses when there are no tracks to grant at all", () => {
+    expect(bundleIsFulfillable(allocateBundleTotal(200, []))).toBe(false);
+  });
+
+  it("accepts a real grant list", () => {
+    const allocation = allocateBundleTotal(200, [
+      { song_id: "a", weight: 100 },
+      { song_id: "b", weight: 100 },
     ]);
-    expect(bundle.map((b) => b.song_id)).toEqual(["a", "b"]);
-    expect(bundle[1].amount).toBe(20.5);
-    expect(bundleIsFulfillable(bundle)).toBe(true);
-  });
-});
-
-describe("playlist total rounding", () => {
-  it("never leaks a float tail into the amount charged or shown", () => {
-    // 0.1 + 0.2 = 0.30000000000000004 in float arithmetic.
-    expect(playlistTotal([{ price: 0.1 }, { price: 0.2 }])).toBe(0.3);
-    expect(playlistTotal([{ price: 12.3 }, { price: 4.4 }, { price: 5.5 }])).toBe(22.2);
+    expect(bundleIsFulfillable(allocation)).toBe(true);
+    expect(allocation).toHaveLength(2);
   });
 
-  it("treats missing/null prices as zero and an empty list as zero", () => {
-    expect(playlistTotal([{ price: null }, { price: undefined }])).toBe(0);
-    expect(playlistTotal([])).toBe(0);
-  });
-
-  it("matches Kwacha pricing granularity", () => {
-    // Realistic catalogue: 10 Kwacha singles, 150 Kwacha albums.
-    expect(playlistTotal([{ price: 10 }, { price: 10 }, { price: 150 }])).toBe(170);
+  it("accepts a grant list that contains a zero-value track", () => {
+    // A free track inside a paid album is still granted an entitlement row; it
+    // simply receives no share of the price. The bundle is not empty.
+    const allocation = allocateBundleTotal(100, [
+      { song_id: "paid", weight: 100 },
+      { song_id: "free", weight: 0 },
+    ]);
+    expect(bundleIsFulfillable(allocation)).toBe(true);
   });
 });

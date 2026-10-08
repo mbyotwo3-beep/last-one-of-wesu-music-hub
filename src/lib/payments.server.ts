@@ -3,7 +3,7 @@
  * Called by the Lenco webhook handler after a transaction is confirmed.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { allocateBundleTotal, buildBundle, bundleIsFulfillable } from "./money-invariants";
+import { allocateBundleTotal, bundleIsFulfillable } from "./money-invariants";
 
 interface PaymentTransaction {
   id: string;
@@ -25,8 +25,8 @@ interface PaymentTransaction {
  *   child song transaction per track. Each child fires the revenue-split
  *   trigger for its own song, so every artist/label/collaborator is paid
  *   exactly as if the buyer had purchased that track directly. The parent
- *   bundle row is only the receipt (the trigger ignores item_type 'album' and
- *   'playlist' by design).
+ *   bundle row is only the receipt (the trigger ignores item_type 'album' by
+ *   design).
  *
  * Albums are fanned out rather than settled as one opaque row because a single
  * album purchase row leaves three things broken: the ownership guard could
@@ -36,10 +36,6 @@ interface PaymentTransaction {
  * and every credited collaborator nothing.
  */
 export async function fulfillTransaction(tx: PaymentTransaction): Promise<void> {
-  if (tx.item_type === "playlist") {
-    await fulfillPlaylistBundle(tx);
-    return;
-  }
   if (tx.item_type === "album") {
     await fulfillAlbum(tx);
     return;
@@ -50,116 +46,6 @@ export async function fulfillTransaction(tx: PaymentTransaction): Promise<void> 
   await fulfillPurchase(tx);
 }
 
-async function fulfillPlaylistBundle(tx: PaymentTransaction): Promise<void> {
-  const meta = (tx.metadata ?? {}) as Record<string, unknown>;
-  const bundle = buildBundle(meta.songs);
-
-  // An empty bundle would silently fall through the loop below and settle the
-  // transaction as "completed" — money taken, nothing granted, no error, and
-  // the buyer sees a success receipt. Fail loudly so settleTransaction marks
-  // it "fulfillment_failed" and support can see it.
-  if (!bundleIsFulfillable(bundle)) {
-    throw new Error("Playlist payment has no song bundle to fulfil");
-  }
-
-  // Tracks deleted between checkout and fulfilment: the buyer paid for them and
-  // cannot receive them. Record which so reconciliation/support can refund.
-  const unfulfilled: string[] = [];
-  for (const { song_id, amount } of bundle) {
-    const ref = `${tx.id}:${song_id}`;
-
-    // 1. Purchase row (idempotent on the unique transaction reference).
-    const { data: existingPurchase } = await supabaseAdmin
-      .from("purchases")
-      .select("id")
-      .eq("transaction_ref", ref)
-      .maybeSingle();
-    if (!existingPurchase) {
-      // Skip songs that vanished after payment (deleted/taken down) rather
-      // than granting entitlements for ghosts.
-      const { data: song } = await supabaseAdmin
-        .from("songs")
-        .select("id")
-        .eq("id", song_id)
-        .maybeSingle();
-      if (!song) {
-        unfulfilled.push(song_id);
-        continue;
-      }
-      const { error: purchaseError } = await supabaseAdmin.from("purchases").insert({
-        user_id: tx.user_id,
-        song_id,
-        album_id: null,
-        status: "completed",
-        amount,
-        payment_method: tx.method_code,
-        transaction_ref: ref,
-      } as any);
-      // Lost race with a concurrent fulfilment — the other worker owns it.
-      if (purchaseError && purchaseError.code !== "23505") {
-        throw new Error(`fulfillPlaylistBundle purchase failed: ${purchaseError.message}`);
-      }
-    }
-
-    // 2. Child song transaction (idempotent). Inserting it completed fires
-    // the revenue-split trigger for exactly this song. Ordered AFTER the
-    // purchase so a crash between the two still converges on retry: the
-    // purchase check above passes, and this check creates the missing child.
-    const { data: existingChild } = await supabaseAdmin
-      .from("payment_transactions")
-      .select("id")
-      .eq("item_type", "song")
-      .eq("item_id", song_id)
-      .eq("user_id", tx.user_id)
-      .eq("status", "completed")
-      .filter("metadata->>bundle_parent", "eq", tx.id)
-      .maybeSingle();
-    if (!existingChild) {
-      const { error: childError } = await supabaseAdmin.from("payment_transactions").insert({
-        user_id: tx.user_id,
-        amount,
-        currency: tx.currency,
-        method_code: tx.method_code,
-        provider: tx.provider ?? "lenco",
-        provider_ref: null,
-        provider_token: null,
-        status: "completed",
-        item_type: "song",
-        item_id: song_id,
-        metadata: { bundle_parent: tx.id, phone: (meta.phone as string | null) ?? null },
-      } as any);
-      if (childError)
-        throw new Error(`fulfillPlaylistBundle child tx failed: ${childError.message}`);
-    }
-  }
-
-  // Paid for tracks that no longer exist. Record them on the parent so
-  // reconciliation can find and refund them — never fail the whole
-  // fulfilment, the buyer still keeps everything that DID exist.
-  if (unfulfilled.length > 0) {
-    try {
-      await supabaseAdmin
-        .from("payment_transactions")
-        .update({ metadata: { ...meta, unfulfilled_song_ids: unfulfilled } })
-        .eq("id", tx.id);
-    } catch (e) {
-      console.error("[payments] could not record unfulfilled playlist songs", tx.id, e);
-    }
-  }
-}
-
-/**
- * Settle an album purchase by fanning it out across the release's tracks.
- *
- * Each track gets its own `purchases` row and its own completed child song
- * transaction. The child transaction is the important half: the revenue-split
- * trigger needs a `song_id` to find that track's collaborators, so without it
- * an album sale paid the album's owner everything and the people credited on
- * the tracks nothing.
- *
- * `album_id` is set on the per-track rows as well as the receipt, so album
- * earnings reporting and the ownership guard both resolve from one query.
- */
 async function fulfillAlbum(tx: PaymentTransaction): Promise<void> {
   const albumId = tx.item_id;
   if (!albumId) throw new Error("Album payment has no album id");

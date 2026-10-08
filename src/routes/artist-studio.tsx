@@ -1297,7 +1297,16 @@ function UploadWizard() {
           price,
           cover_url,
           release_date: releaseDate || undefined,
-          status: "draft",
+          // A finished release is a SUBMISSION, not a work in progress.
+          //
+          // Both the album and its tracks were being created as "draft", which
+          // is the state meaning "the artist is still editing this". That put
+          // the whole release in a state moderation could not act on: approving
+          // the album published none of its tracks, and approving one track
+          // promoted the album on its own. The only way through was approving
+          // all twelve tracks one at a time, which is exactly how a release ends
+          // up looking like a dozen unrelated singles.
+          status: "pending",
         },
       });
 
@@ -1357,7 +1366,10 @@ function UploadWizard() {
             has_feature: doFeatureInvite || doFeatureDirect,
             has_label: doLabelInvite,
             track_number: trackIdx + 1,
-            status: "draft",
+            // "pending", not "draft" — see the album above. Tracks uploaded as
+            // part of a release are under review with the release, so approving
+            // the album publishes the whole bundle in one action.
+            status: "pending",
             // Server requires this when the album itself is free (price 0).
             fee_acknowledged: feeAgreed,
           },
