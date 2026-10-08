@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSupabaseAuth, optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { isStaffUser, isSuperadminUser } from "./roles";
 
@@ -376,30 +376,63 @@ export const isFollowingPlaylist = createServerFn({ method: "GET" })
   });
 
 export const getPlaylistWithSongs = createServerFn({ method: "GET" })
+  .middleware([optionalSupabaseAuth])
   .validator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    // Dynamically load supabaseAdmin if available to allow link-shared playlists to be viewed by friends
-    let supabase: any;
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        supabase = supabaseAdmin;
-      } catch {
-        supabase = getPublicSupabase();
-      }
-    } else {
-      supabase = getPublicSupabase();
+  .handler(async ({ data, context }) => {
+    /**
+     * Client selection, in order of preference.
+     *
+     * This used to jump straight to the SERVICE ROLE whenever the env var was
+     * set, wrapped in a try/catch that only covered the dynamic import. A
+     * service key that is rejected by the API does not throw — it returns 401
+     * on every query — so the catch never fired and the next line rethrew the
+     * query error. With a bad key in the environment, EVERY playlist page 500'd.
+     *
+     * So: the caller's own RLS-scoped client first, which covers their own
+     * playlists and editorial ones with no privileged credential at all. The
+     * service role is only a FALLBACK, for a playlist shared by link to someone
+     * who is not its owner, and a failure there degrades to "not found" rather
+     * than taking the page down.
+     */
+    // Always present: an RLS-scoped client bound to the caller's token, or an
+    // anonymous one. Either way it reads the caller's own playlists and the
+    // public editorial ones without any privileged credential.
+    const caller: any = context.supabase;
+
+    let playlist: any = null;
+    let admin: any = null;
+
+    {
+      const { data: row } = await caller
+        .from("playlists")
+        .select("id,user_id,name,description,cover_url,is_public,created_at")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (row) playlist = row;
     }
 
-    // 1. Fetch playlist
-    const { data: playlist, error: plError } = await supabase
-      .from("playlists")
-      .select("id,user_id,name,description,cover_url,is_public,created_at")
-      .eq("id", data.id)
-      .maybeSingle();
+    if (!playlist && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // Link-shared playlist: the caller is not the owner, so RLS hid it. Try
+      // the service role — and swallow any failure, because a rejected key must
+      // not 500 the page.
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: row } = await supabaseAdmin
+          .from("playlists")
+          .select("id,user_id,name,description,cover_url,is_public,created_at")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (row) {
+          playlist = row;
+          admin = supabaseAdmin;
+        }
+      } catch {
+        /* service role unavailable — fall through to not-found */
+      }
+    }
 
-    if (plError) throw new Error(plError.message);
     if (!playlist) return null;
+    const supabase: any = admin ?? caller;
 
     // 2. Fetch playlist_songs
     const { data: psRows, error: psError } = await supabase
@@ -408,7 +441,9 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
       .eq("playlist_id", data.id)
       .order("position", { ascending: true });
 
-    if (psError) throw new Error(psError.message);
+    // The playlist itself was readable, so failing on its songs is a real
+    // fault — but showing an empty tracklist beats a 500 page.
+    if (psError) return { playlist, songs: [] };
 
     const songIds = (psRows ?? []).map((r: any) => r.song_id).filter(Boolean);
     if (songIds.length === 0) {
