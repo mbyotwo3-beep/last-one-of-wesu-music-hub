@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 /**
@@ -43,21 +43,48 @@ export function useOnlineStatus(): boolean {
   return online;
 }
 
-export function saveSnapshot(key: string, data: unknown): void {
+/**
+ * Namespace a snapshot by account.
+ *
+ * The storage key used to be the caller's constant string, e.g.
+ * "library:my-playlists". Two people using the same phone shared it: sign in as
+ * A, go offline, sign out, sign in as B, go offline — and B's Library rendered
+ * A's playlists, names and tracklists. Nothing about that is public data, so
+ * the fix is to scope the key.
+ *
+ * The scope is derived from the React Query key, which already carries
+ * `user?.id` for user-scoped lists. Public lists like ["new-releases"] have no
+ * user id, so they keep one shared snapshot — which is correct, they are the
+ * same for everyone.
+ */
+export function snapshotStorageKey(key: string, scope?: string): string {
+  return scope ? `${PREFIX}${scope}:${key}` : `${PREFIX}${key}`;
+}
+
+export function saveSnapshot(key: string, data: unknown, scope?: string): void {
   try {
     if (typeof window === "undefined" || !window.localStorage) return;
     const raw = JSON.stringify({ at: Date.now(), data });
-    if (raw.length > MAX_BYTES) return;
-    window.localStorage.setItem(PREFIX + key, raw);
+    if (raw.length > MAX_BYTES) {
+      // Best-effort by design: a previous snapshot of this same scope is left
+      // in place rather than deleted, so offline browsing degrades to stale
+      // instead of to empty. It was entirely silent before, so "offline just
+      // quietly stopped working" was undiagnosable from the outside.
+      console.warn(
+        `[offline-list] snapshot "${key}" is ${raw.length} bytes, over the ${MAX_BYTES} limit — keeping the previous snapshot instead of writing this one.`,
+      );
+      return;
+    }
+    window.localStorage.setItem(snapshotStorageKey(key, scope), raw);
   } catch {
     /* quota / private mode — caching is best-effort */
   }
 }
 
-export function loadSnapshot<T>(key: string): T | null {
+export function loadSnapshot<T>(key: string, scope?: string): T | null {
   try {
     if (typeof window === "undefined" || !window.localStorage) return null;
-    const raw = window.localStorage.getItem(PREFIX + key);
+    const raw = window.localStorage.getItem(snapshotStorageKey(key, scope));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { at?: unknown; data?: T };
     if (!parsed || typeof parsed.at !== "number" || Date.now() - parsed.at > MAX_AGE_MS) {
@@ -91,6 +118,13 @@ export function useOfflineList<T>(
   options: OfflineListOptions<T>,
 ): OfflineListResult<T> {
   const online = useOnlineStatus();
+  // Scope the snapshot by the query key. Keys for user-scoped lists already
+  // contain user?.id, so switching accounts on one phone reads a different
+  // snapshot instead of the previous account's.
+  const scope = useMemo(
+    () => options.queryKey.filter((p) => p != null).join(":"),
+    [options.queryKey],
+  );
   const query = useQuery({
     queryKey: options.queryKey,
     queryFn: options.queryFn,
@@ -107,11 +141,11 @@ export function useOfflineList<T>(
   };
 
   useEffect(() => {
-    if (query.data !== undefined) saveSnapshot(key, query.data);
-  }, [key, query.data]);
+    if (query.data !== undefined) saveSnapshot(key, query.data, scope);
+  }, [key, query.data, scope]);
 
   const snapshot =
-    query.data !== undefined || online ? undefined : (loadSnapshot<T>(key) ?? undefined);
+    query.data !== undefined || online ? undefined : (loadSnapshot<T>(key, scope) ?? undefined);
   const data = query.data ?? snapshot;
   return {
     data,

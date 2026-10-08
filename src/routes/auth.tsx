@@ -569,7 +569,7 @@ function AuthPage() {
               setError(null);
               setNotice(null);
             }}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors block w-full cursor-pointer"
+            className="text-sm w-full cursor-pointer inline-flex items-center justify-center gap-2 rounded-full border border-primary px-5 py-2.5 font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
           >
             {mode === "signin"
               ? "Don't have an account? Sign up"

@@ -25,6 +25,9 @@ import { friendlyError } from "@/lib/friendly-error";
 import { copyTextToClipboard } from "@/lib/external-url";
 import { supabase } from "@/integrations/supabase/client";
 
+/** How long a post-sign-in "add to playlist" intent stays valid. */
+const PENDING_ADD_TTL_MS = 5 * 60 * 1000;
+
 interface ShareMenuProps {
   songId?: string;
   songTitle?: string;
@@ -198,8 +201,19 @@ export function ShareMenu({
       const currentPath = window.location.pathname + window.location.search;
       // Remember the intent: after sign-in the menu auto-opens the playlist
       // picker so the flow actually completes (Google-style continue).
+      //
+      // Stored with a timestamp and short expiry. It used to be a bare song id
+      // cleared only when a ShareMenu for that exact track mounted — so if
+      // sign-in returned to a page that did not render that track (reordered
+      // list, a shelf that re-queried, a windowed list not yet scrolled), the
+      // key survived and popped the picker open unprompted on some later visit.
       try {
-        if (songId) sessionStorage.setItem("pending_add_playlist", songId);
+        if (songId) {
+          sessionStorage.setItem(
+            "pending_add_playlist",
+            JSON.stringify({ songId, at: Date.now() }),
+          );
+        }
       } catch {
         /* ignore */
       }
@@ -218,10 +232,16 @@ export function ShareMenu({
   useEffect(() => {
     if (!user || type !== "song" || !songId) return;
     try {
-      if (sessionStorage.getItem("pending_add_playlist") === songId) {
-        sessionStorage.removeItem("pending_add_playlist");
-        setShowPlaylistModal(true);
-      }
+      const raw = sessionStorage.getItem("pending_add_playlist");
+      if (!raw) return;
+      // Clear on sight, whether or not it matches. An unmatched stale key is
+      // just as much a bug as a matched one, and leaving it behind is what
+      // caused the unprompted reopen.
+      sessionStorage.removeItem("pending_add_playlist");
+      const parsed = JSON.parse(raw) as { songId?: unknown; at?: unknown } | null;
+      if (!parsed || typeof parsed.songId !== "string") return;
+      if (typeof parsed.at !== "number" || Date.now() - parsed.at > PENDING_ADD_TTL_MS) return;
+      if (parsed.songId === songId) setShowPlaylistModal(true);
     } catch {
       /* ignore */
     }

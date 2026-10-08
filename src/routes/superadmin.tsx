@@ -925,7 +925,7 @@ function SettingsTab() {
           />
         </label>
         <label className="block text-sm">
-          Commission % (for non-free songs)
+          Platform commission % — applies to every sale: single tracks and albums
           <input
             type="number"
             min={0}
@@ -934,6 +934,14 @@ function SettingsTab() {
             value={site.commission_pct ?? 20}
             onChange={(e) => setSite({ ...site, commission_pct: Number(e.target.value) })}
           />
+          <span className="block text-xs text-muted-foreground mt-1">
+            Goes to the platform owners. The remaining {100 - Number(site.commission_pct ?? 20)}% is
+            the artists&apos; pool, split between the credited performers and collaborators by the
+            percentages agreed when each track was uploaded. Album purchases are charged on the same
+            basis — each track is settled individually, so collaborators on album tracks are paid
+            per track. A collaborator credited by name only, with no account to pay, has their share
+            added to the commission instead of being lost.
+          </span>
         </label>
         <label className="block text-sm">
           Android app URL (APK or Play Store link)

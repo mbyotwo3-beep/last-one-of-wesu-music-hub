@@ -84,6 +84,9 @@ interface SongRowProps {
   onMove?: (songId: string, dir: "up" | "down") => void;
   isFirst?: boolean;
   isLast?: boolean;
+  /** A reorder is in flight. Without it two fast taps both read the same list,
+   *  perform the same swap, and one move is silently lost. */
+  movePending?: boolean;
 }
 
 function SongRow({
@@ -97,6 +100,7 @@ function SongRow({
   onMove,
   isFirst,
   isLast,
+  movePending,
 }: SongRowProps) {
   const { isSaved, toggle } = useSavedTrack(s.id);
   const isCurrentTrack = currentTrackId === s.id;
@@ -212,8 +216,8 @@ function SongRow({
                 e.stopPropagation();
                 onMove(s.id, "up");
               }}
-              disabled={isFirst}
-              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+              disabled={isFirst || movePending}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-default cursor-pointer"
               aria-label="Move up"
               title="Move up"
             >
@@ -224,8 +228,8 @@ function SongRow({
                 e.stopPropagation();
                 onMove(s.id, "down");
               }}
-              disabled={isLast}
-              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+              disabled={isLast || movePending}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-default cursor-pointer"
               aria-label="Move down"
               title="Move down"
             >
@@ -811,6 +815,7 @@ function Page() {
                   }
                   isFirst={i === 0}
                   isLast={i === songs.length - 1}
+                  movePending={moveM.isPending}
                 />
               )}
             />

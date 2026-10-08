@@ -175,13 +175,20 @@ export const removeFromPlaylist = createServerFn({ method: "POST" })
       throw new Error("You can only remove songs from your own playlists");
     }
 
-    const { error } = await context.supabase
+    // Count what was actually removed. Returning ok:true unconditionally meant a
+    // second tap on an already-removed track toasted "Removed from playlist"
+    // again, telling the user something happened when nothing did.
+    const { data: deleted, error } = await context.supabase
       .from("playlist_songs")
       .delete()
       .eq("playlist_id", data.playlist_id)
-      .eq("song_id", data.song_id);
+      .eq("song_id", data.song_id)
+      .select("id");
     if (error) throw new Error(error.message);
-    return { ok: true };
+    if (!deleted || deleted.length === 0) {
+      return { ok: true, removed: false };
+    }
+    return { ok: true, removed: true };
   });
 
 async function requirePlaylistOwner(supabase: any, userId: string, playlistId: string) {
@@ -256,28 +263,37 @@ export const movePlaylistSong = createServerFn({ method: "POST" })
     if (idx === -1) throw new Error("Song is not in this playlist");
     const swapWith = data.direction === "up" ? idx - 1 : idx + 1;
     if (swapWith < 0 || swapWith >= list.length) return { ok: true, moved: false };
-    // Swap positions with two plain updates (no unique-constraint
-    // assumption — duplicates are already prevented at add time).
+
     const a = list[idx];
     const b = list[swapWith];
-    const { error: e1 } = await context.supabase
-      .from("playlist_songs")
-      .update({ position: -1 } as any)
-      .eq("playlist_id", data.playlist_id)
-      .eq("song_id", a.song_id);
-    if (e1) throw new Error(e1.message);
+
+    // Two writes, swapping the positions directly.
+    //
+    // This used to write position = -1 to `a` first, to dodge a transient
+    // unique violation. There is no unique index on (playlist_id, position), so
+    // the sentinel guarded nothing — and if the second write failed, `a` was
+    // left sitting at -1, which sorts FIRST in every ORDER BY position. One
+    // failed network call permanently moved a track to the top of the playlist.
+    //
+    // If the two rows somehow already share a position (legacy data), swapping
+    // would be a no-op, so fall back to writing their ordinals, which are
+    // always distinct.
+    const [aNext, bNext] = a.position === b.position ? [swapWith, idx] : [b.position, a.position];
+
     const { error: e2 } = await context.supabase
       .from("playlist_songs")
-      .update({ position: a.position } as any)
-      .eq("playlist_id", data.playlist_id)
-      .eq("song_id", b.song_id);
-    if (e2) throw new Error(e2.message);
-    const { error: e3 } = await context.supabase
-      .from("playlist_songs")
-      .update({ position: b.position } as any)
+      .update({ position: aNext } as any)
       .eq("playlist_id", data.playlist_id)
       .eq("song_id", a.song_id);
+    if (e2) throw new Error(e2.message);
+
+    const { error: e3 } = await context.supabase
+      .from("playlist_songs")
+      .update({ position: bNext } as any)
+      .eq("playlist_id", data.playlist_id)
+      .eq("song_id", b.song_id);
     if (e3) throw new Error(e3.message);
+
     return { ok: true, moved: true };
   });
 
@@ -399,11 +415,19 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
       return { playlist, songs: [] };
     }
 
-    // 3. Fetch songs
+    // 3. Fetch songs.
+    //
+    // Filtered to approved. It selected `status` but never used it, so a
+    // playlist rendered tracks that are pending review or have been taken down
+    // for a T&C breach — full artwork, duration and price — and pressing play
+    // then failed inside the signed-URL check, because that path does enforce
+    // status. The listener saw a track they were told they could play and it
+    // would not play.
     const { data: songRows, error: sError } = await supabase
       .from("songs")
       .select("id,title,duration,price,cover_url,artist_id,status,audio_url")
-      .in("id", songIds);
+      .in("id", songIds)
+      .eq("status", "approved");
 
     if (sError) throw new Error(sError.message);
 
