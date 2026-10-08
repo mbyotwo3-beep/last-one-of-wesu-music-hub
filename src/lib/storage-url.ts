@@ -8,11 +8,7 @@ import { signImageUrls } from "@/lib/media.functions";
  */
 
 export type ImageBucket =
-  | "album-art"
-  | "artist-images"
-  | "user-avatars"
-  | "hero-images"
-  | "label-images";
+  "album-art" | "artist-images" | "user-avatars" | "hero-images" | "label-images";
 
 const cache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();

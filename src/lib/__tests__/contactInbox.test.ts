@@ -37,9 +37,9 @@ describe("validateSupportMessage", () => {
   });
 
   it("rejects oversized fields", () => {
-    expect(
-      validateSupportMessage({ name: "A", email: "a@b.com", message: "x".repeat(5001) }),
-    ).toBe("Message is too long (max 5000 characters)");
+    expect(validateSupportMessage({ name: "A", email: "a@b.com", message: "x".repeat(5001) })).toBe(
+      "Message is too long (max 5000 characters)",
+    );
     expect(
       validateSupportMessage({
         name: "A",

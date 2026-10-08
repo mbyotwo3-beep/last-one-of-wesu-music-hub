@@ -89,7 +89,9 @@ for (const [marker, who] of MARKERS) {
       break;
     }
   }
-  console.log(`  ${hit ? "PRESENT" : "absent "}  ${marker.padEnd(32)} <- ${who}${hit ? ` (${hit})` : ""}`);
+  console.log(
+    `  ${hit ? "PRESENT" : "absent "}  ${marker.padEnd(32)} <- ${who}${hit ? ` (${hit})` : ""}`,
+  );
 }
 
 const hasNewest = [...bodies.values()].some((b) => b.includes(MARKERS[0][0]));

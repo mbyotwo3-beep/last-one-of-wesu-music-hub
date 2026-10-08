@@ -57,7 +57,7 @@ async function table(name, cols) {
   const r = await fetchWithRetry(`${url}/rest/v1/${name}?select=${cols}`);
   if (!r.ok) return { name, error: r.status };
   const contentRange = r.headers.get("content-range") ?? "";
-  const total = Number((contentRange.match(/\/(\d+)$/)?.[1] ?? "0"));
+  const total = Number(contentRange.match(/\/(\d+)$/)?.[1] ?? "0");
   const body = await r.json();
   return { name, total, rows: Array.isArray(body) ? body : [] };
 }
@@ -76,7 +76,10 @@ function report(t) {
   }
   const byStatus = {};
   for (const r of t.rows) byStatus[r.status ?? "?"] = (byStatus[r.status ?? "?"] ?? 0) + 1;
-  const parts = Object.entries(byStatus).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
+  const parts =
+    Object.entries(byStatus)
+      .map(([k, v]) => `${k} ${v}`)
+      .join(", ") || "none";
   console.log(`${t.name}: ${t.total} total  (${parts})`);
   return t;
 }
@@ -90,7 +93,9 @@ if (s) {
   const noCover = s.rows.filter((x) => !x.cover_url);
   const free = s.rows.filter((x) => Number(x.price ?? 0) === 0);
   const onAlbum = s.rows.filter((x) => x.album_id);
-  console.log(`\n  missing audio : ${noAudio.length}${noAudio.length ? " — " + noAudio.map((x) => x.title).join(", ") : ""}`);
+  console.log(
+    `\n  missing audio : ${noAudio.length}${noAudio.length ? " — " + noAudio.map((x) => x.title).join(", ") : ""}`,
+  );
   console.log(`  missing cover : ${noCover.length}`);
   console.log(`  free (K0)    : ${free.length}`);
   console.log(`  on an album  : ${onAlbum.length} of ${s.total}`);
@@ -102,7 +107,11 @@ if (s) {
     if (!x.cover_url) flags.push("NO-COVER");
     if (Number(x.price ?? 0) === 0) flags.push("FREE");
     if (!x.album_id) flags.push("no-album");
-    console.log(`  ${x.status.padEnd(9)} K${Number(x.price ?? 0).toFixed(2).padStart(6)}  ${x.title}${flags.length ? "   [" + flags.join(", ") + "]" : ""}`);
+    console.log(
+      `  ${x.status.padEnd(9)} K${Number(x.price ?? 0)
+        .toFixed(2)
+        .padStart(6)}  ${x.title}${flags.length ? "   [" + flags.join(", ") + "]" : ""}`,
+    );
   }
 }
 if (a) {

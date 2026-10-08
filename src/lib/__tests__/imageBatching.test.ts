@@ -1,9 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  resolveImageUrl,
-  invalidateImageUrl,
-  __setBatchSigner,
-} from "../storage-url";
+import { resolveImageUrl, invalidateImageUrl, __setBatchSigner } from "../storage-url";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -15,14 +11,14 @@ describe("image URL batching", () => {
 
   it("coalesces a render burst into ONE signer call", async () => {
     const signer = vi.fn(async (items: { bucket: string; path: string }[]) => ({
-      urls: Object.fromEntries(items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`])),
+      urls: Object.fromEntries(
+        items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`]),
+      ),
     }));
     __setBatchSigner(signer);
 
     const paths = Array.from({ length: 25 }, (_, i) => `cover-${i}.jpg`);
-    const results = await Promise.all(
-      paths.map((p) => resolveImageUrl("album-art", p)),
-    );
+    const results = await Promise.all(paths.map((p) => resolveImageUrl("album-art", p)));
 
     expect(signer).toHaveBeenCalledTimes(1);
     expect(signer.mock.calls[0][0]).toHaveLength(25);
@@ -33,7 +29,9 @@ describe("image URL batching", () => {
 
   it("serves repeats from cache with zero signer calls", async () => {
     const signer = vi.fn(async (items: { bucket: string; path: string }[]) => ({
-      urls: Object.fromEntries(items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`])),
+      urls: Object.fromEntries(
+        items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`]),
+      ),
     }));
     __setBatchSigner(signer);
 
@@ -45,7 +43,9 @@ describe("image URL batching", () => {
 
   it("resolves duplicates in the same window for every waiter", async () => {
     const signer = vi.fn(async (items: { bucket: string; path: string }[]) => ({
-      urls: Object.fromEntries(items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`])),
+      urls: Object.fromEntries(
+        items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`]),
+      ),
     }));
     __setBatchSigner(signer);
 
@@ -86,16 +86,18 @@ describe("image URL batching", () => {
     __setBatchSigner(signer);
 
     await expect(resolveImageUrl("album-art", null)).resolves.toBeNull();
-    await expect(
-      resolveImageUrl("album-art", "https://cdn.example.com/x.jpg"),
-    ).resolves.toBe("https://cdn.example.com/x.jpg");
+    await expect(resolveImageUrl("album-art", "https://cdn.example.com/x.jpg")).resolves.toBe(
+      "https://cdn.example.com/x.jpg",
+    );
     await sleep(40);
     expect(signer).not.toHaveBeenCalled();
   });
 
   it("invalidate drops a queued request and lets the next resolve re-sign", async () => {
     const signer = vi.fn(async (items: { bucket: string; path: string }[]) => ({
-      urls: Object.fromEntries(items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`])),
+      urls: Object.fromEntries(
+        items.map((it) => [`${it.bucket}:${it.path}`, `signed://${it.path}`]),
+      ),
     }));
     __setBatchSigner(signer);
 

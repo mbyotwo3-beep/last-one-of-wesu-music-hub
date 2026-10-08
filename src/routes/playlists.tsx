@@ -71,6 +71,9 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
+      // The dashboard counts playlists from its own query with no staleTime, so
+      // without this its stat and its 'No playlists yet' copy stay stale.
+      qc.invalidateQueries({ queryKey: ["my-overview"] });
       setShowCreate(false);
       setNewPlaylist({ name: "", description: "", make_public: false });
       // RLS only lets staff publish. Saying so is the difference between
@@ -92,6 +95,9 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["my-playlists"] });
       qc.invalidateQueries({ queryKey: ["my-playlists-sidebar"] });
       qc.invalidateQueries({ queryKey: ["my-playlist-names"] });
+      // The dashboard counts playlists from its own query with no staleTime, so
+      // without this its stat and its 'No playlists yet' copy stay stale.
+      qc.invalidateQueries({ queryKey: ["my-overview"] });
       toast.success("Playlist deleted successfully");
     },
     onError: (error) => {

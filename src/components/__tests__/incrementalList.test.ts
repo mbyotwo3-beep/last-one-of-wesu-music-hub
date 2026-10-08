@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import {
-  extendVisibleCount,
-  clampVisibleCount,
-  hasMoreItems,
-} from "../IncrementalList";
+import { extendVisibleCount, clampVisibleCount, hasMoreItems } from "../IncrementalList";
 
 describe("incremental list windowing", () => {
   it("extends by exactly one page and stops at the total", () => {

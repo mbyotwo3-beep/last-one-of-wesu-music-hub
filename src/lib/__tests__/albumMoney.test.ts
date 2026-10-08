@@ -23,9 +23,7 @@ describe("albumSellablePrice", () => {
   });
 
   it("honours an explicit album price — a bundle discount is legitimate", () => {
-    expect(
-      albumSellablePrice({ price: 1200, songs: [{ price: 150 }, { price: 150 }] }),
-    ).toBe(1200);
+    expect(albumSellablePrice({ price: 1200, songs: [{ price: 150 }, { price: 150 }] })).toBe(1200);
   });
 
   it("accepts numeric strings, because Postgres numeric arrives as a string", () => {
@@ -49,7 +47,13 @@ describe("albumSellablePrice", () => {
 
 describe("summariseAlbum agrees with albumSellablePrice", () => {
   it("uses the same price rule, so the tile and the till cannot disagree", () => {
-    const album = { price: null, songs: [{ price: 150, duration: 200 }, { price: 90, duration: 100 }] };
+    const album = {
+      price: null,
+      songs: [
+        { price: 150, duration: 200 },
+        { price: 90, duration: 100 },
+      ],
+    };
     expect(summariseAlbum(album).effective_price).toBe(albumSellablePrice(album));
     expect(summariseAlbum(album).track_count).toBe(2);
     expect(summariseAlbum(album).total_duration).toBe(300);

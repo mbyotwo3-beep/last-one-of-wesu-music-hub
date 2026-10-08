@@ -34,6 +34,7 @@ import { recordPlay, updatePlayProgress } from "@/lib/play-history.functions";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useIsNative } from "@/hooks/use-platform";
+import { computeSeekTime } from "@/lib/player-seek";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -467,14 +468,12 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       // background playback exist. Otherwise nothing new to load.
       if (resolvedForUserRef.current !== (user?.id ?? null) && usePlayer.getState().isPreview) {
         // fall through to re-resolve
-      } else if (
-        !(
-          flippedToNative &&
-          currentTrackIdRef.current &&
-          track.audioUrl !== undefined &&
-          track.audioUrl !== null
-        )
-      ) {
+      } else if (!(
+        flippedToNative &&
+        currentTrackIdRef.current &&
+        track.audioUrl !== undefined &&
+        track.audioUrl !== null
+      )) {
         return;
       }
     }
@@ -1584,10 +1583,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   function seek(e: React.MouseEvent<HTMLDivElement>) {
     if (!dur) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const targetDur = isPreview ? 15 : dur;
+    // Extracted to @/lib/player-seek so it is testable. The inline version had a
+    // copy in playerLogic.test.ts that could pass while this broke.
+    const target = computeSeekTime(e.clientX, rect.left, rect.width, isPreview ? 15 : dur);
     // Route through the store so preview clamping + empty-src guards apply.
-    usePlayer.getState().seekTo(pct * targetDur);
+    usePlayer.getState().seekTo(target);
   }
 
   const VolIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;

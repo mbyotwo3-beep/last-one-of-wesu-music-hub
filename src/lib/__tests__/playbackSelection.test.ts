@@ -143,7 +143,11 @@ describe("Cover hydration fills only what is missing", () => {
   it("fills missing covers, preserves existing ones", () => {
     const track = { id: "a" };
     const queue = [{ id: "a" }, { id: "b", coverUrl: "keep" }, { id: "c" }];
-    const { track: t, queue: q, changed } = hydrateTrackCovers(track, queue, {
+    const {
+      track: t,
+      queue: q,
+      changed,
+    } = hydrateTrackCovers(track, queue, {
       a: "url-a",
       b: "url-b",
       c: "url-c",
@@ -289,9 +293,9 @@ describe("External interruption sync", () => {
     expect(
       shouldAdoptExternalPlay({ storePlaying: false, hasRealSrc: true, idMatches: true }),
     ).toBe(true);
-    expect(
-      shouldAdoptExternalPlay({ storePlaying: true, hasRealSrc: true, idMatches: true }),
-    ).toBe(false);
+    expect(shouldAdoptExternalPlay({ storePlaying: true, hasRealSrc: true, idMatches: true })).toBe(
+      false,
+    );
     expect(
       shouldAdoptExternalPlay({ storePlaying: false, hasRealSrc: true, idMatches: false }),
     ).toBe(false);
@@ -306,9 +310,9 @@ describe("External interruption sync", () => {
         expect(typeof shouldAdoptExternalPause({ storePlaying: a, hasRealSrc: b, ended: c })).toBe(
           "boolean",
         );
-        expect(typeof shouldAdoptExternalPlay({ storePlaying: a, hasRealSrc: b, idMatches: c })).toBe(
-          "boolean",
-        );
+        expect(
+          typeof shouldAdoptExternalPlay({ storePlaying: a, hasRealSrc: b, idMatches: c }),
+        ).toBe("boolean");
       }),
       { numRuns: 50 },
     );

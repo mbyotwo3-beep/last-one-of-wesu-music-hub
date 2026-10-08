@@ -30,11 +30,32 @@ async function grab(url, tries = 5) {
 }
 
 const ROUTES = [
-  "/", "/artists", "/albums", "/hot-tracks", "/new-music", "/must-have",
-  "/browse", "/search?q=test", "/library", "/downloads", "/queue",
-  "/liked-songs", "/playlists", "/notifications", "/profile", "/get-app",
-  "/contact", "/become-artist", "/auth", "/checkout", "/checkout/success",
-  "/privacy", "/terms", "/terms-listener", "/terms-artist", "/labels",
+  "/",
+  "/artists",
+  "/albums",
+  "/hot-tracks",
+  "/new-music",
+  "/must-have",
+  "/browse",
+  "/search?q=test",
+  "/library",
+  "/downloads",
+  "/queue",
+  "/liked-songs",
+  "/playlists",
+  "/notifications",
+  "/profile",
+  "/get-app",
+  "/contact",
+  "/become-artist",
+  "/auth",
+  "/checkout",
+  "/checkout/success",
+  "/privacy",
+  "/terms",
+  "/terms-listener",
+  "/terms-artist",
+  "/labels",
 ];
 
 // Feature strings that must exist in the live entry bundle. Each is a fix we
@@ -75,8 +96,14 @@ const FORBIDDEN = [["subscription tiers", "Free & Premium tiers"]];
 const fail = [];
 const warn = [];
 const ok = (m) => console.log(`  PASS  ${m}`);
-const bad = (m) => { fail.push(m); console.log(`  FAIL  ${m}`); };
-const wrn = (m) => { warn.push(m); console.log(`  WARN  ${m}`); };
+const bad = (m) => {
+  fail.push(m);
+  console.log(`  FAIL  ${m}`);
+};
+const wrn = (m) => {
+  warn.push(m);
+  console.log(`  WARN  ${m}`);
+};
 
 console.log(`\nWesu+ launch check — ${BASE}\n`);
 
@@ -115,7 +142,9 @@ if (!m) {
     try {
       const t = await grab(BASE + p);
       for (const c of t.matchAll(/assets\/[A-Za-z0-9_.\-]+\.js/g)) chunks.add(c[0]);
-    } catch { /* a route we already report on below */ }
+    } catch {
+      /* a route we already report on below */
+    }
   }
   let all = "";
   const fetched = new Set();
@@ -153,9 +182,7 @@ if (!m) {
       all.includes(needle) ? ok(`shipped: ${name}`) : bad(`MISSING from live bundle: ${name}`);
     }
     for (const [name, needle] of MUST_NOT_SHIP) {
-      all.includes(needle)
-        ? bad(`SHIPPED but should not exist: ${name}`)
-        : ok(`removed: ${name}`);
+      all.includes(needle) ? bad(`SHIPPED but should not exist: ${name}`) : ok(`removed: ${name}`);
     }
     for (const [name, needle] of FORBIDDEN) {
       all.includes(needle) ? bad(`regressed copy live: ${name}`) : ok(`removed: ${name}`);
@@ -192,9 +219,15 @@ const env = await (async () => {
     const raw = await readFile(".env", "utf8");
     const g = (k) =>
       (raw.split(/\r?\n/).find((l) => l.startsWith(k + "=")) || "")
-        .split("=").slice(1).join("=").trim().replace(/^"|"$/g, "");
+        .split("=")
+        .slice(1)
+        .join("=")
+        .trim()
+        .replace(/^"|"$/g, "");
     return { url: g("VITE_SUPABASE_URL"), key: g("VITE_SUPABASE_PUBLISHABLE_KEY") };
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 })();
 
 if (!env.url || !env.key) {
@@ -207,7 +240,9 @@ if (!env.url || !env.key) {
       if (!r.ok) return null;
       const body = await r.json();
       return Array.isArray(body) ? body : [];
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   };
   const songRows = await rows("songs", "id,title,price,audio_url,cover_url,status");
   const albumRows = await rows("albums", "id,status");
@@ -221,7 +256,11 @@ if (!env.url || !env.key) {
     const detail = (rs) => {
       const out = {};
       for (const r of rs) out[r.status ?? "?"] = (out[r.status ?? "?"] ?? 0) + 1;
-      return Object.entries(out).map(([k, v]) => `${k} ${v}`).join(", ") || "none visible";
+      return (
+        Object.entries(out)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(", ") || "none visible"
+      );
     };
     console.log(`  INFO  songs:    ${detail(songRows)}`);
     console.log(`  INFO  albums:   ${detail(albumRows ?? [])}`);

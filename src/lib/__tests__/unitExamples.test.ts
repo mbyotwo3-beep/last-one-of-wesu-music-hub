@@ -19,9 +19,7 @@ describe("getPublicAudioUrl: paid song throws correct message", () => {
   }
 
   it("paid song (price=10) throws 'This song requires a purchase'", () => {
-    expect(() => getPublicAudioUrlGuard(10)).toThrow(
-      "This song requires a purchase",
-    );
+    expect(() => getPublicAudioUrlGuard(10)).toThrow("This song requires a purchase");
   });
 
   it("free song (price=0) does not throw", () => {

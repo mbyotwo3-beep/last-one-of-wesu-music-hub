@@ -95,6 +95,4 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(
-  `  ${path}: structure ok ($$ x${dollars}, parens balanced, no uuid aggregates)`,
-);
+console.log(`  ${path}: structure ok ($$ x${dollars}, parens balanced, no uuid aggregates)`);

@@ -26,10 +26,7 @@ import {
 // ---------------------------------------------------------------------------
 
 async function makeDeviceKey(): Promise<CryptoKey> {
-  return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
+  return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
 describe("Vault encryption", () => {
@@ -49,7 +46,9 @@ describe("Vault encryption", () => {
     const plain = new TextEncoder().encode("fake-audio-bytes").buffer as ArrayBuffer;
     const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
     const wrongIv = crypto.getRandomValues(new Uint8Array(12));
-    await expect(crypto.subtle.decrypt({ name: "AES-GCM", iv: wrongIv }, key, cipher)).rejects.toThrow();
+    await expect(
+      crypto.subtle.decrypt({ name: "AES-GCM", iv: wrongIv }, key, cipher),
+    ).rejects.toThrow();
   });
 
   it("device key is non-extractable (raw key bytes can never leave the app)", async () => {
@@ -62,7 +61,10 @@ describe("Vault encryption", () => {
       fc.asyncProperty(fc.uint8Array({ minLength: 1, maxLength: 256 }), async (bytes) => {
         const key = await makeDeviceKey();
         const iv = crypto.getRandomValues(new Uint8Array(12));
-        const input = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+        const input = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
         const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, input);
         const back = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
         expect(new Uint8Array(back)).toEqual(bytes);
@@ -170,9 +172,9 @@ describe("Stale vault license decision", () => {
   });
 
   it("only a confirmed purchase failure blocks a stale copy", () => {
-    expect(
-      decideStaleVaultPlayback({ stale: true, online: true, probePurchaseFailed: true }),
-    ).toBe("blocked");
+    expect(decideStaleVaultPlayback({ stale: true, online: true, probePurchaseFailed: true })).toBe(
+      "blocked",
+    );
   });
 
   it("unknown age fails open (plays) without IndexedDB", async () => {

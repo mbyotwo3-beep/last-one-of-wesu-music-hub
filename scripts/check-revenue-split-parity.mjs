@@ -64,7 +64,9 @@ if (!sumMatch) {
 // The payout. It joins artists, so artist_id IS NULL cannot appear — meaning the
 // unpayable share must be routed somewhere explicitly.
 const paysViaJoin = /JOIN public\.artists a ON a\.id = sc\.artist_id/.test(body);
-const absorbs = /v_unclaimed_pct/.test(body) && /payee_role\s*,\s*amount\s*,\s*pct\s*\)\s*\n?\s*VALUES \(NEW\.id, 'platform'/.test(body);
+const absorbs =
+  /v_unclaimed_pct/.test(body) &&
+  /payee_role\s*,\s*amount\s*,\s*pct\s*\)\s*\n?\s*VALUES \(NEW\.id, 'platform'/.test(body);
 
 if (paysViaJoin && !absorbs) {
   problems.push(

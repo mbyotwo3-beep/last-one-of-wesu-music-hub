@@ -45,12 +45,9 @@ describe("Artist status clamp", () => {
 
   it("staff can set any status", () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom<Status>("draft", "pending", "approved", "rejected"),
-        (s) => {
-          expect(clampArtistStatus(s, "draft", true)).toBe(s);
-        },
-      ),
+      fc.property(fc.constantFrom<Status>("draft", "pending", "approved", "rejected"), (s) => {
+        expect(clampArtistStatus(s, "draft", true)).toBe(s);
+      }),
       { numRuns: 50 },
     );
   });
@@ -77,17 +74,25 @@ function validatePayoutRequest(d: { amount: unknown; method_code: unknown; desti
 describe("Payout request validation", () => {
   it("rejects NaN, Infinity, zero and negatives (NaN passes every </> check)", () => {
     for (const bad of [NaN, Infinity, -Infinity, 0, -5, "abc", undefined, null]) {
-      expect(() => validatePayoutRequest({ amount: bad, method_code: "mtn", destination: "0977" })).toThrow();
+      expect(() =>
+        validatePayoutRequest({ amount: bad, method_code: "mtn", destination: "0977" }),
+      ).toThrow();
     }
   });
 
   it("rejects blank method/destination", () => {
-    expect(() => validatePayoutRequest({ amount: 600, method_code: "  ", destination: "0977" })).toThrow();
-    expect(() => validatePayoutRequest({ amount: 600, method_code: "mtn", destination: "" })).toThrow();
+    expect(() =>
+      validatePayoutRequest({ amount: 600, method_code: "  ", destination: "0977" }),
+    ).toThrow();
+    expect(() =>
+      validatePayoutRequest({ amount: 600, method_code: "mtn", destination: "" }),
+    ).toThrow();
   });
 
   it("accepts a well-formed request", () => {
-    expect(validatePayoutRequest({ amount: 600, method_code: "mtn", destination: "0977" })).toBe(600);
+    expect(validatePayoutRequest({ amount: 600, method_code: "mtn", destination: "0977" })).toBe(
+      600,
+    );
   });
 });
 
@@ -126,7 +131,15 @@ describe("Payout balance deduction", () => {
         fc.array(
           fc.record({
             amount: fc.integer({ min: 0, max: 5000 }),
-            status: fc.constantFrom("pending", "approved", "processing", "paid", "completed", "rejected", "failed"),
+            status: fc.constantFrom(
+              "pending",
+              "approved",
+              "processing",
+              "paid",
+              "completed",
+              "rejected",
+              "failed",
+            ),
           }),
           { maxLength: 8 },
         ),
@@ -144,7 +157,10 @@ describe("Payout balance deduction", () => {
 // "cancelled" must settle as failed, never strand a row in pending.
 // ---------------------------------------------------------------------------
 
-function classifyWebhook(event: string, status: string): "success" | "failure" | "pending" | "ignore" {
+function classifyWebhook(
+  event: string,
+  status: string,
+): "success" | "failure" | "pending" | "ignore" {
   const isSuccess =
     event.endsWith(".successful") || status === "successful" || status === "success";
   const isFailure =
@@ -153,8 +169,7 @@ function classifyWebhook(event: string, status: string): "success" | "failure" |
     status === "failed" ||
     status === "declined" ||
     status === "cancelled";
-  const isPending =
-    status === "pay-offline" || status === "pending" || event.endsWith(".pending");
+  const isPending = status === "pay-offline" || status === "pending" || event.endsWith(".pending");
   if (isPending && !isSuccess && !isFailure) return "pending";
   if (isSuccess) return "success";
   if (isFailure) return "failure";

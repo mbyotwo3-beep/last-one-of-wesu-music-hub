@@ -3,12 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isStaffUser } from "@/lib/roles";
 
 export type MediaBucketName =
-  | "song-audio"
-  | "album-art"
-  | "artist-images"
-  | "user-avatars"
-  | "label-images"
-  | "hero-images";
+  "song-audio" | "album-art" | "artist-images" | "user-avatars" | "label-images" | "hero-images";
 
 const BUCKETS: MediaBucketName[] = [
   "song-audio",

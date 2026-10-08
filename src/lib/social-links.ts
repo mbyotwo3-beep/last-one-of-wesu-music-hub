@@ -1,10 +1,5 @@
 export type SocialLinkKey =
-  | "instagram"
-  | "twitter"
-  | "facebook"
-  | "youtube"
-  | "spotify"
-  | "apple_music";
+  "instagram" | "twitter" | "facebook" | "youtube" | "spotify" | "apple_music";
 
 export const SOCIAL_LINK_LABELS: Record<SocialLinkKey, string> = {
   instagram: "Instagram",
