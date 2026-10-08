@@ -205,6 +205,22 @@ function CollabsTab() {
         exceed 100%. Registered artists get an in-app invite — no email needed. They approve it in
         their Collabs inbox (and get notified), and the credit goes live on the song page.
       </p>
+      {/* The co-lead / featured distinction, spelled out. Getting this wrong is
+          what made a joint song display as "A feat. B" — nobody featured
+          anybody. */}
+      <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs">
+        <p className="font-semibold text-primary mb-1">Pick the relationship honestly</p>
+        <p className="text-muted-foreground">
+          <strong>Co-lead artist</strong> — you both made it together. The song lists as{" "}
+          <em>You &amp; Them</em> as the artist, with no "feat." anywhere.
+          <br />
+          <strong>Featured artist</strong> — they came in on your song. The song lists as{" "}
+          <em>You</em> with <em>(feat. Them)</em>.
+          <br />
+          Either way they need their own account. Without one their credit is a bare name and they
+          receive none of the earnings — so send them your registration link.
+        </p>
+      </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -267,7 +283,11 @@ function CollabsTab() {
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value as any })}
           >
-            <option value="featured">Featured</option>
+            {/* Co-lead vs featured is the distinction that was missing: a song two
+                artists made together is NOT "A feat. B". They are both the
+                artist. */}
+            <option value="main">Co-lead artist (made it together)</option>
+            <option value="featured">Featured artist (on their song)</option>
             <option value="producer">Producer</option>
             <option value="writer">Writer</option>
             <option value="remixer">Remixer</option>

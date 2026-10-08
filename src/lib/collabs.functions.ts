@@ -33,7 +33,7 @@ export const inviteCollaborator = createServerFn({ method: "POST" })
     (d: {
       song_id: string;
       artist_id: string;
-      role: "featured" | "producer" | "writer" | "remixer";
+      role: "main" | "featured" | "producer" | "writer" | "remixer";
       split_pct: number;
     }) => d,
   )
@@ -266,7 +266,7 @@ export const addSongCredit = createServerFn({ method: "POST" })
   .validator(
     (d: {
       song_id: string;
-      role: "featured" | "producer" | "writer" | "remixer";
+      role: "main" | "featured" | "producer" | "writer" | "remixer";
       /** Present for an account credit. */
       artist_id?: string | null;
       /** Present for a name-only credit. */
@@ -288,9 +288,14 @@ export const addSongCredit = createServerFn({ method: "POST" })
     if (hasAccount && name) {
       throw new Error("A credit is either an account or a name, not both");
     }
-    if (!hasAccount && data.role === "featured") {
+    if (!hasAccount && (data.role === "featured" || data.role === "main")) {
+      // A co-lead and a feature are both PERFORMANCES, so both need an account:
+      // without one there is nothing to link to and nobody to pay. Producer /
+      // writer / remixer are credits only, so a bare name is fine there.
       throw new Error(
-        "A featured artist needs their own Wesu account so the credit can link to their profile",
+        data.role === "main"
+          ? "A co-lead artist needs their own Wesu account so the credit can link to their profile and receive their share"
+          : "A featured artist needs their own Wesu account so the credit can link to their profile and receive their share",
       );
     }
     if (name && (name.length < 1 || name.length > 80)) {

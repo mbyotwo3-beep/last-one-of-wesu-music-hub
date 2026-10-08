@@ -30,7 +30,7 @@ export const inviteArtistForFeature = createServerFn({ method: "POST" })
       song_id: string;
       email: string;
       artist_name?: string;
-      role?: "featured" | "producer" | "writer" | "remixer";
+      role?: "main" | "featured" | "producer" | "writer" | "remixer";
       split_pct?: number;
     }) => d,
   )

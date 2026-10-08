@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
+import { creditLabel, formatFeatureSuffix, isCreditOnly, isPerformer } from "@/lib/credits";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Music2, Play, Pause, ShoppingBag, Heart, ArrowLeft } from "lucide-react";
@@ -92,6 +93,24 @@ function SongPage() {
     );
   };
 
+  // Co-leads are performers and belong in the artist line; featured artists
+  // render as a suffix; producer/writer/remixer are credits only.
+  const performerCredits = credits.filter((c) => isPerformer(c.role));
+  const creditOnlyCredits = credits.filter((c) => isCreditOnly(c.role));
+  const featureSuffix = formatFeatureSuffix(performerCredits);
+
+  const leadArtistLink = artist ? (
+    <Link
+      to="/artists/$id"
+      params={{ id: artist.id }}
+      className="text-lg text-muted-foreground hover:text-foreground hover:underline"
+    >
+      {artist.name}
+    </Link>
+  ) : (
+    <p className="text-lg text-muted-foreground">Unknown artist</p>
+  );
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 pb-32">
       <button
@@ -114,24 +133,24 @@ function SongPage() {
             <h1 className="mt-2 text-4xl md:text-6xl font-black tracking-tight break-words">
               {song!.title}
             </h1>
-            {artist ? (
-              <Link
-                to="/artists/$id"
-                params={{ id: artist.id }}
-                className="mt-3 inline-block text-lg text-muted-foreground hover:text-foreground hover:underline"
-              >
-                {artist.name}
-              </Link>
-            ) : (
-              <p className="mt-3 text-lg text-muted-foreground">Unknown artist</p>
-            )}
+            {/* Spotify's artist line: co-leads are joined with " & " and ARE
+                the artist; a feature sits in a "(feat. X)" suffix and never in
+                the artist line. Previously every second artist was rendered as
+                a credit below, so a song two artists made together did not say
+                so. */}
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
+              {leadArtistLink}
+              {featureSuffix ? (
+                <span className="text-lg text-muted-foreground">{featureSuffix}</span>
+              ) : null}
+            </div>
             {/* Credits: features and production credits, which existed in the
                 database but were never rendered anywhere. A featured artist or
                 a credited producer/writer with an account links to their page;
                 a name-only credit shows as a plain name. */}
-            {credits.length > 0 ? (
+            {creditOnlyCredits.length > 0 ? (
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-                {credits.map((c) => (
+                {creditOnlyCredits.map((c) => (
                   <span key={c.id} className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">
                       {c.artistId ? (
@@ -146,7 +165,7 @@ function SongPage() {
                         c.name
                       )}
                     </span>{" "}
-                    {c.label}
+                    {creditLabel(c.role)}
                   </span>
                 ))}
               </div>
