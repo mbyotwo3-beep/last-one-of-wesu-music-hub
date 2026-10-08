@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "postinstall": "node scripts/apply-native-audio-patch.mjs",
     "launch:check": "node scripts/launch-check.mjs",
+    "launch:whats-live": "node scripts/whats-live.mjs",
     "import:catalogue": "node scripts/import-catalogue.mjs",
     "verify:ci-install": "node scripts/verify-ci-install.mjs",
     "verify:no-known-vulns": "node scripts/verify-no-known-vulns.mjs",
