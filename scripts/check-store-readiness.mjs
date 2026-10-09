@@ -153,6 +153,42 @@ if (pbx) {
   }
 }
 
+// ---------------------------------------------------------------- downloads
+// The sideload APK is published so testers can install it without a store.
+// A file in public/ that the app never imports is exactly the kind of thing
+// that gets silently dropped by a bundler change and 404s in production while
+// still sitting in git, looking perfectly fine in the repo.
+//
+// This exists because that is what I nearly shipped: I checked dist/, which is
+// a stale month-old artifact, instead of .output/public/, which is what the
+// build actually writes and what Vercel serves.
+const APK_PUB = "public/wesuplus.apk";
+if (existsSync(APK_PUB)) {
+  const built = ".output/public/wesuplus.apk";
+  if (existsSync(built)) {
+    const a = readFileSync(APK_PUB);
+    const b = readFileSync(built);
+    if (a.length !== b.length || !a.equals(b)) {
+      problems.push(
+        `public/wesuplus.apk is not the build that was just deployed\n` +
+          `        public/     ${a.length} bytes\n` +
+          `        .output/    ${b.length} bytes\n` +
+          `      Testers would download a stale build. Re-copy the APK and rebuild.`,
+      );
+    } else {
+      notes.push(`sideload APK ${(a.length / 1048576).toFixed(1)} MB, committed and deployed`);
+    }
+  }
+  // VersionName is 0.0.1 on every build, so it cannot identify which one this
+  // is. versionCode can, and it is what makes one build an upgrade of another.
+  const vc = read("android/app/build.gradle")?.match(/versionCode\s+(\d+)/)?.[1];
+  if (!vc) {
+    problems.push("android: cannot read versionCode, so the published APK cannot be identified");
+  } else {
+    notes.push(`published APK is versionCode ${vc}`);
+  }
+}
+
 // ---------------------------------------------------------------- both
 // The Swift package list is generated. If it drifts from package.json, an iOS
 // build compiles against a plugin that is not there and fails at link time.

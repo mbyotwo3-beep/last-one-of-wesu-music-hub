@@ -30,6 +30,13 @@ keystore.properties
 *.apk
 *.aab
 
+# ...except the sideload build, which is deliberately published so testers can
+# download it from the site. Keep this as the ONLY apk/aab in the repo: if a
+# build ever committed both, the old one would win at the same URL depending on
+# case-insensitive filesystem ordering, and a tester would silently install the
+# version we are trying to replace.
+!public/wesuplus.apk
+
 # iOS build artifacts (regenerated on the Mac via cap sync + pod install).
 ios/App/App/public/
 ios/App/Pods/
