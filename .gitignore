@@ -57,3 +57,6 @@ DerivedData/
 
 e2e artifacts
 .e2e-baseline.json
+
+# Kotlin build sessions (generated, machine-local)
+android/.kotlin/
