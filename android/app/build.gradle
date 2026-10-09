@@ -17,8 +17,9 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 28 = post-CVE framework upgrade (react-start 1.168.60) + co-lead credits.
-        versionCode 28
+        // 29 = album bundle selling, playlist fixes, and the mobile tap-target
+        // and layout fixes (plays/price overlap, hover-only controls on touch).
+        versionCode 29
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
