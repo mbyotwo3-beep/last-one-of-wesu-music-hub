@@ -36,14 +36,27 @@ if (gradle) {
   // A release build that is not signed cannot be uploaded and cannot be
   // upgraded over later. Unsigned-if-missing is convenient locally and fatal
   // here, so it is called out loudly rather than left to the store.
+  //
+  // BUT the keystore and its passwords are gitignored on purpose, so they are
+  // absent from any fresh clone and on CI. Treating that as a failure broke a
+  // Vercel deploy for the same reason check-app-url did: the gate could not tell
+  // "absent by design" from "broken".
+  //
+  // So this is reported when it is knowable, and only enforced where it matters.
+  // Building for release is what needs the key, so build-android.sh asserts it
+  // itself rather than trusting a prebuild gate that also runs on the web deploy.
   const props = read("android/app/keystore.properties");
   const storeFile = props ? /storeFile\s*=\s*(.+)/.exec(props)?.[1]?.trim() : null;
-  if (!props) {
-    problems.push("android: keystore.properties is absent — the release build will be UNSIGNED");
-  } else if (!storeFile || !existsSync(`android/app/${storeFile}`)) {
-    problems.push(`android: keystore.properties points at ${storeFile}, which does not exist`);
+  if (props) {
+    if (!storeFile || !existsSync(`android/app/${storeFile}`)) {
+      problems.push(`android: keystore.properties points at ${storeFile}, which does not exist`);
+    } else {
+      notes.push(`android  release keystore present (${storeFile})`);
+    }
   } else {
-    notes.push(`android  release keystore present (${storeFile})`);
+    notes.push(
+      "android  release keystore not on this machine (gitignored — fine for the web deploy)",
+    );
   }
 
   // minSdk is a floor decided by requirement, not preference.
@@ -201,16 +214,34 @@ if (spm) {
     // other platform: they have no ios/ directory and including them is wrong.
     // An earlier version of this check listed all five as failures — they are
     // absent on purpose.
-    const capDeps = Object.keys(JSON.parse(pkg).dependencies ?? {}).filter(
-      (d) => /@capacitor\/|@capgo\//.test(d) && existsSync(`node_modules/${d}/ios`),
+    const allDeps = Object.keys(JSON.parse(pkg).dependencies ?? {}).filter((d) =>
+      /@capacitor\/|@capgo\//.test(d),
     );
-    for (const d of capDeps) {
-      const short = d.split("/").pop();
-      if (!new RegExp(`\\b${short}\\b`).test(spm)) {
-        problems.push(`ios: ${d} is installed but missing from CapApp-SPM/Package.swift`);
+
+    if (!existsSync("node_modules")) {
+      // Without node_modules there is no way to tell which packages have an
+      // iOS implementation, so the filter yields nothing. Reporting "0 plugins
+      // wired" would look like a passing verification while checking nothing at
+      // all — say plainly that it was skipped instead.
+      notes.push("ios     SPM plugin check skipped (no node_modules — run it after npm install)");
+    } else {
+      const capDeps = allDeps.filter((d) => existsSync(`node_modules/${d}/ios`));
+      for (const d of capDeps) {
+        const short = d.split("/").pop();
+        if (!new RegExp(`\\b${short}\\b`).test(spm)) {
+          problems.push(`ios: ${d} is installed but missing from CapApp-SPM/Package.swift`);
+        }
+      }
+      // Every iOS-capable plugin must be wired. A silently empty candidate list
+      // would make this pass while verifying nothing.
+      if (capDeps.length === 0) {
+        problems.push(
+          "ios: found no Capacitor packages with an ios/ directory — the plugin check verified nothing",
+        );
+      } else {
+        notes.push(`ios     ${capDeps.length} Capacitor plugin(s) wired into CapApp-SPM`);
       }
     }
-    notes.push(`ios     ${capDeps.length} Capacitor plugin(s) wired into CapApp-SPM`);
   }
 }
 

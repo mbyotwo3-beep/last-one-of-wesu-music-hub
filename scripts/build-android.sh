@@ -31,17 +31,23 @@ echo "  java $(java -version 2>&1 | head -1)"
 
 PROPS="android/app/keystore.properties"
 if [ ! -f "$PROPS" ]; then
-  echo "  WARNING $PROPS is missing — the release build will be UNSIGNED." >&2
-  echo "  Unsigned builds cannot be installed and cannot upgrade an existing app." >&2
-  echo "  An APK exists to try, but Play Console will reject the AAB." >&2
-else
-  STORE_FILE="$(sed -n 's/^storeFile=//p' "$PROPS" | tr -d '[:space:]')"
-  if [ -z "$STORE_FILE" ] || [ ! -f "android/app/$STORE_FILE" ]; then
-    echo "  FAIL $PROPS points at '${STORE_FILE:-<empty>}', which does not exist." >&2
-    exit 1
-  fi
-  echo "  signing keystore present ($STORE_FILE)"
+  echo "  FAIL $PROPS is missing — this build would be UNSIGNED." >&2
+  echo "  An unsigned APK cannot be installed and cannot upgrade an existing" >&2
+  echo "  install; Play Console rejects the AAB outright." >&2
+  echo "  It is gitignored on purpose, so this is expected on CI — but never" >&2
+  echo "  when building the release you intend to ship." >&2
+  exit 1
 fi
+STORE_FILE="$(sed -n 's/^storeFile=//p' "$PROPS" | tr -d '[:space:]')"
+if [ -z "$STORE_FILE" ] || [ ! -f "android/app/$STORE_FILE" ]; then
+  echo "  FAIL $PROPS points at '${STORE_FILE:-<empty>}', which does not exist." >&2
+  exit 1
+fi
+echo "  signing keystore present ($STORE_FILE)"
+
+# The store gates deliberately do NOT require the keystore: they run on the web
+# deploy, where it is correctly absent. Here it is mandatory, so it is enforced
+# above rather than by a prebuild gate that would also fire in the wrong place.
 
 say "web build (the app is a shell around the live site)"
 npm run build
