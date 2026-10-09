@@ -47,3 +47,6 @@ DerivedData/
 *.njsproj
 *.sln
 *.sw?
+
+e2e artifacts
+.e2e-baseline.json
