@@ -202,8 +202,12 @@ export const usePlayer = create<PlayerState>()(
 
         const safeIndex = plan.startIndex;
         primeAudio();
+        // `plan.tracks`, not `tracks`. Reading from the caller's array while
+        // storing the filtered one put the player on a track that was never in
+        // the queue: correct by luck whenever nothing was filtered, wrong the
+        // moment offline mode removed anything.
         const track = preserveResolvedAudioUrl(
-          tracks[safeIndex] ?? null,
+          plan.tracks[safeIndex] ?? null,
           get().track,
           get().isPreview,
         );

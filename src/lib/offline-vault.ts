@@ -400,8 +400,14 @@ export function planEviction(
     evict.push(c.songId);
     freed += Math.max(0, c.size || 0);
   }
-  // Still short after removing everything: the caller reports the shortfall.
-  return freed + freeBytes >= needBytes ? evict : evict;
+  // Every candidate, even when removing all of them still will not be enough.
+  // The caller deletes what it can and then reports the shortfall, so returning
+  // a partial list here would just leave tracks behind that nothing else frees.
+  //
+  // (An earlier version ended in `return freed + freeBytes >= needBytes ? evict :
+  // evict` — both branches identical, which reads like unfinished intent. The
+  // behaviour above is the intent; the dead ternary is gone.)
+  return evict;
 }
 
 /**
@@ -413,19 +419,28 @@ async function makeRoomFor(bytesNeeded: number, protectSongId?: string): Promise
   const evictable = meta.filter((m) => m.songId !== protectSongId);
   const { bytes } = await getVaultUsage();
 
-  // Device quota: aim to stay under 90% of what the browser reports.
+  // Two different budgets, and conflating them is the bug this guards against:
+  //
+  //   `limit` is a DEVICE limit (what the OS says this app may occupy).
+  //   `free` must be measured against the VAULT's size, because that is the only
+  //   thing eviction can shrink. Using navigator.storage.estimate().usage here
+  //   would mix in every other cache and file, so the computed free space would
+  //   be wrong by however much else the WebView is holding — and the app would
+  //   evict a listener's downloads unnecessarily, or fail to evict when it must.
   let need = bytesNeeded;
   let limit = MAX_VAULT_BYTES;
   try {
     if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
       const est = await navigator.storage.estimate();
-      if (est.quota) {
-        limit = Math.min(limit, Math.floor(est.quota * 0.9));
-        need = Math.max(bytesNeeded, (est.usage ?? 0) + bytesNeeded - limit);
-      }
+      if (est.quota) limit = Math.min(limit, Math.floor(est.quota * 0.9));
     }
   } catch {
     /* estimate() unsupported — fall back to the hard cap */
+  }
+  if (limit < bytesNeeded) {
+    // The device cap is smaller than the download itself. Nothing to evict;
+    // assertQuotaFor will report it.
+    need = bytesNeeded;
   }
 
   const free = Math.max(0, limit - bytes);
@@ -434,14 +449,20 @@ async function makeRoomFor(bytesNeeded: number, protectSongId?: string): Promise
     need,
     free,
   );
+
+  // Only report what was ACTUALLY deleted. Returning the whole plan would have
+  // the UI say "removed 3 downloads" when one delete failed, and the listener
+  // would find a track still sitting there.
+  const removed: string[] = [];
   for (const id of victims) {
     try {
       await removeTrackFromVault(id);
+      removed.push(id);
     } catch {
       /* keep going: one undeletable track must not block the rest */
     }
   }
-  return victims;
+  return removed;
 }
 
 async function assertQuotaFor(bytesNeeded: number, protectSongId?: string): Promise<void> {
@@ -514,13 +535,20 @@ export async function saveTrackToVault(
     data: ciphertext,
     artwork: meta.artwork ?? null,
   };
+  // Strip the ciphertext and artwork for the metadata mirror, which is what
+  // lists read so that /downloads never deserialises gigabytes of audio.
+  //
+  // Named `metaRow`, not `meta`: this used to shadow the `meta` parameter, so
+  // the `revokeOfflineObjectUrl(meta.songId)` below was reading the destructured
+  // row rather than its argument. It worked by luck (both carry songId) and
+  // would have broken silently the moment the two shapes diverged.
+  const { data: _ciphertext, artwork: _artwork, ...metaRow } = record;
+  void _ciphertext;
+  void _artwork;
+
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.put(record));
-    // Mirror the metadata so listing never reads the ciphertext.
-    const { data: _data, artwork: _artwork, ...meta } = record;
-    void _data;
-    void _artwork;
-    await tx(META_STORE, "readwrite", (s) => s.put(meta));
+    await tx(META_STORE, "readwrite", (s) => s.put(metaRow));
     // The player reads the id set synchronously; keep it correct on save too.
     noteVaultChanged(record.songId, true);
   } catch (err: any) {
@@ -529,7 +557,7 @@ export async function saveTrackToVault(
     }
     throw new Error("Could not save this download");
   }
-  revokeOfflineObjectUrl(meta.songId);
+  revokeOfflineObjectUrl(record.songId);
   const { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork } = record;
   return { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork };
 }

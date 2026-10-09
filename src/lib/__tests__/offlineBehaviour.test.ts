@@ -56,8 +56,36 @@ describe("planEviction", () => {
 
   it("evicts everything it is asked to when nothing else fits", () => {
     // A download larger than the whole library: report every victim rather
-    // than silently returning none and failing with a confusing error.
+    // than silently returning none and failing with a confusing error. The
+    // caller deletes what it can and then reports the shortfall itself.
     expect(planEviction(lib, 10_000, 0)).toEqual(["old", "mid", "new"]);
+  });
+
+  it("does not count the protected track's size towards the free space", () => {
+    // makeRoomFor filters the track being saved out of the candidate list, so a
+    // re-download of the oldest song cannot evict itself. Pinned here because
+    // the protection is invisible in this function.
+    const withNewest = [
+      { songId: "old", size: 100, downloadedAt: 1_000 },
+      { songId: "new", size: 100, downloadedAt: 3_000 },
+    ];
+    expect(
+      planEviction(
+        withNewest.filter((t) => t.songId !== "new"),
+        100,
+        0,
+      ),
+    ).toEqual(["old"]);
+  });
+
+  it("treats a zero-size track as freeing nothing but still evicting it", () => {
+    // A metadata row with no recorded size must not be a reason to give up —
+    // removing it may still be what unblocks the download.
+    const unknownSize = [
+      { songId: "a", size: 0, downloadedAt: 1 },
+      { songId: "b", size: 500, downloadedAt: 2 },
+    ];
+    expect(planEviction(unknownSize, 500, 0)).toEqual(["a", "b"]);
   });
 
   it("treats an unknown size as zero rather than negative", () => {

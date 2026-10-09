@@ -31,6 +31,15 @@ const checks = [
     why: "using the unfiltered array would keep unplayable tracks in the queue",
   },
   {
+    // Found by the store-level tests. `queue: plan.tracks` was correct while
+    // the SELECTION read `tracks[safeIndex]` — so the store held one queue and
+    // played a track from another. It only misbehaved once something was
+    // actually filtered, which is why the pure-function tests stayed green.
+    name: "the selected track is read from the FILTERED array too",
+    ok: /plan\.tracks\[safeIndex\]/.test(player) && !/const track = preserveResolvedAudioUrl\(\s*\n?\s*tracks\[safeIndex\]/.test(player),
+    why: "selecting from the caller's array plays a track that is not in the queue",
+  },
+  {
     name: "the shuffle deck is rebuilt from the filtered queue",
     ok: /rebuildShuffleDeck\(state\.shuffle,\s*plan\.tracks\.length/.test(player),
     why: "a deck sized to the old queue draws indexes that no longer exist",
