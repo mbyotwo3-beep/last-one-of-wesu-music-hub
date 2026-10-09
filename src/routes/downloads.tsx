@@ -3,6 +3,7 @@ import { routeErrorComponent } from "@/components/RouteError";
 import { ArrowLeft } from "lucide-react";
 import { DownloadsSection } from "@/components/DownloadsSection";
 import { GetTheApp } from "@/components/GetTheApp";
+import { OfflineDiagnostics } from "@/components/OfflineDiagnostics";
 
 /**
  * Offline downloads — intentionally PUBLIC (no RoleGate). A listener with
@@ -42,6 +43,11 @@ function DownloadsPage() {
           for a while and nothing on the site linked to it, so this was a support
           conversation every time. */}
       <GetTheApp />
+      {/* "My downloads are not being kept" is the report, and it has five
+          possible causes that look identical from outside. This names which. */}
+      <div className="mb-6">
+        <OfflineDiagnostics />
+      </div>
       <DownloadsSection />
     </div>
   );

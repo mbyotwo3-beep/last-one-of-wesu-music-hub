@@ -49,7 +49,41 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebViewClient(new WesuWebViewClient(bridge));
         }
+        enableServiceWorkerInterception();
         checkWebViewIsUsable(bridge);
+    }
+
+    /**
+     * Let the WebView hand service-worker requests to the worker.
+     *
+     * Offline support depends entirely on public/sw.js being able to intercept
+     * navigations, and Capacitor never configures ServiceWorkerController. The
+     * default client forwards SW requests to the host app's
+     * `shouldInterceptRequest`, which a Capacitor app does not implement — so
+     * without this the worker can be registered yet never serve a page.
+     *
+     * Returning null means "let the service worker handle it", which is exactly
+     * the intent. Registered unconditionally and guarded: service workers need
+     * API 24+ (our minSdk) and this must never be able to block a launch.
+     */
+    private void enableServiceWorkerInterception() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 24) return;
+            android.webkit.ServiceWorkerController swController =
+                    android.webkit.ServiceWorkerController.getInstance();
+            swController.setServiceWorkerClient(
+                    new android.webkit.ServiceWorkerClient() {
+                        @Override
+                        public android.webkit.WebResourceResponse shouldInterceptRequest(
+                                android.webkit.WebResourceRequest request) {
+                            // null = do not intercept; the worker responds.
+                            return null;
+                        }
+                    });
+        } catch (Throwable ignored) {
+            // Never block a launch on this. Offline simply falls back to the
+            // branded error page.
+        }
     }
 
     /**
@@ -157,6 +191,8 @@ public class MainActivity extends BridgeActivity {
     private static class WesuWebViewClient extends BridgeWebViewClient {
 
         private static final String ERROR_PAGE = "file:///android_asset/error.html";
+        /** Base URL the error page is loaded under, via loadDataWithBaseURL. */
+        private static final String ERROR_BASE = "https://www.wesuplus.com/";
         private static final String RETRY_SCHEME = "wesuapp";
 
         /** Last main-frame URL that failed — used for retry, never displayed. */
@@ -210,7 +246,10 @@ public class MainActivity extends BridgeActivity {
             super.onPageFinished(view, url);
             // A successful load clears the retry target — a later unrelated
             // failure must never retry a stale URL.
-            if (url != null && !url.equals(ERROR_PAGE)) {
+            // loadDataWithBaseURL reports the BASE url, not the error page, so the
+            // old file:// sentinel no longer identifies our own page. Compare on
+            // the base we pass instead.
+            if (url != null && !ERROR_BASE.equals(url)) {
                 lastFailedUrl = null;
             }
         }
@@ -218,10 +257,47 @@ public class MainActivity extends BridgeActivity {
         /** Show the branded offline page. Never records the page itself as
          *  a retry target (that would loop Try-again on the error page). */
         private void showErrorPage(WebView view, String failingUrl) {
-            if (failingUrl != null && !failingUrl.equals(ERROR_PAGE)) {
+            if (failingUrl != null && !failingUrl.equals(ERROR_PAGE) && !failingUrl.equals(ERROR_BASE)) {
                 lastFailedUrl = failingUrl;
             }
-            view.loadUrl(ERROR_PAGE);
+
+            // Loaded as DATA, not as file:///android_asset/error.html.
+            //
+            // Android 11 (API 30) changed the default of setAllowFileAccess to
+            // false, so loading anything from file:// inside a Capacitor WebView
+            // is refused on a modern phone. That is why some listeners saw
+            // Android's own "Webpage not available" screen instead of ours: the
+            // error handler fired, then its own error page was blocked.
+            //
+            // loadDataWithBaseURL needs no permission, works on every API level,
+            // and an https base URL keeps the origin sane for anything the page
+            // references.
+            String html = readAsset("error.html");
+            if (html != null) {
+                view.loadDataWithBaseURL("https://www.wesuplus.com/", html, "text/html", "UTF-8", null);
+            } else {
+                // The asset is missing entirely — fall back rather than show a
+                // blank screen, and let the default page appear.
+                view.loadUrl(ERROR_PAGE);
+            }
+        }
+
+        /** Read a file from the APK's assets, or null if it is absent. */
+        private String readAsset(String name) {
+            try {
+                java.io.InputStream in = getAssets().open(name);
+                try {
+                    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    return out.toString("UTF-8");
+                } finally {
+                    in.close();
+                }
+            } catch (Exception ignored) {
+                return null;
+            }
         }
 
         @Override

@@ -17,13 +17,15 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 31 = three playback/storage fixes found reviewing vc30:
-        //   - the player selected a track from the UNFILTERED queue, so offline
-        //     mode could store one queue and play a track from another;
-        //   - eviction mixed device-level storage usage with vault-level size,
-        //     so it freed the wrong amount;
-        //   - a shadowed variable made the object-URL revoke read the wrong row.
-        versionCode 31
+        // 32 = the native half of the offline fix:
+        //   - the WebView now hands requests to the service worker. Capacitor
+        //     never configures ServiceWorkerController, so the worker could be
+        //     registered yet never serve a page — offline simply did not work.
+        //   - the offline page is loaded as DATA rather than from
+        //     file:///android_asset/. Android 11 disabled file access by default,
+        //     so the error handler fired and then its OWN page was blocked,
+        //     showing the listener Android's raw "Webpage not available".
+        versionCode 32
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
