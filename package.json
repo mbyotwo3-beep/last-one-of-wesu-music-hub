@@ -20,13 +20,14 @@
     "verify:no-known-vulns": "node scripts/verify-no-known-vulns.mjs",
     "verify:offline-mode": "node scripts/check-offline-mode.mjs",
     "verify:offline-boot": "node scripts/check-offline-boot.mjs",
+    "verify:app-distribution": "node scripts/check-app-distribution.mjs",
     "verify:app-url": "node scripts/check-app-url.mjs",
     "verify:ios-project": "node scripts/check-ios-project.mjs",
     "verify:store-ready": "node scripts/check-store-readiness.mjs",
     "verify:hover-controls": "node scripts/check-hover-only-controls.mjs",
     "verify:revenue-split": "node scripts/check-revenue-split-parity.mjs",
     "verify:no-secrets": "node scripts/scan-apk-secrets.mjs",
-    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs && node scripts/check-offline-mode.mjs && node scripts/check-offline-boot.mjs && node scripts/check-app-url.mjs && node scripts/check-ios-project.mjs && node scripts/check-store-readiness.mjs"
+    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs && node scripts/check-offline-mode.mjs && node scripts/check-offline-boot.mjs && node scripts/check-app-distribution.mjs && node scripts/check-app-url.mjs && node scripts/check-ios-project.mjs && node scripts/check-store-readiness.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

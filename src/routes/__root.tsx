@@ -187,6 +187,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.png", type: "image/png" },
       { rel: "apple-touch-icon", href: "/images/wesu-icon-192.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      // iOS ignores the web manifest entirely, so without these "Add to Home
+      // Screen" opens Safari in a browser-looking window instead of fullscreen.
+      // These three are the only way to get the app-like experience on an iPhone
+      // without an App Store build.
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Wesu+" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

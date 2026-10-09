@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
 import { ArrowLeft } from "lucide-react";
 import { DownloadsSection } from "@/components/DownloadsSection";
+import { GetTheApp } from "@/components/GetTheApp";
 
 /**
  * Offline downloads — intentionally PUBLIC (no RoleGate). A listener with
@@ -36,6 +37,11 @@ function DownloadsPage() {
       >
         <ArrowLeft className="size-4" /> Back
       </Link>
+      {/* Listeners arrive here specifically asking for an app, because they
+          believe downloads only exist inside one. The APK has been downloadable
+          for a while and nothing on the site linked to it, so this was a support
+          conversation every time. */}
+      <GetTheApp />
       <DownloadsSection />
     </div>
   );
