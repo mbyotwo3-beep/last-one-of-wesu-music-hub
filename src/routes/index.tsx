@@ -15,6 +15,7 @@ import { getActiveCarousels } from "@/lib/carousel.functions";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
 import { SkeletonHeroCarousel, SkeletonShelf, SkeletonTrackRow } from "@/components/Skeleton";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 const discoverQO = queryOptions({
   queryKey: ["home-discover"],
@@ -74,20 +75,7 @@ export const Route = createFileRoute("/")({
     ]);
   },
   component: IndexRoute,
-  errorComponent: ({ error, reset }) => (
-    <div className="p-12 text-center">
-      <p className="text-destructive mb-2">
-        Couldn't load the homepage{(error as Error)?.message ? `: ${(error as Error).message}` : ""}
-        .
-      </p>
-      <button
-        onClick={() => reset()}
-        className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
-      >
-        Try again
-      </button>
-    </div>
-  ),
+  errorComponent: SharedRouteError,
 });
 
 function IndexRoute() {

@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/friendly-error";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 export const Route = createFileRoute("/queue")({
   head: () => ({
@@ -18,22 +19,7 @@ export const Route = createFileRoute("/queue")({
     ],
   }),
   component: QueuePage,
-  errorComponent: ({ error, reset }) => (
-    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-3">
-      <ListMusic className="size-10 text-muted-foreground mx-auto" />
-      <h1 className="text-2xl font-bold">Couldn't load your queue</h1>
-      <p className="text-muted-foreground text-sm">
-        Your queue is still playing in the background — this is only the list view.
-      </p>
-      <button
-        onClick={() => reset()}
-        className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
-      >
-        Try again
-      </button>
-      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
-    </div>
-  ),
+  errorComponent: SharedRouteError,
   notFoundComponent: () => (
     <div className="max-w-lg mx-auto px-6 py-16 text-center">Queue not found</div>
   ),

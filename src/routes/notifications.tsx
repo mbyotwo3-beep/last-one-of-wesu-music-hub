@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { openExternalUrl } from "@/lib/external-url";
 import { useEffect } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/notifications")({
   head: () => ({ meta: [{ title: "Notifications — Wesu+" }] }),
@@ -166,7 +167,8 @@ function Page() {
           <Bell className="size-12 mx-auto mb-4 opacity-40" />
           <p className="text-destructive mb-2">
             Couldn't load notifications
-            {(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+            {/* Was the raw error message, which leaked server internals. */}
+            {friendlyError(error, "We couldn't load your notifications right now.")}
           </p>
           <button
             onClick={() => refetch()}

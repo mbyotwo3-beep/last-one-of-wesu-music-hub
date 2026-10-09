@@ -4,6 +4,7 @@ import { Smartphone, Download, ArrowLeft, Music2, WifiOff } from "lucide-react";
 import { getSiteConfig } from "@/lib/pricing.functions";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import { friendlyError } from "@/lib/friendly-error";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 const siteQO = queryOptions({
   queryKey: ["site-config"],
@@ -25,18 +26,7 @@ export const Route = createFileRoute("/get-app")({
     return context.queryClient.ensureQueryData(siteQO);
   },
   component: GetAppPage,
-  errorComponent: ({ error, reset }) => (
-    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-3">
-      <h1 className="text-2xl font-bold">Couldn't load the app download</h1>
-      <button
-        onClick={() => reset()}
-        className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
-      >
-        Try again
-      </button>
-      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
-    </div>
-  ),
+  errorComponent: SharedRouteError,
   notFoundComponent: () => (
     <div className="max-w-lg mx-auto px-6 py-16 text-center">Page not found</div>
   ),

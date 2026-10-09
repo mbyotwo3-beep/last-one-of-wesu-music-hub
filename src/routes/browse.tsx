@@ -29,6 +29,7 @@ import { getRecentlyPlayed } from "@/lib/play-history.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
@@ -124,19 +125,7 @@ export const Route = createFileRoute("/browse")({
     ]);
   },
   component: BrowseRoute,
-  errorComponent: ({ error, reset }) => (
-    <div className="p-12 text-center">
-      <p className="text-destructive mb-2">
-        Couldn't load Browse{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
-      </p>
-      <button
-        onClick={() => reset()}
-        className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
-      >
-        Try again
-      </button>
-    </div>
-  ),
+  errorComponent: SharedRouteError,
 });
 
 function BrowseRoute() {

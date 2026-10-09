@@ -10,6 +10,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { friendlyError } from "@/lib/friendly-error";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 const searchSchema = z.object({
   q: z.string().optional().default(""),
@@ -29,9 +30,7 @@ export const Route = createFileRoute("/search")({
     };
   },
   component: SearchPage,
-  errorComponent: ({ error }) => (
-    <div className="p-8 text-sm text-destructive">Search failed: {friendlyError(error)}</div>
-  ),
+  errorComponent: SharedRouteError,
   notFoundComponent: () => <div className="p-8">Nothing here.</div>,
 });
 

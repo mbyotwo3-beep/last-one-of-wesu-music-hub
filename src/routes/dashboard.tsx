@@ -11,6 +11,7 @@ import { getMyListenerAnalytics } from "@/lib/analytics.functions";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { getMyLabel } from "@/lib/labels.functions";
 import { useCurrency } from "@/stores/currency";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -87,7 +88,8 @@ function DashboardPage() {
       <div className="p-12 text-center">
         <p className="text-destructive mb-2">
           Couldn't load your library
-          {(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+          {/* Was the raw error message, which leaked server internals. */}
+          {friendlyError(error, "We couldn't load your saved songs right now.")}
         </p>
         <button
           onClick={() => refetch()}

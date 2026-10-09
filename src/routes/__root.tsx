@@ -21,6 +21,8 @@ import { usePlatform } from "../hooks/use-platform";
 import { BottomTabBar } from "../components/mobile/BottomTabBar";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
+import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
+import { isOfflineTransportFailure } from "../lib/loader-graceful";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
 import { MiniPlayer } from "../components/mobile/MiniPlayer";
 import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
@@ -102,6 +104,14 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
+
+  // The root boundary catches failures no route claimed, so it is the LAST place
+  // a connectivity error can surface. Without this, losing signal on an
+  // unrouted URL showed "Something went wrong on our end" — blaming us for the
+  // listener's data plan.
+  if (isOfflineTransportFailure(error)) {
+    return <OfflineRouteNotice what="this page" />;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

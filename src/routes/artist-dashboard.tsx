@@ -36,6 +36,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { toast } from "sonner";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { EarningsSection } from "@/components/EarningsSection";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/artist-dashboard")({
   head: () => ({
@@ -163,7 +164,13 @@ function ArtistDashboardPage() {
     return (
       <div className="max-w-2xl mx-auto p-12 text-center">
         <p className="text-destructive mb-4">Failed to load artist data</p>
-        <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+        <p className="text-sm text-muted-foreground">
+          {/* Server internals must not reach the screen: this used to render
+              the raw message, which for a 500 was PostgREST JSON and for an
+              expired session read "Unauthorized: Invalid token". A human
+              sentence plus a retry tells the artist what to do. */}
+          {friendlyError(error, "We couldn't load your dashboard. Try again in a moment.")}
+        </p>
       </div>
     );
   }

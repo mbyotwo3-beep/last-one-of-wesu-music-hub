@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPayment } from "@/lib/payments.functions";
 import { friendlyError } from "@/lib/friendly-error";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 type SuccessSearch = {
   ref?: string;
@@ -26,31 +27,7 @@ export const Route = createFileRoute("/checkout/success")({
   component: CheckoutSuccessPage,
   // A payment receipt is the last thing a buyer sees — it must never render
   // a raw stack/message or fall through to the generic root error page.
-  errorComponent: ({ error, reset }) => (
-    <div className="max-w-lg mx-auto px-6 py-16 text-center space-y-4">
-      <XCircle className="size-10 text-destructive mx-auto" />
-      <h1 className="text-2xl font-bold">We couldn't load your receipt</h1>
-      <p className="text-muted-foreground text-sm">
-        Your payment may still have gone through. Check your Library, or try again — if you were
-        charged and the track isn't there, contact support with your payment reference.
-      </p>
-      <div className="flex gap-3 justify-center">
-        <button
-          onClick={() => reset()}
-          className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
-        >
-          Try again
-        </button>
-        <Link
-          to="/library"
-          className="px-5 py-2.5 rounded-full bg-secondary border border-border font-semibold"
-        >
-          My Library
-        </Link>
-      </div>
-      {error ? <p className="text-xs text-muted-foreground">{friendlyError(error)}</p> : null}
-    </div>
-  ),
+  errorComponent: SharedRouteError,
   notFoundComponent: () => (
     <div className="max-w-lg mx-auto px-6 py-16 text-center">
       <h1 className="text-2xl font-bold">Receipt not found</h1>

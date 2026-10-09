@@ -12,6 +12,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { IncrementalList } from "@/components/IncrementalList";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/liked-songs")({
   head: () => ({ meta: [{ title: "Liked Songs — Wesu+" }] }),
@@ -224,7 +225,7 @@ function Page() {
               <Heart className="size-12 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-1">Couldn't load liked songs</h2>
               <p className="text-xs text-muted-foreground mb-6">
-                {(error as Error)?.message ?? "Something went wrong."}
+                {friendlyError(error, "We couldn't load your liked songs.")}
               </p>
               <button
                 onClick={() => refetch()}

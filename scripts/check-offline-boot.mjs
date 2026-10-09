@@ -23,7 +23,7 @@
  *
  * Usage: node scripts/check-offline-boot.mjs
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 
 const problems = [];
 const notes = [];
@@ -219,6 +219,143 @@ if (existsSync(albumRoute)) {
         `        when the album cannot be shown offline`,
     );
   }
+}
+
+/**
+ * Error text rendered into the page rather than shown in a toast.
+ *
+ * A toast is transient and dismissible, so a raw message there is acceptable —
+ * mostly it reaches an artist or admin who can act on it. Text that persists in
+ * JSX is not: it shows a listener server internals like "Unauthorized: Invalid
+ * token" and says nothing about what to do.
+ *
+ * Line-based on purpose. Three regex attempts failed here and each failure was a
+ * false alarm, which is worse than no check at all:
+ *
+ *   1. `[^}]*` matched newlines, pairing a `{` in one function with an
+ *      `error.message` three functions later — 8 false positives.
+ *   2. A 400-char bounded toast strip swallowed the JSX after each toast —
+ *      4 false NEGATIVES, the worst kind.
+ *   3. `[^/]*` in the line anchor also matched newlines — 3 false positives.
+ *
+ * A single-line scan cannot span functions. Lines containing `toast.` are skipped.
+ */
+function renderedErrorLines(src) {
+  const hits = [];
+  const lines = src.split("\n");
+  lines.forEach((line, i) => {
+    if (line.includes("toast.")) return;
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+    if (inCallContext(lines, i)) return;
+    if (feedsToastOnly(lines, i)) return;
+    if (
+      line.includes("(error as Error)?.message") ||
+      line.includes("(error as Error).message") ||
+      /\{\s*error\.message\s*\}/.test(line)
+    ) {
+      hits.push(i + 1);
+    }
+  });
+  return hits;
+}
+
+/**
+ * Lines that are part of a `console.*(...)` or `toast.*(...)` call.
+ *
+ * Looked at across lines because both are routinely written multi-line. A
+ * per-line check reported a console.error's object body — `errorMessage:
+ * (error as Error).message` on the line after the opening brace — as a
+ * listener-facing leak.
+ */
+function inCallContext(lines, index) {
+  for (let i = index; i >= Math.max(0, index - 12); i--) {
+    const l = lines[i];
+    if (
+      /\b(console\.(?:error|warn|log|debug|info)|toast\.(?:error|success|info|warning))\s*\(/.test(
+        l,
+      )
+    ) {
+      const depth = (l.match(/\(/g) || []).length - (l.match(/\)/g) || []).length;
+      if (depth > 0) return true;
+      continue;
+    }
+    // A statement boundary closes any open call.
+    if (/;\s*$/.test(l) && !/\($/.test(l.trim())) return false;
+  }
+  return false;
+}
+
+/**
+ * True when the message is assigned to a variable that only a toast consumes.
+ *
+ *   const errorMsg = (error as Error).message;      // line 156
+ *   toast.error(`Failed to update profile: ${errorMsg}`);   // line 157
+ *
+ * That is a toast, not a leak — the same category the line scan above already
+ * allows. It is separated by a line, so inCallContext cannot see it and the
+ * naive check reported it. Treated as acceptable only when the NEXT toast call
+ * actually interpolates the variable; an unused assignment would be a real
+ * problem and is left visible.
+ */
+function feedsToastOnly(lines, index) {
+  const next = lines.slice(index + 1, index + 6).join("\n");
+  if (!/\btoast\.(error|success|info|warning)\s*\(/.test(next)) return false;
+  // The name being assigned on this line must appear inside that toast call.
+  const m = /const\s+(\w+)\s*=\s*\(error as Error\)\??\.message/.exec(lines[index]);
+  if (!m) return false;
+  const toastBlock = next.slice(next.search(/\btoast\./));
+  return toastBlock.includes(m[1]);
+}
+
+// --- 9. EVERY route's error surface must handle offline.
+//
+// Six detail routes read through useSuspenseQuery, which has no offline branch:
+// the fetch rejects and the error surface renders. Nine more wrote their own
+// inline screen. All showed a red "Something went wrong" for what is simply no
+// connection, and eight leaked raw `(error as Error).message` — server internals
+// like "Unauthorized: Invalid token" — to the listener.
+//
+// So the rule is: no route may define its own error surface. They delegate, and
+// the offline branch lives in the shared one. A new route that forgets gets
+// caught here rather than by a listener on a train.
+const ROUTE_DIR = "src/routes";
+const ownError = [];
+const rawLeaks = [];
+if (existsSync(ROUTE_DIR)) {
+  const routeFiles = readdirSync(ROUTE_DIR).filter((f) => f.endsWith(".tsx"));
+  for (const name of routeFiles) {
+    if (name === "__root.tsx") continue; // checked separately above
+    const src = readFileSync(`${ROUTE_DIR}/${name}`, "utf8");
+    if (/errorComponent:\s*\(\{[^}]*\}\)\s*=>\s*(<|\()/.test(src)) {
+      ownError.push(name);
+    }
+    // Raw error text RENDERED into the page.
+    //
+    // A toast is fine: transient, dismissed, and mostly aimed at an artist who
+    // can act on it. Text that persists on screen is not — it shows a listener
+    // server internals like "Unauthorized: Invalid token" or raw PostgREST JSON,
+    // and says nothing about what to do next.
+    //
+    // So toast.error(...) is explicitly allowed and only JSX is flagged. This is
+    // why the first version of this check produced seven false alarms: it
+    // matched toasts, which are not a leak.
+    const isAdmin = name.startsWith("superadmin") || name.startsWith("admin");
+    if (!isAdmin && renderedErrorLines(src).length) {
+      rawLeaks.push(`${name} (line ${renderedErrorLines(src)[0]})`);
+    }
+  }
+  notes.push(`${routeFiles.length} routes checked for an offline-capable error surface`);
+}
+if (ownError.length) {
+  problems.push(
+    `these routes define their own error surface, so the offline branch never runs:\n` +
+      `        ${ownError.join("\n        ")}`,
+  );
+}
+if (rawLeaks.length) {
+  problems.push(
+    `these routes render raw error text to the listener:\n        ${rawLeaks.join("\n        ")}`,
+  );
 }
 
 console.log("  the app can start with the data off");

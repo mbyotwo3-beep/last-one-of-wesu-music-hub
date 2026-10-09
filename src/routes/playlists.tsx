@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ShareMenu } from "@/components/ShareMenu";
 import { PlaylistCover } from "@/components/PlaylistCover";
 import { usePlayer } from "@/stores/player";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({
@@ -220,7 +221,7 @@ function Page() {
     return (
       <div className="p-12 text-center">
         <p className="text-destructive mb-2">
-          Couldn't load playlists{(error as Error)?.message ? `: ${(error as Error).message}` : ""}.
+          Couldn't load playlists. {friendlyError(error, "Try again in a moment.")}
         </p>
         <button
           onClick={() => refetch()}

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { NowPlayingScreen } from "@/components/mobile/screens/NowPlayingScreen";
 import { friendlyError } from "@/lib/friendly-error";
+import { RouteError as SharedRouteError } from "@/components/RouteError";
 
 /**
  * Modal route for the full-screen Now Playing view.
@@ -26,8 +27,6 @@ export const Route = createFileRoute("/now-playing")({
     ],
   }),
   component: NowPlayingScreen,
-  errorComponent: ({ error }) => (
-    <div className="p-12 text-center text-muted-foreground">{friendlyError(error)}</div>
-  ),
+  errorComponent: SharedRouteError,
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });

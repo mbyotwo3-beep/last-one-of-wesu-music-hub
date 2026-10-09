@@ -26,6 +26,7 @@ import { uploadFileToBucket } from "@/lib/storage";
 import { getMyLabelAnalytics } from "@/lib/analytics.functions";
 import { AnalyticsSection } from "@/components/AnalyticsSection";
 import { getWithdrawalConfig } from "@/lib/pricing.functions";
+import { friendlyError } from "@/lib/friendly-error";
 
 export const Route = createFileRoute("/label-dashboard")({
   head: () => ({ meta: [{ title: "Label Dashboard — Wesu+" }] }),
@@ -61,7 +62,10 @@ function Page() {
     return (
       <div className="max-w-xl mx-auto px-6 py-16 text-center">
         <p className="text-destructive mb-4">Failed to load label data</p>
-        <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+        <p className="text-sm text-muted-foreground">
+          {/* Was the raw error message, which leaked server internals. */}
+          {friendlyError(error, "We couldn't load your label. Try again in a moment.")}
+        </p>
       </div>
     );
   }
