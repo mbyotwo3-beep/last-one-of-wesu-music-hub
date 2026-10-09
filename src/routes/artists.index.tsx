@@ -3,6 +3,7 @@ import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions } from "@tanstack/react-query";
 import { listArtists } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
+import { loaderGraceful } from "@/lib/loader-graceful";
 import { CheckCircle2, User } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 
@@ -20,10 +21,11 @@ export const Route = createFileRoute("/artists/")({
     ],
   }),
   loader: async ({ context }) => {
-    // Awaited rather than fire-and-forget, so the shelf is in the server HTML
-    // and a failure surfaces instead of rendering an empty page. Same fix as
-    // /albums — see the note there.
-    return context.queryClient.ensureQueryData(artistsQO);
+    // Awaited rather than fire-and-forget, so the shelf is in the server HTML.
+    // Caught for the same reason as /albums: offline this cannot succeed, and an
+    // unhandled rejection replaced the route with an error screen, while the
+    // component below already reads from an offline snapshot.
+    return loaderGraceful(context.queryClient.ensureQueryData(artistsQO), []);
   },
   component: ArtistsPage,
   errorComponent: routeErrorComponent(),

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { loaderGracefulAll } from "@/lib/loader-graceful";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
@@ -101,7 +102,18 @@ export const Route = createFileRoute("/browse")({
     // for hydration, so a crawler or a slow first paint saw an empty page.
     // Promise.all over the seven, so they run concurrently rather than
     // sequentially — awaiting them one by one would have serialised the page.
-    await Promise.all([
+    // Awaited so these seven shelves are in the server HTML. Left
+    // fire-and-forget, the loader returned immediately and every shelf waited
+    // for hydration, so a crawler or a slow first paint saw an empty page.
+    // Promise.all over the seven, so they run concurrently rather than
+    // sequentially — awaiting them one by one would have serialised the page.
+    //
+    // Failures are tolerated. With the data off this loader cannot succeed, and
+    // an unhandled rejection replaced /browse — a main navigation tab — with an
+    // error screen. Each shelf already reads through useOfflineList, which
+    // renders the last snapshot offline, so continuing here is what lets that
+    // fallback actually run.
+    await loaderGracefulAll([
       context.queryClient.ensureQueryData(featuredQO),
       context.queryClient.ensureQueryData(newReleasesQO),
       context.queryClient.ensureQueryData(trendingQO),

@@ -1,7 +1,9 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import { albumSellablePrice, getAlbumWithSongs } from "@/lib/music.functions";
+import { useOfflineList } from "@/hooks/use-offline-list";
+import { isOfflineTransportFailure, isRedirect } from "@/lib/loader-graceful";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
@@ -12,10 +14,26 @@ import { useSavedTrack } from "@/hooks/use-saved-track";
 import { toast } from "sonner";
 import { isUuid } from "@/lib/route-params";
 
+type AlbumPayload = Awaited<ReturnType<typeof getAlbumWithSongs>>;
+
+/**
+ * The album query, as plain values rather than a queryOptions() object.
+ *
+ * queryOptions() attaches TanStack's data-tag symbols, and useOfflineList takes
+ * a plain {queryKey, queryFn} — passing the tagged object through made the two
+ * incompatible. Reusing the same key and function here keeps the loader and the
+ * component reading one cache entry, which is the point: the snapshot the
+ * component falls back to offline IS the entry the loader primed.
+ */
+// Mutable, not `as const`: useOfflineList's queryKey is a plain unknown[], and
+// a readonly tuple is not assignable to it.
+const albumKey = (id: string) => ["album", id];
+const albumFn = (id: string) => getAlbumWithSongs({ data: { id } });
+
 const albumQO = (id: string) =>
   queryOptions({
-    queryKey: ["album", id],
-    queryFn: () => getAlbumWithSongs({ data: { id } }),
+    queryKey: albumKey(id),
+    queryFn: () => albumFn(id),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -24,9 +42,30 @@ export const Route = createFileRoute("/albums/$id")({
     // Reject a malformed id before it reaches the uuid column, which would
     // otherwise 500 with a raw Postgres error.
     if (!isUuid(params.id)) throw notFound();
-    const data = await context.queryClient.ensureQueryData(albumQO(params.id));
-    if (!data.album) throw notFound();
-    return data;
+
+    try {
+      const data = await context.queryClient.ensureQueryData(albumQO(params.id));
+      if (!data.album) throw notFound();
+      return data;
+    } catch (err) {
+      // notFound() is a redirect, not a failure. It must not be mistaken for a
+      // network problem and downgraded into an offline page.
+      if (isRedirect(err)) throw err;
+      // ensureQueryData REJECTS on failure — it never returns an error field.
+      // That matters here: the original code let the rejection escape, and the
+      // router's notFoundComponent then told the listener "Album not found" for
+      // an album they had PAID FOR, purely because they lost signal. Worse than
+      // an error message — it claims their purchase does not exist.
+      //
+      // So a transport failure is separated from a genuine missing record. A
+      // server that answered and returned no album still throws notFound below;
+      // only the offline case returns a marker, and the component reads its own
+      // cached snapshot.
+      if (isOfflineTransportFailure(err)) {
+        return { album: null, offline: true as const };
+      }
+      throw err;
+    }
   },
   head: ({ loaderData }) => ({
     meta: [
@@ -178,13 +217,43 @@ function SongRow({
 function AlbumPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const { data } = useSuspenseQuery(albumQO(id));
+  // NOT useSuspenseQuery. Suspense has no offline branch: with the data off the
+  // fetch rejects and the component throws into the route error boundary, so the
+  // listener got an error page instead of their album. useOfflineList falls back
+  // to the last snapshot, which is the whole point of the cached shell.
+  const { data } = useOfflineList(`album:${id}`, {
+    queryKey: albumKey(id),
+    queryFn: () => albumFn(id),
+    staleTime: 5 * 60 * 1000,
+  });
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const formatPrice = useCurrency((s) => s.formatPrice);
-  const album = data.album!;
+
+  // Offline with no snapshot of this album: say so plainly. The alternative —
+  // "Album not found" — tells someone their purchase vanished because they lost
+  // signal, which is both false and alarming.
+  if (!data?.album) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <p className="text-lg font-semibold mb-2">Can&apos;t show this album right now</p>
+        <p className="text-muted-foreground text-sm mb-6">
+          You&apos;re offline and this album isn&apos;t saved on this device. Your downloads still
+          play — reconnect to browse the full catalogue. Nothing has been removed from your account.
+        </p>
+        <button
+          onClick={() => navigate({ to: "/downloads" })}
+          className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+        >
+          Go to downloads
+        </button>
+      </div>
+    );
+  }
+
+  const album = data.album;
   const artist =
     (album as { artist?: { id: string; name: string; avatar_url?: string | null } | null })
       .artist ?? null;

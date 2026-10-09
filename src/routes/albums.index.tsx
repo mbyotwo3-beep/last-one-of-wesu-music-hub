@@ -3,6 +3,7 @@ import { routeErrorComponent } from "@/components/RouteError";
 import { queryOptions } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
+import { loaderGraceful } from "@/lib/loader-graceful";
 import { Disc } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 import { useCurrency } from "@/stores/currency";
@@ -25,14 +26,17 @@ export const Route = createFileRoute("/albums/")({
     //
     // Fire-and-forget meant the loader returned before the query resolved, so
     // the server rendered an empty Albums grid and the releases only appeared
-    // after hydration. Two consequences: nothing in the HTML for a crawler or a
-    // first paint, and if listAlbums threw — a transient database error, a
-    // deploy-time failure — the visitor got a blank shelf with no error and
-    // nothing in the server log.
+    // after hydration. That was the reason to await, and it still holds: nothing
+    // in the HTML for a crawler or a first paint otherwise.
     //
-    // /albums/$id already awaited its own loader, which is why the detail page
-    // server-rendered correctly while this one did not.
-    return context.queryClient.ensureQueryData(albumsQO);
+    // The failure is now caught, which the comment above used to argue against.
+    // That argument was right when the app could not boot offline at all, where
+    // swallowing meant a silently empty grid with no error anywhere. Now that the
+    // shell caches and the app starts with the data off, a thrown rejection
+    // replaced this route with an error screen — and this route reads through
+    // useOfflineList, which renders the last snapshot offline. Catching here is
+    // what lets that fallback run instead of being overridden.
+    return loaderGraceful(context.queryClient.ensureQueryData(albumsQO), []);
   },
   component: AlbumsPage,
   errorComponent: routeErrorComponent(),

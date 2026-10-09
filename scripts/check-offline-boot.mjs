@@ -144,6 +144,83 @@ if (existsSync("src/components/DownloadsSection.tsx")) {
   }
 }
 
+// --- 6. route loaders must not override the snapshot fallback
+//
+// Each of these routes reads its data through useOfflineList, which renders the
+// last snapshot when a query fails offline. A loader that throws sits one level
+// ABOVE that fallback and replaces it with an error screen — so the offline
+// path existed and was never reached.
+const LOADER_ROUTES = {
+  "src/routes/browse.tsx": "loaderGracefulAll",
+  "src/routes/albums.index.tsx": "loaderGraceful",
+  "src/routes/artists.index.tsx": "loaderGraceful",
+  "src/routes/albums.$id.tsx": "isOfflineTransportFailure",
+};
+
+for (const [file, helper] of Object.entries(LOADER_ROUTES)) {
+  if (!existsSync(file)) {
+    problems.push(`${file} is missing — cannot check its loader`);
+    continue;
+  }
+  const src = readFileSync(file, "utf8");
+  // Match a CALL, not a mention.
+  //
+  // Checking `src.includes(helper)` also matches the import statement, so
+  // removing every call site while leaving the import passed the gate. Verified
+  // negatively on /browse, which is why this is written the long way.
+  const called = new RegExp(`[^\\w.]${helper}\\s*\\(`).test(src);
+  if (!called) {
+    problems.push(
+      `${file} never CALLS ${helper}, so its loader throws offline and replaces\n` +
+        `        the snapshot fallback with an error screen`,
+    );
+  }
+}
+
+// --- 7. the album case specifically: a paid-for album must never be reported
+// as missing just because the listener lost signal.
+const albumRoute = "src/routes/albums.$id.tsx";
+if (existsSync(albumRoute)) {
+  const src = readFileSync(albumRoute, "utf8");
+  // useSuspenseQuery has no offline branch at all: it rejects into the route
+  // error boundary. The snapshot layer is the only offline-capable read.
+  //
+  // Strip comments first. An earlier version of this check matched the string
+  // "useSuspenseQuery" ANYWHERE, including in the explanatory comment that
+  // documents why it is not used — so the negative test passed while the file
+  // was fully reverted. Verified negatively, which is how it was found.
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  if (/useSuspenseQuery/.test(code)) {
+    problems.push(
+      `${albumRoute} uses useSuspenseQuery — suspense has no offline fallback, so the\n` +
+        `        page errors out instead of rendering the cached album`,
+    );
+  }
+  // The notFound() must be inside the try, AFTER the transport check, so a real
+  // missing record still says so.
+  if (!/isRedirect\(err\)/.test(src)) {
+    problems.push(
+      `${albumRoute} does not guard isRedirect — a genuine notFound would be\n` +
+        `        misread as offline and shown as "can't show this album"`,
+    );
+  }
+}
+
+// --- 8. and the message must never claim a purchase vanished
+if (existsSync(albumRoute)) {
+  const src = readFileSync(albumRoute, "utf8");
+  if (
+    /Nothing (?:has been )?(?:been )?(?:lost|removed) from your (?:account|purchase)/i.test(src)
+  ) {
+    // good — reassures the listener their purchase is intact
+  } else {
+    problems.push(
+      `${albumRoute} does not reassure the listener that their purchase is intact\n` +
+        `        when the album cannot be shown offline`,
+    );
+  }
+}
+
 console.log("  the app can start with the data off");
 for (const n of notes) console.log(`    ${n}`);
 
