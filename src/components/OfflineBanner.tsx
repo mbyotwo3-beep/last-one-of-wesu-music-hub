@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { WifiOff } from "lucide-react";
+import { WifiOff, Download, X } from "lucide-react";
 import { toast } from "sonner";
+
+import { useOfflineMode } from "@/stores/offline-mode";
 
 export type OnlineTransition = "went-offline" | "went-online" | "none";
 
@@ -20,15 +22,36 @@ function readOnline(): boolean {
 }
 
 /**
- * Offline mode strip: while there is no data connection every page shows a
- * one-tap route into the on-device downloads (which play with zero bars,
- * Spotify-style). The moment data returns, a toast invites the listener
- * back to streaming. Fires each transition, never on first paint.
+ * Offline strip: shown when there is no data connection, OR when the listener
+ * has switched Offline mode on.
+ *
+ * The two are different states and were previously conflated into "offline".
+ * Spotify separates them:
+ *
+ *   - no connection  — the app cannot stream anything; downloads still play;
+ *   - Offline mode   — the LISTENER chose to stop streaming, even with full
+ *                      bars, and wants the app to behave as if it were offline.
+ *
+ * Only the first is automatic. Treating it as the only case meant there was no
+ * way to ask for a download-only session on a good connection — useful on metered
+ * data, and the thing listeners actually reach for.
+ *
+ * The mode is persisted, so it survives the cold starts the WebView is subject
+ * to on mobile.
  */
 export function OfflineBanner() {
   const navigate = useNavigate();
   const [online, setOnline] = useState<boolean>(() => readOnline());
   const wasOffline = useRef(false);
+  const offlineMode = useOfflineMode();
+  const { enabled, setEnabled, hydrate } = offlineMode;
+
+  // The store starts false because the module is evaluated during SSR, where
+  // localStorage does not exist. Reading it here keeps the first client render
+  // in agreement with what the listener last chose.
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     const update = () => {
@@ -59,6 +82,29 @@ export function OfflineBanner() {
     };
   }, [navigate]);
 
+  // Listener-chosen Offline mode: shown even when the connection is fine, and it
+  // has to be dismissible, or they cannot get back to streaming.
+  if (online && enabled) {
+    return (
+      <div
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary/15 border-b border-primary/30 text-xs"
+        role="status"
+      >
+        <Download className="size-3.5 text-primary" />
+        <span className="text-foreground font-semibold">Offline mode — downloads only</span>
+        <button
+          type="button"
+          onClick={() => setEnabled(false)}
+          className="ml-1 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-bold text-primary-foreground hover:brightness-110 transition-all cursor-pointer"
+        >
+          Turn off
+          <X className="size-3" />
+        </button>
+      </div>
+    );
+  }
+
+  // Genuinely no connection.
   if (online) return null;
   return (
     <button

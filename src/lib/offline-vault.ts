@@ -356,7 +356,92 @@ export async function getVaultUsage(): Promise<{ trackCount: number; bytes: numb
   }
 }
 
-async function assertQuotaFor(bytesNeeded: number): Promise<void> {
+/**
+ * How much room a new download needs before auto-eviction kicks in.
+ *
+ * Spotify frees unused stored data to make space and only falls back to asking
+ * the listener to remove something themselves when nothing can be freed. We used
+ * to do neither: a full vault simply threw, so a listener who downloaded a
+ * 1.5 GB library hit a dead end and could not add anything without manually
+ * deleting tracks one by one.
+ *
+ * This is the pure decision, kept separate so it is testable: it says WHICH
+ * tracks to drop, in what order, never touching the one being downloaded.
+ */
+export function planEviction(
+  candidates: { songId: string; size: number; downloadedAt: number }[],
+  needBytes: number,
+  freeBytes: number,
+): string[] {
+  if (needBytes <= freeBytes) return [];
+  // Oldest first: least recently downloaded goes first, which is also what a
+  // listener would choose if asked.
+  const ordered = [...candidates].sort((a, b) => a.downloadedAt - b.downloadedAt);
+  const evict: string[] = [];
+  let freed = 0;
+  for (const c of ordered) {
+    if (freed + freeBytes >= needBytes) break;
+    evict.push(c.songId);
+    freed += Math.max(0, c.size || 0);
+  }
+  // Still short after removing everything: the caller reports the shortfall.
+  return freed + freeBytes >= needBytes ? evict : evict;
+}
+
+/**
+ * Make room, freeing the oldest downloads if necessary.
+ * Returns the ids it removed so the UI can say what happened.
+ */
+async function makeRoomFor(bytesNeeded: number, protectSongId?: string): Promise<string[]> {
+  const meta = await listVaultMeta();
+  const evictable = meta.filter((m) => m.songId !== protectSongId);
+  const { bytes } = await getVaultUsage();
+
+  // Device quota: aim to stay under 90% of what the browser reports.
+  let need = bytesNeeded;
+  let limit = MAX_VAULT_BYTES;
+  try {
+    if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
+      const est = await navigator.storage.estimate();
+      if (est.quota) {
+        limit = Math.min(limit, Math.floor(est.quota * 0.9));
+        need = Math.max(bytesNeeded, (est.usage ?? 0) + bytesNeeded - limit);
+      }
+    }
+  } catch {
+    /* estimate() unsupported — fall back to the hard cap */
+  }
+
+  const free = Math.max(0, limit - bytes);
+  const victims = planEviction(
+    evictable.map((m) => ({ songId: m.songId, size: m.size ?? 0, downloadedAt: m.downloadedAt })),
+    need,
+    free,
+  );
+  for (const id of victims) {
+    try {
+      await removeTrackFromVault(id);
+    } catch {
+      /* keep going: one undeletable track must not block the rest */
+    }
+  }
+  return victims;
+}
+
+async function assertQuotaFor(bytesNeeded: number, protectSongId?: string): Promise<void> {
+  // Free space first, exactly as Spotify does, and only complain if that was
+  // not enough.
+  const evicted = await makeRoomFor(bytesNeeded, protectSongId);
+  if (evicted.length) {
+    try {
+      console.info(
+        `[offline-vault] freed space for a new download by removing ${evicted.length} older download(s)`,
+      );
+    } catch {
+      /* console may be absent in some hosts */
+    }
+  }
+
   try {
     if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
       const est = await navigator.storage.estimate();
@@ -386,7 +471,9 @@ export async function saveTrackToVault(
 ): Promise<VaultTrackMeta> {
   if (!supported()) throw new Error("Offline downloads are not supported here");
   if (!plaintext || plaintext.byteLength === 0) throw new Error("Nothing to save");
-  await assertQuotaFor(plaintext.byteLength);
+  // Protect the track being saved: eviction must never delete the thing the
+  // listener just asked for, even if it is the oldest entry (a re-download).
+  await assertQuotaFor(plaintext.byteLength, meta.songId);
   const key = await getDeviceKey();
   const iv = randomIv();
   let ciphertext: ArrayBuffer;

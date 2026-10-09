@@ -4,6 +4,7 @@ import { Download, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
+import { useOfflineMode } from "@/stores/offline-mode";
 import {
   getVaultArtObjectUrl,
   getVaultUsage,
@@ -58,8 +59,15 @@ function VaultCover({ songId, path, alt }: { songId: string; path: string | null
 export function DownloadsSection() {
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
+  const { enabled: offlineModeEnabled, setEnabled: setOfflineMode, hydrate } = useOfflineMode();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Hooks must run before the mounted/vault gate below — this file already had a
+  // hydration bug from getting that wrong, so the effect belongs here with the
+  // others.
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   const { data: tracks } = useQuery({
     // Prefix-matched by touchVaultQueries(["vault-track"]) so every
@@ -123,6 +131,25 @@ export function DownloadsSection() {
           </button>
         )}
       </div>
+
+      {/* The Offline mode switch lives here because this is where a listener goes
+          to manage the device. Spotify keeps it in Settings; on a phone with no
+          settings page, the downloads list is the honest home for it. */}
+      <label className="mb-3 flex items-start gap-3 rounded-xl border border-border bg-card p-3 cursor-pointer">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={offlineModeEnabled}
+          onChange={(e) => setOfflineMode(e.target.checked)}
+        />
+        <span className="text-sm">
+          <span className="font-semibold text-foreground">Offline mode</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            Play only these {list.length} download{list.length === 1 ? "" : "s"}, even with full
+            bars. Stays on until you turn it off, including after the app is closed.
+          </span>
+        </span>
+      </label>
       {list.length === 0 ? (
         <p className="text-muted-foreground">
           No downloads yet — tap the download icon on any bought or free song and it plays here with
