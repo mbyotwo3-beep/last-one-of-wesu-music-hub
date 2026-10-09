@@ -172,24 +172,34 @@ if (pbx) {
 // that gets silently dropped by a bundler change and 404s in production while
 // still sitting in git, looking perfectly fine in the repo.
 //
-// This exists because that is what I nearly shipped: I checked dist/, which is
-// a stale month-old artifact, instead of .output/public/, which is what the
-// build actually writes and what Vercel serves.
+// COMPARED AGAINST THE GRADLE OUTPUT, NOT .output
+//
+// An earlier version compared against .output/public/wesuplus.apk, which is
+// created BY THE BUILD — and this gate runs in prebuild, before the build. So
+// publishing a new APK could never pass: the gate always saw the previous
+// build's copy and failed the build that would have refreshed it. Chicken and
+// egg, and the only way out was to delete the check.
+//
+// android/app/build/outputs is written by Gradle, is the real product of the
+// Android build, and exists before this gate runs. That is the correct thing to
+// compare against: "is the APK we publish the one we just built?"
 const APK_PUB = "public/wesuplus.apk";
+const APK_BUILT = "android/app/build/outputs/apk/release/app-release.apk";
+
 if (existsSync(APK_PUB)) {
-  const built = ".output/public/wesuplus.apk";
-  if (existsSync(built)) {
+  if (existsSync(APK_BUILT)) {
     const a = readFileSync(APK_PUB);
-    const b = readFileSync(built);
+    const b = readFileSync(APK_BUILT);
     if (a.length !== b.length || !a.equals(b)) {
       problems.push(
-        `public/wesuplus.apk is not the build that was just deployed\n` +
-          `        public/     ${a.length} bytes\n` +
-          `        .output/    ${b.length} bytes\n` +
-          `      Testers would download a stale build. Re-copy the APK and rebuild.`,
+        `public/wesuplus.apk is NOT the build in android/app/build/outputs\n` +
+          `        published  ${a.length} bytes\n` +
+          `        built      ${b.length} bytes\n` +
+          `      Testers would download a stale build. Copy the fresh APK over\n` +
+          `      public/wesuplus.apk before building.`,
       );
     } else {
-      notes.push(`sideload APK ${(a.length / 1048576).toFixed(1)} MB, committed and deployed`);
+      notes.push(`sideload APK ${(a.length / 1048576).toFixed(1)} MB, matches the Gradle output`);
     }
   }
   // VersionName is 0.0.1 on every build, so it cannot identify which one this

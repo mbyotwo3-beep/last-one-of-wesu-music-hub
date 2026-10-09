@@ -198,8 +198,24 @@ public class MainActivity extends BridgeActivity {
         /** Last main-frame URL that failed — used for retry, never displayed. */
         private String lastFailedUrl;
 
+        /**
+         * Kept so readAsset can reach the APK's assets. getAssets() is an
+         * Activity method and this client is static, so it has to be passed in.
+         */
+        private final android.content.Context appContext;
+
         WesuWebViewClient(Bridge bridge) {
             super(bridge);
+            android.content.Context ctx = null;
+            try {
+                if (bridge != null && bridge.getWebView() != null) {
+                    ctx = bridge.getWebView().getContext();
+                }
+            } catch (Throwable ignored) {
+                // No context is survivable: readAsset returns null and the
+                // caller falls back to loadUrl.
+            }
+            this.appContext = ctx != null ? ctx.getApplicationContext() : null;
         }
 
         @Override
@@ -272,7 +288,7 @@ public class MainActivity extends BridgeActivity {
             // loadDataWithBaseURL needs no permission, works on every API level,
             // and an https base URL keeps the origin sane for anything the page
             // references.
-            String html = readAsset("error.html");
+            String html = readAsset(appContext, "error.html");
             if (html != null) {
                 view.loadDataWithBaseURL("https://www.wesuplus.com/", html, "text/html", "UTF-8", null);
             } else {
@@ -282,10 +298,17 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
-        /** Read a file from the APK's assets, or null if it is absent. */
-        private String readAsset(String name) {
+        /**
+         * Read a file from the APK's assets, or null if it is absent.
+         *
+         * Static because WesuWebViewClient is static, and getAssets() is an
+         * Activity method — so the context is passed in. The first attempt called
+         * getAssets() directly and failed to compile for exactly that reason.
+         */
+        private String readAsset(android.content.Context ctx, String name) {
             try {
-                java.io.InputStream in = getAssets().open(name);
+                if (ctx == null) return null;
+                java.io.InputStream in = ctx.getApplicationContext().getAssets().open(name);
                 try {
                     java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
                     byte[] buf = new byte[8192];

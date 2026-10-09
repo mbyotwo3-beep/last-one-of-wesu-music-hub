@@ -115,7 +115,61 @@ if (existsSync(root)) {
   problems.push("src/routes/__root.tsx is missing");
 }
 
-// --- 6. the honesty check: the copy must not claim downloads are app-only
+// --- 6. the native side must actually let offline work
+//
+// Two native bugs made offline impossible no matter what the web layer did, and
+// neither is visible from JavaScript:
+//
+//   ServiceWorkerController is never configured by Capacitor, so the worker could
+//   register and yet intercept nothing.
+//
+//   Android 11 defaults setAllowFileAccess to FALSE, so loading the offline page
+//   from file:///android_asset/ is refused — the error handler fired and then its
+//   OWN page was blocked, showing Android's raw "Webpage not available".
+//
+// The second also explains why two different screenshots exist for one failure:
+// it was never flaky, it depends on the Android version.
+const ACTIVITY = "android/app/src/main/java/com/wesu/music/MainActivity.java";
+if (!existsSync(ACTIVITY)) {
+  problems.push(`${ACTIVITY} is missing`);
+} else {
+  // Comments are stripped first. This file explains both bugs in prose, and the
+  // words "ServiceWorkerController" and "loadDataWithBaseURL" appear there — so a
+  // naive search matched the explanation rather than the code, and both negative
+  // tests passed with the fix removed. Same trap as the album-route check.
+  const javaCode = readFileSync(ACTIVITY, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  if (!/ServiceWorkerController\s*\.\s*getInstance/.test(javaCode)) {
+    problems.push(
+      "MainActivity never configures ServiceWorkerController. Capacitor does not,\n" +
+        "        so the service worker can register but never serve a page — offline\n" +
+        "        fails no matter what the web layer does.",
+    );
+  }
+  if (!/setServiceWorkerClient/.test(javaCode)) {
+    problems.push(
+      "MainActivity does not install a ServiceWorkerClient — the worker cannot\n" +
+        "        intercept anything without one",
+    );
+  }
+  // The offline page must be DATA, not file://.
+  if (/loadUrl\(\s*ERROR_PAGE\s*\)/.test(javaCode) && !/loadDataWithBaseURL/.test(javaCode)) {
+    problems.push(
+      "MainActivity loads the offline page from file:// without a data-URL path.\n" +
+        "        Android 11 disabled file access by default, so on a modern phone the\n" +
+        "        handler's own page is blocked and the listener sees Android's raw\n" +
+        "        error screen with a visible URL.",
+    );
+  }
+  // SSL errors must still fail closed. Play policy rejects apps that bypass them,
+  // and a music app that silently accepts a bad certificate is a licence leak.
+  if (!/onReceivedSslError/.test(javaCode) || !/handler\.cancel\(\)/.test(javaCode)) {
+    problems.push("MainActivity must cancel on SSL errors — never bypass a certificate error");
+  }
+}
+
+// --- 7. the honesty check: the copy must not claim downloads are app-only
 //
 // Listeners were asking on the belief that downloads only work inside an app.
 // They do not — the vault is IndexedDB, which a desktop browser has too. Copy
