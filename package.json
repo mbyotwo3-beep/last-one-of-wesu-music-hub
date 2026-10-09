@@ -18,10 +18,11 @@
     "import:catalogue": "node scripts/import-catalogue.mjs",
     "verify:ci-install": "node scripts/verify-ci-install.mjs",
     "verify:no-known-vulns": "node scripts/verify-no-known-vulns.mjs",
+    "verify:offline-mode": "node scripts/check-offline-mode.mjs",
     "verify:hover-controls": "node scripts/check-hover-only-controls.mjs",
     "verify:revenue-split": "node scripts/check-revenue-split-parity.mjs",
     "verify:no-secrets": "node scripts/scan-apk-secrets.mjs",
-    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs"
+    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs && node scripts/check-offline-mode.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

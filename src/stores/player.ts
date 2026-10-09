@@ -12,6 +12,9 @@ import {
   type RepeatMode,
   type ShuffleDeck,
 } from "@/stores/play-order";
+import { offlineModeEnabled } from "@/stores/offline-mode";
+import { getCachedVaultIds, isVaultIndexReady } from "@/lib/vault-index";
+import { planOfflineQueue } from "@/lib/offline-queue";
 
 export type { ShuffleDeck };
 
@@ -165,16 +168,47 @@ export const usePlayer = create<PlayerState>()(
           });
           return;
         }
-        // Clamp out-of-bounds callers instead of storing a queueIndex with no track.
-        const safeIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
-        if (tracks.length) primeAudio();
+
+        // Offline mode: a queue may only hold tracks that are on this device.
+        //
+        // Every surface funnels through here, and the shuffle deck is derived
+        // from the resulting queue, so this one filter also constrains shuffle
+        // and Next/Prev. Without it, tapping a shelf with the mode on builds a
+        // queue of tracks that each die on a signed URL they cannot obtain.
+        //
+        // `isVaultIndexReady` guard: before the first read completes the index
+        // is empty, and treating "not read yet" as "nothing downloaded" would
+        // wipe the queue of every listener right after a cold start. If the
+        // index is not ready, build the queue unfiltered — a wrong queue on the
+        // first tap is far better than silence — and the next read corrects it.
+        const offlineMode = offlineModeEnabled();
+        const plan = planOfflineQueue(
+          tracks,
+          startIndex,
+          offlineMode && isVaultIndexReady(),
+          getCachedVaultIds(),
+        );
+
+        if (plan.empty) {
+          // Nothing playable, but do NOT clear what is currently playing —
+          // refusing a new queue should not stop the song already in progress.
+          set({
+            error: offlineMode
+              ? "Offline mode: none of those songs are downloaded on this device."
+              : null,
+          });
+          return;
+        }
+
+        const safeIndex = plan.startIndex;
+        primeAudio();
         const track = preserveResolvedAudioUrl(
           tracks[safeIndex] ?? null,
           get().track,
           get().isPreview,
         );
         set((state) => ({
-          queue: tracks,
+          queue: plan.tracks,
           queueIndex: safeIndex,
           track,
           selectionId: track ? state.selectionId + 1 : state.selectionId,
@@ -182,12 +216,21 @@ export const usePlayer = create<PlayerState>()(
           progressSeconds: 0,
           // The old deck indexes the PREVIOUS queue. Left in place, the next
           // skip drew an index that no longer existed.
-          shuffleDeck: rebuildShuffleDeck(state.shuffle, tracks.length, safeIndex),
+          shuffleDeck: rebuildShuffleDeck(state.shuffle, plan.tracks.length, safeIndex),
           error: null,
         }));
       },
 
       addToQueue: (track) => {
+        // Same rule as setQueue: nothing reaches the queue that cannot play.
+        if (track && offlineModeEnabled() && isVaultIndexReady()) {
+          if (!getCachedVaultIds().has(track.id)) {
+            set({
+              error: `"${track.title}" is not downloaded on this device.`,
+            });
+            return;
+          }
+        }
         if (track) primeAudio();
         set((state) => {
           const at = state.queue.length;

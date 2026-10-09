@@ -46,9 +46,10 @@ export function OfflineBanner() {
   const offlineMode = useOfflineMode();
   const { enabled, setEnabled, hydrate } = offlineMode;
 
-  // The store starts false because the module is evaluated during SSR, where
-  // localStorage does not exist. Reading it here keeps the first client render
-  // in agreement with what the listener last chose.
+  // The store boots false because it is evaluated during SSR, where storage does
+  // not exist. Reading it here keeps the first client render in agreement with
+  // what the listener last chose — and primes the vault index, so the very
+  // first tap under Offline mode is filtered rather than slipping through.
   useEffect(() => {
     hydrate();
   }, [hydrate]);

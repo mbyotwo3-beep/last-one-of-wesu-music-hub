@@ -23,7 +23,41 @@ import { create } from "zustand";
 
 const STORAGE_KEY = "wesu:offline-mode";
 
+/**
+ * localStorage with a document.cookie fallback.
+ *
+ * The WebView can run with storage partitioned or blocked, and an
+ * IndexedDB-only store would leave the mode silently resetting to off on every
+ * cold start — a switch that forgets itself is worse than none. Cookies have
+ * survived cases where localStorage has not, so try both.
+ *
+ * Last write wins, and reads tolerate anything unexpected.
+ */
+function readCookie(): boolean | null {
+  try {
+    if (typeof document === "undefined") return null;
+    const hit = /(?:^|;\s*)wesu-offline-mode=([01])/.exec(document.cookie);
+    if (!hit) return null;
+    return hit[1] === "1";
+  } catch {
+    return null;
+  }
+}
+
+function writeCookie(enabled: boolean): void {
+  try {
+    if (typeof document === "undefined") return;
+    const maxAge = enabled ? 60 * 60 * 24 * 365 : 0;
+    // SameSite=Lax so this never rides along on a cross-site request.
+    document.cookie = `wesu-offline-mode=${enabled ? "1" : "0"}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  } catch {
+    /* best effort */
+  }
+}
+
 function readPersisted(): boolean {
+  const cookie = readCookie();
+  if (cookie !== null) return cookie;
   try {
     if (typeof window === "undefined" || !window.localStorage) return false;
     return window.localStorage.getItem(STORAGE_KEY) === "1";
@@ -35,6 +69,7 @@ function readPersisted(): boolean {
 }
 
 function persist(enabled: boolean): void {
+  writeCookie(enabled);
   try {
     if (typeof window === "undefined" || !window.localStorage) return;
     window.localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
@@ -56,6 +91,25 @@ export interface OfflineModeState {
   hydrate: () => void;
 }
 
+/**
+ * Load the vault id index once the mode is on.
+ *
+ * The player refuses to queue anything not in that index, and it deliberately
+ * ignores an index that has not been read yet (so a cold start does not silence
+ * playback). The consequence is that the FIRST tap after enabling the mode can
+ * slip through unfiltered. Reading the index here closes that window.
+ *
+ * Imported lazily: the vault touches IndexedDB and cannot be evaluated during
+ * SSR, and this store is imported by the player, which runs on the server too.
+ */
+function primeVaultIndex(): void {
+  void import("@/lib/offline-vault")
+    .then((m) => m.refreshVaultIdCache())
+    .catch(() => {
+      /* no vault here — the mode simply has nothing to allow */
+    });
+}
+
 export const useOfflineMode = create<OfflineModeState>((set, get) => ({
   // Server render: never claim offline mode, or the HTML and the first client
   // render disagree and React warns.
@@ -63,15 +117,18 @@ export const useOfflineMode = create<OfflineModeState>((set, get) => ({
   setEnabled: (next) => {
     persist(next);
     set({ enabled: next });
+    if (next) primeVaultIndex();
   },
   toggle: () => {
     const next = !get().enabled;
     persist(next);
     set({ enabled: next });
+    if (next) primeVaultIndex();
   },
   hydrate: () => {
     const stored = readPersisted();
     if (stored !== get().enabled) set({ enabled: stored });
+    if (stored) primeVaultIndex();
   },
 }));
 

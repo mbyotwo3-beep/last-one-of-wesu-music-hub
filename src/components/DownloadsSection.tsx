@@ -10,6 +10,7 @@ import {
   getVaultUsage,
   isVaultSupported,
   listVaultMeta,
+  refreshVaultIdCache,
   removeTrackFromVault,
 } from "@/lib/offline-vault";
 
@@ -68,6 +69,12 @@ export function DownloadsSection() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+  // The player consults this index synchronously and refuses to queue anything
+  // missing from it. Reading it here means a listener who lands on /downloads
+  // first, then taps a track, is filtered correctly on the very first tap.
+  useEffect(() => {
+    if (mounted) void refreshVaultIdCache();
+  }, [mounted]);
 
   const { data: tracks } = useQuery({
     // Prefix-matched by touchVaultQueries(["vault-track"]) so every
@@ -145,8 +152,9 @@ export function DownloadsSection() {
         <span className="text-sm">
           <span className="font-semibold text-foreground">Offline mode</span>
           <span className="block text-xs text-muted-foreground mt-0.5">
-            Play only these {list.length} download{list.length === 1 ? "" : "s"}, even with full
-            bars. Stays on until you turn it off, including after the app is closed.
+            Play only your {list.length} download{list.length === 1 ? "" : "s"}, even with full
+            bars. Tapping anything you have not downloaded will be skipped. Stays on until you turn
+            it off, including after the app is closed.
           </span>
         </span>
       </label>

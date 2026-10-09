@@ -13,6 +13,8 @@
  * nothing playable is ever written to disk or exposed as a file/URL.
  */
 
+import { noteVaultChanged, setCachedVaultIds } from "@/lib/vault-index";
+
 const DB_NAME = "wesu-offline-vault";
 const DB_VERSION = 2;
 const TRACKS_STORE = "tracks";
@@ -199,6 +201,20 @@ export function decideStaleVaultPlayback(args: {
   if (!args.stale) return "play";
   if (!args.online) return "play";
   return args.probePurchaseFailed ? "blocked" : "play";
+}
+
+/**
+ * Rebuild the in-memory id set the player reads synchronously.
+ *
+ * The state lives in vault-index.ts, deliberately outside this module: the player
+ * store imports it, and pulling encryption and IndexedDB code into the player
+ * would make playback depend on a storage layer that also cannot run during SSR.
+ * This function is the vault's only contribution — it is the part that knows how
+ * to enumerate storage.
+ */
+export async function refreshVaultIdCache(): Promise<ReadonlySet<string>> {
+  const meta = await listVaultMeta();
+  return setCachedVaultIds(meta.map((m) => m.songId));
 }
 
 /** List downloaded tracks (metadata only — never decrypts audio). */
@@ -505,6 +521,8 @@ export async function saveTrackToVault(
     void _data;
     void _artwork;
     await tx(META_STORE, "readwrite", (s) => s.put(meta));
+    // The player reads the id set synchronously; keep it correct on save too.
+    noteVaultChanged(record.songId, true);
   } catch (err: any) {
     if (err?.name === "QuotaExceededError") {
       throw new Error("Not enough device storage for this download");
@@ -526,6 +544,7 @@ export async function removeTrackFromVault(songId: string): Promise<void> {
   try {
     await tx(TRACKS_STORE, "readwrite", (s) => s.delete(songId));
     await tx(META_STORE, "readwrite", (s) => s.delete(songId));
+    noteVaultChanged(songId, false);
   } catch {
     throw new Error("Could not remove this download. Try again.");
   }
