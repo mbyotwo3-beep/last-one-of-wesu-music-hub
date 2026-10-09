@@ -19,8 +19,11 @@ export const Route = createFileRoute("/artists/")({
       { name: "description", content: "Browse every artist on Wesu+." },
     ],
   }),
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(artistsQO).catch(() => {});
+  loader: async ({ context }) => {
+    // Awaited rather than fire-and-forget, so the shelf is in the server HTML
+    // and a failure surfaces instead of rendering an empty page. Same fix as
+    // /albums — see the note there.
+    return context.queryClient.ensureQueryData(artistsQO);
   },
   component: ArtistsPage,
   errorComponent: routeErrorComponent(),

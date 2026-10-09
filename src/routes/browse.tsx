@@ -95,14 +95,21 @@ export const Route = createFileRoute("/browse")({
   }),
   validateSearch: (search: Record<string, unknown>): { genre?: string } =>
     typeof search.genre === "string" ? { genre: search.genre } : {},
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(featuredQO);
-    context.queryClient.ensureQueryData(newReleasesQO);
-    context.queryClient.ensureQueryData(trendingQO);
-    context.queryClient.ensureQueryData(topArtistsQO);
-    context.queryClient.ensureQueryData(recentAlbumsQO);
-    context.queryClient.ensureQueryData(playlistsQO);
-    context.queryClient.ensureQueryData(genresQO);
+  loader: async ({ context }) => {
+    // Awaited so these seven shelves are in the server HTML. Left
+    // fire-and-forget, the loader returned immediately and every shelf waited
+    // for hydration, so a crawler or a slow first paint saw an empty page.
+    // Promise.all over the seven, so they run concurrently rather than
+    // sequentially — awaiting them one by one would have serialised the page.
+    await Promise.all([
+      context.queryClient.ensureQueryData(featuredQO),
+      context.queryClient.ensureQueryData(newReleasesQO),
+      context.queryClient.ensureQueryData(trendingQO),
+      context.queryClient.ensureQueryData(topArtistsQO),
+      context.queryClient.ensureQueryData(recentAlbumsQO),
+      context.queryClient.ensureQueryData(playlistsQO),
+      context.queryClient.ensureQueryData(genresQO),
+    ]);
   },
   component: BrowseRoute,
   errorComponent: ({ error, reset }) => (

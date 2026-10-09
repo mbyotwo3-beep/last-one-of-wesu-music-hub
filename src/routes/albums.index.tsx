@@ -20,8 +20,19 @@ export const Route = createFileRoute("/albums/")({
       { name: "description", content: "Browse every album and single available on Wesu+." },
     ],
   }),
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(albumsQO).catch(() => {});
+  loader: async ({ context }) => {
+    // Awaited, and no .catch(() => {}) swallowing the failure.
+    //
+    // Fire-and-forget meant the loader returned before the query resolved, so
+    // the server rendered an empty Albums grid and the releases only appeared
+    // after hydration. Two consequences: nothing in the HTML for a crawler or a
+    // first paint, and if listAlbums threw — a transient database error, a
+    // deploy-time failure — the visitor got a blank shelf with no error and
+    // nothing in the server log.
+    //
+    // /albums/$id already awaited its own loader, which is why the detail page
+    // server-rendered correctly while this one did not.
+    return context.queryClient.ensureQueryData(albumsQO);
   },
   component: AlbumsPage,
   errorComponent: routeErrorComponent(),

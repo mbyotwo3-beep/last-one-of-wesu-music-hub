@@ -22,6 +22,20 @@ const discoverQO = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
+// Called directly, the way discoverQO does — useServerFn is a hook and cannot
+// be used to build a module-scope queryOptions.
+const carouselsQO = queryOptions({
+  queryKey: ["active-carousels"],
+  queryFn: () => getActiveCarousels(),
+  staleTime: 60 * 1000,
+});
+
+const heroQO = queryOptions({
+  queryKey: ["active-hero-slides"],
+  queryFn: () => getActiveHeroSlides(),
+  staleTime: 60 * 1000,
+});
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -40,10 +54,24 @@ export const Route = createFileRoute("/")({
     ],
     links: [{ rel: "canonical", href: "/" }],
   }),
-  loader: ({ context }) => {
-    // Offline cold start must not throw: the page renders last-known
-    // content from snapshots instead (Spotify-style browsable cache).
-    context.queryClient.ensureQueryData(discoverQO).catch(() => {});
+  loader: async ({ context }) => {
+    // Awaited, but a failure is still swallowed on purpose.
+    //
+    // Offline cold start must not throw: the page renders last-known content
+    // from snapshots instead (Spotify-style browsable cache). Not awaiting,
+    // though, meant the server never had the shelves either — every visitor got
+    // an empty home page until hydration, and a deploy-time error produced a
+    // blank page with nothing in the server log.
+    //
+    // Awaiting gives the server real content when the network is fine, and the
+    // catch keeps the offline path working when it is not.
+    await context.queryClient.ensureQueryData(discoverQO).catch(() => {});
+    // The component also reads the carousel and hero queries. Nothing primed
+    // them, so those two always waited for hydration even on a warm cache.
+    await Promise.all([
+      context.queryClient.ensureQueryData(carouselsQO).catch(() => {}),
+      context.queryClient.ensureQueryData(heroQO).catch(() => {}),
+    ]);
   },
   component: IndexRoute,
   errorComponent: ({ error, reset }) => (
