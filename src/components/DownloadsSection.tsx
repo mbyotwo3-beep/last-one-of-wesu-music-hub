@@ -94,7 +94,31 @@ export function DownloadsSection() {
   // paint render the whole section — a hydration mismatch plus a flash of an
   // empty downloads page. Gate on "mounted" instead, so both sides render the
   // same thing first.
-  if (!mounted || !isVaultSupported()) return null;
+  //
+  // Note the second half of that condition changed too. Returning null when the
+  // vault is unsupported made the whole page EMPTY — indistinguishable from
+  // "you have no downloads". That is the worst possible answer when someone is
+  // trying to work out why their downloads are not being kept: the failure
+  // looks exactly like the absence of a feature. It now says what is wrong.
+  if (!mounted) return null;
+
+  if (!isVaultSupported()) {
+    return (
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-3">Downloads on this device</h2>
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <p className="text-sm text-foreground font-medium">
+            This phone can&apos;t store downloads
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Wesu+ keeps downloads in private storage on this device. Android is blocking it, so
+            songs cannot be saved here. Music still streams normally whenever you have internet.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   const list = tracks ?? [];
   const mb = ((usage?.bytes ?? 0) / 1048576).toFixed(1);
 

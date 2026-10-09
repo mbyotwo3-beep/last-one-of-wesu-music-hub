@@ -20,6 +20,7 @@ import { ThemeProvider, themeInitScript } from "../hooks/use-theme";
 import { usePlatform } from "../hooks/use-platform";
 import { BottomTabBar } from "../components/mobile/BottomTabBar";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
 import { MiniPlayer } from "../components/mobile/MiniPlayer";
 import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
@@ -212,6 +213,26 @@ function RootComponent() {
   // MiniPlayer reserves ~4rem above the 4rem tab bar only when a track is
   // loaded — don't leave dead whitespace on track-less pages.
   const hasTrack = usePlayer((s) => !!s.track);
+
+  // Install the offline shell cache.
+  //
+  // Without this the app cannot start with the data off at all: it is SSR, so
+  // there is no document to load, and every offline feature (the encrypted
+  // vault, offline mode, the list snapshots) lives inside the React tree that
+  // never boots. Registering is deferred until after load so it never competes
+  // with first paint, and a failure is deliberately swallowed — the app must
+  // still boot online if a worker will not register.
+  useEffect(() => {
+    if (platform !== "native") return;
+    if (!shellCacheSupported()) return;
+    const go = () => void ensureShellCache();
+    if (document.readyState === "complete") {
+      go();
+      return;
+    }
+    window.addEventListener("load", go, { once: true });
+    return () => window.removeEventListener("load", go);
+  }, [platform]);
 
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {

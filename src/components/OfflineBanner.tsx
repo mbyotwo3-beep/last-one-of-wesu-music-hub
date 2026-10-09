@@ -115,7 +115,7 @@ export function OfflineBanner() {
       aria-label="Offline — show my downloads"
     >
       <WifiOff className="size-3.5" />
-      <span>Offline — tap for your downloads</span>
+      <span>Offline — your downloads still play</span>
     </button>
   );
 }
