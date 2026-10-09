@@ -66,8 +66,16 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<!-- arm64, not armv7. armv7 is the 32-bit ABI, which iOS has not
+		     supported since iOS 11 — every device that can install this build is
+		     arm64. -->
+		<string>arm64</string>
 	</array>
+	<!-- Export compliance. We ship no cryptography of our own beyond the OS
+	     HTTPS stack, so declare it exempt rather than making every upload wait
+	     on a compliance questionnaire. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

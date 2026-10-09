@@ -17,9 +17,10 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 29 = album bundle selling, playlist fixes, and the mobile tap-target
-        // and layout fixes (plays/price overlap, hover-only controls on touch).
-        versionCode 29
+        // 30 = Offline mode wired through the player (queues only hold tracks
+        // on the device, oldest-first eviction when storage fills) plus the
+        // iOS host fix and privacy manifest.
+        versionCode 30
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
