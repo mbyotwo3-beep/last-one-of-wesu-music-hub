@@ -16,7 +16,6 @@ import { HeroCarousel } from "@/components/HeroCarousel";
 import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
 import { SkeletonHeroCarousel, SkeletonShelf, SkeletonTrackRow } from "@/components/Skeleton";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
-import { GetTheApp } from "@/components/GetTheApp";
 
 const discoverQO = queryOptions({
   queryKey: ["home-discover"],
@@ -144,10 +143,6 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
-        {/* The home page, because this is where "is there an app?" is asked.
-            It renders only on a phone that has not already installed us, so it
-            costs a desktop or an installed app nothing. */}
-        <GetTheApp />
         {/* Show full skeleton during initial load */}
         {isInitialLoading ? (
           <>

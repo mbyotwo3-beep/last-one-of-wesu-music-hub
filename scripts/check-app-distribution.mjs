@@ -29,41 +29,47 @@ if (!existsSync(published)) {
   notes.push(`APK ${(readFileSync(published).length / 1048576).toFixed(1)} MB at /wesuplus.apk`);
 }
 
-// --- 2. something on the site must LINK to it
+// --- 2. the homepage must NOT advertise the sideload APK
 //
-// The actual defect. Searching for the string is not enough: a comment or a
-// dead branch would satisfy it. This looks for the download inside rendered JSX.
-const LINKING = [
-  "src/components/GetTheApp.tsx",
-  "src/routes/downloads.tsx",
-  "src/routes/index.tsx",
-];
-let linked = [];
-for (const file of LINKING) {
-  if (!existsSync(file)) continue;
-  const src = readFileSync(file, "utf8");
-  if (/["'`]\/wesuplus\.apk["'`]/.test(src)) linked.push(file);
-}
-if (!linked.length) {
-  problems.push(
-    "nothing in the UI links to /wesuplus.apk — listeners asking for the app cannot\n" +
-      "        find it. This is the defect that kept the app 'unavailable' while it\n" +
-      "        was fully built and hosted.",
-  );
+// Decision: everyone installs from Google Play. The sideload link exists only
+// for us to share directly with a tester, so it must stay reachable as a URL
+// while never being advertised.
+//
+// The earlier version of this check REQUIRED a UI link, and would have fought
+// this decision. It was right at the time — nothing linked to the APK and
+// listeners genuinely could not find it. Now the requirement is inverted: the
+// link must still work, and must not be pushed at anyone.
+const APK_URL_RE = /["'`]\/wesuplus\.apk["'`]/;
+
+const HOMEPAGE = "src/routes/index.tsx";
+if (existsSync(HOMEPAGE)) {
+  const home = readFileSync(HOMEPAGE, "utf8");
+  if (APK_URL_RE.test(home) || /GetTheApp/.test(home)) {
+    problems.push(
+      "the homepage advertises the sideload APK.\n" +
+        "        Everyone installs from Google Play; the APK link is only for us to\n" +
+        "        share directly. Remove <GetTheApp /> and the /wesuplus.apk URL\n" +
+        "        from src/routes/index.tsx.",
+    );
+  } else {
+    notes.push("homepage does not advertise the sideload — Play Store only");
+  }
 } else {
-  notes.push(`linked from ${linked.length} surface(s): ${linked.join(", ")}`);
+  problems.push("src/routes/index.tsx is missing");
 }
 
-// --- 3. the GetTheApp panel must exist and be used
+// --- 3. the /downloads panel still exists
+//
+// Kept on /downloads only. That page is reached deliberately, by someone already
+// looking at their offline music, and it is where a Play-Store link belongs
+// while the APK link is reserved for us to share by hand.
 if (!existsSync("src/components/GetTheApp.tsx")) {
-  problems.push("src/components/GetTheApp.tsx is missing — there is no install affordance");
+  problems.push("src/components/GetTheApp.tsx is missing — /downloads has no install panel");
 } else {
   const src = readFileSync("src/components/GetTheApp.tsx", "utf8");
-  const used = LINKING.slice(1).some(
-    (f) => existsSync(f) && readFileSync(f, "utf8").includes("<GetTheApp"),
-  );
-  if (!used) {
-    problems.push("GetTheApp exists but is not rendered anywhere");
+  const dl = "src/routes/downloads.tsx";
+  if (existsSync(dl) && !readFileSync(dl, "utf8").includes("<GetTheApp")) {
+    problems.push("GetTheApp exists but is not rendered on /downloads");
   }
   // beforeinstallprompt must be preventDefault()ed, or Chrome also shows its own
   // mini-infobar and the listener gets two competing prompts.
