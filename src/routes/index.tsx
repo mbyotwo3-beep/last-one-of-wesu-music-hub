@@ -171,6 +171,16 @@ function HomePage() {
               />
             ) : (
               heroPick && (
+                /* FALLBACK, not the hero.
+                 *
+                 * This only renders when hero_carousel_slides has no active rows.
+                 * It looks enough like the real hero that it reads as one, which is
+                 * why it was mistaken for a hardcoded section nobody can edit.
+                 *
+                 * The fix is to add a slide at /admin -> Hero Carousel. The
+                 * comment here exists so the next person does not try to style
+                 * this instead.
+                 */
                 <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
                   <StorageImage
                     bucket="album-art"
