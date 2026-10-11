@@ -12,6 +12,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { getSiteConfig, DEFAULT_SITE } from "@/lib/pricing.functions";
+import { routeErrorComponent } from "@/components/RouteError";
 
 /**
  * The published artist terms must state the commission the LEDGER actually
@@ -74,6 +75,9 @@ export const Route = createFileRoute("/terms-artist")({
     ],
   }),
   component: ArtistTermsPage,
+  // Reads site config over the network; a blank page is the worst outcome for a
+  // terms document someone has to read before signing up.
+  errorComponent: routeErrorComponent("Couldn't load the artist terms"),
 });
 
 const sections = [

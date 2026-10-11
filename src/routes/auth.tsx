@@ -11,6 +11,7 @@ import { acceptInvitation } from "@/lib/invitations.functions";
 import { TermsConsent } from "@/components/TermsConsent";
 import { toast } from "sonner";
 import { useIsNative } from "@/hooks/use-platform";
+import { routeErrorComponent } from "@/components/RouteError";
 import {
   stashPendingAction,
   takePendingAction,
@@ -49,6 +50,10 @@ export const Route = createFileRoute("/auth")({
     type: typeof search.type === "string" ? search.type : undefined,
   }),
   component: AuthPage,
+  // Auth calls the server (sign-in, invitations) and renders site config. With
+  // no boundary, a failed call left a listener staring at a blank page on the
+  // one screen they cannot work around.
+  errorComponent: routeErrorComponent("Couldn't sign you in"),
 });
 
 function AuthPage() {
