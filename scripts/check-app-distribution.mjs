@@ -126,8 +126,12 @@ if (existsSync(root)) {
 // Two native bugs made offline impossible no matter what the web layer did, and
 // neither is visible from JavaScript:
 //
-//   ServiceWorkerController is never configured by Capacitor, so the worker could
-//   register and yet intercept nothing.
+//   Capacitor's WebViewLocalServer answers every request to the configured
+//   server.url itself, BEFORE the WebView's service-worker machinery is
+//   consulted. A worker could register, report that it controlled the page, and
+//   still never serve a single navigation. Configuring ServiceWorkerController
+//   did not help, because the request never got far enough to reach it. This
+//   version of the app answers documents from OfflineShell instead.
 //
 //   Android 11 defaults setAllowFileAccess to FALSE, so loading the offline page
 //   from file:///android_asset/ is refused — the error handler fired and then its
@@ -136,6 +140,7 @@ if (existsSync(root)) {
 // The second also explains why two different screenshots exist for one failure:
 // it was never flaky, it depends on the Android version.
 const ACTIVITY = "android/app/src/main/java/com/wesu/music/MainActivity.java";
+const SHELL = "android/app/src/main/java/com/wesu/music/OfflineShell.java";
 if (!existsSync(ACTIVITY)) {
   problems.push(`${ACTIVITY} is missing`);
 } else {
@@ -143,21 +148,39 @@ if (!existsSync(ACTIVITY)) {
   // words "ServiceWorkerController" and "loadDataWithBaseURL" appear there — so a
   // naive search matched the explanation rather than the code, and both negative
   // tests passed with the fix removed. Same trap as the album-route check.
+  //
+  // This gate previously REQUIRED ServiceWorkerController to be present. That
+  // requirement encoded the bug: it failed the build on the correct code and
+  // would have passed on code that cannot serve a page at all. A gate must
+  // assert a mechanism that works, not one that merely looks like a fix.
   const javaCode = readFileSync(ACTIVITY, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/[^\n]*/g, "");
-  if (!/ServiceWorkerController\s*\.\s*getInstance/.test(javaCode)) {
+  if (!/OfflineShell\s*\.\s*resolve/.test(javaCode)) {
     problems.push(
-      "MainActivity never configures ServiceWorkerController. Capacitor does not,\n" +
-        "        so the service worker can register but never serve a page — offline\n" +
-        "        fails no matter what the web layer does.",
+      "MainActivity does not resolve requests through OfflineShell. Capacitor's\n" +
+        "        proxy answers the navigation itself and the service worker is never\n" +
+        "        consulted, so without this the app cannot open while offline.",
     );
   }
-  if (!/setServiceWorkerClient/.test(javaCode)) {
-    problems.push(
-      "MainActivity does not install a ServiceWorkerClient — the worker cannot\n" +
-        "        intercept anything without one",
-    );
+  // The live site must still win when there IS a connection: the app is a shell
+  // around wesuplus.com, so a cache-first app would freeze on install-day HTML
+  // and no web fix would ever reach an installed listener.
+  const offlineShellSrc = existsSync(SHELL)
+    ? readFileSync(SHELL, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+    : "";
+  if (/OfflineShell\s*\.\s*resolve/.test(javaCode) && offlineShellSrc) {
+    const docStart = offlineShellSrc.indexOf("WebResourceResponse serveDocument(");
+    const docBody =
+      docStart === -1 ? "" : offlineShellSrc.slice(docStart, docStart + 900);
+    const fetchAt = docBody.indexOf("fetch(url, requestHeaders)");
+    const cacheAt = docBody.indexOf("serveCachedDocument(ctx, url)");
+    if (fetchAt !== -1 && cacheAt !== -1 && fetchAt > cacheAt) {
+      problems.push(
+        "OfflineShell consults the cache before the network — the app would show a\n" +
+          "          stale shell while online and no web fix would reach installed users",
+      );
+    }
   }
   // The offline page must be DATA, not file://.
   if (/loadUrl\(\s*ERROR_PAGE\s*\)/.test(javaCode) && !/loadDataWithBaseURL/.test(javaCode)) {

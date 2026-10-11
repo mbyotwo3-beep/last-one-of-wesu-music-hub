@@ -26,7 +26,7 @@ android {
         //     offline status panel.
         //   No native change since 32, but the WebView loads the site over the
         //   network, so all of this reaches installed users as a web deploy.
-        versionCode 33
+        versionCode 34
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

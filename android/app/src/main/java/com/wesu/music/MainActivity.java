@@ -46,45 +46,40 @@ public class MainActivity extends BridgeActivity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
         }
         Bridge bridge = getBridge();
+        // Must be set before the client is installed: the client's very first
+        // request may arrive synchronously during loadUrl and needs this.
+        OfflineShell.AppContextHolder.set(getApplicationContext());
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebViewClient(new WesuWebViewClient(bridge));
         }
-        enableServiceWorkerInterception();
         checkWebViewIsUsable(bridge);
     }
 
     /**
-     * Let the WebView hand service-worker requests to the worker.
+     * REMOVED IN vc34 — ServiceWorkerController.
      *
-     * Offline support depends entirely on public/sw.js being able to intercept
-     * navigations, and Capacitor never configures ServiceWorkerController. The
-     * default client forwards SW requests to the host app's
-     * `shouldInterceptRequest`, which a Capacitor app does not implement — so
-     * without this the worker can be registered yet never serve a page.
+     * This was the vc32 attempt at offline. It does not work here and never
+     * could, which took a real tester report and a read of Capacitor's source to
+     * establish.
      *
-     * Returning null means "let the service worker handle it", which is exactly
-     * the intent. Registered unconditionally and guarded: service workers need
-     * API 24+ (our minSdk) and this must never be able to block a launch.
+     * Configuring ServiceWorkerController does let the WebView ask the worker
+     * about a request — but only for requests that reach the WebView's own
+     * pipeline. Capacitor answers first:
+     *
+     *     BridgeWebViewClient.shouldInterceptRequest
+     *       -> WebViewLocalServer.shouldInterceptRequest
+     *          -> isMainUrl("https://www.wesuplus.com/")  == true
+     *          -> handleProxyRequest  (its own HttpURLConnection)
+     *
+     * So the worker was registered, reported itself as controlling the page, and
+     * was never consulted for a single navigation. The vc33 build showed the
+     * branded offline error page while the worker sat there claiming control.
+     *
+     * public/sw.js is NOT removed. In a desktop browser it works, and it is the
+     * mechanism there. It is only the Android WebView that cannot reach it.
+     * OfflineShell now does the job natively, network-first with a cache
+     * fallback, which is the same order the worker uses.
      */
-    private void enableServiceWorkerInterception() {
-        try {
-            if (android.os.Build.VERSION.SDK_INT < 24) return;
-            android.webkit.ServiceWorkerController swController =
-                    android.webkit.ServiceWorkerController.getInstance();
-            swController.setServiceWorkerClient(
-                    new android.webkit.ServiceWorkerClient() {
-                        @Override
-                        public android.webkit.WebResourceResponse shouldInterceptRequest(
-                                android.webkit.WebResourceRequest request) {
-                            // null = do not intercept; the worker responds.
-                            return null;
-                        }
-                    });
-        } catch (Throwable ignored) {
-            // Never block a launch on this. Offline simply falls back to the
-            // branded error page.
-        }
-    }
 
     /**
      * The app IS a web page, so the phone's Android System WebView is the
@@ -216,6 +211,52 @@ public class MainActivity extends BridgeActivity {
                 // caller falls back to loadUrl.
             }
             this.appContext = ctx != null ? ctx.getApplicationContext() : null;
+        }
+
+        /**
+         * WHY THIS EXISTS — the offline bug, at its actual root
+         *
+         * With server.url set, Capacitor classifies https://www.wesuplus.com/ as
+         * THE MAIN URL and routes every request through handleProxyRequest, which
+         * opens its own HttpURLConnection. See
+         * WebViewLocalServer.shouldInterceptRequest -> isMainUrl ->
+         * handleProxyRequest, around line 210 of that file.
+         *
+         * That is fatal for a service worker. The proxy answers the request
+         * before the WebView's service-worker machinery is ever consulted, so
+         * public/sw.js could be registered, report itself as controlling the
+         * page, and still never serve a single navigation. Offline simply could
+         * not work, which is exactly what a tester reported.
+         *
+         * The fix is to load the shell from the APK instead. The client bundle
+         * already ships in assets/public/client, so a WebViewAssetLoader can serve
+         * it from disk with no network at all.
+         *
+         * It is a FALLBACK, not a replacement: if the network works, the request
+         * returns null and Capacitor's normal proxy handles it, so listeners
+         * still get the live site and every web fix reaches them with no rebuild.
+         */
+        @Override
+        public android.webkit.WebResourceResponse shouldInterceptRequest(
+                WebView view, WebResourceRequest request) {
+            try {
+                if (request == null || request.getUrl() == null) return null;
+                if (!"GET".equalsIgnoreCase(request.getMethod())) return null;
+
+                android.net.Uri uri = request.getUrl();
+                String host = uri.getHost();
+                if (host == null) return null;
+                // Exact host, not endsWith: "evil-wesuplus.com" must not match.
+                if (!"www.wesuplus.com".equals(host)) return null;
+
+                android.webkit.WebResourceResponse resolved = OfflineShell.resolve(
+                        request.getUrl().toString(), request.getRequestHeaders());
+                // null means "not ours to answer", so the normal path runs.
+                if (resolved != null) return resolved;
+            } catch (Throwable ignored) {
+                // Any failure falls through to the normal network path.
+            }
+            return super.shouldInterceptRequest(view, request);
         }
 
         @Override
