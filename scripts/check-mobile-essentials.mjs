@@ -135,6 +135,90 @@ for (const cap of CAPABILITIES) {
   }
 }
 
+// --- no hook may sit AFTER an early return in the same component
+//
+// React throws "rendered fewer hooks than expected" when a component returns
+// early on one render and calls more hooks on the next. It is invisible in
+// review and crashes in the hand.
+//
+// This already happened twice in albums.$id.tsx — once when adding an offline
+// guard, once when adding preview warming — and both times it was found by
+// checking line numbers, not by reading the code. So it is checked structurally.
+if (existsSync("src/routes")) {
+  const offenders = [];
+  for (const name of readdirSync("src/routes").filter((f) => f.endsWith(".tsx"))) {
+    const src = read(`src/routes/${name}`);
+    if (!src) continue;
+    const lines = code(src).split("\n");
+
+    // A top-level early return: 2-space indent, `if (...) {`, then `return`.
+    const earlyReturn = lines.findIndex(
+      (l) => /^ {2}if \(.*\) \{\s*$/.test(l) && lines.slice(0, 0).length === 0,
+    );
+    if (earlyReturn === -1) continue;
+    const returnLine = lines.findIndex((l, i) => i > earlyReturn && /^ {4}return\b/.test(l));
+    if (returnLine === -1) continue;
+
+    const hooksAfter = lines
+      .slice(returnLine + 1, returnLine + 80)
+      .filter((l) => /^ {2}(use[A-Z]\w*\(|const\s+\{[^}]*\}\s*=\s*use)/.test(l));
+    if (hooksAfter.length) {
+      offenders.push(`${name}: ${hooksAfter.length} hook(s) after an early return`);
+    }
+  }
+  if (offenders.length) {
+    problems.push(
+      `these components call hooks after an early return, which React treats as a crash:\n` +
+        `        ${offenders.join("\n        ")}`,
+    );
+  } else {
+    notes.push("no route calls a hook after an early return");
+  }
+}
+
+// --- preview warming must stay bounded
+//
+// Asked for "preload 15 seconds of all songs listed". Implemented as a limited,
+// ordered warm of what is on screen instead, because warming every preview URL is
+// a server request per song before the listener has chosen anything — real data
+// cost on the phones this audience actually uses.
+const preload = read("src/lib/preview-preload.ts");
+if (!preload) {
+  problems.push("src/lib/preview-preload.ts is missing — preview warming is gone");
+} else {
+  const p = code(preload);
+  // BOTH layers must limit. planPreviewWarm caps what the caller asks for and
+  // warmPreviews caps what it executes. Removing either one alone still bounded
+  // the work by accident, which is why an earlier single-slice check passed with
+  // its own slice deleted.
+  const planned = /\.slice\(start,\s*end\)[\s\S]{0,80}?\.slice\(0,\s*limit\)/.test(p);
+  // Non-greedy to the closing `)` of filter, THEN slice. `[^)]*` cannot work here:
+  // the filter body contains an arrow function, so it stops at the arrow's own
+  // parenthesis and the slice is never seen. That reported a correctly bounded
+  // file as unbounded.
+  const executed = /items\.filter\(.*?\)\.slice\(0,\s*limit\)/.test(p);
+  if (!planned || !executed) {
+    problems.push(
+      `preview warming is not bounded at both layers (plan: ${planned}, execution: ${executed}).\n` +
+        "        Warming every listed preview is a server call per song before the\n" +
+        "        listener has chosen anything - real data cost on metered phones.",
+    );
+  }
+  if (!/for\s*\(const item of queue\)/.test(p)) {
+    problems.push(
+      "preview warming no longer walks the queue sequentially - a burst of\n" +
+        "        concurrent speculative requests is what makes a phone feel slow",
+    );
+  }
+  if (!/navigator\.onLine\s*===\s*false/.test(p)) {
+    problems.push(
+      "preview warming does not skip while offline — every request would fail and\n" +
+        "        drain the battery",
+    );
+  }
+  notes.push("preview warming is bounded, ordered and skips when offline");
+}
+
 // --- offline mode must be reachable on a phone, not buried on /downloads
 const downloads = read("src/routes/downloads.tsx");
 if (!downloads) {

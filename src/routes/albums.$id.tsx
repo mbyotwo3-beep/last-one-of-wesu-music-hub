@@ -4,6 +4,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { albumSellablePrice, getAlbumWithSongs } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { isOfflineTransportFailure, isRedirect } from "@/lib/loader-graceful";
+import { usePreviewWarm } from "@/hooks/use-preview-warm";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { useCurrency } from "@/stores/currency";
@@ -226,6 +227,18 @@ function AlbumPage() {
     queryFn: () => albumFn(id),
     staleTime: 5 * 60 * 1000,
   });
+
+  // Warm the preview URLs for the first tracks, so tapping one starts playing
+  // instead of pausing on a spinner.
+  //
+  // ABOVE the `if (!data?.album)` return below, deliberately. A hook placed
+  // after an early return is skipped on that render and called on the next, and
+  // React throws "rendered fewer hooks than expected". That crash was found and
+  // fixed once in this file already; it is easy to walk straight back into.
+  //
+  // data?.songs ?? [] keeps it safe: an empty list warms nothing rather than
+  // throwing.
+  usePreviewWarm(data?.songs ?? [], 6);
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
