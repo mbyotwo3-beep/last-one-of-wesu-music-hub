@@ -3,6 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StorageImage } from "@/components/StorageImage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { usePlayer } from "@/stores/player";
 import { useOfflineMode } from "@/stores/offline-mode";
 import {
@@ -145,6 +155,14 @@ export function DownloadsSection() {
     }
   };
 
+  // Deleting a download is irreversible and costs real data to undo. It used to
+  // happen on a single tap, so a mis-tap while scrolling cost someone their
+  // offline copy and a re-download on a metered connection — the one action on
+  // this page that genuinely deserves a confirmation.
+  const [pendingRemoval, setPendingRemoval] = useState<{ songId: string; title: string } | null>(
+    null,
+  );
+
   return (
     <section id="downloads" className="mb-10 scroll-mt-24">
       <div className="flex items-center justify-between mb-4">
@@ -226,7 +244,7 @@ export function DownloadsSection() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => remove(t.songId, t.title)}
+                  onClick={() => setPendingRemoval({ songId: t.songId, title: t.title })}
                   className="p-2 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
                   aria-label={`Remove ${t.title} from this device`}
                   title="Remove from this device"
@@ -238,6 +256,36 @@ export function DownloadsSection() {
           </div>
         </>
       )}
+
+      <AlertDialog
+        open={!!pendingRemoval}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoval(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this download?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingRemoval?.title}&rdquo; will no longer play without internet. You can
+              download it again whenever you want, but it will use your data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
+              onClick={() => {
+                const target = pendingRemoval;
+                setPendingRemoval(null);
+                if (target) void remove(target.songId, target.title);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

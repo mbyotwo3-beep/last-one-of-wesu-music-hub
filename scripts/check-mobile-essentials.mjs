@@ -220,6 +220,53 @@ if (!preload) {
 }
 
 // --- offline mode must be reachable on a phone, not buried on /downloads
+// --- destructive, data-costing actions must be reversible or confirmed
+//
+// Deleting a download cannot be undone and re-downloading it costs real data on
+// a metered connection. It used to happen on a single tap with no confirmation
+// and no undo, so a mis-tap during a scroll destroyed someone's offline copy.
+// The list has a confirm dialog now; the inline toggle is allowed to stay a
+// one-tap toggle, but only because it offers an undo.
+const dlSection = read("src/components/DownloadsSection.tsx");
+const dlButton = read("src/components/DownloadButton.tsx");
+
+if (dlSection) {
+  if (!/AlertDialog/.test(dlSection)) {
+    problems.push(
+      "DownloadsSection deletes without confirmation — a mis-tap costs a re-download\n" +
+        "        on metered data. It needs an AlertDialog.",
+    );
+  }
+  if (!/setPendingRemoval/.test(dlSection)) {
+    problems.push(
+      "DownloadsSection removes immediately; the delete must go through a pending state",
+    );
+  } else {
+    notes.push("deleting a download asks first");
+  }
+}
+
+if (dlButton) {
+  const oneTapRemove = /onClick=\{remove\}/.test(dlButton);
+  // The undo must be a real action ON the toast that reports the removal, not
+  // the word "undo" appearing anywhere in the file. A previous version matched a
+  // bare /undo/i and passed with the whole action removed.
+  const removalToast = /toast\.success\(\s*"Download removed[^"]*"\s*,[\s\S]{0,600}?\)\s*;/.exec(
+    dlButton,
+  );
+  const hasUndo = !!removalToast && /action\s*:\s*\{[\s\S]{0,300}?onClick/.test(removalToast[0]);
+  if (oneTapRemove && !hasUndo) {
+    problems.push(
+      "DownloadButton removes a download on one tap and offers no undo.\n" +
+        "        Either confirm it, or make it a toast with an Undo action — an\n" +
+        "        irreversible, data-costing action needs a way back.",
+    );
+  } else if (oneTapRemove) {
+    notes.push("the inline download toggle can be undone");
+  }
+}
+
+// --- offline mode must be reachable on a phone, not buried on /downloads
 const downloads = read("src/routes/downloads.tsx");
 if (!downloads) {
   problems.push("src/routes/downloads.tsx is missing — the offline switch is unreachable");

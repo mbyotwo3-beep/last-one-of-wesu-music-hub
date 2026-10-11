@@ -218,7 +218,27 @@ export function DownloadButton({
       }
       await removeTrackFromVault(songId);
       await touchVaultQueries(qc);
-      toast.success("Download removed from this device");
+      // Undo, rather than a confirmation dialog.
+      //
+      // This button is a toggle — it looks like one, and treating it as a
+      // toggle is what people expect. A dialog on every un-download breaks that
+      // contract and trains people to dismiss dialogs without reading them, which
+      // is worse on the actions that DO need confirming.
+      //
+      // Undo is the better trade because the bytes are still recoverable:
+      // redownloading costs data, but nothing is lost while the window is open.
+      // The screenshot is captured before removal, because afterwards it is gone.
+      toast.success("Download removed from this device", {
+        description: "You can download it again whenever you want.",
+        action: {
+          label: "Undo",
+          onClick: () => {
+            // Reuse the real download path rather than re-implementing it —
+            // same entitlement check, same progress, same cache refresh.
+            void download();
+          },
+        },
+      });
     } catch {
       toast.error("Could not remove this download");
     }

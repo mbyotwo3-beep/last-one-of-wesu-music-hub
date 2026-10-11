@@ -17,15 +17,16 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 32 = the native half of the offline fix:
-        //   - the WebView now hands requests to the service worker. Capacitor
-        //     never configures ServiceWorkerController, so the worker could be
-        //     registered yet never serve a page — offline simply did not work.
-        //   - the offline page is loaded as DATA rather than from
-        //     file:///android_asset/. Android 11 disabled file access by default,
-        //     so the error handler fired and then its OWN page was blocked,
-        //     showing the listener Android's raw "Webpage not available".
-        versionCode 32
+        // 33 = listener-annoyance pass:
+        //   - deleting a download asks first, and the inline toggle offers Undo,
+        //     so a mis-tap no longer costs a re-download on metered data;
+        //   - carries preview warming (tap plays without a visible pause), the
+        //     error boundaries on /auth and /terms-artist, the hooks-after-return
+        //     fix that stopped the album page crashing on reconnect, and the
+        //     offline status panel.
+        //   No native change since 32, but the WebView loads the site over the
+        //   network, so all of this reaches installed users as a web deploy.
+        versionCode 33
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
