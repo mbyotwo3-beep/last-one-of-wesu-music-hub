@@ -522,19 +522,31 @@ function FollowedArtistCard({ artist, userId }: { artist: any; userId: string | 
 function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const qc = useQueryClient();
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store.
+  //
+  // Subscribing to the whole store re-renders on EVERY state change,
+  // including progressSeconds, which the audio element updates several times a
+  // second. A library page with a few dozen cards therefore re-renders on every
+  // tick while a preview plays - on exactly the low-end phones this audience uses.
+  //
+  // None of these cards read progress. They need `playing`, the current track id,
+  // and the action functions.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
 
-  const isPlaying = player.playing && player.track?.id === song.id;
+  const isPlaying = isPlayingNow && nowPlayingId === song.id;
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (isPlaying) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
     // Single-track queue (not bare setTrack) so Next/Prev and the queue
     // screen keep working instead of jumping into a stale queue.
-    player.setQueue(
+    replaceQueue(
       [
         {
           id: song.id,
@@ -654,19 +666,31 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
  */
 function PurchasedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const { isSaved, toggle, loading } = useSavedTrack(song.id);
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store.
+  //
+  // Subscribing to the whole store re-renders on EVERY state change,
+  // including progressSeconds, which the audio element updates several times a
+  // second. A library page with a few dozen cards therefore re-renders on every
+  // tick while a preview plays - on exactly the low-end phones this audience uses.
+  //
+  // None of these cards read progress. They need `playing`, the current track id,
+  // and the action functions.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
 
-  const isPlaying = player.playing && player.track?.id === song.id;
+  const isPlaying = isPlayingNow && nowPlayingId === song.id;
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (isPlaying) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
     // Single-track queue (not bare setTrack) so Next/Prev and the queue
     // screen keep working instead of jumping into a stale queue.
-    player.setQueue(
+    replaceQueue(
       [
         {
           id: song.id,
@@ -747,7 +771,19 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
  * Playlist card in Library with cover art, track count, and instant play/pause.
  */
 function PlaylistCard({ playlist }: { playlist: any }) {
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store.
+  //
+  // Subscribing to the whole store re-renders on EVERY state change,
+  // including progressSeconds, which the audio element updates several times a
+  // second. A library page with a few dozen cards therefore re-renders on every
+  // tick while a preview plays - on exactly the low-end phones this audience uses.
+  //
+  // None of these cards read progress. They need `playing`, the current track id,
+  // and the action functions.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
 
   // PostgREST may return the embedded song as an object or a 1-array —
   // unwrap defensively like the playlists pages do.
@@ -765,7 +801,7 @@ function PlaylistCard({ playlist }: { playlist: any }) {
     .filter(Boolean);
 
   const songCount = songs.length;
-  const isThisPlaylistActive = player.playing && songs.some((s: any) => s.id === player.track?.id);
+  const isThisPlaylistActive = isPlayingNow && songs.some((s: any) => s.id === nowPlayingId);
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -774,12 +810,12 @@ function PlaylistCard({ playlist }: { playlist: any }) {
       return;
     }
     if (isThisPlaylistActive) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
-    const currentIdx = songs.findIndex((s: any) => s.id === player.track?.id);
+    const currentIdx = songs.findIndex((s: any) => s.id === nowPlayingId);
     if (currentIdx !== -1) {
-      player.togglePlay();
+      togglePlayback();
     } else {
       const tracks = songs.map((s: any) => ({
         id: s.id,
@@ -788,7 +824,7 @@ function PlaylistCard({ playlist }: { playlist: any }) {
         coverUrl: s.cover_url,
         durationSeconds: s.duration,
       }));
-      player.setQueue(tracks, 0);
+      replaceQueue(tracks, 0);
     }
   };
 
