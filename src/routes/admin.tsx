@@ -1035,16 +1035,22 @@ function SongMod() {
   } | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
 
-  const player = usePlayer();
-  const currentTrackId = player.track?.id;
-  const isPlaying = player.playing;
+  // Subscribe to the FIELDS, not the whole store. Subscribing to everything
+  // re-renders this component on every state change, including progressSeconds,
+  // which the audio element updates several times a second during playback.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
+  const currentTrackId = nowPlayingId;
+  const isPlaying = isPlayingNow;
 
   const handleAudition = (song: any) => {
     if (currentTrackId === song.id) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
-    player.setQueue(
+    replaceQueue(
       [
         {
           id: song.id,

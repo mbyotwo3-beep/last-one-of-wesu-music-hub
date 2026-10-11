@@ -24,7 +24,13 @@ export function AppleMusicSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { user } = useAuth();
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store. Subscribing to everything
+  // re-renders this component on every state change, including progressSeconds,
+  // which the audio element updates several times a second during playback.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
   const [searchQuery, setSearchQuery] = useState("");
 
   const mainNav = [
@@ -77,7 +83,7 @@ export function AppleMusicSidebar() {
 
   const safeLikedSongs = likedSongs ?? [];
   const isLikedSongsPlaying =
-    player.playing && safeLikedSongs.some((s: any) => s.id === player.track?.id);
+    isPlayingNow && safeLikedSongs.some((s: any) => s.id === nowPlayingId);
 
   const handlePlayLikedSongs = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,12 +93,12 @@ export function AppleMusicSidebar() {
       return;
     }
     if (isLikedSongsPlaying) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
-    const currentIdx = safeLikedSongs.findIndex((s: any) => s.id === player.track?.id);
+    const currentIdx = safeLikedSongs.findIndex((s: any) => s.id === nowPlayingId);
     if (currentIdx !== -1) {
-      player.togglePlay();
+      togglePlayback();
     } else {
       const tracks = safeLikedSongs.map((s: any) => ({
         id: s.id,
@@ -101,7 +107,7 @@ export function AppleMusicSidebar() {
         coverUrl: s.cover_url,
         durationSeconds: s.duration,
       }));
-      player.setQueue(tracks, 0);
+      replaceQueue(tracks, 0);
     }
   };
 
@@ -124,15 +130,15 @@ export function AppleMusicSidebar() {
     }
 
     const isThisPlaylistActive =
-      player.playing && songs.some((s: any) => s.id === player.track?.id);
+      isPlayingNow && songs.some((s: any) => s.id === nowPlayingId);
     if (isThisPlaylistActive) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
 
-    const currentIdx = songs.findIndex((s: any) => s.id === player.track?.id);
+    const currentIdx = songs.findIndex((s: any) => s.id === nowPlayingId);
     if (currentIdx !== -1) {
-      player.togglePlay();
+      togglePlayback();
     } else {
       const tracks = songs.map((s: any) => ({
         id: s.id,
@@ -141,7 +147,7 @@ export function AppleMusicSidebar() {
         coverUrl: s.cover_url,
         durationSeconds: s.duration,
       }));
-      player.setQueue(tracks, 0);
+      replaceQueue(tracks, 0);
     }
   };
 
@@ -275,7 +281,7 @@ export function AppleMusicSidebar() {
                 })
                 .filter(Boolean);
               const isThisPlaylistActive =
-                player.playing && songs.some((s: any) => s.id === player.track?.id);
+                isPlayingNow && songs.some((s: any) => s.id === nowPlayingId);
 
               return (
                 <div

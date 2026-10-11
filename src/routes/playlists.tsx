@@ -35,7 +35,13 @@ export const Route = createFileRoute("/playlists")({
 function Page() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store. Subscribing to everything
+  // re-renders this component on every state change, including progressSeconds,
+  // which the audio element updates several times a second during playback.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
   const createFn = useServerFn(createPlaylist);
   const deleteFn = useServerFn(deletePlaylist);
 
@@ -131,15 +137,15 @@ function Page() {
     }
 
     const isThisPlaylistActive =
-      player.playing && songs.some((s: any) => s.id === player.track?.id);
+      isPlayingNow && songs.some((s: any) => s.id === nowPlayingId);
     if (isThisPlaylistActive) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
 
-    const currentIdx = songs.findIndex((s: any) => s.id === player.track?.id);
+    const currentIdx = songs.findIndex((s: any) => s.id === nowPlayingId);
     if (currentIdx !== -1) {
-      player.togglePlay();
+      togglePlayback();
     } else {
       const tracks = songs.map((s: any) => ({
         id: s.id,
@@ -148,7 +154,7 @@ function Page() {
         coverUrl: s.cover_url,
         durationSeconds: s.duration,
       }));
-      player.setQueue(tracks, 0);
+      replaceQueue(tracks, 0);
     }
   };
 
@@ -350,7 +356,7 @@ function Page() {
               .filter(Boolean);
             const songCount = songs.length;
             const isThisPlaylistActive =
-              player.playing && songs.some((s: any) => s.id === player.track?.id);
+              isPlayingNow && songs.some((s: any) => s.id === nowPlayingId);
 
             return (
               <div

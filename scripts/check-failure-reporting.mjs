@@ -29,7 +29,8 @@
  * This is the same lesson as the offline diagnostics: a failure that cannot be
  * identified from the outside costs several rounds of guessing every time.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const problems = [];
 const notes = [];
@@ -88,25 +89,44 @@ if (!/isOfflineTransportFailure/.test(boundary)) {
   notes.push("connectivity failures are distinguished from real faults");
 }
 
-// --- /library specifically: the page reported broken
-const lib = "src/routes/library.tsx";
-if (existsSync(lib)) {
-  const src = readFileSync(lib, "utf8");
-  // usePlayer() with no selector subscribes the component to EVERY state change.
-  // progressSeconds updates several times a second while a preview plays, so a
-  // Library page with cards re-renders constantly on the exact device profile
-  // most likely to hit it. That is a real cost, and it is measured here rather
-  // than asserted.
-  const whole = (src.match(/usePlayer\(\)/g) ?? []).length;
-  if (whole > 0) {
+// --- no component subscribes to the WHOLE player store
+//
+// usePlayer() with no selector subscribes the component to every state change,
+// including progressSeconds, which the audio element updates several times a
+// second. Any page with cards re-renders on every tick during playback, on
+// exactly the low-end phones this audience uses.
+//
+// Found once on /library, then found in five more places — one of them
+// AppleMusicSidebar, mounted on every page, so that one line re-rendered the
+// app's chrome several times a second right across the site. Checking a single
+// named file is how five of six survived the first fix, so this walks all of src.
+//
+// Comments are stripped first, so the explanatory comment beside each fixed call
+// can say why the whole-store form is wrong without being read as one.
+const offenders = [];
+function walk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) walk(p);
+    else if (/\.tsx?$/.test(entry.name)) {
+      const code = readFileSync(p, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^[ \t]*\/\/.*$/gm, "");
+      const n = (code.match(/usePlayer\(\)/g) ?? []).length;
+      if (n) offenders.push(`${p} (${n})`);
+    }
+  }
+}
+if (existsSync("src")) {
+  walk("src");
+  if (offenders.length) {
     problems.push(
-      `${lib} calls usePlayer() with NO selector ${whole} time(s).\n` +
-        "        That subscribes the component to the entire store, including\n" +
-        "        progressSeconds, which updates several times a second during\n" +
-        "        playback. The whole page re-renders on every tick.",
+      `whole-store player subscriptions: ${offenders.join(", ")}\n` +
+        "        usePlayer() with no selector re-renders the component on every\n" +
+        "        audio tick. Subscribe to fields instead: usePlayer((s) => s.playing).",
     );
   } else {
-    notes.push("/library subscribes to individual player fields, not the whole store");
+    notes.push("no component subscribes to the whole player store");
   }
 }
 

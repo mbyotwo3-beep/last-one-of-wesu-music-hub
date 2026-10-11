@@ -1,5 +1,5 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { routeErrorComponent } from "@/components/RouteError";
+import { createFileRoute, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
+import { routeErrorComponent, RouteError } from "@/components/RouteError";
 import {
   queryOptions,
   useSuspenseQuery,
@@ -41,16 +41,85 @@ const albumEditQO = (id: string) =>
     staleTime: 60_000,
   });
 
+/**
+ * "You are signed in, but this album is not yours."
+ *
+ * A typed error rather than a plain one, so the screen below can say something
+ * true instead of the generic "something went wrong". The id travels with it so
+ * the listener has a way forward — the album they wanted to edit.
+ */
+class AlbumNotOwnedError extends Error {
+  albumId: string;
+  constructor(albumId: string) {
+    super("You don't have permission to edit this album.");
+    this.name = "AlbumNotOwnedError";
+    this.albumId = albumId;
+  }
+}
+
+function AlbumEditError({ error }: { error: unknown }) {
+  if (error instanceof AlbumNotOwnedError) {
+    return (
+      <div className="px-6 py-16 text-center max-w-md mx-auto">
+        <h1 className="text-xl font-bold mb-2">This album isn't yours</h1>
+        <p className="text-muted-foreground text-sm mb-6">
+          You're signed in, but this album belongs to another artist. Only they can
+          change it.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link
+            to="/albums/$id"
+            params={{ id: error.albumId }}
+            className="inline-flex items-center px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold min-h-[44px] cursor-pointer"
+          >
+            Open the album
+          </Link>
+          <Link
+            to="/artist-studio"
+            className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 text-foreground text-sm font-semibold min-h-[44px] cursor-pointer"
+          >
+            Your studio
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  return <RouteError error={error} />;
+}
+
 export const Route = createFileRoute("/albums/$id/edit")({
   loader: async ({ context, params }) => {
     // Reject a malformed id before it reaches the uuid column, which would
     // otherwise 500 with a raw Postgres error.
     if (!isUuid(params.id)) throw notFound();
-    const data = await context.queryClient.ensureQueryData(albumEditQO(params.id));
-    if (data.forbidden) throw new Error("You don't have permission to edit this album.");
+
+    // TWO different failures both rendered a 500 "Kasuli wandi", found by
+    // crawling every route rather than by reading this file.
+    //
+    // getAlbumWithSongsForEdit runs behind requireSupabaseAuth, which throws a
+    // plain Error("Unauthorized: ...") when there is no session — so any signed
+    // out visitor who followed an album link got a dead-end error screen. And a
+    // signed in visitor who is not the owner came back forbidden: true, which
+    // this loader re-threw as another plain Error.
+    //
+    // A dead-end error is the wrong answer to both. Someone signed out should be
+    // offered sign-in. Someone signed in but not the owner should be told exactly
+    // that, with a link to the album they were trying to edit.
+    let data: Awaited<ReturnType<typeof getAlbumWithSongsForEdit>>;
+    try {
+      data = await context.queryClient.ensureQueryData(albumEditQO(params.id));
+    } catch (e) {
+      if (/unauthorized|not authenticated|401/i.test(String((e as Error)?.message ?? e))) {
+        throw redirect({ to: "/auth" });
+      }
+      throw e;
+    }
+
+    if (data.forbidden) throw new AlbumNotOwnedError(params.id);
     if (!data.album) throw notFound();
     return data;
   },
+  errorComponent: AlbumEditError,
   head: ({ loaderData }) => ({
     meta: [
       { title: `Edit ${loaderData?.album?.title ?? "Album"} — Wesu+` },
@@ -61,7 +130,9 @@ export const Route = createFileRoute("/albums/$id/edit")({
     ],
   }),
   component: AlbumEditPage,
-  errorComponent: routeErrorComponent(),
+  // AlbumEditError (declared above) handles the not-owner case and delegates
+  // everything else to the shared surface. A second errorComponent here would
+  // silently win, so there is exactly one.
   notFoundComponent: () => <div className="p-12 text-center">Album not found.</div>,
 });
 

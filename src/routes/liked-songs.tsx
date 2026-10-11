@@ -53,7 +53,16 @@ function formatTotalRuntime(seconds: number) {
 function Page() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store. Subscribing to everything
+  // re-renders this component on every state change, including progressSeconds,
+  // which the audio element updates several times a second during playback.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
+  // shuffle lives in the store too; subscribed as a field for the same reason.
+  const shuffleOn = usePlayer((s) => s.shuffle);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
 
   const {
     data: likedSongs,
@@ -89,7 +98,7 @@ function Page() {
   }));
 
   const isLikedSongsPlaying =
-    player.playing && safeLikedSongs.some((s) => s.id === player.track?.id);
+    isPlayingNow && safeLikedSongs.some((s) => s.id === nowPlayingId);
   const totalDuration = safeLikedSongs.reduce((acc: number, s: any) => acc + (s.duration || 0), 0);
 
   const handlePlayAll = () => {
@@ -98,14 +107,14 @@ function Page() {
       return;
     }
     if (isLikedSongsPlaying) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
-    const currentIndex = safeLikedSongs.findIndex((s) => s.id === player.track?.id);
+    const currentIndex = safeLikedSongs.findIndex((s) => s.id === nowPlayingId);
     if (currentIndex !== -1) {
-      player.togglePlay();
+      togglePlayback();
     } else {
-      player.setQueue(songTracks, 0);
+      replaceQueue(songTracks, 0);
     }
   };
 
@@ -120,8 +129,8 @@ function Page() {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    player.setQueue(shuffled, 0);
-    if (!player.shuffle) player.toggleShuffle();
+    replaceQueue(shuffled, 0);
+    if (!shuffleOn) toggleShuffle();
   };
 
   if (isLoading) {
@@ -275,17 +284,26 @@ function LikedSongRow({
   songTracks: any[];
 }) {
   const { isSaved, toggle } = useSavedTrack(song.id);
-  const player = usePlayer();
+  // Subscribe to the FIELDS, not the whole store. Subscribing to everything
+  // re-renders this component on every state change, including progressSeconds,
+  // which the audio element updates several times a second during playback.
+  const isPlayingNow = usePlayer((s) => s.playing);
+  const nowPlayingId = usePlayer((s) => s.track?.id);
+  const togglePlayback = usePlayer((s) => s.togglePlay);
+  const replaceQueue = usePlayer((s) => s.setQueue);
+  // shuffle lives in the store too; subscribed as a field for the same reason.
+  const shuffleOn = usePlayer((s) => s.shuffle);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
 
-  const isCurrentTrack = player.track?.id === song.id;
-  const isPlayingThisTrack = player.playing && isCurrentTrack;
+  const isCurrentTrack = nowPlayingId === song.id;
+  const isPlayingThisTrack = isPlayingNow && isCurrentTrack;
 
   const handlePlay = () => {
     if (isPlayingThisTrack) {
-      player.togglePlay();
+      togglePlayback();
       return;
     }
-    player.setQueue(songTracks, index);
+    replaceQueue(songTracks, index);
   };
 
   return (
