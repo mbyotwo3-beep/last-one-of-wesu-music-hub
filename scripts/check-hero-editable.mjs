@@ -26,6 +26,16 @@
 import { readFileSync, existsSync } from "node:fs";
 
 /**
+ * Drop comments before checking source for a token.
+ *
+ * Explanatory comments here describe the very mistake a check looks for, so an
+ * unstripped search matches the explanation and reports correct code as broken.
+ */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
+/**
  * Read .env / .env.local the way scan-apk-secrets.mjs does, so the slide count
  * works without the caller exporting anything.
  *
@@ -60,8 +70,14 @@ if (!existsSync(ADMIN)) {
   problems.push(`${ADMIN} is missing — there is no way to edit the hero`);
 } else {
   const admin = readFileSync(ADMIN, "utf8");
-  if (!/HeroCarouselBuilder/.test(admin)) {
-    problems.push("/admin does not render HeroCarouselBuilder — the hero has no editing UI");
+  // Match the JSX, not the name anywhere. `import { HeroCarouselBuilder }` satisfied
+  // the old check on its own, so deleting the tab — the one thing that makes the
+  // hero editable — left the gate green. Found by deliberately removing it.
+  if (!/<HeroCarouselBuilder/.test(admin)) {
+    problems.push(
+      "/admin does not RENDER HeroCarouselBuilder — the import may be there but the\n" +
+        "        tab is not mounted, so the hero has no editing UI",
+    );
   }
   // The tab must be reachable, not just imported.
   if (!/id:\s*"hero-carousel"/.test(admin)) {
@@ -93,8 +109,26 @@ if (!existsSync(FUNCTIONS)) {
   }
 }
 
-// --- 2. the homepage must read the hero from the table, not invent one
+// --- 2. the homepage must read the hero from the table, and rotate the
+//        catalogue only while that table is empty
+//
+// This section previously required the string "FALLBACK, not the hero" in the
+// homepage source, which only existed because the fallback was a SECOND layout
+// that mimicked the real hero. Requiring a comment is a weak rule in both
+// directions: it fails when a correct refactor deletes the comment, and it says
+// nothing about behaviour.
+//
+// The contract that actually matters, and is asserted here instead:
+//
+//   an admin slide ALWAYS wins, and
+//   only with no admin slides does the hero rotate through songs and albums
+//
+// The screenshot that prompted this was the hero stuck on one album forever,
+// which came from a fixed `featured[0] ?? recentAlbums[0]` pick.
 const HOME = "src/routes/index.tsx";
+const POOL = "src/lib/hero-pool.ts";
+const HOOK = "src/hooks/use-hero-pool.ts";
+
 if (!existsSync(HOME)) {
   problems.push(`${HOME} is missing`);
 } else {
@@ -105,13 +139,107 @@ if (!existsSync(HOME)) {
   if (!/HeroCarousel/.test(home)) {
     problems.push("the homepage never renders <HeroCarousel />");
   }
-  // The fallback must SAY it is a fallback, or it is mistaken for the hero again.
-  if (!/FALLBACK, not the hero/i.test(home)) {
+
+  // The fixed pick is the bug itself. Remove it and the hero is stuck forever.
+  if (/featured\s*\[\s*0\s*\]/.test(home) && /recentAlbums\s*\[\s*0\s*\]/.test(home)) {
     problems.push(
-      "the homepage fallback is not labelled as a fallback in the source.\n" +
-        "        It renders when there are no active slides, looks like the real\n" +
-        "        hero, and was mistaken for a hardcoded section nobody can edit.",
+      "the homepage still falls back to a fixed `featured[0] ?? recentAlbums[0]`,\n" +
+        "        which is why the hero showed the same album to everyone forever",
     );
+  }
+
+  // Admin first. `adminSlides.length > 0 ? adminSlides : pool` in either order of
+  // the condition, but the ADMIN branch must be the one taken when slides exist.
+  const adminWins = /usingAdminSlides\s*=\s*adminHeroSlides\.length\s*>\s*0/.test(home);
+  const adminChosen = /usingAdminSlides\s*\?\s*adminHeroSlides\s*:\s*heroPool/.test(home);
+  if (!adminWins || !adminChosen) {
+    problems.push(
+      "the homepage does not clearly prefer admin slides over the random pool.\n" +
+        "        An admin who adds a slide at /admin -> Hero Carousel expects to see\n" +
+        "        it, and silently rotating the catalogue instead is worse than the\n" +
+        "        bug this replaced.",
+    );
+  } else {
+    notes.push("admin slides take priority; the pool is only the empty-table case");
+  }
+
+  // Both kinds must reach the pool. This matches the POOL CONSTRUCTION, not the
+  // words "trending" and "newReleases" anywhere in the file — those appear in the
+  // destructuring and in the shelves below the hero, so a loose search passed
+  // even with a pool fed albums only. Found by deliberately breaking it.
+  const poolBuildsSongs =
+    /useMemo\(\s*\(\)\s*=>\s*\[\s*\.\.\.trending/.test(home) &&
+    /useMemo\(\s*\(\)\s*=>\s*\[\s*\.\.\.featured/.test(home);
+  if (!poolBuildsSongs) {
+    problems.push(
+      "the homepage hero pool is not built from both songs and albums —\n" +
+        "        it must interleave [...featured, ...recentAlbums] with\n" +
+        "        [...trending, ...newReleases], or the hero rotates through\n" +
+        "        albums only, which is what it did before",
+    );
+  } else {
+    notes.push("the hero pool is fed songs as well as albums");
+  }
+
+  // Randomness during render is a hydration mismatch: the server emits one
+  // slide and the client another, and React rebuilds the markup visibly.
+  if (/Math\.random/.test(home)) {
+    problems.push(
+      "the homepage calls Math.random() during render — the server and the client\n" +
+        "        will pick different hero slides and hydration will visibly rebuild",
+    );
+  }
+}
+
+if (!existsSync(POOL)) {
+  problems.push(`${POOL} is missing — nothing builds the rotating hero pool`);
+} else {
+  // Comments stripped first. hero-pool.ts explains WHY it does not call
+  // Math.random, in a comment that contains the words "Math.random" — so the
+  // first version of this check failed against correct code, for exactly the
+  // reason the comment exists. Eighth time a check has matched its own
+  // explanation.
+  const pool = stripComments(readFileSync(POOL, "utf8"));
+  if (/Math\.random/.test(pool)) {
+    problems.push(
+      `${POOL} calls Math.random() — the pool must be a pure function of its input\n` +
+        "        or the server and client render different slides",
+    );
+  } else {
+    notes.push("the hero pool is deterministic, so SSR and hydration agree");
+  }
+}
+
+if (!existsSync(HOOK)) {
+  problems.push(`${HOOK} is missing — nothing shuffles the pool after mount`);
+} else {
+  const hook = stripComments(readFileSync(HOOK, "utf8"));
+  if (!/Math\.random/.test(hook)) {
+    problems.push(`${HOOK} never randomises, so every visitor gets the same order`);
+  }
+  if (!/useEffect/.test(hook)) {
+    problems.push(
+      `${HOOK} randomises outside an effect — doing it during render is a hydration\n` +
+        "        mismatch",
+    );
+  }
+  // Without a once-only guard the effect re-shuffles on every re-render, so the
+  // hero changes item mid-rotation and the order never settles.
+  //
+  // It must be a real useRef CALL and a real CONDITIONAL READ. Checking for the
+  // words `useRef` and `.current` was satisfied by the import line and by the
+  // two assignment statements that flip the flag, so deleting only the guard
+  // that consumes it still passed.
+  const hasRef = /useRef\s*\(/.test(hook);
+  const readsGuard = /if\s*\([^)]*\.current[^)]*\)\s*return/.test(hook);
+  if (!hasRef || !readsGuard) {
+    problems.push(
+      `${HOOK} has no once-only guard that is actually READ (useRef(...) plus an\n` +
+        "        if on .current) — the pool would be reshuffled on every re-render\n" +
+        "        and the hero would never settle on an order",
+    );
+  } else {
+    notes.push("the order is randomised once after mount, and never during render");
   }
 }
 

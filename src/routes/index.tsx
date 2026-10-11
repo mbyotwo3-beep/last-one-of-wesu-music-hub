@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { useServerFn } from "@tanstack/react-start";
 import { Play } from "lucide-react";
@@ -12,7 +13,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { TrackCard, AlbumTile, ArtistTile, PlaylistTile } from "@/components/discover/TrackCard";
 import { CarouselShelf } from "@/components/CarouselShelf";
 import { getActiveCarousels } from "@/lib/carousel.functions";
-import { HeroCarousel } from "@/components/HeroCarousel";
+import { HeroCarousel, type HeroSlide } from "@/components/HeroCarousel";
+import { useHeroPool } from "\@/hooks/use-hero-pool";
 import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
 import { SkeletonHeroCarousel, SkeletonShelf, SkeletonTrackRow } from "@/components/Skeleton";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
@@ -129,7 +131,31 @@ function HomePage() {
     moods = [],
   } = discoverData ?? {};
 
-  const heroPick = featured[0] ?? recentAlbums[0];
+  // Admin slides always win. Only when the table has no active rows does the
+  // hero fall back to rotating through the catalogue.
+  //
+  // Everything below runs unconditionally so the hook order stays stable: making
+  // it conditional is exactly how hooks-after-early-return crashed
+  // albums.$id.tsx twice.
+  const heroPool = useHeroPool(
+    useMemo(() => [...featured, ...recentAlbums], [featured, recentAlbums]),
+    useMemo(() => [...trending, ...newReleases], [trending, newReleases]),
+  );
+
+  const adminHeroSlides: HeroSlide[] = (heroSlides ?? []).map((slide) => ({
+    id: slide.id,
+    title: slide.title,
+    description: slide.description,
+    imageUrl: slide.image_url,
+    videoUrl: slide.video_url || undefined,
+    ctaText: slide.cta_text,
+    ctaLink: slide.cta_link,
+    ctaExternal: slide.cta_external,
+    ctaTarget: (slide as any).link_target ?? "_self",
+  }));
+
+  const usingAdminSlides = adminHeroSlides.length > 0;
+  const heroSlidesToShow: HeroSlide[] = usingAdminSlides ? adminHeroSlides : heroPool;
   const empty =
     featured.length === 0 &&
     newReleases.length === 0 &&
@@ -154,68 +180,32 @@ function HomePage() {
           </>
         ) : (
           <>
-            {/* Hero Carousel - Netlify-style with auto-rotation */}
-            {heroSlides && heroSlides.length > 0 ? (
-              <HeroCarousel
-                slides={heroSlides.map((slide) => ({
-                  id: slide.id,
-                  title: slide.title,
-                  description: slide.description,
-                  imageUrl: slide.image_url,
-                  videoUrl: slide.video_url || undefined,
-                  ctaText: slide.cta_text,
-                  ctaLink: slide.cta_link,
-                  ctaExternal: slide.cta_external,
-                  ctaTarget: (slide as any).link_target ?? "_self",
-                }))}
-              />
+            {/* Hero Carousel - Netlify-style with auto-rotation
+             *
+             * Two sources, and the admin always wins:
+             *
+             *   1. hero_carousel_slides, set at /admin -> Hero Carousel.
+             *   2. Otherwise a rotating pool of real songs and albums, so the
+             *      hero is never stuck showing one album forever.
+             *
+             * Both go through the SAME HeroCarousel, so the rotation, the dots,
+             * the swipe and the CTA behaviour are identical either way. That is
+             * deliberate: the old fallback was a second, near-identical layout
+             * that looked like the hero, and it is what made this look
+             * hardcoded and unfixable.
+             */}
+            {heroSlidesToShow.length > 0 ? (
+              <HeroCarousel slides={heroSlidesToShow} />
             ) : (
-              heroPick && (
-                /* FALLBACK, not the hero.
-                 *
-                 * This only renders when hero_carousel_slides has no active rows.
-                 * It looks enough like the real hero that it reads as one, which is
-                 * why it was mistaken for a hardcoded section nobody can edit.
-                 *
-                 * The fix is to add a slide at /admin -> Hero Carousel. The
-                 * comment here exists so the next person does not try to style
-                 * this instead.
-                 */
-                <section className="relative rounded-2xl overflow-hidden bg-card ring-1 ring-white/5 aspect-[16/9] md:aspect-[2.4/1]">
-                  <StorageImage
-                    bucket="album-art"
-                    path={heroPick.cover_url}
-                    alt={heroPick.title}
-                    className="absolute inset-0 w-full h-full object-cover opacity-70"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-                  <div className="relative h-full flex flex-col justify-end p-6 md:p-10 max-w-2xl">
-                    <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">
-                      Featured
-                    </p>
-                    <h1 className="text-2xl md:text-5xl font-bold text-white tracking-tight mb-2">
-                      {heroPick.title}
-                    </h1>
-                    <p className="text-sm md:text-lg text-zinc-300 mb-5">
-                      {(heroPick.artist as { name?: string } | null)?.name ?? "Various Artists"}
-                    </p>
-                    <div className="flex gap-3">
-                      <Link
-                        to="/albums/$id"
-                        params={{ id: heroPick.id }}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm cursor-pointer hover:scale-105 transition-transform"
-                      >
-                        <Play className="size-4 fill-current" />
-                        Open Album
-                      </Link>
-                      <Link
-                        to="/browse"
-                        className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm backdrop-blur cursor-pointer hover:scale-105 transition-transform"
-                      >
-                        Browse All
-                      </Link>
-                    </div>
-                  </div>
+              !heroSlidesLoading && (
+                <section className="rounded-2xl bg-card ring-1 ring-white/5 p-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Nothing to show yet —{" "}
+                    <Link to="/browse" className="underline">
+                      browse the catalogue
+                    </Link>
+                    .
+                  </p>
                 </section>
               )
             )}

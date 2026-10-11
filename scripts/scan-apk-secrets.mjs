@@ -32,11 +32,40 @@ import { readFileSync, readdirSync, rmSync, mkdirSync, existsSync } from "node:f
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-const APK = process.argv[2] ?? "wesuplus.apk";
+/**
+ * Where the built APK actually lives.
+ *
+ * It defaults to "wesuplus.apk" in the repository root, which does not exist —
+ * the file is in public/ (what Vercel serves) and in build/android/ (the
+ * release artefact). So `node scripts/scan-apk-secrets.mjs` printed
+ * "nothing to scan (skipped)" and exited 0, on a run where a 7 MB APK was
+ * sitting right there.
+ *
+ * A credential scan that silently skips is worse than no scan: it reports a
+ * clean build while checking nothing. It now searches the real locations, and
+ * FAILS if it finds none, unless --allow-missing is passed explicitly.
+ */
+const CANDIDATES = [
+  "android/app/build/outputs/apk/release/app-release.apk",
+  "build/android/wesuplus.apk",
+  "public/wesuplus.apk",
+];
 
-if (!existsSync(APK)) {
-  console.log(`  ${APK} not present — nothing to scan (skipped)`);
-  process.exit(0);
+const allowMissing = process.argv.includes("--allow-missing");
+const explicit = process.argv.slice(2).find((a) => !a.startsWith("--"));
+const APK = explicit ?? CANDIDATES.find((p) => existsSync(p));
+
+if (!APK) {
+  if (allowMissing) {
+    console.log("  no APK found — skipped because --allow-missing was passed");
+    process.exit(0);
+  }
+  console.error(
+    "  no APK to scan. Looked in:\n" +
+      CANDIDATES.map((p) => `        ${p}`).join("\n") +
+      "\n  Build one, or pass --allow-missing if a missing APK is genuinely fine.",
+  );
+  process.exit(1);
 }
 
 function envFile(name) {
