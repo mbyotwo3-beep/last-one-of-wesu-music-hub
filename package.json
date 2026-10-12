@@ -24,6 +24,8 @@
     "verify:failure-reporting": "node scripts/check-failure-reporting.mjs",
     "verify:failure-negatives": "node scripts/check-failure-reporting-negatives.mjs",
     "verify:links": "node scripts/check-links-and-keys.mjs",
+    "verify:role-gating": "node scripts/check-role-gating.mjs",
+    "verify:role-negatives": "node scripts/check-role-gating-negatives.mjs",
     "verify:links-negatives": "node scripts/check-links-and-keys-negatives.mjs",
     "verify:audit-routes": "node scripts/audit-routes.mjs",
     "verify:offline-shell": "node scripts/check-offline-shell.mjs",
@@ -38,7 +40,7 @@
     "verify:hover-controls": "node scripts/check-hover-only-controls.mjs",
     "verify:revenue-split": "node scripts/check-revenue-split-parity.mjs",
     "verify:no-secrets": "node scripts/scan-apk-secrets.mjs",
-    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs && node scripts/check-offline-mode.mjs && node scripts/check-offline-boot.mjs && node scripts/check-offline-shell.mjs && node scripts/check-mobile-essentials.mjs && node scripts/check-failure-reporting.mjs && node scripts/check-links-and-keys.mjs && node scripts/check-hero-editable.mjs && node scripts/check-app-distribution.mjs && node scripts/check-app-url.mjs && node scripts/check-ios-project.mjs && node scripts/check-store-readiness.mjs && node scripts/scan-apk-secrets.mjs"
+    "prebuild": "node scripts/verify-ci-install.mjs && node scripts/verify-no-known-vulns.mjs && node scripts/check-hover-only-controls.mjs && node scripts/check-revenue-split-parity.mjs && node scripts/check-offline-mode.mjs && node scripts/check-offline-boot.mjs && node scripts/check-offline-shell.mjs && node scripts/check-mobile-essentials.mjs && node scripts/check-failure-reporting.mjs && node scripts/check-role-gating.mjs && node scripts/check-links-and-keys.mjs && node scripts/check-hero-editable.mjs && node scripts/check-app-distribution.mjs && node scripts/check-app-url.mjs && node scripts/check-ios-project.mjs && node scripts/check-store-readiness.mjs && node scripts/scan-apk-secrets.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

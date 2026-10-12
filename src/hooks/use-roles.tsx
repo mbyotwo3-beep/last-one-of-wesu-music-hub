@@ -22,13 +22,16 @@ export function useUserRoles() {
   const { user, loading: authLoading } = useAuth();
   const userId = user?.id ?? null;
 
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["user-roles", userId],
     enabled: !!userId,
     // Roles change only when the account does; keep it warm so a nav bounce
     // never shows a gate flash.
     staleTime: 5 * 60 * 1000,
-    retry: 2,
+    // Three, not two, and with a delay. An expired access token refreshed
+    // mid-request is the common cause of the failure this hook has to survive.
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("user_roles")
@@ -43,17 +46,41 @@ export function useUserRoles() {
   // Keep gates waiting while auth settles or the roles request is in flight.
   const loading = authLoading || (!!userId && isPending);
 
+  /**
+   * Did we actually find out?
+   *
+   * THIS IS THE FIX. The query used to destructure only `{ data, isPending }` and
+   * silently throw away `isError`. A failed read therefore produced `roles: []`,
+   * which is indistinguishable from "you really have no roles" — so RoleGate
+   * told a genuine artist "You need a different account type… Your account isn't
+   * one yet", with a Become an Artist button, on their own dashboard.
+   *
+   * With staleTime of five minutes the wrong answer also survived a refresh, and
+   * because four components read this hook, the nav offered "Become an Artist" as
+   * well.
+   *
+   * A failed read is not a denial. Callers must be able to tell the difference,
+   * and must never claim someone lacks a role they might hold.
+   */
+  const checked = !authLoading && (!userId || (data !== undefined || isError));
+
   return {
     roles,
     loading,
+    /** True when the read succeeded, so `roles` can be trusted. */
+    checked,
+    /** True when we could not find out. Never render a denial on this. */
+    failed: isError,
+    error,
+    refetch,
     isUser: !!user,
-    isArtist: roles.includes("artist"),
-    isAdmin: roles.includes("admin") || roles.includes("superadmin"),
-    isSuperAdmin: roles.includes("superadmin"),
-    isLabel: roles.includes("label"),
+    isArtist: checked && !isError && roles.includes("artist"),
+    isAdmin: checked && !isError && (roles.includes("admin") || roles.includes("superadmin")),
+    isSuperAdmin: checked && !isError && roles.includes("superadmin"),
+    isLabel: checked && !isError && roles.includes("label"),
     // Staff is what "can publish an editorial playlist" means — admin or
     // superadmin. `isAdmin` already covers exactly that, but naming the
     // capability here keeps callers from having to re-derive it.
-    isStaff: roles.includes("admin") || roles.includes("superadmin"),
+    isStaff: checked && !isError && (roles.includes("admin") || roles.includes("superadmin")),
   };
 }

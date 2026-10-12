@@ -18,7 +18,9 @@ const NavbarComponent = function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
-  const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading } = useUserRoles();
+  // `checked` gates every claim about the account: while the roles read is in flight
+// or has failed we must not tell anyone they are or are not an artist.
+const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useUserRoles();
 
   // Use React Query for avatar fetch with proper caching and optimistic UI
   const { data: avatarPath } = useQuery({
@@ -127,7 +129,7 @@ const NavbarComponent = function Navbar() {
           >
             Profile
           </Link>
-          {!isArtist && (
+          {checked && !isArtist && (
             <Link
               to="/become-artist"
               className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
@@ -255,7 +257,7 @@ const NavbarComponent = function Navbar() {
                 >
                   Profile
                 </Link>
-                {!isArtist && (
+                {checked && !isArtist && (
                   <Link
                     to="/become-artist"
                     onClick={() => setMobileMenuOpen(false)}

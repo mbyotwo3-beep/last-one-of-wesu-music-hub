@@ -18,12 +18,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/stores/player";
+import { useUserRoles } from "\@/hooks/use-roles";
 import { toast } from "sonner";
 
 export function AppleMusicSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isArtist, checked } = useUserRoles();
   // Subscribe to the FIELDS, not the whole store. Subscribing to everything
   // re-renders this component on every state change, including progressSeconds,
   // which the audio element updates several times a second during playback.
@@ -335,15 +337,26 @@ export function AppleMusicSidebar() {
           )}
         </nav>
 
-        <div className="mt-4 pt-3 border-t border-border/50">
-          <Link
-            to="/become-artist"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
-          >
-            <Plus className="size-5" />
-            Become an Artist
-          </Link>
-        </div>
+        {/*
+          * Only offer this to someone we KNOW is not an artist.
+          *
+          * It used to render unconditionally, so every artist saw "Become an
+          * Artist" in their own sidebar — the most visible half of the report.
+          * `checked` is what makes it honest: while the roles read is in flight,
+          * or if it failed, we show nothing rather than make a claim we cannot
+          * back up.
+          */}
+        {checked && !isArtist && (
+          <div className="mt-4 pt-3 border-t border-border/50">
+            <Link
+              to="/become-artist"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left cursor-pointer"
+            >
+              <Plus className="size-5" />
+              Become an Artist
+            </Link>
+          </div>
+        )}
       </div>
     </aside>
   );

@@ -107,7 +107,7 @@ function AppVersionFooter() {
 
 export function BottomTabBar() {
   const { user } = useAuth();
-  const { isArtist, isAdmin, isSuperAdmin } = useUserRoles();
+  const { isArtist, isAdmin, isSuperAdmin, checked } = useUserRoles();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
@@ -517,8 +517,11 @@ export function BottomTabBar() {
             <AppVersionFooter />
           </div>
           {/* Pinned bottom: Become an Artist (signed-in non-artists only —
-              anonymous users land on a RoleGate dead end otherwise). */}
-          {!isArtist && user && (
+              anonymous users land on a RoleGate dead end otherwise).
+              `checked` too: while the roles read is in flight or has failed,
+              isArtist is false for everyone and this would be offered to an
+              actual artist. */}
+          {checked && !isArtist && user && (
             <div className="border-t border-border p-4">
               <button
                 onClick={() => {
