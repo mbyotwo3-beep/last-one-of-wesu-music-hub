@@ -32,6 +32,7 @@ import { tmpdir } from "node:os";
 
 const SRC = "android/app/src/main/java/com/wesu/music/OfflineShell.java";
 const MAIN = "android/app/src/main/java/com/wesu/music/MainActivity.java";
+const SHELL = SRC;
 
 const failures = [];
 const notes = [];
@@ -106,14 +107,63 @@ if (!existsSync("public/sw.js")) {
   notes.push("public/sw.js remains for browsers, where it does work");
 }
 
+// --- one route's HTML is NEVER served under another route's URL
+//
+// This is the bug that made /library fail in the app and nowhere else.
+//
+// vc34 fell back to the cached "/" document for any uncached path. A browser
+// never reaches that code — it uses public/sw.js — so no amount of browser
+// testing would ever have shown it. Serving "/" at "/library" hands the client
+// the homepage's markup AND the homepage's inline hydration payload while
+// location.pathname says "/library": the router hydrates one route against
+// another's data, React discards the markup, and the listener lands on the route
+// error boundary with a player bar still running.
+//
+// Correct markup for the wrong URL is worse than no markup.
+const shellSrc = existsSync(SHELL) ? readFileSync(SHELL, "utf8") : "";
+const cachedStart = shellSrc.indexOf("private static WebResourceResponse serveCachedDocument(");
+const cachedBody =
+  cachedStart === -1 ? "" : shellSrc.slice(cachedStart, shellSrc.indexOf("\n    }", cachedStart));
+if (!cachedBody) {
+  fail("serveCachedDocument is missing from OfflineShell");
+} else {
+  const namesRootDoc = /cacheName\("https:\/\/"\s*\+\s*APP_HOST\s*\+\s*"\/"\)/.test(cachedBody);
+  /*
+   * The root document must sit behind a root-path guard.
+   *
+   * Checking merely that the word "isRoot" appears is not enough: the variable is
+   * declared whether or not the branch uses it, so replacing the guard with
+   * `if (true)` — which serves the homepage to every unsaved path — still passed.
+   * The guard itself has to be the condition of the branch that returns it.
+   */
+  const rootGuarded = /if\s*\(\s*isRoot[^)]*\)\s*\{[\s\S]{0,400}?cacheName\(\s*"https:\/\/"/.test(
+    cachedBody,
+  );
+  const rootUsedAsFallback = namesRootDoc && !rootGuarded;
+  if (rootUsedAsFallback) {
+    fail(
+      "serveCachedDocument falls back to the ROOT document for an unsaved path.\n" +
+        "        That serves the homepage's markup and hydration payload under another\n" +
+        "        route's URL. The client hydrates one route against another's data,\n" +
+        "        React rebuilds, and the listener gets the route error page. This is\n" +
+        "        app-only and invisible to browser testing.",
+    );
+  } else if (!/error\.html/.test(cachedBody)) {
+    fail(
+      "an unsaved path does not fall back to error.html, so it either serves the\n" +
+        "        wrong document or falls through to a failed network load",
+    );
+  } else {
+    notes.push("an unsaved route gets its own honest page, never another route's HTML");
+  }
+}
+
 // --- the fallback page must not contradict what the app can now do
 //
-// This page only renders when there is no network AND no saved copy, so it is
-// the first-run-offline case. It used to say "reconnect to open Wesu+ and enjoy
-// them", which was true when the only offline story was "your downloads keep
-// playing" and became false the moment the shell itself could be served from
-// disk. Copy that overstates a limitation sends people hunting for one that is
-// no longer there.
+// This page renders when there is no network AND no saved copy for the path. It
+// used to say "reconnect to open Wesu+ and enjoy them", which was true when the
+// only offline story was "your downloads keep playing" and became false the
+// moment the shell itself could be served from disk.
 const ERROR_HTML = "android/app/src/main/assets/error.html";
 if (!existsSync(ERROR_HTML)) {
   fail(`${ERROR_HTML} is missing, so a failed load falls back to Android's raw error screen`);
@@ -125,13 +175,19 @@ if (!existsSync(ERROR_HTML)) {
         "        without a connection once it has been opened once, so this tells the\n" +
         "        listener to do something the app no longer needs",
     );
-  } else if (!/first time only|first time/i.test(html)) {
+  } else if (!/isn't saved on this phone|first time only/i.test(html)) {
     fail(
-      "the offline fallback page does not say this is a first-run-only situation,\n" +
-        "        so a listener with no connection is left with no idea what to do",
+      "the offline fallback page does not explain that the screen has not been\n" +
+        "        saved on this phone, so a listener with no connection is told nothing\n" +
+        "        about why, or what to do",
+    );
+  } else if (!/Downloads|library/i.test(html)) {
+    fail(
+      "the offline fallback page does not point at Downloads or the library, which\n" +
+        "        are the screens that do work offline and the way out of the dead end",
     );
   } else {
-    notes.push("the fallback page explains this is a first-run-only problem");
+    notes.push("the fallback page explains what is not saved and where to go instead");
   }
 }
 

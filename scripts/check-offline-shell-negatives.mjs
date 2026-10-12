@@ -21,6 +21,7 @@ import { execFileSync } from "node:child_process";
 
 const SRC = "android/app/src/main/java/com/wesu/music/OfflineShell.java";
 const MAIN = "android/app/src/main/java/com/wesu/music/MainActivity.java";
+const SHELL = SRC;
 
 /**
  * Replace the matched substring WITHIN the first line that contains it.
@@ -160,19 +161,45 @@ const cases = [
     expect: "ServiceWorkerController call is still live",
   },
   {
+    // The exact bug shipped in vc34: the root document served as the fallback
+    // for any unsaved path, which put the homepage's markup and hydration
+    // payload under /library's URL.
+    name: "the root document is served again as the fallback for unsaved paths",
+    file: SHELL,
+    apply: onLine("if (isRoot) {", "if (true) {"),
+    expect: "falls back to the ROOT document",
+  },
+  {
+    name: "the root guard is dropped from the branch that serves the root",
+    file: SHELL,
+    apply: (src) => src.replace(/if\s*\(\s*isRoot[^)]*\)\s*\{/, "{"),
+    expect: "falls back to the ROOT document",
+  },
+  {
     name: "the fallback page claims a connection is required",
     file: "android/app/src/main/assets/error.html",
     apply: onLine(
-      "Can't open Wesu+ yet",
+      "This page isn't saved on this phone",
       "You're offline - reconnect to open Wesu+ and enjoy them",
     ),
     expect: "reconnect to open",
   },
   {
-    name: "the fallback page stops explaining the first-run-only case",
+    name: "the fallback page stops explaining what is not saved",
     file: "android/app/src/main/assets/error.html",
-    apply: onLine("first", "many"),
-    expect: "does not say this is a first-run-only situation",
+    apply: onLine("isn't saved on this phone", "is unavailable"),
+    expect: "does not explain that the screen has not been",
+  },
+  {
+    // Both mentions, not one: the page says "Downloads" on one line and
+    // "library" on the next, so removing a single line left the rule satisfied.
+    name: "the fallback page stops pointing at the screens that do work",
+    file: "android/app/src/main/assets/error.html",
+    apply: (src) =>
+      src
+        .replace("Your downloads are always safe and always play — open <b>Downloads</b> or", "Nothing works offline without a connection — open the")
+        .replace("<b>Your library</b>", "the site"),
+    expect: "does not point at Downloads or the library",
   },
 ];
 

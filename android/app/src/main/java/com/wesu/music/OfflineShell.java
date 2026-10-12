@@ -255,26 +255,63 @@ final class OfflineShell {
      * this device has never visited. The client-side router then restores the
      * intended route, so /library opens as /library and not as a dead end.
      */
+    /**
+     * The last copy of THIS page that worked, or the first-run page. Never another
+     * route's copy.
+     *
+     * WHY NOT THE ROOT SHELL AS A FALLBACK
+     *
+     * vc34 fell back to the cached "/" document for any uncached path, which
+     * looked generous and was the source of a bug that only the Android app could
+     * produce. A browser never hits this path — it uses public/sw.js — so no
+     * amount of browser testing would have found it.
+     *
+     * Serving "/" for "/library" hands the client markup for the homepage AND the
+     * homepage's inline hydration payload, while location.pathname says
+     * "/library". TanStack Router then hydrates one route against another's data,
+     * React discards the markup, and the listener lands on the route error
+     * boundary: "This page didn't load" — on the library, with a player bar still
+     * running.
+     *
+     * Correct markup for the wrong URL is worse than no markup: it produces a
+     * confident, wrong page. So an unsaved route gets the offline page, which
+     * says plainly that it has not been saved on this phone yet and offers a
+     * retry.
+     */
     private static WebResourceResponse serveCachedDocument(Context ctx, String url) {
         try {
-            File f = new File(cacheDir(ctx), cacheName(url));
-            if (!f.exists() || f.length() == 0) {
+            String path = urlPath(url);
+            boolean isRoot = path.isEmpty() || "/".equals(path);
+            if (isRoot) {
                 File root = new File(cacheDir(ctx), cacheName("https://" + APP_HOST + "/"));
-                if (!root.exists() || root.length() == 0) {
-                    try {
-                        InputStream in = ctx.getAssets().open("error.html");
-                        if (in != null) {
-                            return new WebResourceResponse("text/html", "utf-8", 200, "OK", noStore(), in);
-                        }
-                    } catch (Throwable ignored2) {
-                    }
-                    return null;
+                if (root.exists() && root.length() > 0) {
+                    return new WebResourceResponse(
+                            "text/html", "utf-8", 200, "OK", noStore(), new FileInputStream(root));
                 }
-                f = root;
+            } else {
+                File exact = new File(cacheDir(ctx), cacheName(url));
+                if (exact.exists() && exact.length() > 0) {
+                    return new WebResourceResponse(
+                            "text/html", "utf-8", 200, "OK", noStore(), new FileInputStream(exact));
+                }
             }
-            return new WebResourceResponse(
-                    "text/html", "utf-8", 200, "OK", noStore(), new FileInputStream(f));
+
+            // Nothing saved for this path. Say so plainly instead of serving a
+            // different page's HTML under this URL.
+            InputStream in = ctx.getAssets().open("error.html");
+            if (in != null) {
+                return new WebResourceResponse("text/html", "utf-8", 200, "OK", noStore(), in);
+            }
+            return null;
         } catch (Throwable ignored) {
+            try {
+                InputStream in = ctx.getAssets().open("error.html");
+                if (in != null) {
+                    return new WebResourceResponse("text/html", "utf-8", 200, "OK", noStore(), in);
+                }
+            } catch (Throwable ignored2) {
+                // Nothing survivable: let the normal network path run.
+            }
             return null;
         }
     }
