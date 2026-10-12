@@ -1,4 +1,5 @@
 import { usePlayer } from "@/stores/player";
+import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { StorageImage } from "@/components/StorageImage";
 import { Play, Pause } from "lucide-react";
 
@@ -25,6 +26,15 @@ export function SongRow({ song }: SongRowProps) {
   const playing = usePlayer((s) => s.playing);
   const currentTrack = usePlayer((s) => s.track);
   const isActive = currentTrack?.id === song.id;
+  const { warm } = useIntentWarm();
+
+  // Resolve the signed preview URL as the finger lands, not after the click.
+  // On a touch screen there is no hover, so pointerdown is the earliest signal
+  // there is — and PlayerBar has already cleared the audio element by the time
+  // the tap resolves.
+  const warmThis = () => {
+    if (!isActive) void warm(song.id, song.price ?? undefined);
+  };
 
   const isPlayingThisTrack = playing && isActive;
 
@@ -53,6 +63,8 @@ export function SongRow({ song }: SongRowProps) {
 
   return (
     <button
+      onPointerDown={warmThis}
+      onFocus={warmThis}
       onClick={handlePlay}
       className={`w-full flex items-center gap-3 px-4 py-2 min-h-[44px] text-left transition-colors hover:bg-white/5 active:bg-white/10 ${
         isActive ? "bg-primary/10" : ""

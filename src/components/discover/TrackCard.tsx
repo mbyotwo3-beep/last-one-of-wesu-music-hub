@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Play, Pause, Heart } from "lucide-react";
 import { usePlayer } from "@/stores/player";
+import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSavedAlbum } from "@/hooks/use-saved-album";
@@ -25,6 +26,15 @@ export interface TrackCardSong {
 /** Cover-first tile for New Music / Made For You style shelves. */
 export function TrackCard({ song }: { song: TrackCardSong }) {
   const setQueue = usePlayer((s) => s.setQueue);
+  const { warm } = useIntentWarm();
+  const isActive = usePlayer((s) => s.track?.id) === song.id;
+
+  // Warm the signed preview URL as the pointer arrives, so tapping this card
+  // does not start from silence. See hooks/use-intent-warm for why this is on
+  // intent rather than on the whole visible list.
+  const warmThis = () => {
+    if (!isActive) void warm(song.id, song.price ?? undefined);
+  };
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -77,6 +87,8 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
     <div className="group text-left w-full relative">
       {/* Cover Image & Play Button Overlay */}
       <div
+        onPointerDown={warmThis}
+        onFocus={warmThis}
         onClick={handlePlay}
         className="relative block w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 cursor-pointer group-hover:scale-[1.02] transition-transform"
       >
@@ -91,6 +103,8 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         >
           <button
             type="button"
+            onPointerDown={warmThis}
+            onFocus={warmThis}
             onClick={handlePlay}
             aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
             className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"

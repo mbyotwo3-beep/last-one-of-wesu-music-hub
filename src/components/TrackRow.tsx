@@ -5,6 +5,7 @@ import { PriceTag } from "@/components/PriceTag";
 import { DownloadButton } from "@/components/DownloadButton";
 import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
+import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { ShareMenu } from "@/components/ShareMenu";
 
 interface TrackRowProps {
@@ -35,9 +36,20 @@ export function TrackRow({
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
   const { isSaved, toggle } = useSavedTrack(id);
+  const { warm } = useIntentWarm();
 
   const isCurrentTrack = currentTrackId === id;
   const isPlayingThisTrack = playing && isCurrentTrack;
+
+  // Resolve the signed preview URL while the pointer is still on the row.
+  //
+  // PlayerBar clears the audio element BEFORE it starts the round trip, so an
+  // unwarmed tap is silence for the whole of it. Warming on intent means the
+  // request is already in flight by the time the click resolves. pointerdown
+  // rather than pointerenter because there is no hover on a touch screen.
+  const warmThis = () => {
+    if (!isCurrentTrack) void warm(id, price ?? undefined);
+  };
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -55,6 +67,8 @@ export function TrackRow({
       {/* Track Number / Play Button — 44px target, not a bare 16px icon. */}
       <div className="flex w-11 shrink-0 justify-center">
         <button
+          onPointerDown={warmThis}
+          onFocus={warmThis}
           onClick={handlePlay}
           className="grid size-11 place-items-center rounded-full text-foreground transition-colors hover:bg-secondary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label={isPlayingThisTrack ? "Pause" : "Play"}
@@ -81,6 +95,8 @@ export function TrackRow({
           playable, not a bare click handler on a div. */}
       <button
         type="button"
+        onPointerDown={warmThis}
+        onFocus={warmThis}
         onClick={handlePlay}
         className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:underline"
       >
