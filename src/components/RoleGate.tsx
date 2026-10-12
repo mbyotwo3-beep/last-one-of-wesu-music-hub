@@ -29,10 +29,12 @@ export function RoleGate({ require, children }: Props) {
         isSuperAdmin,
         isLabel,
       });
-  const ok = access === "allowed";
+  const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const ok = access === "allowed" || (isOffline && require === "user");
 
   useEffect(() => {
     if (loading || failed) return;
+    if (isOffline && require === "user") return;
     if (access === "redirect-auth") {
       navigate({
         to: "/auth",
@@ -64,6 +66,9 @@ export function RoleGate({ require, children }: Props) {
    * we could not check, and here is the button.
    */
   if (failed) {
+    if (require === "user" && (isUser || (typeof navigator !== "undefined" && navigator.onLine === false))) {
+      return <>{children}</>;
+    }
     return (
       <div className="px-6 py-16 text-center max-w-md mx-auto">
         <h1 className="text-xl font-bold mb-2">We couldn't check your account</h1>

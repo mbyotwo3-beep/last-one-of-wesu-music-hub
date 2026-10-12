@@ -260,7 +260,16 @@ final class OfflineShell {
             File f = new File(cacheDir(ctx), cacheName(url));
             if (!f.exists() || f.length() == 0) {
                 File root = new File(cacheDir(ctx), cacheName("https://" + APP_HOST + "/"));
-                if (!root.exists() || root.length() == 0) return null;
+                if (!root.exists() || root.length() == 0) {
+                    try {
+                        InputStream in = ctx.getAssets().open("error.html");
+                        if (in != null) {
+                            return new WebResourceResponse("text/html", "utf-8", 200, "OK", noStore(), in);
+                        }
+                    } catch (Throwable ignored2) {
+                    }
+                    return null;
+                }
                 f = root;
             }
             return new WebResourceResponse(

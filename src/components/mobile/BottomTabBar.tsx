@@ -139,7 +139,8 @@ export function BottomTabBar() {
   const tabs = computeTabs();
 
   function handleTab(tab: Tab) {
-    if (tab.requireAuth && !user) {
+    const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (tab.requireAuth && !user && !isOffline) {
       navigate({ to: "/auth", search: { redirect: pathname + searchStr } });
     } else {
       navigate({ to: tab.to as any });
