@@ -52,7 +52,19 @@ function hasId(value: unknown): value is { id: string } {
   return typeof id === "string" && id.length > 0;
 }
 
-function Page() {
+/**
+ * Exported so it can be rendered in a test.
+ *
+ * This page has been reported broken repeatedly, and every diagnosis came from
+ * reading the source. Reading kept producing true statements that did not
+ * locate the fault — "no loader", "all queries guarded", "no unguarded access"
+ * were all correct and all beside the point.
+ *
+ * Rendering it executes the component, so whatever throws throws in a second
+ * with a stack trace instead of on a listener's phone. See
+ * __tests__/library-render.test.tsx.
+ */
+export function Page() {
   const { user } = useAuth();
   const followedFn = useServerFn(listFollowedPlaylists);
 
@@ -788,8 +800,9 @@ function PlaylistCard({ playlist }: { playlist: any }) {
   // PostgREST may return the embedded song as an object or a 1-array —
   // unwrap defensively like the playlists pages do.
   const songs = (playlist.playlist_songs ?? [])
+    .filter((ps: any) => ps != null)
     .slice()
-    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+    .sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
     .map((ps: any) => {
       let s = ps.song ?? ps.songs;
       if (Array.isArray(s)) s = s[0];

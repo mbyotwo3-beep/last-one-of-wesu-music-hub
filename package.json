@@ -26,6 +26,7 @@
     "verify:links": "node scripts/check-links-and-keys.mjs",
     "verify:role-gating": "node scripts/check-role-gating.mjs",
     "verify:role-negatives": "node scripts/check-role-gating-negatives.mjs",
+    "verify:library-render-negatives": "node scripts/check-library-render-negatives.mjs",
     "verify:links-negatives": "node scripts/check-links-and-keys-negatives.mjs",
     "verify:audit-routes": "node scripts/audit-routes.mjs",
     "verify:offline-shell": "node scripts/check-offline-shell.mjs",
