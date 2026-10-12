@@ -31,6 +31,7 @@
     "verify:library-render-negatives": "node scripts/check-library-render-negatives.mjs",
     "verify:links-negatives": "node scripts/check-links-and-keys-negatives.mjs",
     "verify:audit-routes": "node scripts/audit-routes.mjs",
+    "verify:money": "node scripts/audit-money.mjs",
     "verify:offline-shell": "node scripts/check-offline-shell.mjs",
     "verify:offline-shell-negatives": "node scripts/check-offline-shell-negatives.mjs",
     "verify:hero-editable": "node scripts/check-hero-editable.mjs",

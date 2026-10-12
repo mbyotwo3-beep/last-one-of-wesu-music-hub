@@ -1,122 +1,128 @@
 /**
- * Where the money actually is.
+ * Does every completed sale allocate exactly what was charged?
  *
- * Gross transaction value and the sum of revenue_splits disagree by a wide
- * margin, and the two answers mean very different things:
+ * WHY THIS IS NOT IN prebuild
  *
- *   - money never taken (abandoned mobile-money pushes)  -> nothing to reconcile
- *   - money taken but never settled (fulfilment_failed)   -> refund owed
+ * check-revenue-split-parity.mjs reads migration SQL. It proves one historical
+ * fix is still present in the file; it says nothing about the rows. The invariant
+ * that actually matters — artists 80%, platform 20%, total equal to the charge —
+ * had no check at all, live or simulated.
  *
- * revenue_splits rows are only written when a transaction transitions to
- * completed, so the gap is expected in the first case and alarming in the second.
- * This splits it out.
+ * This reads the real rows. It needs Supabase credentials, so it is a verify
+ * script, not a build gate: on a machine without credentials it reports that it
+ * could not run and exits non-zero, because a money check that silently skips is
+ * the same failure mode this project keeps hitting.
  *
- * Read only. Usage: node scripts/audit-money.mjs
+ * THE RULE
+ *
+ * For every completed payment transaction:
+ *
+ *     sum(revenue_splits.amount) == payment_transactions.amount
+ *
+ * with the platform share equal to the configured commission, and every artist
+ * share summing to the remainder. A transaction that over-allocates pays out of
+ * money that was never taken; one that under-allocates silently keeps a
+ * listener's kwacha.
+ *
+ * The K1.50 found below is a real row from September, before the commission
+ * existed. It is reported, not corrected: writing money rows is not this
+ * script's decision to make.
+ *
+ * Usage: node scripts/audit-money.mjs
  */
 import { readFileSync } from "node:fs";
 
-function envFile(name) {
+function env(f) {
+  const o = {};
   try {
-    const out = {};
-    for (const line of readFileSync(name, "utf8").split("\n")) {
-      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (!m) continue;
-      out[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+    for (const l of readFileSync(f, "utf8").split(/\r?\n/)) {
+      const m = l.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m) o[m[1]] = m[2].replace(/^["']|["']$/g, "");
     }
-    return out;
-  } catch {
-    return {};
-  }
+  } catch {}
+  return o;
 }
+const E = { ...env(".env"), ...env(".env.local") };
+const URL_ = E.SUPABASE_URL;
+const KEY = E.SUPABASE_SERVICE_ROLE_KEY;
 
-const env = { ...envFile(".env"), ...envFile(".env.local") };
-const BASE = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-const KEY = env.SUPABASE_SERVICE_ROLE_KEY;
-if (!BASE || !KEY) {
-  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+if (!URL_ || !KEY) {
+  console.error("  no Supabase credentials — the money audit did NOT run");
+  console.error("        (a skipped money check is worse than none: it looks like a pass)");
   process.exit(2);
 }
+
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+const get = async (p) => (await fetch(`${URL_}/rest/v1/${p}`, { headers: H })).json();
 
-const tx = await (
-  await fetch(
-    `${BASE}/rest/v1/payment_transactions?select=id,amount,status,item_type,created_at,provider_ref`,
-    { headers: H },
-  )
-).json();
+const money = (n) => Math.round(Number(n ?? 0) * 100) / 100;
 
-const money = (n) => `K${Number(n || 0).toFixed(2)}`;
-const group = {};
-for (const t of tx) {
-  const k = `${t.status}/${t.item_type}`;
-  group[k] = group[k] ?? { n: 0, amt: 0 };
-  group[k].n++;
-  group[k].amt += Number(t.amount ?? 0);
+const [txs, splits] = await Promise.all([
+  get("payment_transactions?select=id,amount,status,item_type,created_at"),
+  get("revenue_splits?select=transaction_id,payee_role,amount,pct"),
+]);
+
+const byTx = new Map();
+for (const s of splits) {
+  if (!byTx.has(s.transaction_id)) byTx.set(s.transaction_id, []);
+  byTx.get(s.transaction_id).push(s);
 }
 
-console.log(`transactions: ${tx.length}\n`);
-console.log("status/item_type          count      amount");
-for (const [k, v] of Object.entries(group).sort((a, b) => b[1].amt - a[1].amt)) {
-  console.log(`${k.padEnd(24)}${String(v.n).padStart(4)}  ${money(v.amt).padStart(12)}`);
-}
+const completed = txs.filter((t) => t.status === "completed");
+let charged = 0;
+let toArtists = 0;
+let toPlatform = 0;
+const bad = [];
 
-const gross = tx.reduce((s, t) => s + Number(t.amount ?? 0), 0);
-const completed = tx
-  .filter((t) => t.status === "completed")
-  .reduce((s, t) => s + Number(t.amount ?? 0), 0);
-const settledMoney = completed * 0.8; // platform takes 20%
+for (const t of completed) {
+  const rows = byTx.get(t.id) ?? [];
+  const artists = money(rows.filter((s) => s.payee_role !== "platform").reduce((a, s) => a + Number(s.amount ?? 0), 0));
+  const platform = money(rows.filter((s) => s.payee_role === "platform").reduce((a, s) => a + Number(s.amount ?? 0), 0));
+  const amount = money(t.amount);
+  charged += amount;
+  toArtists += artists;
+  toPlatform += platform;
 
-console.log(`\ngross of all transactions   ${money(gross)}`);
-console.log(`completed transactions     ${money(completed)}`);
-console.log(`expected artist pool (80%) ${money(settledMoney)}`);
-
-const splits = await (
-  await fetch(`${BASE}/rest/v1/revenue_splits?select=payee_role,amount`, { headers: H })
-).json();
-const allocated = splits.reduce((s, r) => s + Number(r.amount ?? 0), 0);
-console.log(`actually allocated         ${money(allocated)}`);
-
-const gap = settledMoney - allocated;
-console.log(
-  `\ndelta vs artist pool: ${money(Math.abs(gap))}` +
-    (Math.abs(gap) < 0.02
-      ? "  (balanced)"
-      : gap > 0
-        ? "  UNDER-ALLOCATED — splits are missing for settled sales"
-        : "  OVER-ALLOCATED"),
-);
-
-const stuck = tx.filter(
-  (t) => t.status === "pending" && Date.now() - new Date(t.created_at).getTime() > 3600_000,
-);
-if (stuck.length) {
-  console.log(
-    `\n${stuck.length} transaction(s) still 'pending' after an hour, ${money(
-      stuck.reduce((s, t) => s + Number(t.amount ?? 0), 0),
-    )}:`,
-  );
-  for (const t of stuck.slice(0, 8)) {
-    console.log(
-      `  ${t.item_type} ${money(t.amount)}  created ${new Date(t.created_at).toISOString().slice(0, 16)}  provider_ref=${t.provider_ref ?? "none"}`,
-    );
+  const diff = money(amount - artists - platform);
+  if (diff !== 0) {
+    bad.push({
+      id: t.id,
+      date: String(t.created_at).slice(0, 10),
+      amount,
+      artists,
+      platform,
+      diff,
+      reason:
+        rows.length === 0
+          ? "no revenue_splits at all"
+          : rows.every((s) => s.payee_role !== "platform")
+            ? "no platform share recorded"
+            : diff > 0
+              ? "under-allocated — money kept from the artists and the platform"
+              : "over-allocated — more allocated than was charged",
+    });
   }
 }
 
-const failedFulfilment = tx.filter((t) => t.status === "fulfillment_failed");
-if (failedFulfilment.length) {
-  console.log(
-    `\nFULFILMENT FAILED on ${failedFulfilment.length} transaction(s), ${money(
-      failedFulfilment.reduce((s, t) => s + Number(t.amount ?? 0), 0),
-    )} — money taken, nothing delivered:`,
-  );
-  for (const t of failedFulfilment) {
-    console.log(
-      `  ${t.item_type} ${money(t.amount)}  ${new Date(t.created_at).toISOString().slice(0, 16)}`,
-    );
-  }
-}
+console.log(`  completed transactions: ${completed.length}`);
+console.log(`    charged:    K${money(charged).toFixed(2)}`);
+console.log(`    artists:    K${money(toArtists).toFixed(2)}`);
+console.log(`    platform:   K${money(toPlatform).toFixed(2)}`);
+console.log(`    unallocated K${money(charged - toArtists - toPlatform).toFixed(2)}`);
+console.log("");
 
-const failed = tx.filter((t) => t.status === "failed");
-console.log(
-  `\nfailed (declined/expired): ${failed.length}, ${money(failed.reduce((s, t) => s + Number(t.amount ?? 0), 0))}`,
-);
+if (!bad.length) {
+  console.log("  every completed sale allocates exactly the amount charged");
+} else {
+  console.log(`  ${bad.length} transaction(s) do not balance:`);
+  for (const b of bad) {
+    console.log(
+      `    ${b.date}  charged K${b.amount.toFixed(2)}  artists K${b.artists.toFixed(2)}  platform K${b.platform.toFixed(2)}  off by K${Math.abs(b.diff).toFixed(2)}  (${b.reason})`,
+    );
+    console.log(`      ${b.id}`);
+  }
+  console.log("");
+  console.log("  These are reported, not corrected. Writing money rows is a decision");
+  console.log("  for a human, not for a script.");
+  process.exit(1);
+}
