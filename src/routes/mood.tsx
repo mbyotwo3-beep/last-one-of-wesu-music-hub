@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Play, Sparkles, Loader2 } from "lucide-react";
 import { recommendByMood } from "@/lib/mood.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { Link } from "@tanstack/react-router";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { Button } from "@/components/ui/button";
