@@ -75,15 +75,12 @@ export const getMyArtistOverview = createServerFn({ method: "GET" })
         .eq("artist_id", artist.id)
         .order("created_at", { ascending: false }),
       supabase.from("albums").select("id").eq("artist_id", artist.id),
-      supabase
-        .from("artist_followers")
-        .select("id", { count: "exact", head: true })
-        .eq("artist_id", artist.id),
+      supabase.from("artists").select("follower_count").eq("id", artist.id).maybeSingle(),
     ]);
 
     const songRowsAll = songRowsRes.data ?? [];
     const albumRows = albumRowsRes.data ?? [];
-    const totalFollowers = followersRes.count ?? 0;
+    const totalFollowers = (followersRes.data as any)?.follower_count ?? 0;
 
     const songIds = songRowsAll.map((s) => s.id);
     const albumIds = albumRows.map((a) => a.id);
