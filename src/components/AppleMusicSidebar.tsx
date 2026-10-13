@@ -12,13 +12,15 @@ import {
   Plus,
   Home,
   Library,
+  Smartphone,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/stores/player";
-import { useUserRoles } from "\@/hooks/use-roles";
+import { useUserRoles } from "@/hooks/use-roles";
+import { useIsNative } from "@/hooks/use-platform";
 import { toast } from "sonner";
 
 export function AppleMusicSidebar() {
@@ -26,6 +28,7 @@ export function AppleMusicSidebar() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isArtist, checked } = useUserRoles();
+  const isNative = useIsNative();
   // Subscribe to the FIELDS, not the whole store. Subscribing to everything
   // re-renders this component on every state change, including progressSeconds,
   // which the audio element updates several times a second during playback.
@@ -354,6 +357,23 @@ export function AppleMusicSidebar() {
             >
               <Plus className="size-5" />
               Become an Artist
+            </Link>
+          </div>
+        )}
+
+        {/* Get App link — only shown on the web (not inside the native APK) */}
+        {!isNative && (
+          <div className={`${checked && !isArtist ? "mt-1" : "mt-4 pt-3 border-t border-border/50"}`}>
+            <Link
+              to="/get-app"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full text-left cursor-pointer ${
+                pathname === "/get-app"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
+            >
+              <Smartphone className="size-5" />
+              Get the App
             </Link>
           </div>
         )}

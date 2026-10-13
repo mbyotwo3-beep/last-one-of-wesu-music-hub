@@ -18,9 +18,11 @@ import {
   Mic2,
   Plus,
   Lock,
+  Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
+import { useIsNative } from "@/hooks/use-platform";
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -137,6 +139,7 @@ export function BottomTabBar() {
   });
 
   const tabs = computeTabs();
+  const isNative = useIsNative();
 
   function handleTab(tab: Tab) {
     const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
@@ -396,6 +399,25 @@ export function BottomTabBar() {
                 <span className="text-sm font-medium">Create a playlist…</span>
               </button>
             ) : null}
+
+            {/* Get App — hidden inside the native APK */}
+            {!isNative && (
+              <>
+                <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  App
+                </h3>
+                <button
+                  onClick={() => {
+                    navigate({ to: "/get-app" });
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                >
+                  <Smartphone className="size-5" />
+                  <span className="text-sm font-medium">Get the Android App</span>
+                </button>
+              </>
+            )}
 
             {/* Legal Section */}
             <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
