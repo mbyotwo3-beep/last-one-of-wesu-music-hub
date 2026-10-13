@@ -70,7 +70,21 @@ export const upsertFeaturedSlot = createServerFn({ method: "POST" })
       .eq("id", data.target_id)
       .maybeSingle();
     if (!target) throw new Error(`Target ${data.target_type} does not exist`);
-    const row: any = { ...data, created_by: context.userId };
+    // Explicit column allow-list — never spread caller input into the row.
+    const row: any = {
+      slot_type: data.slot_type,
+      target_type: data.target_type,
+      target_id: data.target_id,
+      created_by: context.userId,
+    };
+    if (data.position !== undefined) row.position = Number(data.position) || 0;
+    if (data.title !== undefined) row.title = data.title == null ? null : String(data.title).slice(0, 200);
+    if (data.subtitle !== undefined)
+      row.subtitle = data.subtitle == null ? null : String(data.subtitle).slice(0, 300);
+    if (data.image_url !== undefined) row.image_url = data.image_url == null ? null : String(data.image_url);
+    if (data.starts_at !== undefined) row.starts_at = data.starts_at;
+    if (data.ends_at !== undefined) row.ends_at = data.ends_at;
+    if (data.active !== undefined) row.active = !!data.active;
     const { error } = data.id
       ? await supabaseAdmin.from("featured_slots").update(row).eq("id", data.id)
       : await supabaseAdmin.from("featured_slots").insert(row);
