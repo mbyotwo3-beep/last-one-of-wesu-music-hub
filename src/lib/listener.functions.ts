@@ -411,25 +411,9 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
       if (row) playlist = row;
     }
 
-    if (!playlist && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      // Link-shared playlist: the caller is not the owner, so RLS hid it. Try
-      // the service role — and swallow any failure, because a rejected key must
-      // not 500 the page.
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: row } = await supabaseAdmin
-          .from("playlists")
-          .select("id,user_id,name,description,cover_url,is_public,created_at")
-          .eq("id", data.id)
-          .maybeSingle();
-        if (row) {
-          playlist = row;
-          admin = supabaseAdmin;
-        }
-      } catch {
-        /* service role unavailable — fall through to not-found */
-      }
-    }
+    // Private playlists stay owner-only: RLS already returns the caller's own
+    // playlists and public ones; anything else is reported as not found.
+    if (playlist && !playlist.is_public && playlist.user_id !== context.userId) playlist = null;
 
     if (!playlist) return null;
     const supabase: any = admin ?? caller;

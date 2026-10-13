@@ -1,3 +1,4 @@
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createServerFn } from "@tanstack/react-start";
 
 export type MoodPick = {
@@ -28,8 +29,9 @@ const SCHEMA = {
   },
 };
 
-/** Recommend catalog songs for a described mood via Lovable AI Gateway. Public. */
+/** Recommend catalog songs for a described mood via Lovable AI Gateway. Signed-in users only (spends AI credits). */
 export const recommendByMood = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((d: { prompt: string }) => {
     const prompt = String(d?.prompt ?? "")
       .trim()
