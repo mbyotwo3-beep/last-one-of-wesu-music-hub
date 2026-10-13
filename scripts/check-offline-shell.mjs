@@ -264,14 +264,32 @@ function findAndroidJar() {
 }
 
 const jar = findAndroidJar();
-const jdk =
-  process.env.JAVA_HOME ||
-  "C:\\Program Files\\Android\\Android Studio\\jbr";
+const jdk = process.env.JAVA_HOME || "C:\\Program Files\\Android\\Android Studio\\jbr";
+const haveToolchain = Boolean(jar) && existsSync(join(jdk, "bin", "java.exe"));
 
-if (!jar || !existsSync(join(jdk, "bin", "java.exe"))) {
-  fail(
-    "could not run the classification probe (no android.jar or no JDK), so the\n" +
-      "        rules that decide what may be served from cache are unproven",
+if (!haveToolchain) {
+  /*
+   * THIS GATE USED TO HARD-FAIL WITHOUT AN ANDROID SDK, AND THAT BROKE PRODUCTION.
+   *
+   * `npm run build` is Vercel's build command (vercel.json). Vercel has no Android
+   * SDK and no JDK, so this probe could never run there — and the gate exited 1,
+   * which failed every deploy. wesuplus.com was serving a stale bundle while
+   * commits sat pushed and green on GitHub.
+   *
+   * That is the exact failure this project keeps hitting, committed by me: a
+   * check that is right locally and fatal somewhere else, with the fatal part
+   * invisible because nobody read the deploy log.
+   *
+   * So the toolchain-backed part SKIPS here and says so, loudly. Every rule above
+   * — the wiring, the ordering, the host match, the context, the copy — is pure
+   * source analysis and still runs and still fails the build. Only the part that
+   * genuinely needs javac is deferred.
+   */
+  console.log(
+    "    SKIPPED the classification probe: no Android SDK or JDK on this machine.\n" +
+      "        The source rules above still ran and still gate the build. The probe\n" +
+      "        executes OfflineShell's real methods and is enforced on the machine\n" +
+      "        that builds the APK (npm run verify:offline-shell).",
   );
 } else {
   const work = mkdtempSync(join(tmpdir(), "offline-shell-"));
