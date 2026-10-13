@@ -36,20 +36,21 @@ export function useHeroPool(albums: PoolAlbum[], songs: PoolSong[]): PoolSlide[]
   // any state update and stays stable for that render pass.
   const [pool, setPool] = useState<PoolSlide[]>(deterministic);
   const shuffled = useRef(false);
+  const prevDeterministic = useRef(deterministic);
 
   // A new query result must replace the pool, not be ignored because the
   // component happens to have already mounted.
-  const sourceChanged = deterministic !== pool;
   useEffect(() => {
-    if (sourceChanged) {
-      setPool(deterministic);
+    if (prevDeterministic.current !== deterministic) {
+      prevDeterministic.current = deterministic;
       shuffled.current = false;
+      setPool(deterministic);
       return;
     }
     if (shuffled.current || pool.length < 2) return;
     shuffled.current = true;
     setPool(shuffleHeroPool(pool, Math.floor(Math.random() * 0x7fffffff)));
-  }, [deterministic, pool, sourceChanged]);
+  }, [deterministic, pool]);
 
   return pool;
 }

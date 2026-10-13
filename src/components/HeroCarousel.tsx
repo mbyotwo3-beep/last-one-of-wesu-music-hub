@@ -51,7 +51,18 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
+  const [signedUrls, setSignedUrls] = useState<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const slide of slides) {
+      if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
+        map.set(slide.id, slide.imageUrl);
+      } else {
+        const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
+        if (cached) map.set(slide.id, cached);
+      }
+    }
+    return map;
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
   // Native apps have no tabs: external "new tab" links open in-app instead.
@@ -117,61 +128,41 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     resetProgress();
   }, [currentIndex]);
 
-  // Resolve image URLs for all slides on mount
+  // Resolve image URLs for all slides on mount — batched into one setState to
+  // avoid multiple rapid re-renders that show up as flickering.
   useEffect(() => {
     let cancelled = false;
 
-    slides.forEach(async (slide) => {
-      if (cancelled) return;
-
-      // If it's already an absolute URL, use it directly
-      if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
-        setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
-        return;
-      }
-
-      // If it starts with "uploads/", resolve through hero-images bucket (legacy support)
-      if (slide.imageUrl.startsWith("uploads/")) {
-        const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
-        if (cached) {
-          setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
-          return;
-        }
-        try {
-          const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
-          if (url && !cancelled) {
-            setSignedUrls((prev) => new Map(prev).set(slide.id, url));
+    const resolveAll = async () => {
+      const entries = await Promise.all(
+        slides.map(async (slide) => {
+          // Already an absolute URL — use directly
+          if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
+            return [slide.id, slide.imageUrl] as const;
           }
-        } catch (e) {
-          console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
-          // Fallback to using the raw URL
-          if (!cancelled) {
-            setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
+
+          const bucket = "hero-images" as any;
+
+          // Try the in-memory cache first (avoids a network round-trip)
+          const cached = peekImageUrl(bucket, slide.imageUrl);
+          if (cached) return [slide.id, cached] as const;
+
+          try {
+            const url = await resolveImageUrl(bucket, slide.imageUrl);
+            return [slide.id, url || slide.imageUrl] as const;
+          } catch (e) {
+            console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
+            return [slide.id, slide.imageUrl] as const;
           }
-        }
-        return;
-      }
+        }),
+      );
 
-      // Otherwise, assume it's in hero-images bucket with user_id folder
-      const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
-      if (cached) {
-        setSignedUrls((prev) => new Map(prev).set(slide.id, cached));
-        return;
+      if (!cancelled) {
+        setSignedUrls(new Map(entries.filter(([, url]) => !!url) as [string, string][]));
       }
+    };
 
-      try {
-        const url = await resolveImageUrl("hero-images" as any, slide.imageUrl);
-        if (url && !cancelled) {
-          setSignedUrls((prev) => new Map(prev).set(slide.id, url));
-        }
-      } catch (e) {
-        console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
-        // Fallback to using the raw URL
-        if (!cancelled) {
-          setSignedUrls((prev) => new Map(prev).set(slide.id, slide.imageUrl));
-        }
-      }
-    });
+    resolveAll();
 
     return () => {
       cancelled = true;
@@ -209,32 +200,45 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Background with video or image */}
+      {/* Background with video or image cross-fade */}
       <div className="absolute inset-0">
-        {currentSlide.videoUrl ? (
-          <div className="relative w-full h-full">
-            <iframe
-              src={currentSlide.videoUrl}
-              className="absolute inset-0 w-full h-full object-cover"
-              title={currentSlide.title}
-              allow="autoplay; encrypted-media"
-              allowFullScreen
-              style={{ pointerEvents: "none" }}
-            />
-            <div className="absolute inset-0 bg-black/60" />
-          </div>
-        ) : (
-          <div
-            className="absolute inset-0 transition-opacity duration-700 ease-in-out"
-            style={{
-              backgroundImage: `url(${signedUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-          </div>
-        )}
+        {slides.map((slide, idx) => {
+          const isCurrent = idx === currentIndex;
+          const slideSignedUrl = signedUrls.get(slide.id) || slide.imageUrl;
+          return (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                isCurrent ? "opacity-100 z-0" : "opacity-0 -z-10 pointer-events-none"
+              }`}
+            >
+              {slide.videoUrl && isCurrent ? (
+                <div className="relative w-full h-full">
+                  <iframe
+                    src={slide.videoUrl}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    title={slide.title}
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    style={{ pointerEvents: "none" }}
+                  />
+                  <div className="absolute inset-0 bg-black/60" />
+                </div>
+              ) : (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${slideSignedUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Content */}

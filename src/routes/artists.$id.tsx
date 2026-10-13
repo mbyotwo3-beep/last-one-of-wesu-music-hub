@@ -20,7 +20,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/stores/currency";
 import { useEffect, useState } from "react";
-import { resolveImageUrl } from "@/lib/storage-url";
+import { resolveImageUrl, peekImageUrl } from "@/lib/storage-url";
 import { toast } from "sonner";
 import { DownloadButton } from "@/components/DownloadButton";
 import { SocialLinks } from "@/components/SocialLinks";
@@ -70,11 +70,16 @@ function ArtistPage() {
   const navigate = useNavigate();
   const a = data.artist!;
 
-  const [coverBg, setCoverBg] = useState<string | null>(null);
+  const [coverBg, setCoverBg] = useState<string | null>(() => peekImageUrl("artist-images", a.cover_url));
   useEffect(() => {
     let cancelled = false;
     if (!a.cover_url) {
       setCoverBg(null);
+      return;
+    }
+    const cached = peekImageUrl("artist-images", a.cover_url);
+    if (cached) {
+      setCoverBg(cached);
       return;
     }
     resolveImageUrl("artist-images", a.cover_url)

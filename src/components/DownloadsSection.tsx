@@ -72,6 +72,9 @@ export function DownloadsSection() {
   const setQueue = usePlayer((s) => s.setQueue);
   const { enabled: offlineModeEnabled, setEnabled: setOfflineMode, hydrate } = useOfflineMode();
   const [mounted, setMounted] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<{ songId: string; title: string } | null>(
+    null,
+  );
   useEffect(() => setMounted(true), []);
   // Hooks must run before the mounted/vault gate below — this file already had a
   // hydration bug from getting that wrong, so the effect belongs here with the
@@ -154,14 +157,6 @@ export function DownloadsSection() {
       toast.error("Could not remove this download");
     }
   };
-
-  // Deleting a download is irreversible and costs real data to undo. It used to
-  // happen on a single tap, so a mis-tap while scrolling cost someone their
-  // offline copy and a re-download on a metered connection — the one action on
-  // this page that genuinely deserves a confirmation.
-  const [pendingRemoval, setPendingRemoval] = useState<{ songId: string; title: string } | null>(
-    null,
-  );
 
   return (
     <section id="downloads" className="mb-10 scroll-mt-24">

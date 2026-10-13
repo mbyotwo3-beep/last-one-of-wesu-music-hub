@@ -22,27 +22,31 @@ interface Props {
  * cache and re-signs once before falling back to the placeholder.
  */
 export function StorageImage({ bucket, path, alt, className, loading = "lazy", onClick }: Props) {
-  const [url, setUrl] = useState<string | null>(() => peekImageUrl(bucket, path));
+  const cachedUrl = peekImageUrl(bucket, path);
+  const [url, setUrl] = useState<string | null>(cachedUrl);
   const [failed, setFailed] = useState(false);
   const [retried, setRetried] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => !cachedUrl && Boolean(path));
 
   useEffect(() => {
     let cancel = false;
     setFailed(false);
     setRetried(false);
-    setIsLoading(true);
+
     if (!path) {
       setUrl(null);
       setIsLoading(false);
       return;
     }
+
     const cached = peekImageUrl(bucket, path);
     if (cached) {
       setUrl(cached);
       setIsLoading(false);
       return;
     }
+
+    setIsLoading(true);
     resolveImageUrl(bucket, path)
       .then((u) => {
         if (!cancel) {

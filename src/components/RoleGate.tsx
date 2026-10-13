@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useUserRoles, type AppRole } from "@/hooks/use-roles";
 import { checkRoleAccess } from "@/components/roleGate.utils";
@@ -18,6 +18,7 @@ export function RoleGate({ require, children }: Props) {
   // history (prevents back-button redirect loops).
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const redirectedRef = useRef(false);
 
   const access = loading
     ? null
@@ -36,13 +37,17 @@ export function RoleGate({ require, children }: Props) {
     if (loading || failed) return;
     if (isOffline && require === "user") return;
     if (access === "redirect-auth") {
+      if (pathname === "/auth" || redirectedRef.current) return;
+      redirectedRef.current = true;
+      const target = pathname + (searchStr ?? "");
       navigate({
         to: "/auth",
-        search: { redirect: pathname + (searchStr ?? "") },
+        search: { redirect: target },
         replace: true,
       });
       return;
     }
+    redirectedRef.current = false;
     // A wrong-role visit no longer bounces to "/": it stays put and renders the
     // explanation + the way forward. Navigating away meant the toast was the
     // only signal, and the toast claimed the user *lacks* the role — which was

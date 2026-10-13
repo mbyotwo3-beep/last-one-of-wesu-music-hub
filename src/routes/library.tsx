@@ -33,17 +33,17 @@ import { listFollowedPlaylists } from "@/lib/listener.functions";
 
 export const Route = createFileRoute("/library")({
   head: () => ({ meta: [{ title: "My Library — Wesu+" }] }),
-  component: () => (
-    <RoleGate require="user">
-      <LibraryRoute />
-    </RoleGate>
-  ),
+  component: LibraryRoute,
   errorComponent: routeErrorComponent(),
   notFoundComponent: () => <div className="p-12 text-center">Not found</div>,
 });
 
 function LibraryRoute() {
-  return <Page />;
+  return (
+    <RoleGate require="user">
+      <Page />
+    </RoleGate>
+  );
 }
 
 function hasId(value: unknown): value is { id: string } {
@@ -800,9 +800,9 @@ function PlaylistCard({ playlist }: { playlist: any }) {
   // PostgREST may return the embedded song as an object or a 1-array —
   // unwrap defensively like the playlists pages do.
   const songs = (playlist.playlist_songs ?? [])
-    .filter((ps: any) => ps != null)
     .slice()
     .sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
+    .filter((ps: any) => ps != null)
     .map((ps: any) => {
       let s = ps.song ?? ps.songs;
       if (Array.isArray(s)) s = s[0];

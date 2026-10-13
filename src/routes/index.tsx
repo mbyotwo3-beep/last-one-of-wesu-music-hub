@@ -14,7 +14,7 @@ import { TrackCard, AlbumTile, ArtistTile, PlaylistTile } from "@/components/dis
 import { CarouselShelf } from "@/components/CarouselShelf";
 import { getActiveCarousels } from "@/lib/carousel.functions";
 import { HeroCarousel, type HeroSlide } from "@/components/HeroCarousel";
-import { useHeroPool } from "\@/hooks/use-hero-pool";
+import { useHeroPool } from "@/hooks/use-hero-pool";
 import { getActiveHeroSlides } from "@/lib/hero-carousel.functions";
 import { SkeletonHeroCarousel, SkeletonShelf, SkeletonTrackRow } from "@/components/Skeleton";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
@@ -142,17 +142,21 @@ function HomePage() {
     useMemo(() => [...trending, ...newReleases], [trending, newReleases]),
   );
 
-  const adminHeroSlides: HeroSlide[] = (heroSlides ?? []).map((slide) => ({
-    id: slide.id,
-    title: slide.title,
-    description: slide.description,
-    imageUrl: slide.image_url,
-    videoUrl: slide.video_url || undefined,
-    ctaText: slide.cta_text,
-    ctaLink: slide.cta_link,
-    ctaExternal: slide.cta_external,
-    ctaTarget: (slide as any).link_target ?? "_self",
-  }));
+  const adminHeroSlides: HeroSlide[] = useMemo(
+    () =>
+      (heroSlides ?? []).map((slide) => ({
+        id: slide.id,
+        title: slide.title,
+        description: slide.description,
+        imageUrl: slide.image_url,
+        videoUrl: slide.video_url || undefined,
+        ctaText: slide.cta_text,
+        ctaLink: slide.cta_link,
+        ctaExternal: slide.cta_external,
+        ctaTarget: (slide as any).link_target ?? "_self",
+      })),
+    [heroSlides],
+  );
 
   const usingAdminSlides = adminHeroSlides.length > 0;
   const heroSlidesToShow: HeroSlide[] = usingAdminSlides ? adminHeroSlides : heroPool;
@@ -163,24 +167,10 @@ function HomePage() {
     topArtists.length === 0 &&
     recentAlbums.length === 0;
 
-  // Initial loading state - show skeletons while first fetch completes
-  const isInitialLoading = carouselsLoading || heroSlidesLoading;
-
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
-        {/* Show full skeleton during initial load */}
-        {isInitialLoading ? (
-          <>
-            <SkeletonHeroCarousel />
-            <SkeletonShelf count={5} />
-            <SkeletonShelf count={5} />
-            <SkeletonShelf count={5} />
-            <SkeletonShelf count={5} />
-          </>
-        ) : (
-          <>
-            {/* Hero Carousel - Netlify-style with auto-rotation
+        {/* Hero Carousel - Netlify-style with auto-rotation
              *
              * Two sources, and the admin always wins:
              *
@@ -194,25 +184,29 @@ function HomePage() {
              * that looked like the hero, and it is what made this look
              * hardcoded and unfixable.
              */}
-            {heroSlidesToShow.length > 0 ? (
+            {heroSlidesLoading ? (
+              <SkeletonHeroCarousel />
+            ) : heroSlidesToShow.length > 0 ? (
               <HeroCarousel slides={heroSlidesToShow} />
             ) : (
-              !heroSlidesLoading && (
-                <section className="rounded-2xl bg-card ring-1 ring-white/5 p-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Nothing to show yet —{" "}
-                    <Link to="/browse" className="underline">
-                      browse the catalogue
-                    </Link>
-                    .
-                  </p>
-                </section>
-              )
+              <section className="rounded-2xl bg-card ring-1 ring-white/5 p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nothing to show yet —{" "}
+                  <Link to="/browse" className="underline">
+                    browse the catalogue
+                  </Link>
+                  .
+                </p>
+              </section>
             )}
 
             {/* Custom Carousels configured by Admin / Superadmin */}
-            {carousels &&
-              carousels.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)}
+            {carouselsLoading && !carousels ? (
+              <SkeletonShelf count={5} />
+            ) : (
+              carousels &&
+              carousels.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)
+            )}
 
             {user && recentlyPlayed && recentlyPlayed.length > 0 && (
               <HorizontalShelf title="Recently Played" showAllLink="/library">
@@ -373,8 +367,6 @@ function HomePage() {
                 </Link>
               </div>
             )}
-          </>
-        )}
       </div>
     </div>
   );

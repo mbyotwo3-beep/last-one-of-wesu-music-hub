@@ -48,9 +48,11 @@ const cases = [
 
 function runTest() {
   try {
-    execFileSync("npx", ["vitest", "--run", TEST], { stdio: ["ignore", "pipe", "pipe"] });
+    const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
+    execFileSync(cmd, ["vitest", "--run", TEST], { stdio: ["ignore", "pipe", "pipe"], shell: true });
     return true;
-  } catch {
+  } catch (err) {
+    // console.error(err);
     return false;
   }
 }
