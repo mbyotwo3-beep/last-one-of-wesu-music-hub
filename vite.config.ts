@@ -6,6 +6,33 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+/**
+ * Emit /offline-assets.json in the client build: every JS/CSS/font file of
+ * this release. public/sw.js precaches the whole list on install so every
+ * screen's code is on the phone, not only screens opened while online —
+ * otherwise opening Library/Downloads offline failed to load its code chunk
+ * and showed the error page.
+ */
+function offlineAssetManifest() {
+  return {
+    name: "wesu-offline-asset-manifest",
+    apply: "build" as const,
+    generateBundle(this: any, _opts: unknown, bundle: Record<string, { fileName: string }>) {
+      const envName = this.environment?.name;
+      if (envName && envName !== "client") return;
+      const files = Object.values(bundle)
+        .map((f) => f.fileName)
+        .filter((f) => /\.(js|css|woff2?)$/i.test(f) && !f.endsWith(".map"))
+        .map((f) => "/" + f.replace(/^\/+/, ""));
+      this.emitFile({
+        type: "asset",
+        fileName: "offline-assets.json",
+        source: JSON.stringify({ files }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   // The shared config defaults Nitro to Cloudflare. Keep that target for
   // local/Cloudflare previews, but make Vercel builds emit Vercel functions.
@@ -19,6 +46,7 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    plugins: [offlineAssetManifest()],
     build: {
       // ES2019 syntax target: most listeners are on old Android phones
       // whose frozen WebViews choke on modern syntax (?. ?? logical
