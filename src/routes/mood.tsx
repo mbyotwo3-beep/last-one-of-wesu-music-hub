@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Play, Sparkles, Loader2 } from "lucide-react";
 import { recommendByMood } from "@/lib/mood.functions";
+import { useAuth } from "@/hooks/use-auth";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ function MoodPage() {
   const [prompt, setPrompt] = useState("");
   const setQueue = usePlayer((s) => s.setQueue);
   const m = useMutation({ mutationFn: (p: string) => recommendByMood({ data: { prompt: p } }) });
+  const { user, loading } = useAuth();
   const picks = m.data?.picks ?? [];
   const queue = picks.map((t) => ({
     id: t.id,
@@ -57,9 +59,18 @@ function MoodPage() {
       <p className="text-muted-foreground mb-6">
         Tell us how you feel and what you like — we'll pick songs from Wesu+ to match.
       </p>
+      {!loading && !user && (
+        <p className="mb-4 rounded-md border border-border bg-muted p-3 text-sm">
+          <Link to="/auth" className="font-semibold text-primary underline">
+            Sign in
+          </Link>{" "}
+          to get your Mood Mix.
+        </p>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (!user) return;
           if (prompt.trim().length >= 3) m.mutate(prompt.trim());
         }}
         className="space-y-3"
