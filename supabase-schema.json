@@ -1,0 +1,2071 @@
+{
+  "exportedFrom": "https://spoipjjfvhqwnhfrftax.supabase.co",
+  "tables": {
+    "albums": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cover_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "release_date",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "genre",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "featured",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "artist_followers": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "artists": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "bio",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "genre",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "avatar_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "verified",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "monthly_listeners",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "social_links",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "labels.id"
+      },
+      {
+        "name": "accepts_collabs",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "available_for_features",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "feature_rate",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cover_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "follower_count",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "verification_status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "audit_log": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "actor_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "target_type",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "target_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "meta",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "featured_slots": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "slot_type",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "target_type",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "target_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "position",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "subtitle",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "starts_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "ends_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "active",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "hero_carousel_slides": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "video_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cta_text",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cta_link",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "position",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "active",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cta_external",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "link_target",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "home_carousel_items": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "carousel_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "home_carousels.id"
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "subtitle",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "link_url",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "position",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "home_carousels": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "subtitle",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "show_all_link",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "position",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "active",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "invitations": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "from_user_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "to_user_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "to_email",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "payload",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "responded_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "label_artists": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "label_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "labels.id"
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "royalty_pct",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "joined_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "labels": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "slug",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "owner_user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "bio",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "logo_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "contact_email",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "commission_pct",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "notifications": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "link",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "read_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "payment_methods": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "code",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "logo_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "is_enabled",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "sort_order",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "lenco_operator",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "payment_transactions": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "amount",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "currency",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "method_code",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "provider",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "provider_ref",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "provider_token",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "item_type",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "item_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "metadata",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "payouts": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "amount",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "method_code",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "destination",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "notes",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "requested_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "processed_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "processed_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "period_start",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "period_end",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "gross_amount",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "platform_fee",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label_fee",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "net_amount",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "labels.id"
+      }
+    ],
+    "platform_settings": [
+      {
+        "name": "key",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "value",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "play_history": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "played_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "progress_seconds",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "playlist_songs": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "playlist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "playlists.id"
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "position",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "added_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "playlists": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cover_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "is_public",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "profiles": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "full_name",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "avatar_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "bio",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "location",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "current_subscription_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "public_song_collaborators": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": false,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "credit_name",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "accepted",
+        "type": "boolean",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "purchases": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "album_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "albums.id"
+      },
+      {
+        "name": "amount",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "payment_method",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "transaction_ref",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "revenue_splits": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "transaction_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "payment_transactions.id"
+      },
+      {
+        "name": "payee_user_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "payee_role",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "labels.id"
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "amount",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "pct",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "saved_albums": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "album_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "albums.id"
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "saved_playlists": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "playlist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "playlists.id"
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "saved_tracks": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "song_collaborators": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "song_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "songs.id"
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "split_pct",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "accepted",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "invited_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "credit_name",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "songs": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "artist_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": "artists.id"
+      },
+      {
+        "name": "album_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "albums.id"
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "duration",
+        "type": "integer",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "audio_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "cover_url",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "genre",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "explicit",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "play_count",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "is_trending",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "label_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": "labels.id"
+      },
+      {
+        "name": "allow_collab_requests",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "release_date",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "track_number",
+        "type": "integer",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "subscription_plans": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "code",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "price_zmw",
+        "type": "number",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "interval",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "features",
+        "type": "?",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "is_active",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "sort_order",
+        "type": "integer",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "updated_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "subscriptions": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "plan",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "started_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "expires_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "payment_method",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "auto_renew",
+        "type": "boolean",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "support_messages": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "email",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "subject",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "created_at",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "resolved_at",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "resolved_by",
+        "type": "string",
+        "required": false,
+        "pk": false,
+        "fk": null
+      }
+    ],
+    "user_roles": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "pk": true,
+        "fk": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "required": true,
+        "pk": false,
+        "fk": null
+      }
+    ]
+  }
+}
