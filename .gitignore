@@ -36,6 +36,7 @@ keystore.properties
 # case-insensitive filesystem ordering, and a tester would silently install the
 # version we are trying to replace.
 !public/wesuplus.apk
+!public/wesuplus.aab
 
 # iOS build artifacts (regenerated on the Mac via cap sync + pod install).
 ios/App/App/public/
