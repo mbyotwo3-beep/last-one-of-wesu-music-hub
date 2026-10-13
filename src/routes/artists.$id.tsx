@@ -27,6 +27,7 @@ import { SocialLinks } from "@/components/SocialLinks";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { isUuid } from "@/lib/route-params";
+import { TrackCard } from "@/components/discover/TrackCard";
 
 const artistQO = (id: string) =>
   queryOptions({
@@ -361,6 +362,17 @@ function ArtistPage() {
             </div>
           )}
         </section>
+
+        {((data as any).appearsOn ?? []).length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-4">Appears On &amp; Features</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+              {((data as any).appearsOn as any[]).map((song) => (
+                <TrackCard key={song.id} song={song} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {following && (similarQuery.data?.length ?? 0) > 0 && (
           <section className="mb-12">

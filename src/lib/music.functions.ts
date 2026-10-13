@@ -241,10 +241,38 @@ export const getArtistById = createServerFn({ method: "GET" })
         .limit(20),
     ]);
     if (artist.error) throw new Error(artist.error.message);
+
+    let appearsOn: any[] = [];
+    try {
+      const { data: collabRows } = await supabase
+        .from("public_song_collaborators")
+        .select("role, song_id")
+        .eq("artist_id", data.id)
+        .eq("accepted", true)
+        .limit(20);
+      if (collabRows && collabRows.length > 0) {
+        const songIds = collabRows.map((c: any) => c.song_id).filter(Boolean);
+        if (songIds.length > 0) {
+          const { data: cSongs } = await supabase
+            .from("songs")
+            .select("id,title,duration,price,cover_url,play_count,album_id,artist:artists(id,name)")
+            .in("id", songIds)
+            .eq("status", "approved");
+          appearsOn = (cSongs ?? []).map((cs: any) => {
+            const collab = collabRows.find((c: any) => c.song_id === cs.id);
+            return { ...cs, collabRole: collab?.role ?? "featured" };
+          });
+        }
+      }
+    } catch {
+      /* ignore if public_song_collaborators view not present */
+    }
+
     return {
       artist: artist.data,
       albums: albums.data ?? [],
       topSongs: songs.data ?? [],
+      appearsOn,
     };
   });
 

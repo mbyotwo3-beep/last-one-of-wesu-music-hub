@@ -94,10 +94,11 @@ function SongPage() {
   };
 
   // Co-leads are performers and belong in the artist line; featured artists
-  // render as a suffix; producer/writer/remixer are credits only.
+  // render as a suffix with links; producer/writer/remixer are credits only.
   const performerCredits = credits.filter((c) => isPerformer(c.role));
   const creditOnlyCredits = credits.filter((c) => isCreditOnly(c.role));
-  const featureSuffix = formatFeatureSuffix(performerCredits);
+  const coLeads = performerCredits.filter((c) => c.role === "main");
+  const featuredArtists = performerCredits.filter((c) => c.role === "featured");
 
   const leadArtistLink = artist ? (
     <Link
@@ -134,15 +135,47 @@ function SongPage() {
               {song!.title}
             </h1>
             {/* Spotify's artist line: co-leads are joined with " & " and ARE
-                the artist; a feature sits in a "(feat. X)" suffix and never in
-                the artist line. Previously every second artist was rendered as
-                a credit below, so a song two artists made together did not say
-                so. */}
+                the artist; a feature sits in a "(feat. X)" suffix with links. */}
             <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
               {leadArtistLink}
-              {featureSuffix ? (
-                <span className="text-lg text-muted-foreground">{featureSuffix}</span>
-              ) : null}
+              {coLeads.map((c) => (
+                <span key={c.id} className="text-lg text-muted-foreground">
+                  {" & "}
+                  {c.artistId ? (
+                    <Link
+                      to="/artists/$id"
+                      params={{ id: c.artistId }}
+                      className="hover:text-foreground hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  ) : (
+                    <span>{c.name}</span>
+                  )}
+                </span>
+              ))}
+              {featuredArtists.length > 0 && (
+                <span className="text-lg text-muted-foreground">
+                  {" (feat. "}
+                  {featuredArtists.map((f, i) => (
+                    <span key={f.id}>
+                      {i > 0 && " & "}
+                      {f.artistId ? (
+                        <Link
+                          to="/artists/$id"
+                          params={{ id: f.artistId }}
+                          className="hover:text-foreground hover:underline"
+                        >
+                          {f.name}
+                        </Link>
+                      ) : (
+                        <span>{f.name}</span>
+                      )}
+                    </span>
+                  ))}
+                  {")"}
+                </span>
+              )}
             </div>
             {/* Credits: features and production credits, which existed in the
                 database but were never rendered anywhere. A featured artist or

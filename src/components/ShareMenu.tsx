@@ -508,7 +508,7 @@ export function ShareMenu({
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer text-left"
                       >
                         <User className="size-4" />
-                        Go to artist
+                        {songArtists.length > 1 ? `Go to ${a.name}` : "Go to artist"}
                       </button>
                     ))}
                     <div className="border-t border-border" />

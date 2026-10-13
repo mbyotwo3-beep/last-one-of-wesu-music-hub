@@ -266,7 +266,13 @@ function ArtistDashboardPage() {
             </div>
             <p className="text-muted-foreground">Artist Dashboard</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/collabs"
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-secondary hover:bg-secondary/80 border border-border transition-colors inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Users className="size-4" /> Collaborations
+            </Link>
             <Link
               to="/artist-profile-edit"
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent hover:bg-accent/80 transition-colors inline-flex items-center gap-2 cursor-pointer"
