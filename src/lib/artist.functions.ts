@@ -668,10 +668,12 @@ export const requestArtistVerification = createServerFn({ method: "POST" })
     const minEarnings = verificationConfig.min_earnings;
 
     // Check follower count
-    const { count: followersCount } = await supabase
-      .from("artist_followers")
-      .select("id", { count: "exact", head: true })
-      .eq("artist_id", (artist as any).id);
+    const { data: fc } = await supabase
+      .from("artists")
+      .select("follower_count")
+      .eq("id", (artist as any).id)
+      .maybeSingle();
+    const followersCount = (fc as any)?.follower_count ?? 0;
 
     if ((followersCount ?? 0) < minFollowers) {
       throw new Error(
