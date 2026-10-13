@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Anyone can view follow counts" ON public.artist_followers;
+UPDATE public.artists a SET follower_count = (SELECT count(*) FROM public.artist_followers f WHERE f.artist_id = a.id);
