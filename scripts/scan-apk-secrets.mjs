@@ -28,9 +28,8 @@
  * Usage: node scripts/scan-apk-secrets.mjs [apkPath]
  *   npm run verify:no-secrets   (also wired into the Android build script)
  */
-import { readFileSync, readdirSync, rmSync, mkdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
+import { inflateRawSync } from "node:zlib";
 
 /**
  * Where the built APK actually lives.
@@ -83,40 +82,84 @@ function envFile(name) {
 }
 
 const env = { ...envFile(".env"), ...envFile(".env.local") };
-const TMP = join(process.env.TEMP ?? ".", "apk-secrets-scan");
-rmSync(TMP, { recursive: true, force: true });
-mkdirSync(TMP, { recursive: true });
 
-execFileSync(
-  "powershell.exe",
-  [
-    "-NoProfile",
-    "-Command",
-    `Add-Type -AssemblyName System.IO.Compression.FileSystem;
-     $z=[System.IO.Compression.ZipFile]::OpenRead('${resolve(APK)}');
-     foreach($e in $z.Entries){
-       if($e.Length -gt 0 -and ($e.FullName -match '\\.(dex|js|html|json|xml|properties|txt)$')){
-         try{[System.IO.Compression.ZipFileExtensions]::ExtractToFile($e,(Join-Path '${TMP}' ($e.FullName -replace '[\\\\/]','_')),$true)}catch{}
-       }
-     }
-     $z.Dispose();`,
-  ],
-  { stdio: "ignore" },
-);
+/**
+ * Read text-like entries directly from the APK archive (ZIP format)
+ * using built-in Node.js buffers and zlib.inflateRawSync.
+ *
+ * This runs natively on any OS (Linux on Vercel/CI, macOS, Windows) without
+ * spawning external OS processes (e.g. powershell.exe).
+ */
+function extractApkTextEntries(apkPath) {
+  const buf = readFileSync(apkPath);
+
+  // Locate the End of Central Directory (EOCD) record.
+  // Standard EOCD is 22 bytes, comment can be up to 65535 bytes.
+  let eocd = -1;
+  const searchLimit = Math.max(0, buf.length - 65557);
+  for (let i = buf.length - 22; i >= searchLimit; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd === -1) {
+    throw new Error(`Invalid ZIP archive: EOCD record not found in ${apkPath}`);
+  }
+
+  const totalEntries = buf.readUInt16LE(eocd + 10);
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+
+  const texts = [];
+  let p = cdOffset;
+  for (let i = 0; i < totalEntries && p < eocd; i++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break;
+
+    const method = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const localHeaderOffset = buf.readUInt32LE(p + 42);
+
+    const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
+
+    if (compSize > 0 && /\.(dex|js|html|json|xml|properties|txt)$/i.test(name)) {
+      if (localHeaderOffset + 30 <= buf.length && buf.readUInt32LE(localHeaderOffset) === 0x04034b50) {
+        const locNameLen = buf.readUInt16LE(localHeaderOffset + 26);
+        const locExtraLen = buf.readUInt16LE(localHeaderOffset + 28);
+        const dataOffset = localHeaderOffset + 30 + locNameLen + locExtraLen;
+
+        if (dataOffset + compSize <= buf.length) {
+          const raw = buf.subarray(dataOffset, dataOffset + compSize);
+          try {
+            const data = method === 0 ? raw : method === 8 ? inflateRawSync(raw) : null;
+            if (data) {
+              texts.push(data.toString("latin1"));
+            }
+          } catch {
+            // Ignore unreadable or corrupt entry
+          }
+        }
+      }
+    }
+
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+
+  return texts;
+}
 
 const pad = (s) => s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4);
+
+// Extract text files directly from the APK archive
+const texts = extractApkTextEntries(APK);
 
 // --- 1. every JWT, by decoded role
 const roles = new Map();
 let blob = "";
-for (const f of readdirSync(TMP)) {
-  let text;
-  try {
-    text = readFileSync(join(TMP, f)).toString("latin1");
-    blob += text;
-  } catch {
-    continue;
-  }
+for (const text of texts) {
+  blob += text;
   for (const m of text.matchAll(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/g)) {
     let claims;
     try {
@@ -129,7 +172,6 @@ for (const f of readdirSync(TMP)) {
     roles.set(role, roles.get(role) + 1);
   }
 }
-rmSync(TMP, { recursive: true, force: true });
 
 console.log(`  scanned ${APK}`);
 console.log(
