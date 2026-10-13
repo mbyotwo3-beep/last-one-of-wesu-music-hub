@@ -51,6 +51,8 @@ export interface PoolSlide {
   title: string;
   description: string;
   imageUrl: string;
+  /** Storage bucket the imageUrl path lives in. Defaults to "album-art" for catalogue items. */
+  imageBucket: "album-art" | "hero-images";
   ctaText: string;
   ctaLink: string;
   gradient?: string;
@@ -94,6 +96,7 @@ export function buildHeroPool(albums: PoolAlbum[], songs: PoolSong[]): PoolSlide
       title: a.title?.trim() || "Untitled album",
       description: artistName(a.artist) ?? "Wesu+",
       imageUrl: a.cover_url ?? "",
+      imageBucket: "album-art",
       ctaText: "Open Album",
       ctaLink: `/albums/${a.id}`,
     });
@@ -111,6 +114,7 @@ export function buildHeroPool(albums: PoolAlbum[], songs: PoolSong[]): PoolSlide
       title: s.title?.trim() || "Untitled song",
       description: artistName(s.artist) ?? "Wesu+",
       imageUrl: s.cover_url ?? "",
+      imageBucket: "album-art",
       // A free song must not invite a purchase that costs nothing, and a paid
       // one must say so before the tap, not after.
       ctaText: price > 0 ? `Buy ${kwacha(price)}` : "Play Preview",

@@ -10,6 +10,8 @@ export interface HeroSlide {
   title: string;
   description: string;
   imageUrl: string;
+  /** Storage bucket the imageUrl path lives in. Defaults to "hero-images" for admin slides. */
+  imageBucket?: "album-art" | "hero-images";
   videoUrl?: string;
   ctaText: string;
   ctaLink: string;
@@ -57,7 +59,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       if (/^(https?:|data:|blob:)/i.test(slide.imageUrl)) {
         map.set(slide.id, slide.imageUrl);
       } else {
-        const cached = peekImageUrl("hero-images" as any, slide.imageUrl);
+        const bucket = slide.imageBucket ?? "hero-images";
+        const cached = peekImageUrl(bucket, slide.imageUrl);
         if (cached) map.set(slide.id, cached);
       }
     }
@@ -141,7 +144,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
             return [slide.id, slide.imageUrl] as const;
           }
 
-          const bucket = "hero-images" as any;
+          const bucket = slide.imageBucket ?? "hero-images";
 
           // Try the in-memory cache first (avoids a network round-trip)
           const cached = peekImageUrl(bucket, slide.imageUrl);
