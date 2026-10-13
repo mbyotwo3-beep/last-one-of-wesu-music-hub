@@ -40,13 +40,13 @@
  * Signed audio URLs are single-use and expire, so they are excluded explicitly.
  */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `wesu-shell-${VERSION}`;
 const ASSET_CACHE = `wesu-assets-${VERSION}`;
 const KEEP = new Set([SHELL_CACHE, ASSET_CACHE]);
 
 /** Routes worth keeping a fallback copy of. */
-const SHELL_PATHS = ["/", "/browse", "/downloads", "/library", "/search", "/albums", "/artists"];
+const SHELL_PATHS = ["/", "/browse", "/downloads", "/library", "/liked-songs", "/search", "/albums", "/artists"];
 
 /** Never cached, whatever they look like. */
 const NEVER_CACHE = [
@@ -85,6 +85,29 @@ async function putShell(request, response) {
   }
 }
 
+/**
+ * Cache every code file of this release, so any screen opens offline — not
+ * only the ones visited while online. Failures are tolerated per file.
+ */
+async function precacheAllAssets() {
+  try {
+    const res = await fetch("/offline-assets.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const { files } = await res.json();
+    if (!Array.isArray(files)) return;
+    const cache = await caches.open(ASSET_CACHE);
+    await Promise.allSettled(
+      files.map(async (f) => {
+        if (await cache.match(f)) return;
+        const r = await fetch(f);
+        if (r && r.status === 200) await cache.put(f, r);
+      }),
+    );
+  } catch {
+    /* offline at install, or no manifest — page loads still fill the cache */
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -97,6 +120,7 @@ self.addEventListener("install", (event) => {
           await putShell(new Request(path), res);
         }),
       );
+      await precacheAllAssets();
       await self.skipWaiting();
     })(),
   );
@@ -128,6 +152,7 @@ self.addEventListener("fetch", (event) => {
         try {
           const res = await fetch(request);
           await putShell(request, res);
+          event.waitUntil(precacheAllAssets());
           return res;
         } catch (err) {
           const cache = await caches.open(SHELL_CACHE);
@@ -160,10 +185,10 @@ self.addEventListener("fetch", (event) => {
           // was pruned or the first load happened before this worker existed.
           // Falling through to the network here would throw again, so serve the
           // shell's own HTML rather than a browser error.
-          const shell = await caches.open(SHELL_CACHE);
-          const root = await shell.match("/", { ignoreSearch: true });
-          if (root) return root;
-          throw err;
+          // Never answer a script/style request with HTML: the browser rejects
+          // it with a confusing MIME error. A clean failure lets the app show
+          // its offline screen instead.
+          return new Response("", { status: 504, statusText: "Offline" });
         }
       })(),
     );
