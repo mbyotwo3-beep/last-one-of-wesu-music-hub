@@ -164,27 +164,6 @@ vi.mock("@/hooks/use-roles", () => ({
   }),
 }));
 vi.mock("@/components/RoleGate", () => ({ RoleGate: ({ children }: any) => children }));
-vi.mock("@/components/PlaylistCover", () => ({ PlaylistCover: () => null }));
-vi.mock("@/components/ShareMenu", () => ({ ShareMenu: () => null }));
-// StorageImage, DownloadButton and especially DownloadsSection are deliberately
-// NOT mocked.
-//
-// The first version of this file stubbed all three out, and that hid the most
-// suspicious thing on the page: DownloadsSection is the offline vault UI, it was
-// written for the recent offline work, and /library deep-links to it with
-// #downloads. A throw inside it takes the whole page down and this test would
-// have reported the page as healthy.
-//
-// Components that need a browser are stubbed at the lowest layer instead — see
-// the storage and vault mocks below.
-vi.mock("@/components/IncrementalList", () => ({
-  IncrementalList: ({ items, children, renderItem }: any) => {
-    const list = Array.isArray(items) ? items : [];
-    if (typeof renderItem === "function") return createElement("div", null, list.map(renderItem));
-    if (typeof children === "function") return createElement("div", null, list.map(children));
-    return createElement("div", null, children ?? null);
-  },
-}));
 vi.mock("sonner", () => ({
   toast: { error: () => {}, success: () => {}, info: () => {} },
 }));

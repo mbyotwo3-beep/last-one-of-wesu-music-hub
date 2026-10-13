@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
+import { queueUnlocked } from "@/lib/queue-unlocked";
+import { usePlayer } from "@/stores/player";
 import { AlertTriangle, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -112,6 +114,7 @@ function CheckoutSuccessPage() {
   // (library, purchases, signed audio URLs, track access) is stale. Refresh
   // them immediately so the unlocked content works without a page reload.
   const queryClient = useQueryClient();
+  const addToQueue = usePlayer((s) => s.addToQueue);
   const settledStatus = (transaction as any)?.status;
   useEffect(() => {
     if (settledStatus !== "completed") return;
@@ -149,7 +152,8 @@ function CheckoutSuccessPage() {
     } catch {
       /* ignore */
     }
-  }, [settledStatus, queryClient, transaction]);
+    void queueUnlocked(settledStatus, transaction, addToQueue);
+  }, [settledStatus, queryClient, transaction, addToQueue]);
 
   const [pollElapsed, setPollElapsed] = useState(0);
   const isAwaitingSettlement =
