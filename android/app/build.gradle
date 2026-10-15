@@ -17,16 +17,9 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Monotonic: Play Store rejects a rebuild with the same or lower code.
-        // 33 = listener-annoyance pass:
-        //   - deleting a download asks first, and the inline toggle offers Undo,
-        //     so a mis-tap no longer costs a re-download on metered data;
-        //   - carries preview warming (tap plays without a visible pause), the
-        //     error boundaries on /auth and /terms-artist, the hooks-after-return
-        //     fix that stopped the album page crashing on reconnect, and the
-        //     offline status panel.
-        //   No native change since 32, but the WebView loads the site over the
-        //   network, so all of this reaches installed users as a web deploy.
-        versionCode 36
+        // 37 registers WesuPlayback before Capacitor creates its bridge, restoring
+        // the native background-playback service for installed Android users.
+        versionCode 37
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

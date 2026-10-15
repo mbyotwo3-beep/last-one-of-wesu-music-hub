@@ -29,14 +29,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Custom plugins must be added before BridgeActivity creates its
+        // Capacitor bridge in super.onCreate().
+        registerPlugin(WesuPlaybackPlugin.class);
         super.onCreate(savedInstanceState);
-        // Local bridge for background-playback priority (WesuPlaybackService).
-        // Same package — no import needed. If registration ever fails the JS
-        // side degrades to no-service playback (status quo), never a crash.
-        try {
-            registerPlugin(WesuPlaybackPlugin.class);
-        } catch (Exception ignored) {
-        }
         // Media (notification/lock-screen) controls need the runtime
         // notification permission on Android 13+. Best-effort: lock-screen
         // transport controls work regardless; the shade player needs the grant.

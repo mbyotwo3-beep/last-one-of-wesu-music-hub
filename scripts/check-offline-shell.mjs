@@ -44,7 +44,11 @@ const main = readFileSync(MAIN, "utf8");
 
 // The resolver must be REACHED from shouldInterceptRequest. Defining
 // OfflineShell and never calling it is the exact shape of the bug it replaced.
-if (!/shouldInterceptRequest[\s\S]{0,600}OfflineShell\.resolve\(/.test(main)) {
+const interceptionStart = main.indexOf(
+  "public android.webkit.WebResourceResponse shouldInterceptRequest(",
+);
+const resolverCall = main.indexOf("OfflineShell.resolve(", interceptionStart);
+if (interceptionStart === -1 || resolverCall === -1 || resolverCall - interceptionStart > 1000) {
   fail(
     "MainActivity's shouldInterceptRequest does not call OfflineShell.resolve —\n" +
       "        the offline shell would be dead code, which is what the service\n" +

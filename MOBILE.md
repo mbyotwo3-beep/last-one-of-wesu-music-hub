@@ -6,9 +6,12 @@ runtime. Use the `usePlatform()` hook to branch.
 
 ## Backend
 
-Same project, same `.env` values. Capacitor bundles the web build into the
-APK, so `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are baked in
-at build time — no extra config needed.
+The APK's WebView loads the live site at `https://www.wesuplus.com/`; it does
+not bundle the web app. Web deployments therefore reach installed apps without
+an APK rebuild, while native plugin or Android changes require a new APK.
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are public client
+configuration used by the web deployment. Keep `SUPABASE_SERVICE_ROLE_KEY`
+server-only: never rename it to a `VITE_` variable or import it into client code.
 
 ## Running on Android Studio
 
@@ -17,25 +20,22 @@ at build time — no extra config needed.
    ```bash
    bun install
    ```
-3. Build the web bundle:
-   ```bash
-   bun run build
-   ```
-4. Add the Android platform (first time only):
+3. Add the Android platform (first time only):
    ```bash
    bunx cap add android
    ```
-5. Copy the latest web build into the native project:
+4. Sync native plugins and configuration:
    ```bash
    bunx cap sync
    ```
-6. Open in Android Studio:
+5. Open in Android Studio:
    ```bash
    bunx cap open android
    ```
-7. Press ▶️ in Android Studio to run on an emulator or device.
+6. Press ▶️ in Android Studio to run on an emulator or device.
 
-Re-run `bun run build && bunx cap sync` after every web change.
+Deploy web changes to the live site; they do not require rebuilding the APK.
+Run `bunx cap sync` after changing native plugins or Capacitor configuration.
 
 ### Live-reload during dev (optional)
 

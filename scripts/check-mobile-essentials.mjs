@@ -340,6 +340,16 @@ if (activity) {
   } else {
     notes.push("back backgrounds the app so music keeps playing");
   }
+  const pluginRegistration = a.indexOf("registerPlugin(WesuPlaybackPlugin.class)");
+  const bridgeCreation = a.indexOf("super.onCreate(savedInstanceState)");
+  if (pluginRegistration === -1 || bridgeCreation === -1 || pluginRegistration > bridgeCreation) {
+    problems.push(
+      "WesuPlaybackPlugin must be registered before super.onCreate — Capacitor creates\n" +
+        "        its bridge there, so later registration leaves Android background controls unavailable",
+    );
+  } else {
+    notes.push("WesuPlaybackPlugin is registered before Capacitor creates the bridge");
+  }
 }
 
 console.log("  small things a listener would notice");

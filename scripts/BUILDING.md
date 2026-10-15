@@ -46,10 +46,11 @@ SHA-256  1f4ad3a98ea90f6d70e0a1ad03ada069722f051ecdf918961c5c7eeff6f18283
 
 ### versionCode
 
-Must strictly increase every upload or Play rejects it. Currently **30**. When
-you cut the next build, edit `versionCode` in `android/app/build.gradle` and
-`CURRENT_PROJECT_VERSION` in the Xcode project in the same commit so the two
-platforms stay aligned.
+Each store's build number must strictly increase for uploads to that store.
+Android is currently **37** (`versionCode` in `android/app/build.gradle`); the
+existing published APK is version 36. iOS has its own `CURRENT_PROJECT_VERSION`
+counter in the Xcode project, so bump it independently when preparing an iOS
+release.
 
 ---
 
