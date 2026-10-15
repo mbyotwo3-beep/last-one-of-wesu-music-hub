@@ -185,6 +185,7 @@ if (pbx) {
 // compare against: "is the APK we publish the one we just built?"
 const APK_PUB = "public/wesuplus.apk";
 const APK_BUILT = "android/app/build/outputs/apk/release/app-release.apk";
+let publishedApkMatchesBuild = false;
 
 if (existsSync(APK_PUB)) {
   if (existsSync(APK_BUILT)) {
@@ -200,15 +201,22 @@ if (existsSync(APK_PUB)) {
       );
     } else {
       notes.push(`sideload APK ${(a.length / 1048576).toFixed(1)} MB, matches the Gradle output`);
+      publishedApkMatchesBuild = true;
     }
   }
-  // VersionName is 0.0.1 on every build, so it cannot identify which one this
-  // is. versionCode can, and it is what makes one build an upgrade of another.
+  // Only identify the published APK as the configured version when the APK
+  // matches the release output. The Gradle versionCode alone says nothing
+  // about a pre-existing file in public/.
   const vc = read("android/app/build.gradle")?.match(/versionCode\s+(\d+)/)?.[1];
   if (!vc) {
     problems.push("android: cannot read versionCode, so the published APK cannot be identified");
-  } else {
+  } else if (publishedApkMatchesBuild) {
     notes.push(`published APK is versionCode ${vc}`);
+  } else if (!existsSync(APK_BUILT)) {
+    notes.push(
+      `configured Android build is versionCode ${vc}; published APK version is unverified ` +
+        `because no Gradle release output exists`,
+    );
   }
 }
 
