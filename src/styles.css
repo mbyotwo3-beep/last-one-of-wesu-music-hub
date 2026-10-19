@@ -321,3 +321,69 @@ body {
 img {
   -webkit-touch-callout: none;
 }
+
+/*
+ * Route change cross-fade — the Spotify phone transition.
+ *
+ * HOW SCOPING WORKS
+ *
+ * The View Transitions API snapshots the ENTIRE page by default, which would
+ * cross-fade the top bar and bottom tab bar too — they would appear to blink
+ * on every navigation even though they render identical content. Naming ONE
+ * element (`main`) gives it its own snapshot pair while everything else
+ * paints frame-perfect with no transition at all.
+ *
+ * THE DIRECTION OF MOVEMENT IS DELIBERATE
+ *
+ * Old content fades back 6px and out, new content arrives from 6px forward —
+ * a push-of-stack feel that reads as forward navigation on the tab bar.
+ * Anything larger than this starts to look like a swipe gesture that broke,
+ * which is worse than no transition on fast taps where both halves are only
+ * on screen for ~150ms each.
+ *
+ * FAST-TAP HANDLING
+ *
+ * Both keyframes run in `both` mode and are short on purpose: a listener
+ * hammering the tab bar triggers snapshot after snapshot, and the API skips a
+ * transition if one is mid-flight, so the worst visible artefact is the new
+ * page simply appearing — the exact behaviour without the feature.
+ */
+
+@media (prefers-reduced-motion: no-preference) {
+  main {
+    view-transition-name: main-content;
+  }
+
+  ::view-transition-old(main-content) {
+    animation: wesu-view-out 150ms cubic-bezier(0.2, 0.6, 0.35, 1) both;
+  }
+
+  ::view-transition-new(main-content) {
+    animation: wesu-view-in 200ms cubic-bezier(0.2, 0.6, 0.35, 1) both;
+  }
+
+  @keyframes wesu-view-out {
+    to {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  @keyframes wesu-view-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+}
+
+/*
+ * Reduced motion gets the absence of the transition, not a spinner — with
+ * motion disabled the snapshots are still taken but resolve to an immediate
+ * paint, which is the hard swap users with that setting have always had.
+ */
+@media (prefers-reduced-motion: reduce) {
+  main {
+    view-transition-name: none;
+  }
+}

@@ -9,6 +9,7 @@ import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { ShareMenu } from "@/components/ShareMenu";
 import { useOfflineItem } from "@/hooks/use-offline-availability";
 import { toast } from "sonner";
+import { CoverArt } from "@/components/CoverArt";
 
 interface TrackRowProps {
   id: string;
@@ -104,14 +105,12 @@ export function TrackRow({
       </div>
 
       {/* Album Art */}
-      <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
-        <StorageImage
-          bucket="album-art"
-          path={coverUrl}
-          alt={album}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      <CoverArt
+        bucket="album-art"
+        path={coverUrl}
+        alt={album}
+        className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0"
+      />
 
       {/* Track Info — a real button so the row is keyboard/screen-reader
           playable, not a bare click handler on a div. */}

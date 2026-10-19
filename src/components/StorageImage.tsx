@@ -14,6 +14,12 @@ interface Props {
   className?: string;
   loading?: "eager" | "lazy";
   onClick?: () => void;
+  /**
+   * Fade the picture in once it has decoded, instead of popping it into a
+   * frame. Only meaningful inside CoverArt, which owns the surface the cover
+   * fades in OVER — used bare it would push the fade against nothing.
+   */
+  fade?: boolean;
 }
 
 /**
@@ -21,12 +27,15 @@ interface Props {
  * URL on mount. On error (expired/invalid signed URL) it invalidates the
  * cache and re-signs once before falling back to the placeholder.
  */
-export function StorageImage({ bucket, path, alt, className, loading = "lazy", onClick }: Props) {
+export function StorageImage({ bucket, path, alt, className, loading = "lazy", onClick, fade = false }: Props) {
   const cachedUrl = peekImageUrl(bucket, path);
   const [url, setUrl] = useState<string | null>(cachedUrl);
   const [failed, setFailed] = useState(false);
   const [retried, setRetried] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !cachedUrl && Boolean(path));
+  // Fades only after the element reports a load. Seeded true when a cached URL
+  // is already decoded-equivalent is NOT correct: setting 1 at once would pop.
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -88,6 +97,7 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
 
   const handleLoad = () => {
     setIsLoading(false);
+    setPainted(true);
   };
 
   if (isLoading) {
@@ -115,7 +125,8 @@ export function StorageImage({ bucket, path, alt, className, loading = "lazy", o
     <img
       src={url}
       alt={alt}
-      className={className}
+      className={`${className ?? ""} transition-opacity duration-300 ease-out`}
+      style={fade ? { opacity: painted ? 1 : 0 } : undefined}
       loading={loading}
       decoding="async"
       onClick={onClick}

@@ -10,6 +10,7 @@ import { PriceTag } from "@/components/PriceTag";
 import { DownloadButton } from "@/components/DownloadButton";
 import { useOfflineItem } from "@/hooks/use-offline-availability";
 import { toast } from "sonner";
+import { CoverArt } from "@/components/CoverArt";
 import { ShareMenu } from "@/components/ShareMenu";
 import { PlaylistCover } from "@/components/PlaylistCover";
 
@@ -104,11 +105,11 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
         onClick={handlePlay}
         className="relative block w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 cursor-pointer group-hover:scale-[1.02] transition-transform"
       >
-        <StorageImage
+        <CoverArt
           bucket="album-art"
           path={song.cover_url}
           alt={song.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full"
         />
         <div
           className={`absolute inset-0 bg-black/40 ${isPlayingThisTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity flex items-end justify-end p-2`}

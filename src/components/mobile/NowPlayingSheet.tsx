@@ -17,6 +17,7 @@ import { useRef, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
+import { CoverArt } from "@/components/CoverArt";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useIsNative } from "@/hooks/use-platform";
@@ -263,11 +264,11 @@ export function NowPlayingSheet() {
               }}
             >
               {track.coverUrl ? (
-                <StorageImage
+                <CoverArt
                   bucket="album-art"
                   path={track.coverUrl}
                   alt={track.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">

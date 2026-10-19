@@ -1,9 +1,9 @@
 import { usePlayer } from "@/stores/player";
 import { useIntentWarm } from "@/hooks/use-intent-warm";
-import { StorageImage } from "@/components/StorageImage";
 import { Play, Pause, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useOfflineItem } from "@/hooks/use-offline-availability";
+import { CoverArt } from "@/components/CoverArt";
 
 interface SongRowProps {
   song: {
@@ -89,11 +89,11 @@ export function SongRow({ song }: SongRowProps) {
       aria-disabled={dim ? true : undefined}
       {...dimProps}
     >
-      <StorageImage
+      <CoverArt
         bucket="album-art"
         path={song.coverUrl}
         alt={song.title}
-        className="size-10 rounded-md overflow-hidden bg-card shrink-0 object-cover"
+        className="size-10 rounded-md shrink-0"
       />
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium truncate ${isActive ? "text-primary" : ""}`}>
