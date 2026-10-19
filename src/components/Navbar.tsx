@@ -13,6 +13,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { StorageImage } from "./StorageImage";
 import { useQuery } from "@tanstack/react-query";
 import { SkeletonButton } from "./Skeleton";
+import { OfflineChip } from "./OfflineChip";
 
 const NavbarComponent = function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -226,6 +227,7 @@ const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useU
             <Search className="size-5" />
           </Link>
 
+          <OfflineChip className="hidden sm:inline-flex" />
           <CurrencyToggle />
           <ThemeToggle />
 

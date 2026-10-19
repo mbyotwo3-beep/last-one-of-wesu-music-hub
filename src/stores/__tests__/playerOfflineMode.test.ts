@@ -12,7 +12,7 @@
  *
  * A pure-function test cannot catch that. These drive the actual store.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { usePlayer } from "@/stores/player";
 import { useOfflineMode } from "@/stores/offline-mode";
@@ -43,6 +43,65 @@ describe("setQueue with offline mode OFF", () => {
     expect(s.track?.id).toBe("c");
     expect(s.queue[s.queueIndex].id).toBe("c");
     expect(s.error).toBeNull();
+  });
+});
+
+/**
+ * No connection, listener's Offline mode OFF.
+ *
+ * This block exists because that combination was broken and nothing noticed.
+ * The player filtered the queue only under the MODE, while the interface already
+ * treated a dropped connection as offline and dimmed the rows accordingly. So a
+ * shelf could look correctly greyed out and still hand the player tracks it had
+ * no way to fetch — each one then died asking for a signed URL. Nothing was
+ * thrown, so nothing was logged, and the report was "the shelf doesn't play".
+ *
+ * It is worth its own file-level block because the fix is one condition in the
+ * player's filter, and that condition is easy to revert while fixing something
+ * else in the same function.
+ */
+describe("setQueue with NO CONNECTION and mode off", () => {
+  beforeEach(() => {
+    // navigator.onLine is the input the player reads. Setting it directly is the
+    // only way to exercise the state — there is no offline-mode setting that
+    // produces it.
+    Object.defineProperty(globalThis.navigator, "onLine", {
+      value: false,
+      configurable: true,
+    });
+    setCachedVaultIds(["a", "c"]);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(globalThis.navigator, "onLine", {
+      value: true,
+      configurable: true,
+    });
+  });
+
+  it("filters the queue to downloads even though the mode is off", () => {
+    usePlayer.getState().setQueue([t("a"), t("b"), t("c")], 0);
+    expect(usePlayer.getState().queue.map((x) => x.id)).toEqual(["a", "c"]);
+  });
+
+  it("explains itself when nothing in the shelf is downloaded", () => {
+    setCachedVaultIds([]);
+    usePlayer.getState().setQueue([t("a"), t("b")], 0);
+    // Not the mode's wording — that would blame the listener for the network.
+    expect(usePlayer.getState().error).toMatch(/no connection/i);
+  });
+
+  it("plays a downloaded track normally", () => {
+    usePlayer.getState().setQueue([t("a"), t("b")], 0);
+    const s = usePlayer.getState();
+    expect(s.track?.id).toBe("a");
+    expect(s.error).toBeNull();
+  });
+
+  it("still honours an unread vault rather than emptying the queue", () => {
+    __resetVaultIndexForTests();
+    usePlayer.getState().setQueue([t("a"), t("b")], 0);
+    expect(usePlayer.getState().queue.map((x) => x.id)).toEqual(["a", "b"]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeOnlineTransition } from "@/components/OfflineBanner";
+import { describeOnlineTransition } from "@/components/OfflineLifecycle";
 
 describe("offline/online transition edges", () => {
   it("classifies each edge exactly once", () => {

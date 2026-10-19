@@ -15,6 +15,7 @@ import {
   removeTrackFromVault,
   isVaultSupported,
 } from "@/lib/offline-vault";
+import { useOfflineAvailability } from "@/hooks/use-offline-availability";
 
 interface DownloadButtonProps {
   songId: string;
@@ -124,6 +125,28 @@ export function DownloadButton({
   const buttonClass =
     "inline-flex items-center justify-center size-11 min-h-\[44px\] min-w-\[44px\] shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
   const iconClass = "size-4";
+
+  // No connection: there is nothing to download FROM.
+  //
+  // This is the one place the two offline states must behave differently, and
+  // conflating them is worse here than anywhere else. Under Offline MODE there
+  // is still a working connection — that is the whole point of the switch — so
+  // downloading must keep working, and a listener browsing on a metered
+  // connection is exactly who the mode is for.
+  //
+  // With the network genuinely gone, offering a download is a lie: the tap
+  // would fetch a signed URL, fail, and surface an error about a song the
+  // listener did nothing wrong. So the control is disabled and says why.
+  const { noConnection } = useOfflineAvailability();
+  if (noConnection) {
+    return (
+      <span className="inline-flex flex-col items-end gap-1">
+        <button type="button" disabled className={buttonClass} aria-label="Download unavailable offline">
+          <Download className={iconClass} />
+        </button>
+      </span>
+    );
+  }
 
   // Anonymous listeners get a download icon that leads to sign-in (with a
   // post-login return) — never a dead button, and never a 401 failure.

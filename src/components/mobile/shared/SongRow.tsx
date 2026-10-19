@@ -1,7 +1,9 @@
 import { usePlayer } from "@/stores/player";
 import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { StorageImage } from "@/components/StorageImage";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Download } from "lucide-react";
+import { toast } from "sonner";
+import { useOfflineItem } from "@/hooks/use-offline-availability";
 
 interface SongRowProps {
   song: {
@@ -27,18 +29,32 @@ export function SongRow({ song }: SongRowProps) {
   const currentTrack = usePlayer((s) => s.track);
   const isActive = currentTrack?.id === song.id;
   const { warm } = useIntentWarm();
+  // Offline: the row stays browsable but greys out and refuses to play, exactly
+  // as Spotify does. Dimming alone would be theatre — the tap has to stop too.
+  const { dim, className: dimClass, props: dimProps } = useOfflineItem(song.id);
 
   // Resolve the signed preview URL as the finger lands, not after the click.
   // On a touch screen there is no hover, so pointerdown is the earliest signal
   // there is — and PlayerBar has already cleared the audio element by the time
   // the tap resolves.
+  //
+  // Skipped when dimmed: there is no network to resolve a signed URL against,
+  // so the request would be certain to fail on every tap of an offline row.
   const warmThis = () => {
+    if (dim) return;
     if (!isActive) void warm(song.id, song.price ?? undefined);
   };
 
   const isPlayingThisTrack = playing && isActive;
 
   const handlePlay = () => {
+    if (dim) {
+      toast.info("Not downloaded", {
+        description: "Download this song first to play it without a connection.",
+      });
+      return;
+    }
+
     if (isActive) {
       togglePlay();
       return;
@@ -66,10 +82,12 @@ export function SongRow({ song }: SongRowProps) {
       onPointerDown={warmThis}
       onFocus={warmThis}
       onClick={handlePlay}
-      className={`w-full flex items-center gap-3 px-4 py-2 min-h-[44px] text-left transition-colors hover:bg-white/5 active:bg-white/10 ${
+      className={`w-full flex items-center gap-3 px-4 py-2 min-h-[44px] text-left transition-colors hover:bg-white/5 active:bg-white/10 ${dimClass} ${
         isActive ? "bg-primary/10" : ""
       }`}
       aria-pressed={isActive}
+      aria-disabled={dim ? true : undefined}
+      {...dimProps}
     >
       <StorageImage
         bucket="album-art"
@@ -89,7 +107,9 @@ export function SongRow({ song }: SongRowProps) {
         </span>
       )}
       <div className="shrink-0 w-8 flex justify-center">
-        {isPlayingThisTrack ? (
+        {dim ? (
+          <Download className="size-4 text-muted-foreground" />
+        ) : isPlayingThisTrack ? (
           <Pause className="size-4 text-primary" />
         ) : (
           <Play className="size-4 text-muted-foreground" />

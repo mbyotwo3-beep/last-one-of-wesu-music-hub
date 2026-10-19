@@ -128,7 +128,22 @@ export const useOfflineMode = create<OfflineModeState>((set, get) => ({
   hydrate: () => {
     const stored = readPersisted();
     if (stored !== get().enabled) set({ enabled: stored });
-    if (stored) primeVaultIndex();
+    // The index is read on EVERY boot, not only when the mode is on.
+    //
+    // It used to be conditional on `stored`, and that choice was made when
+    // primeVaultIndex existed to close the "first tap after enabling slips
+    // through" window above. It now also marks the index AS READ, which is the
+    // input the no-connection path in the player and the dimmed rows both gate
+    // on. Leaving it conditional made "vault not read yet" a permanent state for
+    // any listener who never opens the downloads page: a dropped connection
+    // would dim nothing and filter nothing, and the old silent-failure bug was
+    // back for exactly the listener it was fixed for.
+    //
+    // The cold-start guard lives in the READERS (isVaultIndexReady / the
+    // planOfflineQueue guard), not here: a boot read that costs one IndexedDB
+    // metadata sweep is safe, while treating an unread marker as empty is what
+    // this store existed to prevent.
+    primeVaultIndex();
   },
 }));
 

@@ -14,6 +14,7 @@ import {
 } from "@/stores/play-order";
 import { offlineModeEnabled } from "@/stores/offline-mode";
 import { getCachedVaultIds, isVaultIndexReady } from "@/lib/vault-index";
+import { mustFilterQueue, readOnline } from "@/lib/offline-availability";
 import { planOfflineQueue } from "@/lib/offline-queue";
 
 export type { ShuffleDeck };
@@ -31,6 +32,21 @@ export interface PlayerTrack {
 // RepeatMode is defined once, in play-order.ts, next to the logic that reads
 // it. Re-exported here because the store's public type surface is this module.
 export type { RepeatMode } from "@/stores/play-order";
+
+/**
+ * Why nothing from a shelf could be played, or null if something could.
+ *
+ * Two separate states reach this point and they must not be described the same
+ * way. Under the listener's Offline mode the fix is theirs — one tap to turn it
+ * off. With the connection simply gone, telling them to turn off a mode they
+ * never enabled sends them looking in the wrong place, and the real fix is to
+ * reconnect. Same symptom, different owner.
+ */
+export function explainNothingPlayable(modeOn: boolean, noConnection: boolean) {
+  if (modeOn) return "Offline mode: none of those songs are downloaded on this device.";
+  if (noConnection) return "No connection: none of those songs are downloaded on this device.";
+  return null;
+}
 
 function preserveResolvedAudioUrl(
   next: PlayerTrack | null,
@@ -169,34 +185,42 @@ export const usePlayer = create<PlayerState>()(
           return;
         }
 
-        // Offline mode: a queue may only hold tracks that are on this device.
+        // Offline: a queue may only hold tracks that are on this device.
         //
         // Every surface funnels through here, and the shuffle deck is derived
         // from the resulting queue, so this one filter also constrains shuffle
-        // and Next/Prev. Without it, tapping a shelf with the mode on builds a
-        // queue of tracks that each die on a signed URL they cannot obtain.
+        // and Next/Prev. Without it, tapping a shelf with no data builds a queue
+        // of tracks that each die on a signed URL they cannot obtain.
         //
-        // `isVaultIndexReady` guard: before the first read completes the index
-        // is empty, and treating "not read yet" as "nothing downloaded" would
-        // wipe the queue of every listener right after a cold start. If the
+        // `mustFilterQueue` covers BOTH offline states, not just the mode. The
+        // UI already treated a dropped connection as offline, so a shelf could
+        // look correctly dimmed and still hand the player tracks it had no way to
+        // fetch — the shelf simply would not play, with nothing logged. One rule,
+        // used by both, so they cannot disagree again.
+        //
+        // Its `vaultReady` guard is deliberate: before the first read completes
+        // the index is empty, and treating "not read yet" as "nothing downloaded"
+        // would wipe the queue of every listener right after a cold start. If the
         // index is not ready, build the queue unfiltered — a wrong queue on the
         // first tap is far better than silence — and the next read corrects it.
+        const noConnection = !readOnline();
         const offlineMode = offlineModeEnabled();
+        const filtering = mustFilterQueue({
+          online: !noConnection,
+          modeOn: offlineMode,
+          vaultReady: isVaultIndexReady(),
+        });
         const plan = planOfflineQueue(
           tracks,
           startIndex,
-          offlineMode && isVaultIndexReady(),
+          filtering,
           getCachedVaultIds(),
         );
 
         if (plan.empty) {
           // Nothing playable, but do NOT clear what is currently playing —
           // refusing a new queue should not stop the song already in progress.
-          set({
-            error: offlineMode
-              ? "Offline mode: none of those songs are downloaded on this device."
-              : null,
-          });
+          set({ error: explainNothingPlayable(offlineMode, noConnection) });
           return;
         }
 

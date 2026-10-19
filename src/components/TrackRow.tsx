@@ -1,4 +1,4 @@
-import { Play, Pause, Heart } from "lucide-react";
+import { Play, Pause, Heart, Download } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { PriceTag } from "@/components/PriceTag";
@@ -7,6 +7,8 @@ import { StorageImage } from "@/components/StorageImage";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { ShareMenu } from "@/components/ShareMenu";
+import { useOfflineItem } from "@/hooks/use-offline-availability";
+import { toast } from "sonner";
 
 interface TrackRowProps {
   id: string;
@@ -37,6 +39,10 @@ export function TrackRow({
   const currentTrackId = usePlayer((s) => s.track?.id);
   const { isSaved, toggle } = useSavedTrack(id);
   const { warm } = useIntentWarm();
+  // Offline: dim what cannot play here, and stop the tap trying. The row stays
+  // in place and keeps its download button at full strength — dimming the fix
+  // along with the problem would leave the listener with nothing to do but wait.
+  const { dim, className: dimClass, props: dimProps } = useOfflineItem(id);
 
   const isCurrentTrack = currentTrackId === id;
   const isPlayingThisTrack = playing && isCurrentTrack;
@@ -47,12 +53,23 @@ export function TrackRow({
   // unwarmed tap is silence for the whole of it. Warming on intent means the
   // request is already in flight by the time the click resolves. pointerdown
   // rather than pointerenter because there is no hover on a touch screen.
+  //
+  // Skipped while offline: there is no connection to resolve against, and a
+  // request that must fail should not be made on every pointer-down.
   const warmThis = () => {
+    if (dim) return;
     if (!isCurrentTrack) void warm(id, price ?? undefined);
   };
 
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
+
+    if (dim) {
+      toast.info("Not downloaded", {
+        description: "Tap the download button to keep this song on your device.",
+      });
+      return;
+    }
 
     if (isCurrentTrack) {
       togglePlay();
@@ -63,7 +80,10 @@ export function TrackRow({
   };
 
   return (
-    <div className="group flex items-center gap-4 p-3 rounded-lg hover:bg-secondary/50 transition-colors w-full text-left">
+    <div
+      className={`group flex items-center gap-4 p-3 rounded-lg hover:bg-secondary/50 transition-colors w-full text-left ${dimClass}`}
+      {...dimProps}
+    >
       {/* Track Number / Play Button — 44px target, not a bare 16px icon. */}
       <div className="flex w-11 shrink-0 justify-center">
         <button
@@ -71,9 +91,11 @@ export function TrackRow({
           onFocus={warmThis}
           onClick={handlePlay}
           className="grid size-11 place-items-center rounded-full text-foreground transition-colors hover:bg-secondary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label={isPlayingThisTrack ? "Pause" : "Play"}
+          aria-label={dim ? "Not downloaded — tap the download button" : isPlayingThisTrack ? "Pause" : "Play"}
         >
-          {isPlayingThisTrack ? (
+          {dim ? (
+            <Download className="size-4" />
+          ) : isPlayingThisTrack ? (
             <Pause className="size-4 fill-current" />
           ) : (
             <Play className="size-4 fill-current" />

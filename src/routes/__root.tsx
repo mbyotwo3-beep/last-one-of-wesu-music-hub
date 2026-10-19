@@ -19,7 +19,8 @@ import { AppleMusicSidebar } from "../components/AppleMusicSidebar";
 import { ThemeProvider, themeInitScript } from "../hooks/use-theme";
 import { usePlatform } from "../hooks/use-platform";
 import { BottomTabBar } from "../components/mobile/BottomTabBar";
-import { OfflineBanner } from "../components/OfflineBanner";
+import { OfflineLifecycle } from "../components/OfflineLifecycle";
+import { OfflineChip } from "../components/OfflineChip";
 import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
 import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
 import { isOfflineTransportFailure } from "../lib/loader-graceful";
@@ -300,12 +301,17 @@ function RootComponent() {
               <Link to="/" aria-label="Wesu+ home" className="flex items-center gap-2">
                 <img src="/images/wesu-logo.png" alt="Wesu+" className="h-10 w-auto" />
               </Link>
-              <ThemeToggle />
+              {/* Offline is a status, not a notification. It lives in the bar
+                  and never pushes the page down — see OfflineChip. */}
+              <div className="flex items-center gap-2">
+                <OfflineChip />
+                <ThemeToggle />
+              </div>
             </header>
             <main
               className={`flex-1 pt-[calc(env(safe-area-inset-top)+3.25rem)] lg:pt-0 lg:pb-0 ${hasTrack ? "pb-[calc(env(safe-area-inset-bottom)+8rem)]" : "pb-[calc(env(safe-area-inset-bottom)+4rem)]"}`}
             >
-              <OfflineBanner />
+              <OfflineLifecycle />
               <DeviceSetupNudge />
               <Outlet />
             </main>

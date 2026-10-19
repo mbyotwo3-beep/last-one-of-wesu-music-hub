@@ -124,7 +124,25 @@ vi.mock("@/lib/offline-vault", () => ({
   getVaultKey: async () => null,
   vaultIdCache: new Map(),
 }));
-vi.mock("@/lib/vault-index", () => ({ vaultIndex: new Set() }));
+// A faithful stand-in for the vault index.
+//
+// This previously exported `vaultIndex`, which the real module does not export
+// at all — it was a mock of nothing, and it passed only because no caller
+// imported any of the real names. The moment a consumer did, the failure read
+// as a crash in the component under test rather than as a broken mock.
+//
+// Every name the real module exports is here. `vaultReady` is false, which is
+// the honest default: nothing has been read yet, so nothing is dimmed and no
+// queue is filtered.
+const vaultIds = new Set<string>();
+vi.mock("@/lib/vault-index", () => ({
+  getCachedVaultIds: () => vaultIds,
+  isVaultIndexReady: () => false,
+  setCachedVaultIds: () => {},
+  noteVaultChanged: () => {},
+  subscribeVaultIndex: () => () => {},
+  __resetVaultIndexForTests: () => {},
+}));
 vi.mock("@/lib/follow.functions", () => ({
   getFollowerCount: async () => ({ count: 0 }),
   getFollowState: async () => ({ following: false }),

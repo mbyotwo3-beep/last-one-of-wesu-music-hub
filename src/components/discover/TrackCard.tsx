@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Play, Pause, Heart } from "lucide-react";
+import { Play, Pause, Heart, Download } from "lucide-react";
 import { usePlayer } from "@/stores/player";
 import { useIntentWarm } from "@/hooks/use-intent-warm";
 import { StorageImage } from "@/components/StorageImage";
@@ -8,6 +8,8 @@ import { useSavedAlbum } from "@/hooks/use-saved-album";
 import { useAuth } from "@/hooks/use-auth";
 import { PriceTag } from "@/components/PriceTag";
 import { DownloadButton } from "@/components/DownloadButton";
+import { useOfflineItem } from "@/hooks/use-offline-availability";
+import { toast } from "sonner";
 import { ShareMenu } from "@/components/ShareMenu";
 import { PlaylistCover } from "@/components/PlaylistCover";
 
@@ -28,11 +30,15 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const setQueue = usePlayer((s) => s.setQueue);
   const { warm } = useIntentWarm();
   const isActive = usePlayer((s) => s.track?.id) === song.id;
+  // Offline: the shelf stays full — hiding it would leave a blank screen with no
+  // explanation — but unavailable covers grey out and refuse the tap.
+  const { dim, className: dimClass, props: dimProps } = useOfflineItem(song.id);
 
   // Warm the signed preview URL as the pointer arrives, so tapping this card
   // does not start from silence. See hooks/use-intent-warm for why this is on
   // intent rather than on the whole visible list.
   const warmThis = () => {
+    if (dim) return;
     if (!isActive) void warm(song.id, song.price ?? undefined);
   };
   const togglePlay = usePlayer((s) => s.togglePlay);
@@ -62,6 +68,12 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   const handlePlay = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
+    if (dim) {
+      toast.info("Not downloaded", {
+        description: "Download this song first to play it without a connection.",
+      });
+      return;
+    }
     if (isCurrentTrack) {
       togglePlay();
       return;
@@ -84,7 +96,7 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
   };
 
   return (
-    <div className="group text-left w-full relative">
+    <div className={`group text-left w-full relative ${dimClass}`} {...dimProps}>
       {/* Cover Image & Play Button Overlay */}
       <div
         onPointerDown={warmThis}
@@ -106,10 +118,12 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
             onPointerDown={warmThis}
             onFocus={warmThis}
             onClick={handlePlay}
-            aria-label={isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
+            aria-label={dim ? `Not downloaded — ${song.title}` : isPlayingThisTrack ? `Pause ${song.title}` : `Play ${song.title}`}
             className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
           >
-            {isPlayingThisTrack ? (
+            {dim ? (
+              <Download className="size-4" />
+            ) : isPlayingThisTrack ? (
               <Pause className="size-4 fill-current" />
             ) : (
               <Play className="size-4 fill-current ml-0.5" />

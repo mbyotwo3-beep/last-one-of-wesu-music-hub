@@ -19,6 +19,37 @@ import { readFileSync } from "node:fs";
 const player = readFileSync("src/stores/player.ts", "utf8");
 const queue = readFileSync("src/lib/offline-queue.ts", "utf8");
 
+/**
+ * The body of the block that opens with `open`, found by matching braces.
+ *
+ * WHY NOT A CHARACTER WINDOW
+ *
+ * This check used to be `if (plan.empty) {` followed by `/return;/` within 400
+ * characters. It failed a correct change: extending the error message to name
+ * the dropped connection pushed the `return` past the window. The right response
+ * to that is NOT to keep the code short enough to satisfy a number — it is to
+ * stop measuring a number. A window is a proxy for "does this block return
+ * early", and it drifts the moment anyone writes an honest comment in the block.
+ *
+ * Brace matching measures the property itself, so it is right for every length.
+ */
+function blockAfter(source, open) {
+  const start = source.indexOf(open);
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = source.indexOf("{", start); i < source.length; i++) {
+    const c = source[i];
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+const emptyPlanBlock = blockAfter(player, "if (plan.empty) {");
+
 const checks = [
   {
     name: "the player checks the index is ready before filtering on it",
@@ -47,9 +78,26 @@ const checks = [
   {
     name: "an empty plan does not clear the current track",
     ok:
-      /if \(plan\.empty\) \{[\s\S]{0,400}?return;/.test(player) &&
-      !/if \(plan\.empty\)[\s\S]{0,400}?track:\s*null/.test(player),
+      emptyPlanBlock !== null &&
+      /return;/.test(emptyPlanBlock) &&
+      !/track:\s*null/.test(emptyPlanBlock),
     why: "refusing a new queue must not stop the song already playing",
+  },
+  {
+    name: "the player filters the queue when there is NO CONNECTION, not only under the mode",
+    ok: /mustFilterQueue\(\{[\s\S]{0,200}?online:\s*!noConnection/.test(player),
+    why:
+      "the UI already dims rows when the connection drops; if the player filters " +
+      "only under the listener's Offline mode, a correctly dimmed shelf still " +
+      "hands the player tracks it cannot fetch, and the shelf silently does not play",
+  },
+  {
+    name: "the two offline states are described differently",
+    ok: /if \(modeOn\) return "Offline mode/.test(player) &&
+      /if \(noConnection\) return "No connection/.test(player),
+    why:
+      "same symptom, different owner — under the mode the listener can tap 'Turn off', " +
+      "but with the network gone that button fixes nothing and misdirects them",
   },
   {
     name: "add-to-queue refuses a track that is not on the device",
