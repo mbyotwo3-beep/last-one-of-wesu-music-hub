@@ -39,6 +39,25 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // Canonical host. The wesuplus.com -> www redirect cannot be expressed as
+    // a vercel.json routing rule: rules that cannot be applied to the
+    // deployment's own routing output make the production alias step fail,
+    // and then NO deploy ships (production keeps the last good one). So the
+    // apex is answered here, at the HTTP layer, before any app bootstrap.
+    // The original host arrives either in request.url or, where a proxy
+    // rewrote it, in x-forwarded-host (Vercel sets it to the requested host;
+    // it may be a comma list with a port). Path and query are untouched by
+    // the proxy, so they carry over byte for byte.
+    const forwardedHost = (request.headers.get("x-forwarded-host") ?? "").split(",")[0].split(":")[0].trim().toLowerCase();
+    const requestHost = new URL(request.url).hostname.toLowerCase();
+    const host = forwardedHost || requestHost;
+    if (host === "wesuplus.com") {
+      const { pathname, search } = new URL(request.url);
+      return new Response(null, {
+        status: 308,
+        headers: { Location: `https://www.wesuplus.com${pathname}${search}` },
+      });
+    }
     if (env && typeof env === "object") {
       (globalThis as any).__env__ = env;
       for (const [key, value] of Object.entries(env)) {

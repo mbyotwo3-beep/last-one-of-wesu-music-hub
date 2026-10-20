@@ -2,13 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "tanstack-start",
   "buildCommand": "npm run build",
-  "installCommand": "npm install --legacy-peer-deps",
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "wesuplus.com" }],
-      "destination": "https://www.wesuplus.com/:path*",
-      "permanent": true
-    }
-  ]
+  "installCommand": "npm install --legacy-peer-deps"
 }
