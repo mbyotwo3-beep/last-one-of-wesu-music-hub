@@ -3,7 +3,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { useServerFn } from "@tanstack/react-start";
-import { Play } from "lucide-react";
+import { Globe, Play, RefreshCw } from "lucide-react";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
 import { usePlayer } from "@/stores/player";
@@ -85,7 +85,18 @@ function IndexRoute() {
 }
 
 function HomePage() {
-  const { data: discoverData } = useOfflineList("home:discover", {
+  // discover is the page's primary payload: its loading state gates the
+  // shelves. Before, isLoading was ignored with everything defaulting to [] —
+  // and the empty-state, then, claimed "No music has been published yet"
+  // WHILE THE FEED WAS STILL ARRIVING. On a phone that is every cold boot:
+  // relaunch after the process was killed, first launch after an update —
+  // an open that lands on a fake "welcome" screen instead of the app.
+  const {
+    data: discoverData,
+    isLoading: discoverLoading,
+    isError: discoverError,
+    refetch: refetchDiscover,
+  } = useOfflineList("home:discover", {
     queryKey: ["home-discover"],
     queryFn: () => getHomeDiscover(),
     staleTime: 5 * 60 * 1000,
@@ -160,7 +171,12 @@ function HomePage() {
 
   const usingAdminSlides = adminHeroSlides.length > 0;
   const heroSlidesToShow: HeroSlide[] = usingAdminSlides ? adminHeroSlides : heroPool;
+  // Empty means LOADED AND empty. Loading or failed are separate states with
+  // their own surfaces below — "empty" is only allowed to say "no music has
+  // been published yet" when the feed truly arrived empty.
   const empty =
+    !discoverLoading &&
+    !discoverError &&
     featured.length === 0 &&
     newReleases.length === 0 &&
     trending.length === 0 &&
@@ -207,6 +223,34 @@ function HomePage() {
               carousels &&
               carousels.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)
             )}
+
+            {/* The home feed booting: skeleton, not the empty state. Loading
+                 * must never render as "No music has been published yet" —
+                 * that line announced a launch defect that does not exist, on
+                 * every phone cold boot, in the seconds before the shelves
+                 * arrive. A failed fetch draws its own retry surface instead.
+                 */}
+            {discoverLoading && !discoverData ? (
+              <div className="space-y-10">
+                <SkeletonShelf count={6} />
+                <SkeletonShelf count={6} />
+              </div>
+            ) : discoverError ? (
+              <div className="text-center py-20">
+                <Globe className="size-8 text-muted-foreground mx-auto mb-4" aria-hidden="true" />
+                <h2 className="text-lg font-bold mb-2">The feed didn't load</h2>
+                <p className="text-muted-foreground text-sm mb-5">
+                  Check your connection and try again. Your downloads still play.
+                </p>
+                <button
+                  onClick={refetchDiscover}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold min-h-[44px] cursor-pointer"
+                >
+                  <RefreshCw className="size-4" />
+                  Try again
+                </button>
+              </div>
+            ) : null}
 
             {user && recentlyPlayed && recentlyPlayed.length > 0 && (
               <HorizontalShelf title="Recently Played" showAllLink="/library">

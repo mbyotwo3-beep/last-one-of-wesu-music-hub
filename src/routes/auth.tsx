@@ -92,7 +92,6 @@ function AuthPage() {
     } catch {
       /* ignore */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invite]);
 
   // After an OAuth round-trip the page reloads with a session but without

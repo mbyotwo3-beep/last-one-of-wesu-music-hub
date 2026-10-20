@@ -153,7 +153,6 @@ export function RouteError({
       guard: loadRecoveryGuard(),
       nowMs: Date.now(),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, offline]);
 
   useEffect(() => {

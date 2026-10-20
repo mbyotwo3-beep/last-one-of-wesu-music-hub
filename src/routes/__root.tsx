@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   useNavigate,
   HeadContent,
   Scripts,
@@ -23,6 +24,7 @@ import { OfflineLifecycle } from "../components/OfflineLifecycle";
 import { OfflineChip } from "../components/OfflineChip";
 import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
 import { resumeRefreshDecision } from "../lib/resume-recovery";
+import { LAST_ROUTE_KEY, routeRestoreDecision } from "../lib/route-restore";
 import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
 import { isOfflineTransportFailure } from "../lib/loader-graceful";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
@@ -228,6 +230,40 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const platform = usePlatform();
+  const router = useRouter();
+  // Where the listener was: recorded on every navigation so a process-kill
+  // relaunch resumes there instead of the app opening at home every time.
+  const fullPath = useRouterState({
+    select: (s) => s.location.pathname + s.location.search,
+  });
+  useEffect(() => {
+    if (platform !== "native") return;
+    try {
+      localStorage.setItem(LAST_ROUTE_KEY, fullPath);
+    } catch {
+      /* best-effort: private mode just opens home, the pre-fix behaviour */
+    }
+  }, [platform, fullPath]);
+  // Restore it ONCE at native boot. Recording above cannot run first in the
+  // same paint, so the initial value of fullPath is the booted location ("/")
+  // — restoring pushes history and the NEXT paint's write records real routes.
+  useEffect(() => {
+    if (platform !== "native") return;
+    try {
+      const stored = localStorage.getItem(LAST_ROUTE_KEY);
+      const decision = routeRestoreDecision({
+        isNative: platform === "native",
+        currentPath: router.state.location.pathname,
+        stored,
+      });
+      if (decision.action === "restore" && decision.to) router.history.push(decision.to);
+    } catch {
+      /* private mode: open home */
+    }
+    // Once per boot, deliberately narrow deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform]);
+
   // MiniPlayer reserves ~4rem above the 4rem tab bar only when a track is
   // loaded — don't leave dead whitespace on track-less pages.
   const hasTrack = usePlayer((s) => !!s.track);

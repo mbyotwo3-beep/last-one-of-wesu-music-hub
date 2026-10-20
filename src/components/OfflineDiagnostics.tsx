@@ -82,7 +82,7 @@ export function OfflineDiagnostics() {
         try {
           const keys = await caches.keys();
           let entries = 0;
-          let bytes = 0;
+          const bytes = 0;
           for (const k of keys) {
             const c = await caches.open(k);
             const reqs = await c.keys();

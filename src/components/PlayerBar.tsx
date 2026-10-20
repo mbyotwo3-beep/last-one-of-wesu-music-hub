@@ -1315,7 +1315,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       audio.removeEventListener("pause", onExternalPause);
       audio.removeEventListener("play", onExternalPlay);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Volume
@@ -1649,7 +1648,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       document.removeEventListener("visibilitychange", handleVisible);
       window.removeEventListener("focus", handleVisible);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cleanup on unmount
@@ -1673,7 +1671,6 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         /* ignore */
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (audioOnly) return null;

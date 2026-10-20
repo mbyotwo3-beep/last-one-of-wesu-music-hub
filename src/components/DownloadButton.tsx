@@ -123,7 +123,7 @@ export function DownloadButton({
   // metadata on small screens. Unbought tracks lead to checkout, where
   // the price is shown before anything is charged.
   const buttonClass =
-    "inline-flex items-center justify-center size-11 min-h-\[44px\] min-w-\[44px\] shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
+    "inline-flex items-center justify-center size-11 min-h-[44px] min-w-[44px] shrink-0 rounded-full bg-secondary border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50";
   const iconClass = "size-4";
 
   // No connection: there is nothing to download FROM.

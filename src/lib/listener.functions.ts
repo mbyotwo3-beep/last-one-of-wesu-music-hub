@@ -400,7 +400,7 @@ export const getPlaylistWithSongs = createServerFn({ method: "GET" })
     const caller: any = context.supabase;
 
     let playlist: any = null;
-    let admin: any = null;
+    const admin: any = null;
 
     {
       const { data: row } = await caller
