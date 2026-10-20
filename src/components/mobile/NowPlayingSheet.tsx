@@ -18,6 +18,8 @@ import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { CoverArt } from "@/components/CoverArt";
+import { GradientFader } from "@/components/GradientFader";
+import { useArtworkGradient } from "@/hooks/use-artwork-gradient";
 import { useTrackMeta } from "@/hooks/use-track-meta";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useIsNative } from "@/hooks/use-platform";
@@ -68,6 +70,11 @@ export function NowPlayingSheet() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
+
+  // The ambient colour MUST be claimed before the `!track` guard below:
+  // hooks cannot move behind an early return, and this sheet unmounts its
+  // content when nothing is playing but stays mounted itself.
+  const { css: ambientCss } = useArtworkGradient("album-art", track?.coverUrl);
 
   const touchStartY = useRef(0);
   const touchCurrentY = useRef(0);
@@ -184,8 +191,16 @@ export function NowPlayingSheet() {
         ref={sheetRef}
         className={`fixed inset-x-0 bottom-0 z-[90] flex flex-col transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
         style={{
-          background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)",
+          // Near-black base. The colour that used to live here was one
+          // hardcoded blue gradient for every song; the ambient layer below
+          // now derives it from the artwork, cross-fading when the song
+          // changes (GradientFader — CSS cannot transition gradients).
+          background: "#07070b",
           borderRadius: "24px 24px 0 0",
+          // The blurred ambient layer is larger than the sheet; without
+          // clipping it bleeds past the rounded corners onto the backdrop.
+          overflow: "hidden",
+          isolation: "isolate",
           // 100vh (not dvh): pre-2022 WebViews drop unknown units, which
           // would leave the sheet unclamped and overflowing the screen.
           maxHeight: "100vh",
@@ -199,6 +214,27 @@ export function NowPlayingSheet() {
         aria-modal="true"
         aria-label="Now Playing"
       >
+        {/* Ambient colour behind everything, from the artwork itself.
+         * -z-10 keeps it under the controls; isolation on the sheet keeps
+         * it from sliding behind the backdrop. Scale + blur is the Spotify
+         * treatment — a glow, not a picture. The scrim re-darkens toward
+         * the bottom so the transport controls keep their contrast, as the
+         * flat old background guaranteed by being dark already. */}
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <GradientFader
+            css={ambientCss}
+            duration={600}
+            className="opacity-60 saturate-[1.35] scale-150 blur-2xl"
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(2,2,6,0.72) 48%, rgba(4,4,8,0.9) 100%)",
+            }}
+          />
+        </div>
+
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full bg-white/30" />

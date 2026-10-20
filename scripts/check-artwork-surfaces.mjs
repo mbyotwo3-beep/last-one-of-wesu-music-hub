@@ -16,6 +16,14 @@ const trackRow = has("src/components/TrackRow.tsx", /import \{ CoverArt \}/);
 const songRow = has("src/components/mobile/shared/SongRow.tsx", /import \{ CoverArt \}/);
 const nowPlaying = has("src/components/mobile/NowPlayingSheet.tsx", /import \{ CoverArt \}/);
 
+// The ambient-room work: the sheet derives its colour from the artwork
+// through the gradient hook and cross-fades it (GradientFader, because CSS
+// cannot transition gradients), and the Skeleton set sweeps rather than
+// blinks.
+const sheet = readFileSync("src/components/mobile/NowPlayingSheet.tsx", "utf8");
+const skeleton = readFileSync("src/components/Skeleton.tsx", "utf8");
+const styles = readFileSync("src/styles.css", "utf8");
+
 const checks = [
   {
     name: "discover shelf cards"
@@ -38,6 +46,37 @@ const checks = [
     ok: nowPlaying,
     why: "the most-viewed cover in the app; its swap happened while nothing moved",
   },
+  {
+    name: "the now-playing room colour comes from the artwork, cross-faded",
+    ok:
+      /useArtworkGradient\("album-art", track\?\.coverUrl\)/.test(sheet) &&
+      /GradientFader/.test(sheet) &&
+      !/1a1a2e/.test(sheet),
+    why:
+      "one hardcoded blue for every song is the pre-Spotify look the ambient " +
+      "work exists to replace; a revert must fail this build",
+  },
+  {
+    name: "the ambient glow sits behind the controls",
+    ok: /absolute inset-0 -z-10 pointer-events-none/.test(sheet) && /isolation:\s*"isolate"/.test(sheet),
+    why:
+      "without the isolated negative layer the glow either paints over the " +
+      "transport buttons or steals their taps",
+  },
+  {
+    name: "loading skeletons sweep, not blink",
+    ok: !/animate-pulse/.test(skeleton) && /wesu-shimmer/.test(skeleton) && /wesu-shimmer/.test(styles),
+    why:
+      "the sweep is the loading language this design chose; a leftover pulse " +
+      "half-swept is the inconsistency the utility was written to erase",
+  },
+  {
+    name: "the shimmer sweep respects reduced motion",
+    ok: /@media \(prefers-reduced-motion: no-preference\) \{\s*\.wesu-shimmer::after \{/.test(
+      styles.replace(/\r\n/g, "\n"),
+    ),
+    why: "a listener who turned animations off gets the flat block, not an infinite sweep",
+  },
 ];
 
 let failed = 0;
@@ -52,3 +91,4 @@ if (failed) {
   process.exit(1);
 }
 console.log("  every cover surface carries the artwork gradient");
+console.log("  the now-playing room breathes the artwork's colour");
