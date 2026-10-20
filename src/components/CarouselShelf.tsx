@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Music2 } from "lucide-react";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import type { Carousel } from "@/lib/carousel.functions";
 
@@ -150,20 +150,31 @@ export function CarouselShelf({ carousel }: Props) {
 }
 
 function CarouselCard({ item }: { item: NonNullable<Carousel["items"]>[number] }) {
+  // CMS image values are free text. An absolute URL renders directly; a raw
+  // storage path never does anything useful in an <img> — it resolves against
+  // the site root and 404s — so those get the placeholder, not a broken img.
+  const isUsableImage =
+    typeof item.image_url === "string" && /^(https?:|data:|blob:)/i.test(item.image_url);
   return (
     <>
       {/* Card image */}
       <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-card ring-1 ring-white/5 mb-2.5 shadow-md group-hover:ring-primary/40 transition-all group-hover:scale-[1.03] duration-200">
-        <img
-          src={item.image_url}
-          alt={item.title}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => {
-            // fallback gradient on broken image
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
+        {isUsableImage ? (
+          <img
+            src={item.image_url}
+            alt={item.title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              // fallback gradient on broken image
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="flex w-full h-full items-center justify-center">
+            <Music2 className="size-5 text-muted-foreground opacity-70" />
+          </div>
+        )}
         {/* Play overlay on hover */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">

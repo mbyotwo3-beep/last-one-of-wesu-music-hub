@@ -101,6 +101,13 @@ export interface OfflineListOptions<T> {
   queryFn: () => Promise<T>;
   enabled?: boolean;
   staleTime?: number;
+  /**
+   * First-paint value delivered by the route loader (serialized by TanStack
+   * Start). Without it the client's very first render sees `undefined` where
+   * the server saw data, and React regenerates the whole page with a
+   * hydration-mismatch error on every load.
+   */
+  initialData?: T;
 }
 
 export interface OfflineListResult<T> {
@@ -130,6 +137,7 @@ export function useOfflineList<T>(
     queryFn: options.queryFn,
     enabled: options.enabled,
     staleTime: options.staleTime,
+    initialData: options.initialData,
     retry: online ? undefined : false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any) as {

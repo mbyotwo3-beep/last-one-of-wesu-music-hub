@@ -152,10 +152,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
           try {
             const url = await resolveImageUrl(bucket, slide.imageUrl);
-            return [slide.id, url || slide.imageUrl] as const;
+            return [slide.id, url || ""] as const;
           } catch (e) {
             console.error("Failed to resolve hero carousel image:", slide.imageUrl, e);
-            return [slide.id, slide.imageUrl] as const;
+            return [slide.id, ""] as const;
           }
         }),
       );
@@ -175,7 +175,6 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   if (slides.length === 0) return null;
 
   const currentSlide = slides[currentIndex];
-  const signedUrl = signedUrls.get(currentSlide.id) || currentSlide.imageUrl;
 
   // Use the ctaExternal field to determine if link should open in new tab.
   // CMS links are free text — anything that isn't a plain internal path
@@ -207,7 +206,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       <div className="absolute inset-0">
         {slides.map((slide, idx) => {
           const isCurrent = idx === currentIndex;
-          const slideSignedUrl = signedUrls.get(slide.id) || slide.imageUrl;
+          // Only absolute URLs (signed, external) may be painted. A raw
+          // storage path in background-image resolves against the SITE root
+          // and 404s on every page load; until the signed URL arrives the
+          // deterministic placeholder shows instead.
+          const signedUrl = signedUrls.get(slide.id) ?? "";
+          const paintable = /^(https?:|data:|blob:)/i.test(signedUrl);
           return (
             <div
               key={slide.id}
@@ -230,11 +234,15 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
               ) : (
                 <div
                   className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url(${slideSignedUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
+                  style={
+                    paintable
+                      ? {
+                          backgroundImage: `url(${signedUrl})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                      : undefined
+                  }
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
                 </div>

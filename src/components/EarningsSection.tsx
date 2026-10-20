@@ -303,7 +303,7 @@ export function EarningsSection({ data, isLoading }: Props) {
                 className="flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:bg-accent/50 transition-colors"
               >
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  {song.coverUrl ? (
+                  {song.coverUrl && /^(https?:|data:|blob:)/i.test(song.coverUrl) ? (
                     <img
                       src={song.coverUrl}
                       alt=""

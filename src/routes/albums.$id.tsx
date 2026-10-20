@@ -226,6 +226,10 @@ function AlbumPage() {
     queryKey: albumKey(id),
     queryFn: () => albumFn(id),
     staleTime: 5 * 60 * 1000,
+    // The loader's serialized result seeds the first paint so the client
+    // renders the same markup the server did; without it a first visit
+    // painted the "can't show this album" branch inside server content.
+    initialData: Route.useLoaderData(),
   });
 
   // Warm the preview URLs for the first tracks, so tapping one starts playing

@@ -41,7 +41,7 @@ function LabelPage() {
       <div className="flex items-center gap-6 mb-8">
         <div className="size-24 rounded-2xl bg-secondary overflow-hidden">
           {label.logo_url && (
-            <img src={label.logo_url} alt={label.name} className="w-full h-full object-cover" />
+            <StorageImage bucket="label-images" path={label.logo_url} alt={label.name} className="w-full h-full object-cover" />
           )}
         </div>
         <div>

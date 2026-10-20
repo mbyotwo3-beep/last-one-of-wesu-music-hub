@@ -275,11 +275,13 @@ function RootComponent() {
   // Without this the app cannot start with the data off at all: it is SSR, so
   // there is no document to load, and every offline feature (the encrypted
   // vault, offline mode, the list snapshots) lives inside the React tree that
-  // never boots. Registering is deferred until after load so it never competes
-  // with first paint, and a failure is deliberately swallowed — the app must
-  // still boot online if a worker will not register.
+  // never boots. The same is true of a desktop browser tab: an offline F5 or
+  // reload could not render without this shell. Spotify-style offline is
+  // supposed to look the same everywhere, so this registers on the open web
+  // too, not only in the APK. Registering is deferred until after load so it
+  // never competes with first paint, and a failure is deliberately swallowed
+  // — the app must still boot online if a worker will not register.
   useEffect(() => {
-    if (platform !== "native") return;
     if (!shellCacheSupported()) return;
     const go = () => void ensureShellCache();
     if (document.readyState === "complete") {
@@ -288,7 +290,7 @@ function RootComponent() {
     }
     window.addEventListener("load", go, { once: true });
     return () => window.removeEventListener("load", go);
-  }, [platform]);
+  }, []);
 
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {

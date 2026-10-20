@@ -47,7 +47,14 @@ export const Route = createFileRoute("/songs/$id")({
 
 function SongPage() {
   const { id } = Route.useParams();
-  const { data: song } = useSuspenseQuery(songQO(id));
+  // Seed from the serialized loader result: the server rendered from this
+  // cache; a cold client cache would suspend and disagree with the server
+  // HTML (hydration error), right on the buy page.
+  const bootData = Route.useLoaderData();
+  const { data: song } = useSuspenseQuery({
+    ...songQO(id),
+    initialData: bootData,
+  });
   const setQueue = usePlayer((state) => state.setQueue);
   const togglePlay = usePlayer((state) => state.togglePlay);
   const playing = usePlayer((state) => state.playing);

@@ -481,15 +481,22 @@ function CarouselCard({
                     )}
                   </label>
                 </div>
-                {/* Image preview */}
+                {/* Image preview — absolute URLs render; a bare storage path can't
+                    (this builder doesn't know the bucket), so it shows as placeholder */}
                 {newItem.image_url && (
                   <div className="flex items-center gap-3">
-                    <img
-                      src={newItem.image_url}
-                      alt="preview"
-                      className="w-16 h-16 rounded-lg object-cover bg-secondary"
-                      onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
-                    />
+                    {/^(https?:|data:|blob:)/i.test(newItem.image_url) ? (
+                      <img
+                        src={newItem.image_url}
+                        alt="preview"
+                        className="w-16 h-16 rounded-lg object-cover bg-secondary"
+                        onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-card flex items-center justify-center" title="Storage paths need a bucket — use the slide's https:// image URL">
+                        <ImageIcon className="size-4 text-muted-foreground opacity-50" />
+                      </div>
+                    )}
                     <span className="text-xs text-muted-foreground">Preview</span>
                   </div>
                 )}
@@ -605,12 +612,18 @@ function CarouselItemCard({
           className="w-full px-2 py-1 rounded bg-background border border-border font-mono"
         />
         {f.image_url && (
-          <img
-            src={f.image_url}
-            alt="preview"
-            className="w-full aspect-square rounded object-cover bg-card"
-            onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
-          />
+          /^(https?:|data:|blob:)/i.test(f.image_url) ? (
+            <img
+              src={f.image_url}
+              alt="preview"
+              className="w-full aspect-square rounded object-cover bg-card"
+              onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
+            />
+          ) : (
+            <div className="w-full aspect-square rounded bg-card flex items-center justify-center" title="Storage paths need a bucket — use the https:// image URL">
+              <ImageIcon className="size-4 text-muted-foreground opacity-50" />
+            </div>
+          )
         )}
         <div className="flex gap-1">
           <button
@@ -639,12 +652,18 @@ function CarouselItemCard({
 
   return (
     <div className="group relative bg-secondary/40 border border-border rounded-xl overflow-hidden">
-      <img
-        src={item.image_url}
-        alt={item.title}
-        className="w-full aspect-square object-cover"
-        onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
-      />
+      {/^(https?:|data:|blob:)/i.test(item.image_url) ? (
+        <img
+          src={item.image_url}
+          alt={item.title}
+          className="w-full aspect-square object-cover"
+          onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
+        />
+      ) : (
+        <div className="w-full aspect-square bg-card flex items-center justify-center">
+          <ImageIcon className="size-4 text-muted-foreground opacity-50" />
+        </div>
+      )}
       <div className="p-2">
         <p className="text-xs font-semibold truncate">{item.title}</p>
         {item.subtitle && (

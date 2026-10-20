@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { useServerFn } from "@tanstack/react-start";
 import { Globe, Play, RefreshCw } from "lucide-react";
@@ -58,23 +58,22 @@ export const Route = createFileRoute("/")({
     links: [{ rel: "canonical", href: "/" }],
   }),
   loader: async ({ context }) => {
-    // Awaited, but a failure is still swallowed on purpose.
+    // Awaited, and the results are RETURNED so TanStack Start serializes them
+    // into the router state and the client's very first render has the same
+    // data the server rendered. Loading was a side effect only before —
+    // nothing reached the client, so hydration re-painted the page from
+    // skeletons and React tore the server markup down on every load.
     //
     // Offline cold start must not throw: the page renders last-known content
-    // from snapshots instead (Spotify-style browsable cache). Not awaiting,
-    // though, meant the server never had the shelves either — every visitor got
-    // an empty home page until hydration, and a deploy-time error produced a
-    // blank page with nothing in the server log.
-    //
-    // Awaiting gives the server real content when the network is fine, and the
-    // catch keeps the offline path working when it is not.
-    await context.queryClient.ensureQueryData(discoverQO).catch(() => {});
-    // The component also reads the carousel and hero queries. Nothing primed
-    // them, so those two always waited for hydration even on a warm cache.
-    await Promise.all([
-      context.queryClient.ensureQueryData(carouselsQO).catch(() => {}),
-      context.queryClient.ensureQueryData(heroQO).catch(() => {}),
+    // from snapshots instead (Spotify-style browsable cache). A null here is
+    // that honest fallback, not a crash: the component gates the shelves on
+    // data being present and offers a retry when the fetch failed.
+    const [discover, carousels, hero] = await Promise.all([
+      context.queryClient.ensureQueryData(discoverQO).catch(() => null),
+      context.queryClient.ensureQueryData(carouselsQO).catch(() => null),
+      context.queryClient.ensureQueryData(heroQO).catch(() => null),
     ]);
+    return { discover, carousels, hero };
   },
   component: IndexRoute,
   errorComponent: SharedRouteError,
@@ -91,6 +90,14 @@ function HomePage() {
   // WHILE THE FEED WAS STILL ARRIVING. On a phone that is every cold boot:
   // relaunch after the process was killed, first launch after an update —
   // an open that lands on a fake "welcome" screen instead of the app.
+  //
+  // The loader's serialized result seeds the same queries with initialData,
+  // so SERVER and CLIENT paint identically and hydration never disagrees.
+  const boot = Route.useLoaderData() as {
+    discover: unknown;
+    carousels: unknown;
+    hero: unknown;
+  };
   const {
     data: discoverData,
     isLoading: discoverLoading,
@@ -100,6 +107,9 @@ function HomePage() {
     queryKey: ["home-discover"],
     queryFn: () => getHomeDiscover(),
     staleTime: 5 * 60 * 1000,
+    initialData: (boot?.discover ?? undefined) as
+      | Awaited<ReturnType<typeof getHomeDiscover>>
+      | undefined,
   });
   const setQueue = usePlayer((s) => s.setQueue);
   const { user } = useAuth();
@@ -112,24 +122,39 @@ function HomePage() {
     queryKey: ["active-carousels"],
     queryFn: () => carouselsFn(),
     staleTime: 60 * 1000,
+    initialData: (boot?.carousels ?? undefined) as
+      | Awaited<ReturnType<typeof getActiveCarousels>>
+      | undefined,
   });
 
   const { data: heroSlides, isLoading: heroSlidesLoading } = useOfflineList("home:hero", {
     queryKey: ["active-hero-slides"],
     queryFn: () => heroSlidesFn(),
     staleTime: 60 * 1000,
+    initialData: (boot?.hero ?? undefined) as
+      | Awaited<ReturnType<typeof getActiveHeroSlides>>
+      | undefined,
   });
+
+  // The signed-in shelves (For You, Recently Played) must render ONLY after
+  // mount. The server cannot see the localStorage session, so a signed-in
+  // listener's first client paint would disagree with the server HTML —
+  // the same hydration failure the loader-seeding fixes elsewhere. Waiting
+  // one effect-turn keeps server and client unified; the shelf then appears
+  // as a normal post-hydration update.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { data: forYouData, isLoading: forYouLoading } = useOfflineList("home:foryou", {
     queryKey: ["for-you", user?.id],
     queryFn: () => forYouFn(),
-    enabled: !!user,
+    enabled: mounted && !!user,
     staleTime: 5 * 60 * 1000,
   });
   const { data: recentlyPlayed, isLoading: recentlyPlayedLoading } = useOfflineList("home:recent", {
     queryKey: ["recently-played", user?.id],
     queryFn: () => recentlyPlayedFn(),
-    enabled: !!user,
+    enabled: mounted && !!user,
     staleTime: 60 * 1000,
   });
   const {

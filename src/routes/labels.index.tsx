@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
+import { StorageImage } from "@/components/StorageImage";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listApprovedLabels } from "@/lib/labels.functions";
 
@@ -50,7 +51,7 @@ function LabelsPage() {
             >
               <div className="size-16 rounded-xl bg-secondary mb-3 overflow-hidden">
                 {l.logo_url && (
-                  <img src={l.logo_url} alt={l.name} className="w-full h-full object-cover" />
+                  <StorageImage bucket="label-images" path={l.logo_url} alt={l.name} className="w-full h-full object-cover" />
                 )}
               </div>
               <p className="font-semibold">{l.name}</p>

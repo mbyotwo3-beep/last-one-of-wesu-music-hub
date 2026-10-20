@@ -15,9 +15,10 @@
  *     and cost the listener their offline copy until the next page load.
  *   - A failure here is swallowed. Offline support is an enhancement; refusing
  *     to boot because a service worker would not register would be absurd.
- *   - Only registered in the native shell. On the open web the browser manages
- *     its own caching, and claiming a worker's scope on a domain we do not own
- *     the deployment of is not ours to do.
+ *   - Registered on the open web too — not just the native shell. Spotify
+ *     style offline is the same experience on desktop and in the app, and the
+ *     worker's scope IS our own deployment: network-first still means the
+ *     live site is always what a connected listener gets.
  */
 
 const REGISTERED = Symbol.for("wesu.sw.registered");

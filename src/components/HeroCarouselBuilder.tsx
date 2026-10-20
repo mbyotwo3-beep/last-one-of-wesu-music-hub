@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { StorageImage } from "@/components/StorageImage";
 import {
   getAllHeroSlides,
   createHeroSlide,
@@ -230,9 +231,10 @@ function HeroSlideCard({
 
         <GripVertical className="size-4 text-muted-foreground/40" />
 
-        {/* Thumbnail */}
-        <img
-          src={slide.image_url}
+        {/* Thumbnail — stored values are raw storage paths, signed here */}
+        <StorageImage
+          bucket="hero-images"
+          path={slide.image_url}
           alt={slide.title}
           className="w-16 h-10 rounded object-cover bg-secondary"
         />
@@ -304,8 +306,9 @@ function HeroSlideCard({
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Slide Preview
                 </h4>
-                <img
-                  src={slide.image_url}
+                <StorageImage
+                  bucket="hero-images"
+                  path={slide.image_url}
                   alt={slide.title}
                   className="w-full aspect-video rounded-lg object-cover"
                 />

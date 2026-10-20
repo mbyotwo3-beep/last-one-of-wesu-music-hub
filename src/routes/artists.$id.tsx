@@ -61,7 +61,15 @@ export const Route = createFileRoute("/artists/$id")({
 
 function ArtistPage() {
   const { id } = Route.useParams();
-  const { data } = useSuspenseQuery(artistQO(id));
+  // Seed from the serialized loader result. The server rendered from this
+  // cache; useSuspenseQuery on a cold client cache would suspend instead and
+  // paint a different tree, and React regenerates the page with a hydration
+  // error on every landing (seen live in the sweep).
+  const bootData = Route.useLoaderData();
+  const { data } = useSuspenseQuery({
+    ...artistQO(id),
+    initialData: bootData,
+  });
   const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
