@@ -55,6 +55,7 @@ import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as LabelsIndexRouteImport } from './routes/labels.index'
 import { Route as LabelsSlugRouteImport } from './routes/labels.$slug'
+import { Route as PlaylistsIndexRouteImport } from './routes/playlists.index'
 import { Route as PlaylistsIdRouteImport } from './routes/playlists.$id'
 import { Route as SongsIdRouteImport } from './routes/songs.$id'
 import { Route as AlbumsIdEditRouteImport } from './routes/albums.$id.edit'
@@ -291,6 +292,11 @@ const LabelsSlugRoute = LabelsSlugRouteImport.update({
   path: '/labels/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaylistsIndexRoute = PlaylistsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlaylistsRoute,
+} as any)
 const PlaylistsIdRoute = PlaylistsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -366,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
+  '/playlists/': typeof PlaylistsIndexRoute
   '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
@@ -396,7 +403,6 @@ export interface FileRoutesByTo {
   '/new-music': typeof NewMusicRoute
   '/notifications': typeof NotificationsRoute
   '/now-playing': typeof NowPlayingRoute
-  '/playlists': typeof PlaylistsRouteWithChildren
   '/podcast': typeof PodcastRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -418,6 +424,7 @@ export interface FileRoutesByTo {
   '/albums': typeof AlbumsIndexRoute
   '/artists': typeof ArtistsIndexRoute
   '/labels': typeof LabelsIndexRoute
+  '/playlists': typeof PlaylistsIndexRoute
   '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
@@ -472,6 +479,7 @@ export interface FileRoutesById {
   '/albums/': typeof AlbumsIndexRoute
   '/artists/': typeof ArtistsIndexRoute
   '/labels/': typeof LabelsIndexRoute
+  '/playlists/': typeof PlaylistsIndexRoute
   '/albums/$id/edit': typeof AlbumsIdEditRoute
   '/api/public/lenco-webhook': typeof ApiPublicLencoWebhookRoute
   '/api/public/sitemap': typeof ApiPublicSitemapRoute
@@ -527,6 +535,7 @@ export interface FileRouteTypes {
     | '/albums/'
     | '/artists/'
     | '/labels/'
+    | '/playlists/'
     | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
@@ -557,7 +566,6 @@ export interface FileRouteTypes {
     | '/new-music'
     | '/notifications'
     | '/now-playing'
-    | '/playlists'
     | '/podcast'
     | '/privacy'
     | '/profile'
@@ -579,6 +587,7 @@ export interface FileRouteTypes {
     | '/albums'
     | '/artists'
     | '/labels'
+    | '/playlists'
     | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
@@ -632,6 +641,7 @@ export interface FileRouteTypes {
     | '/albums/'
     | '/artists/'
     | '/labels/'
+    | '/playlists/'
     | '/albums/$id/edit'
     | '/api/public/lenco-webhook'
     | '/api/public/sitemap'
@@ -1009,6 +1019,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabelsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/playlists/': {
+      id: '/playlists/'
+      path: '/'
+      fullPath: '/playlists/'
+      preLoaderRoute: typeof PlaylistsIndexRouteImport
+      parentRoute: typeof PlaylistsRoute
+    }
     '/playlists/$id': {
       id: '/playlists/$id'
       path: '/$id'
@@ -1086,10 +1103,12 @@ const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
 
 interface PlaylistsRouteChildren {
   PlaylistsIdRoute: typeof PlaylistsIdRoute
+  PlaylistsIndexRoute: typeof PlaylistsIndexRoute
 }
 
 const PlaylistsRouteChildren: PlaylistsRouteChildren = {
   PlaylistsIdRoute: PlaylistsIdRoute,
+  PlaylistsIndexRoute: PlaylistsIndexRoute,
 }
 
 const PlaylistsRouteWithChildren = PlaylistsRoute._addFileChildren(
