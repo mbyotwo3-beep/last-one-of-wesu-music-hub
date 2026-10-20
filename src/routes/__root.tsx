@@ -22,6 +22,7 @@ import { BottomTabBar } from "../components/mobile/BottomTabBar";
 import { OfflineLifecycle } from "../components/OfflineLifecycle";
 import { OfflineChip } from "../components/OfflineChip";
 import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
+import { resumeRefreshDecision } from "../lib/resume-recovery";
 import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
 import { isOfflineTransportFailure } from "../lib/loader-graceful";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
@@ -257,6 +258,34 @@ function RootComponent() {
       const cleanup = registerDeepLinkHandler();
       return cleanup;
     }
+  }, [platform]);
+
+  // Resume from a long background: doze froze autoRefreshToken, so the next
+  // burst of server calls would otherwise race the silent token refresh and
+  // lose with 401-class route errors. One refresh fires the moment the app
+  // becomes visible again, BEFORE any query needs the token. Pure rule in
+  // resume-recovery; failures here are silent because the route error
+  // surface can still heal the burst it causes.
+  useEffect(() => {
+    if (platform !== "native") return;
+    let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const hiddenForMs = hiddenAt ? Date.now() - hiddenAt : 0;
+      if (resumeRefreshDecision({ hiddenForMs, online: navigator.onLine !== false }) !== "refresh") {
+        return;
+      }
+      import("@/lib/session-resume")
+        .then(({ refreshSessionIfStale }) => refreshSessionIfStale())
+        .catch(() => {
+          /* the route error surface heals what it causes; nothing to report */
+        });
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [platform]);
 
   // Password-recovery deep links (native): route to the reset form once the

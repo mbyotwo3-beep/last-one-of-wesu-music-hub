@@ -1,7 +1,14 @@
 import { useRouter } from "@tanstack/react-router";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { isOfflineTransportFailure } from "@/lib/loader-graceful";
+import {
+  recoveryDecision,
+  type RecoveryAction,
+  type RecoveryGuard,
+  type RecoveryKind,
+} from "@/lib/resume-recovery";
 import { OfflineRouteNotice } from "@/components/OfflineRouteNotice";
 
 /**
@@ -35,10 +42,88 @@ export function errorReference(error: unknown): string {
 }
 
 /**
+ * One attempt per kind, remembered here — sessionStorage survives a WebView
+ * renderer restore (the exact resume case being healed), so the guard holds
+ * across it. Marking happens BEFORE the action; a recovery that cannot be
+ * recorded does not run, because an unremembered auto-reload is the infinite
+ * loop this whole design exists to prevent.
+ */
+const RECOVERY_KEY = "wesu:recovery";
+
+function loadRecoveryGuard(): RecoveryGuard {
+  try {
+    const raw = sessionStorage.getItem(RECOVERY_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as RecoveryGuard;
+    return typeof parsed === "object" && parsed !== null ? (parsed as RecoveryGuard) : {};
+  } catch {
+    return {};
+  }
+}
+
+function markRecoveryAttempt(kind: RecoveryKind, nowMs: number): boolean {
+  try {
+    const guard = { ...loadRecoveryGuard(), [kind]: nowMs };
+    sessionStorage.setItem(RECOVERY_KEY, JSON.stringify(guard));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runRecovery(
+  action: RecoveryAction,
+  router: ReturnType<typeof useRouter>,
+  setHealing: (h: boolean) => void,
+): Promise<void> {
+  if (action === "reload") {
+    if (!markRecoveryAttempt("reload", Date.now())) return;
+    setHealing(true);
+    // A beat of the healing screen so the swap isn't a flash, then a full
+    // reload — the fresh document carries fresh hashes and the dead chunk
+    // reference is gone.
+    window.setTimeout(() => window.location.reload(), 600);
+    return;
+  }
+  if (action === "reauth") {
+    if (!markRecoveryAttempt("reauth", Date.now())) return;
+    setHealing(true);
+    try {
+      // Dynamic import: the browser Supabase client has no business in the
+      // SSR graph of this shared error surface.
+      const { refreshSessionIfStale } = await import("@/lib/session-resume");
+      const ok = await refreshSessionIfStale();
+      // A refresh can succeed while the router is re-running the route, in
+      // which case the route replaces this component — healing(null) on an
+      // unmounted boundary is harmless. If the refresh failed, the honest
+      // fault screen (with Try again) stands.
+      if (ok) await router.invalidate();
+    } finally {
+      setHealing(false);
+    }
+    return;
+  }
+  if (action === "revalidate") {
+    if (!markRecoveryAttempt("revalidate", Date.now())) return;
+    setHealing(true);
+    try {
+      await router.invalidate();
+    } finally {
+      setHealing(false);
+    }
+  }
+}
+
+/**
  * Shared route error surface for every route.
  *
  * One place decides whether a failure is a real fault or simply no connection,
  * so a new route cannot get it wrong by writing its own screen.
+ *
+ * And for the failures a WebView produces coming back from the background,
+ * one place now HEALS them silently first — exactly once per kind per
+ * session window, then honest: a recovery that did not fix the fault always
+ * ends on this screen.
  */
 export function RouteError({
   error,
@@ -50,15 +135,53 @@ export function RouteError({
   fallback?: string;
 }) {
   const router = useRouter();
-
   // Log it. Without this the reason is gone the moment the boundary renders and
   // the only record is a screenshot with no detail on it.
   if (typeof console !== "undefined") {
     console.error("[route-error]", error);
   }
 
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const [healing, setHealing] = useState(false);
+  // Decided at mount from THIS error object. useMemo keeps the decision from
+  // being recomputed on parent re-renders while the effect below acts.
+  const recovery = useMemo(() => {
+    if (isOfflineTransportFailure(error)) return "none" as const;
+    return recoveryDecision({
+      error,
+      offline,
+      guard: loadRecoveryGuard(),
+      nowMs: Date.now(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error, offline]);
+
+  useEffect(() => {
+    if (recovery === "none") return;
+    void runRecovery(recovery, router, setHealing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recovery]);
+
   if (isOfflineTransportFailure(error)) {
     return <OfflineRouteNotice />;
+  }
+
+  if (healing) {
+    const line =
+      recovery === "reload"
+        ? "Updating Wesu+…"
+        : recovery === "reauth"
+          ? "Signing you back in…"
+          : "Reconnecting…";
+    return (
+      <div className="px-6 py-24 text-center max-w-md mx-auto" role="status">
+        <Loader2
+          className="mx-auto size-7 animate-spin text-muted-foreground mb-4"
+          aria-hidden="true"
+        />
+        <p className="text-muted-foreground text-sm">{line}</p>
+      </div>
+    );
   }
 
   const ref = errorReference(error);
