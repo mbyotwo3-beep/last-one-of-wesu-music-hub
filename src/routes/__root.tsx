@@ -234,7 +234,9 @@ function RootComponent() {
   // Where the listener was: recorded on every navigation so a process-kill
   // relaunch resumes there instead of the app opening at home every time.
   const fullPath = useRouterState({
-    select: (s) => s.location.pathname + s.location.search,
+    // searchStr is the string form; location.search is a parsed object that
+    // cannot be string-concatenated (hard-crashes SSR renders).
+    select: (s) => s.location.pathname + (s.location.searchStr ?? ""),
   });
   useEffect(() => {
     if (platform !== "native") return;

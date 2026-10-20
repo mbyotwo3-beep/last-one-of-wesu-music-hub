@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 const home = readFileSync("src/routes/index.tsx", "utf8");
 const root = readFileSync("src/routes/__root.tsx", "utf8");
 const rule = readFileSync("src/lib/route-restore.ts", "utf8");
+const navbar = readFileSync("src/components/Navbar.tsx", "utf8");
 
 const checks = [
   {
@@ -47,6 +48,17 @@ const checks = [
     ok: /if \(!i\.isNative\) return \{ action: "stay" \};/.test(rule) &&
       /startsWith\("\/\/"\)/.test(rule),
     why: "web deep-linking and injection strings are not ours to redirect",
+  },
+  {
+    name: "no router-state select concatenates the parsed search object",
+    ok: [root, home, rule, navbar].every(
+      (t) =>
+        !/location\.pathname\s*\+\s*\(?\s*[\w.]*location\.search\b(?!Str)/.test(t) &&
+        !/s\.location\.search\b(?!Str)[\w. ]*;/.test(t.replace(/searchStr/g, "")),
+    ),
+    why: "location.search is a parsed object — `pathname + s.location.search` throws " +
+      "'Cannot convert object to primitive value' on the server and 500s every SSR route; " +
+      "the string form is location.searchStr",
   },
 ];
 
