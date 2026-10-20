@@ -87,6 +87,7 @@ import {
   evictCachedAudioUrlForUser,
   previewCapDecision,
 } from "@/lib/audio";
+import { stallDecision } from "@/lib/playback-stall";
 
 let _nativeAvailable: boolean | null = null;
 
@@ -1181,6 +1182,107 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, isPreview]);
+
+  // Stall watchdog (HTML engine): a dead buffer fires NO event on some
+  // WebViews — the element sits in stalled/waiting forever with the spinner
+  // spinning. Every 2.5s: if the store says playing, real media is attached,
+  // we are past the load grace window, and the position has not ticked in
+  // 15s, give this asset ONE silent repair — pause, remember the position,
+  // reload the source, re-seek, play. Keeping the position is the whole
+  // point: retry() would restart the song at 0 and drop everything the
+  // listener was hearing.
+  // The native engine drives assets with no HTML src on this element, so the
+  // src guard makes the watchdog a no-op there by construction — the native
+  // side has its own reconciler.
+  useEffect(() => {
+    const audio = getAudio();
+    const state = {
+      pos: -1,
+      lastProgressAt: Date.now(),
+      readyAt: Date.now(),
+      sel: "",
+      recovered: false,
+    };
+    // Load-complete marked by the element actually SOUNDING — the honest
+    // asset-ready moment. NOTE: `recovered` deliberately does NOT reset
+    // here; the recovery's own reload fires "playing" too, and resetting it
+    // would turn a permanently-dead asset into an infinite repair loop. One
+    // silent repair per ASSET: recovered clears only when the track changes.
+    const markPlaying = () => {
+      state.readyAt = Date.now();
+    };
+    audio.addEventListener("playing", markPlaying);
+    const timer = window.setInterval(() => {
+      if (!track) return;
+      if (state.sel !== track.id) {
+        state.sel = track.id;
+        state.pos = -1;
+        state.lastProgressAt = Date.now();
+        state.readyAt = Date.now();
+        state.recovered = false;
+        return;
+      }
+      const store = usePlayer.getState();
+      // Silent unlock placeholder src must never trip the watchdog: priming
+      // plays it while paused forever, and "no progress" is its DUTY.
+      const hasRealSrc = !!audio.src && !audio.src.startsWith("data:");
+      const pos = Math.floor(audio.currentTime || 0);
+      if (pos !== state.pos) {
+        state.pos = pos;
+        state.lastProgressAt = Date.now();
+      }
+      if (
+        stallDecision({
+          playing: store.playing,
+          paused: audio.paused,
+          hasRealSrc,
+          msSinceProgress: Date.now() - state.lastProgressAt,
+          sinceLoadMs: Date.now() - state.readyAt,
+          recoveredOnce: state.recovered,
+        }) !== "recover"
+      ) {
+        return;
+      }
+      state.recovered = true;
+      const saved = audio.currentTime || 0;
+      const resume = (event: Event) => {
+        audio.removeEventListener("canplay", resume);
+        audio.removeEventListener("error", fail);
+        try {
+          if (event.type === "canplay" && usePlayer.getState().playing) {
+            // Position restored BEFORE the play so the listener hears the
+            // frame they left at, not the song's opening.
+            audio.currentTime = saved;
+            audio.play().catch(() => {});
+          }
+        } catch {
+          /* detached element / no src — nothing a watchdog can do */
+        }
+      };
+      const fail = () => {
+        audio.removeEventListener("canplay", resume);
+        audio.removeEventListener("error", fail);
+        // The reload's own failure path (cache eviction + plain-words error)
+        // owns the story from here; the watchdog has no second move.
+      };
+      audio.addEventListener("canplay", resume);
+      audio.addEventListener("error", fail);
+      try {
+        // pause before load() keeps any playing-state listeners from seeing
+        // a middle state and flipping the store.
+        audio.pause();
+        audio.load();
+      } catch {
+        audio.removeEventListener("canplay", resume);
+        audio.removeEventListener("error", fail);
+      }
+    }, 2500);
+    return () => {
+      audio.removeEventListener("playing", markPlaying);
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id]);
 
   // External interruption sync: phone calls, other apps, and the OS pause
   // the element WITHOUT going through the store. Adopt that truth so the
