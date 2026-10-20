@@ -46,6 +46,10 @@ const visible = (html) =>
     .replace(/<script[\s\S]*?<\/script>/g, " ")
     .replace(/<style[\s\S]*?<\/style>/g, " ")
     .replace(/<[^>]+>/g, " ")
+    // React escapes characters as HEX entities (&#x27;), browsers emit both
+    // decimal (&#39;) and hex forms; decode both or every title with an
+    // apostrophe ("I'm Longing") reads as missing and the check cries wolf.
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
     .replace(/\s+/g, " ")
     .trim();

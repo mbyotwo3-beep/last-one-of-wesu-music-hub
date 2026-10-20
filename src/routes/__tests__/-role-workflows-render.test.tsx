@@ -23,7 +23,7 @@
  * attached to this session, so there is no visual evidence behind any of it.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { setRoles, renderPage, pageComponent } from "./harness";
+import { setRoles, renderPage, pageComponent } from "./-harness";
 
 const artist = (over: Record<string, unknown> = {}) => ({
   id: "ar-1",
