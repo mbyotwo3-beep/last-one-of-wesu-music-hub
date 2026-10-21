@@ -12,7 +12,7 @@ export const Route = createFileRoute("/new-music")({
 });
 
 function Page() {
-  const { data, isLoading, error } = useOfflineList("lists:new-releases", {
+  const { data, isLoading, error, refetch } = useOfflineList("lists:new-releases", {
     queryKey: ["new-releases"],
     queryFn: () => getNewReleases(),
     staleTime: 60_000,
@@ -23,7 +23,16 @@ function Page() {
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : error ? (
-        <p className="text-destructive">Failed to load new music.</p>
+        <div>
+          <p className="text-destructive mb-3">Failed to load new music.</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
       ) : (data ?? []).length === 0 ? (
         <p className="text-muted-foreground">No new releases yet.</p>
       ) : (

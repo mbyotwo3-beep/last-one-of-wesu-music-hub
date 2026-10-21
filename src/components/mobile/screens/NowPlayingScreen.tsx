@@ -47,7 +47,30 @@ export function NowPlayingScreen() {
   // was loaded — a React violation that breaks swipe-to-dismiss.
   const touchStartY = useRef<number | null>(null);
 
-  if (!track) return null;
+  if (!track)
+    // Direct /now-playing visits with no track used to render a blank page
+    // (early `return null`), because this screen is designed as the in-app
+    // player overlay. The player is only reachable once audio started, so a
+    // bare visit needs an honest state and a way out instead of nothing.
+    return (
+      <div className="min-h-svh flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <Music2 className="size-14 text-muted-foreground" />
+        <p className="text-lg font-semibold">Nothing playing yet</p>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          Start any song and this becomes your full-screen player with queue controls.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (router.history.length > 1) router.history.back();
+            else router.navigate({ to: "/" });
+          }}
+          className="mt-2 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+        >
+          Back
+        </button>
+      </div>
+    );
 
   const dur = isPreview ? 15 : (track.durationSeconds ?? 0);
   // Spinner only while playback was requested but the source isn't ready.

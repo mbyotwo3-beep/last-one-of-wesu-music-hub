@@ -105,7 +105,28 @@ function AuthPage() {
         if (cancelled || !data.session) return;
         const params: PendingAction = { action, artistId, itemId, itemType, redirect, invite };
         const merged = mergePendingAction(params, takePendingAction(sessionStorage));
-        if (cancelled || !hasPendingAction(merged)) return;
+        if (cancelled || !hasPendingAction(merged)) {
+          if (cancelled) return;
+          // Signed in and nothing queued: a listener visiting /auth by hand
+          // (a stale bookmark, a nav tap) used to be paraded the sign-in form
+          // they no longer need. An explicit ?redirect goes there; intent
+          // params (?action, invitations) keep the page — those flows render
+          // their own signed-in completion UI; OAuth leftovers (?code/state)
+          // don't count as intent. A plain visit lands on the home feed, which
+          // is what the app would open on startup anyway.
+          if (safeRedirect) {
+            navigate({ to: safeRedirect as any, replace: true });
+          } else {
+            const hasIntentParams = !!(action || artistId || itemId || itemType || invite);
+            const qs = new URLSearchParams(window.location.search);
+            qs.delete("code");
+            qs.delete("state");
+            if (!hasIntentParams && Array.from(qs.keys()).length === 0) {
+              navigate({ to: "/", replace: true });
+            }
+          }
+          return;
+        }
         const dest = await runPostAuthAction(merged);
         if (!cancelled) navigate({ to: dest as any });
       } catch {

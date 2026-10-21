@@ -4,6 +4,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { listArtists } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { loaderGraceful } from "@/lib/loader-graceful";
+import { friendlyError } from "@/lib/friendly-error";
 import { CheckCircle2, User } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 
@@ -33,7 +34,11 @@ export const Route = createFileRoute("/artists/")({
 });
 
 function ArtistsPage() {
-  const { data: artists = [] } = useOfflineList("lists:artists", {
+  // Errors used to be indistinguishable from an empty roster: a transient
+  // network failure rendered "No artists yet." — a catalogue claim, not a
+  // status report. The three states are separate now; the loader seeds SSR
+  // data so the common case does not even enter the loading/branch state.
+  const { data: artists = [], isLoading, isError, error, refetch } = useOfflineList("lists:artists", {
     queryKey: ["artists"],
     queryFn: () => listArtists(),
     staleTime: 5 * 60 * 1000,
@@ -44,7 +49,22 @@ function ArtistsPage() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-8">Artists</h1>
 
-        {artists.length === 0 ? (
+        {isLoading ? (
+          <div className="p-12 text-center text-muted-foreground">Loading artists…</div>
+        ) : isError ? (
+          <div className="p-12 border border-dashed border-white/10 rounded-2xl text-center">
+            <p className="text-destructive mb-3">
+              Couldn't load artists. {friendlyError(error, "Try again in a moment.")}
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        ) : artists.length === 0 ? (
           <div className="p-12 border border-dashed border-white/10 rounded-2xl text-center text-muted-foreground">
             No artists yet.
           </div>

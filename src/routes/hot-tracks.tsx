@@ -16,7 +16,7 @@ export const Route = createFileRoute("/hot-tracks")({
 });
 
 function Page() {
-  const { data, isLoading, error } = useOfflineList("lists:trending", {
+  const { data, isLoading, error, refetch } = useOfflineList("lists:trending", {
     queryKey: ["trending"],
     queryFn: () => getTrendingSongs(),
     staleTime: 60_000,
@@ -30,7 +30,16 @@ function Page() {
       {isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : error ? (
-        <p className="text-destructive">Failed to load hot tracks.</p>
+        <div>
+          <p className="text-destructive mb-3">Failed to load hot tracks.</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
       ) : songs.length === 0 ? (
         <p className="text-muted-foreground">No trending tracks yet.</p>
       ) : (

@@ -171,7 +171,13 @@ function Page() {
   // the playlists visitors actually expect (Spotify's equivalents) and they
   // used to be unreachable from this page entirely — the route required
   // sign-in and then listed only YOUR playlists.
-  const { data: editorial = [] } = useOfflineList("lists:editorial-playlists", {
+  const {
+    data: editorial = [],
+    isLoading: editorialLoading,
+    isError: editorialFailed,
+    error: editorialError,
+    refetch: retryEditorial,
+  } = useOfflineList("lists:editorial-playlists", {
     queryKey: ["editorial-playlists"],
     queryFn: () => getPublicPlaylists(),
     staleTime: 5 * 60 * 1000,
@@ -190,7 +196,24 @@ function Page() {
           Curated playlists from Wesu+. Create your own once you sign in.
         </p>
 
-        {editorial.length === 0 ? (
+        {editorialFailed ? (
+          // A failed fetch is not the same as an empty catalogue. This used to
+          // render the empty-state copy for BOTH, so every transient network
+          // hiccup lied to the listener: lists existed, the page said none do.
+          <div className="py-16 border border-dashed border-border rounded-2xl text-center">
+            <p className="text-destructive mb-3">
+              Couldn't load playlists. {friendlyError(editorialError, "Try again in a moment.")}
+            </p>
+            <button
+              onClick={() => retryEditorial()}
+              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        ) : editorialLoading ? (
+          <div className="py-16 text-center text-muted-foreground">Loading playlists…</div>
+        ) : editorial.length === 0 ? (
           <div className="py-16 border border-dashed border-border rounded-2xl text-center text-muted-foreground">
             No public playlists yet — browse the catalogue in the meantime.
           </div>
@@ -412,7 +435,7 @@ function Page() {
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
                     <span className={playlist.is_public ? "text-primary font-medium" : ""}>
-                      {playlist.is_public ? "Editorial • Public" : "Personal • Shareable"}
+                      {playlist.is_public ? "Editorial • Public" : "Personal • Private"}
                     </span>
                     {" • "}
                     {songCount} {songCount === 1 ? "song" : "songs"}

@@ -612,6 +612,12 @@ export const usePlayer = create<PlayerState>()(
           shuffle: s.shuffle,
           repeat: s.repeat,
           progressSeconds: s.progressSeconds,
+          // A preview state must survive the reload too, or the restored bar
+          // presents an unbought track at its FULL duration ("0:00 / 5:25")
+          // with no preview cue — promising playback the listener does not
+          // own. With the flag restored, the bar reads as the 15-second it
+          // actually is before any audio resolves.
+          isPreview: s.isPreview,
         }) as PlayerState,
       merge: (persisted: any, current) => {
         const queue: PlayerTrack[] = persisted?.queue ?? [];

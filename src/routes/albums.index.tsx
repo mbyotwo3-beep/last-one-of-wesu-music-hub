@@ -4,6 +4,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { listAlbums } from "@/lib/music.functions";
 import { useOfflineList } from "@/hooks/use-offline-list";
 import { loaderGraceful } from "@/lib/loader-graceful";
+import { friendlyError } from "@/lib/friendly-error";
 import { Disc } from "lucide-react";
 import { StorageImage } from "@/components/StorageImage";
 import { useCurrency } from "@/stores/currency";
@@ -44,19 +45,42 @@ export const Route = createFileRoute("/albums/")({
 });
 
 function AlbumsPage() {
-  const { data: albums = [] } = useOfflineList("lists:albums", {
+  // Loading, failure and genuinely-empty catalogue are three different
+  // states; they used to collapse into one "No albums yet." — see the
+  // artists page for the same fix with its reasoning.
+  const {
+    data: albums = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useOfflineList("lists:albums", {
     queryKey: ["albums"],
     queryFn: () => listAlbums(),
     staleTime: 5 * 60 * 1000,
   });
   const formatPrice = useCurrency((s) => s.formatPrice);
-
   return (
     <div className="min-h-screen pb-24">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-8">Albums &amp; Singles</h1>
 
-        {albums.length === 0 ? (
+        {isLoading ? (
+          <div className="p-12 text-center text-muted-foreground">Loading albums…</div>
+        ) : isError ? (
+          <div className="p-12 border border-dashed border-white/10 rounded-2xl text-center">
+            <p className="text-destructive mb-3">
+              Couldn't load albums. {friendlyError(error, "Try again in a moment.")}
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        ) : albums.length === 0 ? (
           <div className="p-12 border border-dashed border-white/10 rounded-2xl text-center text-muted-foreground">
             No albums yet.
           </div>
