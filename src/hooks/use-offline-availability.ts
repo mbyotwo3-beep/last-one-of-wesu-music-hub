@@ -23,7 +23,7 @@ import {
  * THE THREE INPUTS
  *
  *   connection  — navigator.onLine, edge-triggered
- *   Offline mode — the listener's own switch, persisted across cold starts
+ *   offline state — mirrors the connection itself; the manual switch is retired
  *   vault       — what is actually on this device
  *
  * THE COLD-START PROBLEM
@@ -45,11 +45,11 @@ function subscribeOnline(cb: () => void) {
 }
 
 export interface OfflineAvailability {
-  /** No connection, or Offline mode is on. */
+  /** True while the network is down — the only offline state there is. */
   offline: boolean;
-  /** No connection at all, as opposed to a deliberate Offline mode session. */
+  /** navigator.onLine is false: the connection itself is gone. */
   noConnection: boolean;
-  /** The listener chose downloads-only. */
+  /** The store's flag; kept for API compatibility with the retired switch. */
   modeOn: boolean;
   /** False until the vault has been read once. */
   vaultReady: boolean;

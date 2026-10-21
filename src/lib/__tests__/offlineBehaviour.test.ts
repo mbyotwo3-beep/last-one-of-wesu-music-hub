@@ -7,7 +7,7 @@
  *
  * Two gaps were found in ours:
  *
- *   1. no Offline mode at all — there was no way to ask for a download-only
+ *   1. no implicit offline at all — there was no way to ask for a download-only
  *      session, only to lose the connection;
  *   2. a full vault just threw, so a listener with a large library hit a dead
  *      end and had to delete tracks by hand.

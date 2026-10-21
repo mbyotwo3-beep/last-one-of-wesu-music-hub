@@ -92,12 +92,14 @@ const checks = [
       "hands the player tracks it cannot fetch, and the shelf silently does not play",
   },
   {
-    name: "the two offline states are described differently",
-    ok: /if \(modeOn\) return "Offline mode/.test(player) &&
-      /if \(noConnection\) return "No connection/.test(player),
+    name: "offline is ONE state — one honest message, never a Turn-off offer",
+    ok:
+      /if \(modeOn \|\| noConnection\) \{[\s\S]{0,200}?"You're offline/.test(player) &&
+      !/setEnabled/.test(readFileSync("src/components/OfflineChip.tsx", "utf8")),
     why:
-      "same symptom, different owner — under the mode the listener can tap 'Turn off', " +
-      "but with the network gone that button fixes nothing and misdirects them",
+      "the retired 'Offline mode' switch had its own wording and an escape hatch; " +
+      "implicit offline offers none, so it can only say what is true — these songs " +
+      "are not on this device — and never blame the listener",
   },
   {
     name: "add-to-queue refuses a track that is not on the device",
@@ -115,9 +117,34 @@ const checks = [
     why: "the cold-start regression above, in the pure function",
   },
   {
-    name: "the offline switch is persisted outside localStorage as well",
-    ok: /document\.cookie/.test(readFileSync("src/stores/offline-mode.ts", "utf8")),
-    why: "a WebView with storage blocked would otherwise reset the mode every launch",
+    name: "offline follows the connection — no switch is persisted, shown, or remembered",
+    ok: (() => {
+      const mode = readFileSync("src/stores/offline-mode.ts", "utf8");
+      const downloads = readFileSync("src/components/DownloadsSection.tsx", "utf8");
+      const chip = readFileSync("src/components/OfflineChip.tsx", "utf8");
+      const chipCopy = readFileSync("src/lib/offline-availability.ts", "utf8");
+      const lifecycle = readFileSync("src/components/OfflineLifecycle.tsx", "utf8");
+      return (
+        // The store mirrors the connection on boot (hydrate)…
+        /navigator\.onLine !== false/.test(mode) &&
+        // …and reads NOTHING that a persisted preference once lived in — a
+        // stale "1" from the retired switch must not trap an online phone.
+        !/getItem|setItem|document\.cookie/.test(mode) &&
+        // No switch surface anywhere, and no chip variant offering "Turn off".
+        !/Offline mode/.test(downloads) &&
+        !/useOfflineMode/.test(chip) &&
+        !/turn-off/.test(chipCopy) &&
+        // OfflineLifecycle mirrors the live edges into the store, so a
+        // mid-session signal loss behaves the same as an offline cold start.
+        /went-offline/.test(lifecycle) &&
+        /setEnabled\((true|false)\)/.test(lifecycle)
+      );
+    })(),
+    why:
+      "nothing asks the listener to understand a mode — downloads-only playback is " +
+      "simply what being DISCONNECTED means, the way YouTube and Spotify treat it. " +
+      "A persisted switch left behind would wake an online phone still trapped, and " +
+      "a visible switch would resurrect a concept users never asked for",
   },
 ];
 

@@ -1,107 +1,45 @@
 /**
- * Offline mode — the user-facing switch, mirroring Spotify's.
+ * Offline state — implicit, never a switch.
  *
- * Spotify separates two stores: DOWNLOADS (things the listener explicitly kept,
- * encrypted, app-only, on a 30-day licence) and CACHE (evicted automatically
- * under storage pressure). We already have that split — an AES-GCM vault for
- * downloads and a small snapshot cache for browsing.
+ * WHAT CHANGED (Spotify/YouTube framing)
  *
- * What we did NOT have was Offline mode itself: a switch that says "no network
- * from here on, show me only what I have". Without it, turning on airplane mode
- * leaves the UI offering tracks that cannot possibly play, because nothing
- * consults the vault when building lists or queues.
+ * This used to be the user-facing "Offline mode": a switch on /downloads the
+ * listener used to force downloads-only playback (persisted in a cookie +
+ * localStorage, surviving cold starts). Listeners had to understand and
+ * remember it — exactly the kind of switch nobody actually wants; YouTube and
+ * Spotify get along without one, and our users did not ask for one either.
  *
- * This store is the single source of truth for that switch. It is deliberately
- * tiny and synchronous so anything can read it without awaiting:
+ * So there is no user-facing mode any more. The behaviour the switch used to
+ * produce — only downloaded songs play, browsing degrades to cached data — is
+ * now simply what happens when the NETWORK is down, automatically:
  *
- *   - persisted, so it survives a cold start (the WebView is killed constantly
- *     on mobile, and a mode that resets itself would be useless);
- *   - readable outside React, so the player store can consult it while building
- *     a queue rather than through a hook.
- */
-import { create } from "zustand";
-
-const STORAGE_KEY = "wesu:offline-mode";
-
-/**
- * localStorage with a document.cookie fallback.
+ *   hydrate() mirrors navigator.onLine into `enabled` on boot.
+ *   OfflineLifecycle mirrors the online/offline events into the store, so a
+ *   mid-session signal loss (train, then tunnel) behaves like a cold start:
+ *   downloaded music keeps playing and nothing tries to stream.
+ *   When connectivity returns the store flips back — no stale leftovers.
  *
- * The WebView can run with storage partitioned or blocked, and an
- * IndexedDB-only store would leave the mode silently resetting to off on every
- * cold start — a switch that forgets itself is worse than none. Cookies have
- * survived cases where localStorage has not, so try both.
+ * Consumers (player.ts, use-offline-availability) keep treating `enabled` as
+ * "downloads only" — `mustFilterQueue` is `(modeOn || !online) && vaultReady`,
+ * so decision-making is unchanged; only the source of truth moved.
  *
- * Last write wins, and reads tolerate anything unexpected.
- */
-function readCookie(): boolean | null {
-  try {
-    if (typeof document === "undefined") return null;
-    const hit = /(?:^|;\s*)wesu-offline-mode=([01])/.exec(document.cookie);
-    if (!hit) return null;
-    return hit[1] === "1";
-  } catch {
-    return null;
-  }
-}
-
-function writeCookie(enabled: boolean): void {
-  try {
-    if (typeof document === "undefined") return;
-    const maxAge = enabled ? 60 * 60 * 24 * 365 : 0;
-    // SameSite=Lax so this never rides along on a cross-site request.
-    document.cookie = `wesu-offline-mode=${enabled ? "1" : "0"}; path=/; max-age=${maxAge}; SameSite=Lax`;
-  } catch {
-    /* best effort */
-  }
-}
-
-function readPersisted(): boolean {
-  const cookie = readCookie();
-  if (cookie !== null) return cookie;
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return false;
-    return window.localStorage.getItem(STORAGE_KEY) === "1";
-  } catch {
-    // Private mode / quota. Default to off rather than trapping the listener in
-    // a mode they cannot leave.
-    return false;
-  }
-}
-
-function persist(enabled: boolean): void {
-  writeCookie(enabled);
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    window.localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
-  } catch {
-    /* best effort */
-  }
-}
-
-export interface OfflineModeState {
-  enabled: boolean;
-  /** Turn it on or off, and remember. */
-  setEnabled: (next: boolean) => void;
-  toggle: () => void;
-  /**
-   * Re-read from storage. Called once on mount, because the module is evaluated
-   * during SSR where localStorage does not exist — so the first render must not
-   * assume the browser's value.
-   */
-  hydrate: () => void;
-}
-
-/**
- * Load the vault id index once the mode is on.
+ * setEnabled() stays in the public surface: OfflineLifecycle drives it on
+ * connectivity edges, and tests own it directly. Legacy persisted values from
+ * the switch era are ignored on read rather than migrated: an online phone
+ * with a stale "1" in storage streams again, because that is what being
+ * ONLINE should mean.
  *
- * The player refuses to queue anything not in that index, and it deliberately
- * ignores an index that has not been read yet (so a cold start does not silence
- * playback). The consequence is that the FIRST tap after enabling the mode can
- * slip through unfiltered. Reading the index here closes that window.
+ * The vault index is still primed on every hydrate and every transition into
+ * offline. The player consults that index synchronously and refuses to queue
+ * anything missing from it — and it deliberately ignores an index that has
+ * not been read yet (so a cold start does not silence playback). Reading the
+ * index here closes the "first tap after the signal drops" window.
  *
  * Imported lazily: the vault touches IndexedDB and cannot be evaluated during
  * SSR, and this store is imported by the player, which runs on the server too.
  */
+import { create } from "zustand";
+
 function primeVaultIndex(): void {
   void import("@/lib/offline-vault")
     .then((m) => m.refreshVaultIdCache())
@@ -110,34 +48,47 @@ function primeVaultIndex(): void {
     });
 }
 
-export const useOfflineMode = create<OfflineModeState>((set, get) => ({
-  // Server render: never claim offline mode, or the HTML and the first client
+/** Connectivity from the browser's own signal. SSR-safe: online is the default. */
+export function isCurrentlyOnline(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+export interface OfflineModeState {
+  /** True —ONLY— while the network is down: downloads-only playback. */
+  enabled: boolean;
+  /** Internal + lifecycle-driven: mirror `enabled` to a connectivity change. */
+  setEnabled: (next: boolean) => void;
+  /**
+   * Re-read from connectivity. Called once on mount (the module is evaluated
+   * during SSR where navigator does not exist — the first render must not
+   * assume the browser's reachability).
+   */
+  hydrate: () => void;
+}
+
+export const useOfflineMode = create<OfflineModeState>((set) => ({
+  // Server render: never claim offline, or the HTML and the first client
   // render disagree and React warns.
   enabled: false,
+
   setEnabled: (next) => {
-    persist(next);
     set({ enabled: next });
+    // Going offline must arm the vault index NOW. Waiting for the first
+    // failed stream to lazily read it means the first tap after a signal
+    // loss flows unfiltered into a doomed resolution path.
     if (next) primeVaultIndex();
   },
-  toggle: () => {
-    const next = !get().enabled;
-    persist(next);
-    set({ enabled: next });
-    if (next) primeVaultIndex();
-  },
+
   hydrate: () => {
-    const stored = readPersisted();
-    if (stored !== get().enabled) set({ enabled: stored });
-    // The index is read on EVERY boot, not only when the mode is on.
+    const offline = !isCurrentlyOnline();
+    set({ enabled: offline });
+    // The index is read on EVERY boot, not only when offline.
     //
-    // It used to be conditional on `stored`, and that choice was made when
-    // primeVaultIndex existed to close the "first tap after enabling slips
-    // through" window above. It now also marks the index AS READ, which is the
-    // input the no-connection path in the player and the dimmed rows both gate
-    // on. Leaving it conditional made "vault not read yet" a permanent state for
-    // any listener who never opens the downloads page: a dropped connection
-    // would dim nothing and filter nothing, and the old silent-failure bug was
-    // back for exactly the listener it was fixed for.
+    // It also marks the index AS READ, which is the input the no-connection
+    // path in the player and the dimmed rows both gate on. Leaving it
+    // conditional made "vault not read yet" a permanent state for a listener
+    // who never opens the downloads page: a dropped connection would dim
+    // nothing and filter nothing — the old silent-failure bug, back again.
     //
     // The cold-start guard lives in the READERS (isVaultIndexReady / the
     // planOfflineQueue guard), not here: a boot read that costs one IndexedDB
@@ -148,7 +99,7 @@ export const useOfflineMode = create<OfflineModeState>((set, get) => ({
 }));
 
 /**
- * Read offline mode from outside React.
+ * Read offline state from outside React.
  *
  * `useOfflineMode.getState()` is the live store value, which is what the player
  * needs while building a queue — a hook cannot be called from a store method.

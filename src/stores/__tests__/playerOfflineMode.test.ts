@@ -47,7 +47,8 @@ describe("setQueue with offline mode OFF", () => {
 });
 
 /**
- * No connection, listener's Offline mode OFF.
+ * No connection — the manual mode is retired, so the flag is off and the
+ * connection is the only input.
  *
  * This block exists because that combination was broken and nothing noticed.
  * The player filtered the queue only under the MODE, while the interface already
@@ -88,7 +89,7 @@ describe("setQueue with NO CONNECTION and mode off", () => {
     setCachedVaultIds([]);
     usePlayer.getState().setQueue([t("a"), t("b")], 0);
     // Not the mode's wording — that would blame the listener for the network.
-    expect(usePlayer.getState().error).toMatch(/no connection/i);
+    expect(usePlayer.getState().error).toMatch(/you're offline|no connection/i);
   });
 
   it("plays a downloaded track normally", () => {
@@ -155,7 +156,7 @@ describe("setQueue with offline mode ON", () => {
     const s = usePlayer.getState();
     expect(s.track?.id).toBe("a");
     expect(s.queue.map((x) => x.id)).toEqual(["a", "c"]);
-    expect(s.error).toMatch(/not downloaded|Offline mode/i);
+    expect(s.error).toMatch(/downloaded|offline/i);
   });
 
   it("does not filter while the index has never been read", () => {

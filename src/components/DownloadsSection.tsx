@@ -70,7 +70,7 @@ function VaultCover({ songId, path, alt }: { songId: string; path: string | null
 export function DownloadsSection() {
   const qc = useQueryClient();
   const setQueue = usePlayer((s) => s.setQueue);
-  const { enabled: offlineModeEnabled, setEnabled: setOfflineMode, hydrate } = useOfflineMode();
+  const { hydrate } = useOfflineMode();
   const [mounted, setMounted] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<{ songId: string; title: string } | null>(
     null,
@@ -176,25 +176,11 @@ export function DownloadsSection() {
         )}
       </div>
 
-      {/* The Offline mode switch lives here because this is where a listener goes
-          to manage the device. Spotify keeps it in Settings; on a phone with no
-          settings page, the downloads list is the honest home for it. */}
-      <label className="mb-3 flex items-start gap-3 rounded-xl border border-border bg-card p-3 cursor-pointer">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={offlineModeEnabled}
-          onChange={(e) => setOfflineMode(e.target.checked)}
-        />
-        <span className="text-sm">
-          <span className="font-semibold text-foreground">Offline mode</span>
-          <span className="block text-xs text-muted-foreground mt-0.5">
-            Play only your {list.length} download{list.length === 1 ? "" : "s"}, even with full
-            bars. Tapping anything you have not downloaded will be skipped. Stays on until you turn
-            it off, including after the app is closed.
-          </span>
-        </span>
-      </label>
+      {/* No switch here any more. Offline is implicit now — the app filters to
+          downloads by itself whenever the connection is gone, the way YouTube
+          and Spotify do, so there is nothing for the listener to turn on, keep
+          track of, or forget to turn off. This page stays honest about what IS
+          on the device, which is the part that remains their business. */}
       {list.length === 0 ? (
         <p className="text-muted-foreground">
           No downloads yet — tap the download icon on any bought or free song and it plays here with

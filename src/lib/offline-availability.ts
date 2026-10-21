@@ -33,7 +33,7 @@ export function readOnline(): boolean {
 export interface OfflineState {
   /** `navigator.onLine !== false`. */
   online: boolean;
-  /** The listener's Offline mode switch. */
+  /** The internal downloads-only flag — wired to the connection now, not a switch. */
   modeOn: boolean;
   /** False until the vault index has been read once. */
   vaultReady: boolean;
@@ -76,12 +76,14 @@ export function isUnavailableOffline(inputs: OfflineInputs): boolean {
   return offline && inputs.vaultReady && !inputs.downloaded;
 }
 
-/** The chip's wording, so the two offline states cannot be conflated again. */
+/** The chip's wording. There is one offline state now — the network is down. */
 export function describeOfflineChip(
   online: boolean,
   modeOn: boolean,
-): { label: string; action: "downloads" | "turn-off"; tone: "muted" | "amber" } | null {
-  if (online && !modeOn) return null;
-  if (!online) return { label: "No connection", action: "downloads", tone: "amber" };
-  return { label: "Offline mode", action: "turn-off", tone: "muted" };
+): { label: string; action: "downloads"; tone: "amber" } | null {
+  // `modeOn` exists for signature compatibility with the retired manual switch:
+  // it cannot manufacture an outage. Offline is purely the network's state —
+  // the way YouTube and Spotify treat it — and online means no pill at all.
+  if (online) return null;
+  return { label: "You're offline", action: "downloads", tone: "amber" };
 }

@@ -21,7 +21,7 @@ function readOnline(): boolean {
 }
 
 /**
- * Offline lifecycle: hydrates the Offline mode store and announces the edges.
+ * Offline lifecycle: hydrates the offline store and announces the edges.
  * Renders NOTHING.
  *
  * WHY THIS IS A SEPARATE COMPONENT FROM OfflineChip
@@ -36,7 +36,7 @@ function readOnline(): boolean {
  *
  * Both were needed. Deleting the component wholesale would have silently removed
  * `hydrate()`, which primes the vault index — so the first tap after a cold start
- * under Offline mode would not have been filtered and would have tried to stream.
+ * with the connection down would not have been filtered and would have tried to stream.
  * That is the failure this project has hit repeatedly: removing the visible part
  * and taking the behaviour with it.
  *
@@ -49,10 +49,10 @@ export function OfflineLifecycle() {
   const wasOffline = useRef(false);
   const hydrate = useOfflineMode((s) => s.hydrate);
 
-  // The store boots false because it is evaluated during SSR, where storage does
-  // not exist. Reading it here keeps the first client render in agreement with
-  // what the listener last chose — and primes the vault index, so the very
-  // first tap under Offline mode is filtered rather than slipping through.
+  // The store boots false because it is evaluated during SSR, where navigator
+  // does not exist. Reading it here keeps the first client render in agreement
+  // with actual connectivity — and primes the vault index, so the very first
+  // tap offline is filtered rather than slipping through to a doomed stream.
   useEffect(() => {
     hydrate();
   }, [hydrate]);
@@ -64,15 +64,26 @@ export function OfflineLifecycle() {
       const edge = describeOnlineTransition(prev, now);
       if (edge === "went-offline") {
         wasOffline.current = true;
-      } else if (edge === "went-online" && wasOffline.current) {
-        wasOffline.current = false;
-        toast.success("Back online", {
-          description: "Stream anything, or keep playing downloads.",
-          action: {
-            label: "Browse",
-            onClick: () => navigate({ to: "/browse" }),
-          },
+        // The store IS the offline state now (no user switch any more): mirror
+        // the edge so the player's downloads-only gating reacts the same way a
+        // cold start does. Doing this here also arms the vault index — the
+        // first tap after the signal drops filters instead of streaming.
+        useOfflineMode.getState().setEnabled(true);
+        toast("You're offline", {
+          description: "Downloaded songs keep playing.",
         });
+      } else if (edge === "went-online") {
+        useOfflineMode.getState().setEnabled(false);
+        if (wasOffline.current) {
+          wasOffline.current = false;
+          toast.success("Back online", {
+            description: "Stream anything, or keep playing downloads.",
+            action: {
+              label: "Browse",
+              onClick: () => navigate({ to: "/browse" }),
+            },
+          });
+        }
       }
       prev = now;
     };

@@ -5,7 +5,7 @@
  * logic it was checking, which is why it stayed green when the shipped code
  * broke — so nothing here is a mirror.
  *
- * The behaviour being pinned is Spotify's: with Offline mode on, the player only
+ * The behaviour being pinned is Spotify's: with the connection down, the player only
  * ever holds tracks that are on the device.
  */
 import { describe, expect, it } from "vitest";

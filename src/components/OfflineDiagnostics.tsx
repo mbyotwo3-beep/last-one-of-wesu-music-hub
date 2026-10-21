@@ -121,7 +121,10 @@ export function OfflineDiagnostics() {
           );
           out.push({
             label: "Songs downloaded",
-            ok: meta.length > 0,
+            // Zero downloads is a starting point, not a fault: marking it red
+            // produced "1 thing(s) not ready" for every new listener, which
+            // reads like a broken app when nothing is broken.
+            ok: meta.length === 0 ? null : true,
             detail: meta.length === 0 ? "none yet" : `${meta.length}`,
           });
         } catch {
@@ -162,7 +165,7 @@ export function OfflineDiagnostics() {
           {checks === null
             ? "Checking…"
             : failing.length === 0
-              ? `Working${vaultLine === "No downloads on this device yet" ? "" : ""}. ${vaultLine}.`
+              ? `Everything checks out. ${vaultLine}.`
               : `${failing.length} thing(s) not ready. Tap to see.`}
         </p>
       ) : (

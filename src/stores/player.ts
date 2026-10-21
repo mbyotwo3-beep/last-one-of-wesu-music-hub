@@ -36,15 +36,16 @@ export type { RepeatMode } from "@/stores/play-order";
 /**
  * Why nothing from a shelf could be played, or null if something could.
  *
- * Two separate states reach this point and they must not be described the same
- * way. Under the listener's Offline mode the fix is theirs — one tap to turn it
- * off. With the connection simply gone, telling them to turn off a mode they
- * never enabled sends them looking in the wrong place, and the real fix is to
- * reconnect. Same symptom, different owner.
+ * Two separate states used to reach this point — the connection, and the
+ * listener's own Offline mode switch — and they got different wording. The
+ * switch is retired: offline is only ever the network's state now, one honest
+ * message covers both, and the wording states the fact (these songs are not on
+ * this device) without ever blaming the listener for the network.
  */
 export function explainNothingPlayable(modeOn: boolean, noConnection: boolean) {
-  if (modeOn) return "Offline mode: none of those songs are downloaded on this device.";
-  if (noConnection) return "No connection: none of those songs are downloaded on this device.";
+  if (modeOn || noConnection) {
+    return "You're offline — none of those songs are downloaded on this device.";
+  }
   return null;
 }
 

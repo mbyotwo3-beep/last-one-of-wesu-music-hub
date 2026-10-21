@@ -82,39 +82,25 @@ describe("offline is one rule, used by both the UI and the player", () => {
   });
 });
 
-describe("the chip tells the two offline states apart", () => {
-  // Conflating them sends people to airplane mode when the fix is one tap, or
-  // to their settings when the fix is a cable.
-  it("says nothing while online and the mode is off", () => {
+describe("the chip appears only when the network is gone", () => {
+  // There is exactly one offline state since the manual switch was retired —
+  // the connection itself. Online means no pill at all, and no leftover flag
+  // can conjure one: a pill saying otherwise would lie about the network.
+  it("says nothing while online — even with a leftover mode flag", () => {
     expect(describeOfflineChip(true, false)).toBeNull();
+    expect(describeOfflineChip(true, true)).toBeNull();
   });
 
-  it("offers downloads when the connection is gone", () => {
+  it("says You're offline and offers the one useful destination", () => {
     expect(describeOfflineChip(false, false)).toMatchObject({
-      label: "No connection",
+      label: "You're offline",
       action: "downloads",
+      tone: "amber",
     });
-  });
-
-  it("offers a way out when the listener chose the mode", () => {
-    expect(describeOfflineChip(true, true)).toMatchObject({
-      label: "Offline mode",
-      action: "turn-off",
-    });
-  });
-
-  it("prefers the connection message when both are true", () => {
-    // Only one action is possible with no network, and it is not "turn off".
-    // Saying "Offline mode" here would offer a button that does not fix
-    // anything.
     expect(describeOfflineChip(false, true)?.action).toBe("downloads");
   });
 
-  it("never labels both states the same way", () => {
-    const labels = [
-      describeOfflineChip(false, false)?.label,
-      describeOfflineChip(true, true)?.label,
-    ];
-    expect(new Set(labels).size).toBe(2);
+  it("never offers a Turn off button — nothing was switched on", () => {
+    expect(describeOfflineChip(false, false)?.action).not.toBe("turn-off");
   });
 });
