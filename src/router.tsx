@@ -1,8 +1,15 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { installViewTransitionNoiseFilter } from "./lib/view-transition-noise";
 
 export const getRouter = () => {
+  // Chromium skips View Transitions that it cannot run (hidden tab, a new
+  // transition aborting the old one) and the router's lifecycle promises turn
+  // that skip into an unhandled rejection. Install the benign filter BEFORE
+  // the first navigation can start a transition. SSR no-ops it via the window
+  // guard.
+  installViewTransitionNoiseFilter();
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
