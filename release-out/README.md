@@ -20,6 +20,15 @@ Play Store + sideload deliverables, built from commit `64b733e`
 - Secret scan of packaged assets: 0 service-key leaks (only benign
   "service_role" mentions in bundled JS).
 - `check-store-readiness` gate: green at build time.
+- Native device verification (Android 16 emulator, 2026-10-22): cold launch
+  renders the live store with real catalogue, bottom-tab navigation, Library
+  sign-in gate for anonymous users, airplane-mode cold launch served by the
+  offline shell (171 saved pages) with the "You're offline → Downloads" chip
+  and the full offline-status diagnostics panel, then live recovery after
+  reconnect; `logcat` shows zero fatals/ANRs for `com.wesu.music`.
+- Console-noise gate: Chromium's benign View Transition skip rejection is
+  filtered in-app (commit `589cccb`, shipped to the live site the same day;
+  pinned by `src/lib/__tests__/viewTransitionNoise.test.ts`).
 
 ## iOS (build on your Mac)
 Everything Xcode needs is committed:
