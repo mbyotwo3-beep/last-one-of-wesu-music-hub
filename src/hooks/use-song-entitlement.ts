@@ -6,7 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
  * Whether the signed-in listener may download / fully play a song:
  * free tracks are always fine, paid tracks need a completed single or
  * album purchase (same rule the server enforces in getDownloadAudioUrl),
- * unless the caller is staff or the song's artist owner (same bypasses).
+ * or the caller is the song's artist owner (same exception). There is no
+ * staff override — admins and superadmins buy their music.
  * Used to swap Buy CTAs for Download controls after purchase.
  */
 export function useSongEntitlement(
@@ -67,17 +68,11 @@ function useEntitlementBypass(
     enabled: !!userId && !!songId && paid,
     staleTime: 60_000,
     queryFn: async () => {
-      // Staff bypass mirrors isStaffUser (own user_roles rows are RLS-readable).
-      const [{ data: roles }, { data: song }] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId!)
-          .in("role", ["admin", "superadmin"]),
-        supabase.from("songs").select("artist_id").eq("id", songId!).maybeSingle(),
-      ]);
-      if ((roles?.length ?? 0) > 0) return true;
-      // Owner-artist bypass mirrors the server (artist row owned by caller).
+      // Owner-artist only — this mirrors the server exactly. The staff leg is
+      // gone: admin and superadmin pay for music like any listener, so the UI
+      // keeps showing Buy for paid songs they have not bought instead of
+      // silently swapping in a Download control the server would refuse.
+      const { data: song } = await supabase.from("songs").select("artist_id").eq("id", songId!).maybeSingle();
       const artistId = (song as { artist_id?: string | null } | null)?.artist_id;
       if (!artistId) return false;
       const { data: artist } = await supabase

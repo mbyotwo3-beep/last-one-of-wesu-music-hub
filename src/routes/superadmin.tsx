@@ -944,10 +944,10 @@ function SettingsTab() {
           </span>
         </label>
         <label className="block text-sm">
-          Android app URL (APK or Play Store link)
+          Android app URL (Google Play link)
           <input
             className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            placeholder="https://…"
+            placeholder="https://play.google.com/store/apps/details?id=…"
             value={site.mobile_app_url ?? ""}
             onChange={(e) => setSite({ ...site, mobile_app_url: e.target.value })}
           />
@@ -956,14 +956,16 @@ function SettingsTab() {
           iPhone app URL (App Store link)
           <input
             className="mt-1 w-full px-3 py-2 rounded-lg bg-secondary border border-border"
-            placeholder="https://…"
+            placeholder="https://apps.apple.com/app/id…"
             value={site.ios_app_url ?? ""}
             onChange={(e) => setSite({ ...site, ios_app_url: e.target.value })}
           />
         </label>
         <p className="text-xs text-muted-foreground">
           Mobile browsers that tap Download are sent to /get-app, which shows these links. Leave
-          blank to show a "coming soon" note instead.
+          blank to show a "coming soon" note instead. Every install flows through the stores — the
+          direct APK stays privately reachable at /wesuplus.apk for testers, and /get-app never
+          advertises it.
         </p>
         <button
           disabled={m.isPending}

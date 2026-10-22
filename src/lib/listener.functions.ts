@@ -3,6 +3,29 @@ import { requireSupabaseAuth, optionalSupabaseAuth } from "@/integrations/supaba
 import { getPublicSupabase } from "./supabase-public.server";
 import { isStaffUser, isSuperadminUser } from "./roles";
 
+/**
+ * The ONE purchase-free exception for audio: the artist who uploaded the song.
+ * Everything else — admin and superadmin included — pays exactly what a
+ * listener pays. The old staff bypass ("full playback for QA and moderation")
+ * let an admin's phone play and download every paid song for nothing, which
+ * is a revenue leak and a support trap ("why can't I get that for free?").
+ * Moderation surfaced no consumer of that bypass, so it is gone and the
+ * entitlement rule is a single sentence: a completed purchase, or you own it.
+ */
+async function ownsThisSong(
+  supabase: any,
+  userId: string,
+  song: { artist_id?: string | null },
+): Promise<boolean> {
+  if (!song?.artist_id) return false;
+  const { data: artist } = await supabase
+    .from("artists")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return !!artist && (artist as { id: string }).id === (song as { artist_id: string }).artist_id;
+}
+
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { full_name?: string; bio?: string; avatar_url?: string; location?: string }) => d)
@@ -486,25 +509,17 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       .single();
     if (!song) throw new Error("Song not found");
 
-    // Staff bypass (admin and superadmin) — full playback for QA and moderation
-    const isStaff = await isStaffUser(context.supabase, context.userId);
-
-    // Check if the caller is the artist who uploaded this song
-    let isOwnerArtist = false;
-    if (!isStaff && (song as any).artist_id) {
-      const { data: artist } = await context.supabase
-        .from("artists")
-        .select("id")
-        .eq("user_id", context.userId)
-        .maybeSingle();
-      if (artist && (artist as any).id === (song as any).artist_id) {
-        isOwnerArtist = true;
-      }
-    }
+    // The one purchase-free exception: the artist who uploaded this song can
+    // hear their own upload. There is NO staff ride any more — admin and
+    // superadmin used to get full playback and downloads of every paid song
+    // "for QA and moderation", which meant an admin phone accessed everything
+    // without buying. Paid music means one thing everywhere: a completed
+    // purchase.
+    const isOwnerArtist = await ownsThisSong(context.supabase, context.userId, song);
 
     // Free if priced 0, purchased individually, purchased with its album,
-    // accessed by staff, or accessed by the song's artist owner.
-    if (!isStaff && !isOwnerArtist && (song as any).price && Number((song as any).price) > 0) {
+    // or accessed by the song's artist owner.
+    if (!isOwnerArtist && (song as any).price && Number((song as any).price) > 0) {
       const albumId = (song as any).album_id as string | null;
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
@@ -565,20 +580,10 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
     if (songError) throw new Error(songError.message);
     if (!song || song.status !== "approved") throw new Error("Song is not available for download");
 
-    const isStaff = await isStaffUser(context.supabase, context.userId);
-    let isOwnerArtist = false;
-    if (!isStaff && (song as any).artist_id) {
-      const { data: artist } = await context.supabase
-        .from("artists")
-        .select("id")
-        .eq("user_id", context.userId)
-        .maybeSingle();
-      if (artist && (artist as any).id === (song as any).artist_id) {
-        isOwnerArtist = true;
-      }
-    }
-
-    if (!isStaff && !isOwnerArtist && Number(song.price ?? 0) > 0) {
+    const isOwnerArtist = await ownsThisSong(context.supabase, context.userId, song);
+    // Everyone who is not the song's own artist needs a completed purchase —
+    // staff included. See getSignedAudioUrl for why the staff ride is gone.
+    if (!isOwnerArtist && Number(song.price ?? 0) > 0) {
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
           .from("purchases")

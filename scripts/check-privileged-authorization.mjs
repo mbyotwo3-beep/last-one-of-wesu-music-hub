@@ -115,6 +115,79 @@ for (const file of PRIVILEGED) {
   }
 }
 
+// --- 5. paid content is not free for staff
+//
+// getSignedAudioUrl and getDownloadAudioUrl used to hand FULL playback and
+// permanent downloads of every paid song to any admin or superadmin with no
+// purchase ("staff bypass — QA and moderation"). In practice that meant a
+// superadmin's phone accessed everything without buying — a straight revenue
+// leak, and a support trap the moment anyone else is granted an admin role.
+// entitlement is now one rule: completed purchase, or the song's own artist.
+// Moderation lost nothing: no admin surface ever consumed that bypass.
+const listenerFunctions = "src/lib/listener.functions.ts";
+if (existsSync(listenerFunctions)) {
+  const src = readFileSync(listenerFunctions, "utf8");
+  const starts = [...src.matchAll(/export const (\w+) = createServerFn/g)];
+  const bodyOf = (name) => {
+    const i = starts.findIndex((m) => m[1] === name);
+    if (i === -1) return null;
+    const to = i + 1 < starts.length ? starts[i + 1].index : src.length;
+    return src.slice(starts[i].index, to);
+  };
+  for (const name of ["getSignedAudioUrl", "getDownloadAudioUrl"]) {
+    const body = bodyOf(name);
+    if (body === null) {
+      problems.push(
+        `${listenerFunctions}: ${name} is missing — the playback/download entitlement\n` +
+          "          surface must not be renamed silently",
+      );
+      continue;
+    }
+    // Braces are sliced, then comments stripped — a comment like "this used to
+    // call isStaffUser" matches prose in a naive wildcard scan, not the code
+    // (same trap as the ServiceWorkerController negatives).
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+    if (/\bisStaffUser\b/.test(code)) {
+      problems.push(
+        `${listenerFunctions}: ${name} still calls isStaffUser — staff used to ride free\n` +
+          "          on every paid song; the only purchase-free access is the song's own artist",
+      );
+    }
+    if (!/\bisOwnerArtist\b/.test(code)) {
+      problems.push(
+        `${listenerFunctions}: ${name} lost the owner-artist path — artists would no\n` +
+          "          longer be able to hear their own uploads",
+      );
+    }
+    notes.push(`${name}: paid songs require a purchase for everyone but the song's own artist`);
+  }
+} else {
+  problems.push(`${listenerFunctions} is missing — the entitlement functions cannot be checked`);
+}
+
+// The client mirror must agree with the server, or the UI offers an access
+// button the server then refuses — and, worse, must not keep consulting
+// user_roles to hand admin/superadmin a free pass the server no longer grants.
+//
+// Comments are stripped first: the file legitimately EXPLAINS the removed
+// bypass in prose, and a naive scan matches the explanation rather than the
+// code (same trap as the ServiceWorkerController negatives in
+// check-app-distribution.mjs).
+const entitlementHook = "src/hooks/use-song-entitlement.ts";
+if (existsSync(entitlementHook)) {
+  const code = readFileSync(entitlementHook, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  if (/\b(admin|superadmin|user_roles)\b/.test(code)) {
+    problems.push(
+      `${entitlementHook}: the entitlement mirror still consults user_roles / admin roles —\n` +
+        "          the server charges staff now, and the UI free-passing them desyncs the two",
+    );
+  } else {
+    notes.push("use-song-entitlement mirrors the owner-artist rule only");
+  }
+}
+
 console.log("  privileged functions verify who is calling");
 for (const n of notes) console.log(`    ${n}`);
 if (problems.length) {

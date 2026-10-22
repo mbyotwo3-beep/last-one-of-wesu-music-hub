@@ -1,19 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import {
-  Smartphone,
-  Download,
-  ArrowLeft,
-  Music2,
-  WifiOff,
-  CheckCircle2,
-  Package,
-} from "lucide-react";
+import { Smartphone, Download, ArrowLeft, Music2, WifiOff, CheckCircle2 } from "lucide-react";
 import { getSiteConfig } from "@/lib/pricing.functions";
-import { isNativeShell, openExternalUrl } from "@/lib/external-url";
+import { openExternalUrl } from "@/lib/external-url";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
 import { GetTheApp } from "@/components/GetTheApp";
-import { useIsMobile, useIsNative } from "@/hooks/use-platform";
+import { useIsNative } from "@/hooks/use-platform";
 
 const siteQO = queryOptions({
   queryKey: ["site-config"],
@@ -42,10 +34,6 @@ export const Route = createFileRoute("/get-app")({
   ),
 });
 
-/** Direct APK hosted in /public — always available as a fallback. */
-const DIRECT_APK_URL = "/wesuplus.apk";
-const APK_VERSION = "1.0"; // bump this when you ship a new APK
-
 const features = [
   {
     icon: Download,
@@ -67,28 +55,22 @@ const features = [
 function GetAppPage() {
   const { data: site } = useSuspenseQuery(siteQO);
   const isNative = useIsNative();
-  const isMobile = useIsMobile();
 
-  // Admin-configured store links take priority (set in /admin → Settings).
-  // Fall back to the direct APK hosted in /public when they are not set yet.
+  // Admin-configured store links take priority (set in /superadmin → Settings).
+  // INSTALLS GO THROUGH THE STORES — this page offers Google Play and the App
+  // Store and nothing else. It used to fall back to the direct sideload APK
+  // with "install unknown apps" instructions and a USB-transfer card, which
+  // buried every page in Android talk. The APK is still HOSTED for testers at
+  // /wesuplus.apk, it is just never offered here: paste each link in Settings
+  // and its button appears below.
   const androidStoreUrl = site?.mobile_app_url?.trim() || "";
   const iosUrl = site?.ios_app_url?.trim() || "";
+  const hasAnyStore = !!(androidStoreUrl || iosUrl);
 
-  // Use store link if available, otherwise the direct APK
-  const androidUrl = androidStoreUrl || DIRECT_APK_URL;
-  const usingDirectApk = !androidStoreUrl;
-
-  function handleAndroidClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  function openExternalInShell(e: React.MouseEvent<HTMLAnchorElement>, url: string) {
     if (isNative) {
       e.preventDefault();
-      void openExternalUrl(androidUrl);
-    }
-  }
-
-  function handleIosClick(e: React.MouseEvent<HTMLAnchorElement>) {
-    if (isNative) {
-      e.preventDefault();
-      void openExternalUrl(iosUrl);
+      void openExternalUrl(url);
     }
   }
 
@@ -107,7 +89,7 @@ function GetAppPage() {
             It moved here from /downloads, which is now the plain list of a
             listener's music: people landing there from a player notice want
             their songs, not install options. This page is where they arrive
-            already asking, so both install routes — this panel and the APK
+            already asking, so both install routes — this panel and the store
             buttons below — belong side by side. The panel hides itself inside
             the installed app. */}
         <GetTheApp />
@@ -117,12 +99,10 @@ function GetAppPage() {
           <div className="mx-auto mb-5 flex size-24 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20 shadow-lg">
             <img src="/images/wesu-logo.png" alt="Wesu+" className="h-14 w-auto" />
           </div>
-          <h1 className="text-4xl font-black tracking-tight mb-3">
-            Take Wesu+ anywhere
-          </h1>
+          <h1 className="text-4xl font-black tracking-tight mb-3">Take Wesu+ anywhere</h1>
           <p className="text-muted-foreground text-lg leading-relaxed max-w-md mx-auto">
-            Get the mobile app for offline listening, background play, and a native
-            music experience — on Google Play and the App Store.
+            Get the mobile app for offline listening, background play, and a native music experience
+            — on Google Play and the App Store.
           </p>
         </div>
 
@@ -144,83 +124,44 @@ function GetAppPage() {
           ))}
         </div>
 
-        {/* Download buttons */}
-        <div className="flex flex-col gap-3 mb-8">
-          {/* Android / APK */}
-          <a
-            href={androidUrl}
-            download={usingDirectApk ? `wesuplus-v${APK_VERSION}.apk` : undefined}
-            onClick={handleAndroidClick}
-            className="group relative inline-flex items-center justify-center gap-3 rounded-2xl bg-primary px-6 py-4 font-bold text-primary-foreground hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
-          >
-            <Smartphone className="size-5" />
-            <span>
-              {usingDirectApk
-                ? `Download APK (v${APK_VERSION} · Android)`
-                : "Get it on Google Play"}
-            </span>
-            {usingDirectApk && (
-              <span className="absolute -top-2 -right-2 text-[10px] bg-green-500 text-white font-bold px-2 py-0.5 rounded-full shadow">
-                FREE
-              </span>
+        {/* Download buttons — the stores only, no APK on this page. When no
+            store link is published yet, say so plainly; never fall back to
+            offering the sideload APK: installs decide once, and every install
+            afterwards needs the store's update path. Testers keep the direct
+            APK by private link. */}
+        {hasAnyStore ? (
+          <div className="flex flex-col gap-3 mb-8">
+            {androidStoreUrl && (
+              <a
+                href={androidStoreUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => openExternalInShell(e, androidStoreUrl)}
+                className="group relative inline-flex items-center justify-center gap-3 rounded-2xl bg-primary px-6 py-4 font-bold text-primary-foreground hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
+              >
+                <Smartphone className="size-5" />
+                <span>Get it on Google Play</span>
+              </a>
             )}
-          </a>
-
-          {/* Direct APK secondary if store link is set */}
-          {!usingDirectApk && (
-            <a
-              href={DIRECT_APK_URL}
-              download={`wesuplus-v${APK_VERSION}.apk`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-3.5 text-sm font-semibold hover:bg-accent transition-all"
-            >
-              <Package className="size-4" />
-              Direct APK download (v{APK_VERSION})
-            </a>
-          )}
-
-          {/* iOS */}
-          {iosUrl && (
-            <a
-              href={iosUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleIosClick}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-4 font-bold hover:bg-accent transition-all"
-            >
-              <Smartphone className="size-5" />
-              Get it on the App Store
-            </a>
-          )}
-        </div>
-
-        {/* Install instructions (only show for direct APK on mobile browser) */}
-        {usingDirectApk && isMobile && !isNative && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 mb-6">
-            <p className="text-sm font-semibold text-amber-200 mb-2">
-              How to install the APK
-            </p>
-            <ol className="space-y-1.5 text-sm text-amber-200/80 list-decimal list-inside">
-              <li>Tap the button above to download the APK</li>
-              <li>Open your Downloads folder and tap the file</li>
-              <li>
-                If prompted, allow <strong>Install unknown apps</strong> for your
-                browser in Settings
-              </li>
-              <li>Tap Install — it takes a few seconds</li>
-              <li>Sign in with your Wesu+ account</li>
-            </ol>
+            {iosUrl && (
+              <a
+                href={iosUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => openExternalInShell(e, iosUrl)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-4 font-bold hover:bg-accent transition-all"
+              >
+                <Smartphone className="size-5" />
+                Get it on the App Store
+              </a>
+            )}
           </div>
-        )}
-
-        {/* Desktop info card (direct-APK route only — once the store links are
-            set, installing is one tap and these transfer steps are obsolete) */}
-        {usingDirectApk && !isMobile && !isNative && (
-          <div className="rounded-2xl border border-border bg-card p-5 mb-6">
-            <p className="text-sm font-semibold mb-1">Downloading on a computer?</p>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-5 mb-8 text-center">
+            <p className="text-sm font-semibold mb-1">Wesu+ is coming to the app stores</p>
             <p className="text-sm text-muted-foreground">
-              Transfer the APK to your Android phone via USB or Google Drive, then
-              install it from your Downloads folder. Alternatively, open this page on
-              your phone to install directly.
+              Find it on Google Play and the App Store once each release is live — the install
+              buttons appear here as they go public.
             </p>
           </div>
         )}
