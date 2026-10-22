@@ -12,6 +12,7 @@ import {
 import { getSiteConfig } from "@/lib/pricing.functions";
 import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
+import { GetTheApp } from "@/components/GetTheApp";
 import { useIsMobile, useIsNative } from "@/hooks/use-platform";
 
 const siteQO = queryOptions({
@@ -101,6 +102,15 @@ function GetAppPage() {
         >
           <ArrowLeft className="size-4" /> Back home
         </Link>
+
+        {/* The install panel (PWA prompt + iOS Add to Home Screen guidance).
+            It moved here from /downloads, which is now the plain list of a
+            listener's music: people landing there from a player notice want
+            their songs, not install options. This page is where they arrive
+            already asking, so both install routes — this panel and the APK
+            buttons below — belong side by side. The panel hides itself inside
+            the installed app. */}
+        <GetTheApp />
 
         {/* Hero */}
         <div className="text-center mb-10">

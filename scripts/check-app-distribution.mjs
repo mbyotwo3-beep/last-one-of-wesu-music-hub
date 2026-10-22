@@ -58,18 +58,30 @@ if (existsSync(HOMEPAGE)) {
   problems.push("src/routes/index.tsx is missing");
 }
 
-// --- 3. the /downloads panel still exists
+// --- 3. the install panel and the APK link still have a deliberate home
 //
-// Kept on /downloads only. That page is reached deliberately, by someone already
-// looking at their offline music, and it is where a Play-Store link belongs
-// while the APK link is reserved for us to share by hand.
+// GetTheApp is the PWA-prompt / iOS-help panel (it captures beforeinstallprompt
+// so Chrome's own mini-infobar does not compete with ours). It lives on /get-app,
+// the page people visit on purpose asking for the app, next to the APK buttons.
+// /downloads must NOT carry it: that page used to be a stack of promos and
+// diagnostics above the listener's actual music, and it is now a plain list —
+// someone arriving from a player notice wants their songs, not install options.
 if (!existsSync("src/components/GetTheApp.tsx")) {
-  problems.push("src/components/GetTheApp.tsx is missing — /downloads has no install panel");
+  problems.push("src/components/GetTheApp.tsx is missing — /get-app has no install panel");
 } else {
   const src = readFileSync("src/components/GetTheApp.tsx", "utf8");
+  const getAppPage = "src/routes/get-app.tsx";
+  if (!existsSync(getAppPage)) {
+    problems.push("src/routes/get-app.tsx is missing — the install panel has no page");
+  } else if (!readFileSync(getAppPage, "utf8").includes("<GetTheApp")) {
+    problems.push("GetTheApp exists but is not rendered on /get-app");
+  }
   const dl = "src/routes/downloads.tsx";
-  if (existsSync(dl) && !readFileSync(dl, "utf8").includes("<GetTheApp")) {
-    problems.push("GetTheApp exists but is not rendered on /downloads");
+  if (existsSync(dl) && /<GetTheApp/.test(readFileSync(dl, "utf8"))) {
+    problems.push(
+      "GetTheApp is rendered on /downloads again — the offline list must stay a\n" +
+        "        plain list; the install panel belongs on /get-app",
+    );
   }
   // beforeinstallprompt must be preventDefault()ed, or Chrome also shows its own
   // mini-infobar and the listener gets two competing prompts.

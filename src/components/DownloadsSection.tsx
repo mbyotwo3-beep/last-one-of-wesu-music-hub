@@ -62,10 +62,10 @@ function VaultCover({ songId, path, alt }: { songId: string; path: string | null
 }
 
 /**
- * Offline downloads living in the encrypted on-device vault. Fully usable
- * with zero connectivity (metadata + audio + covers are all local) — this
- * is the "offline mode" destination the player links to when streaming is
- * unavailable.
+ * Downloaded songs living in the encrypted on-device vault. Fully usable
+ * with zero connectivity (metadata + audio + covers are all local) — the
+ * plain list the player links to when streaming is unavailable, mounted on
+ * /downloads and at the top of the library.
  */
 export function DownloadsSection() {
   const qc = useQueryClient();
@@ -118,7 +118,7 @@ export function DownloadsSection() {
   if (!isVaultSupported()) {
     return (
       <section className="mb-10">
-        <h2 className="text-xl font-semibold mb-3">Downloads on this device</h2>
+        <h2 className="text-xl font-semibold mb-3">Downloaded</h2>
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
           <p className="text-sm text-foreground font-medium">
             This phone can&apos;t store downloads
@@ -163,7 +163,7 @@ export function DownloadsSection() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Download className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold">Downloads on this device</h2>
+          <h2 className="text-xl font-semibold">Downloaded</h2>
         </div>
         {list.length > 0 && (
           <button

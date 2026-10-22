@@ -266,17 +266,33 @@ if (dlButton) {
   }
 }
 
-// --- offline mode must be reachable on a phone, not buried on /downloads
+// --- offline-facing pages must stay free of diagnostics language
+//
+// The diagnostics panel headline ("2 thing(s) not ready") reads as a fault
+// report to a listener whose phone has simply lost signal — zero downloads and
+// no connection are starting points, not failures. It belongs only where
+// something is actually broken: the OfflineRouteNotice someone reaches when a
+// route could not be served at all. /downloads itself is just the music.
 const downloads = read("src/routes/downloads.tsx");
 if (!downloads) {
-  problems.push("src/routes/downloads.tsx is missing — the offline switch is unreachable");
-} else if (!/OfflineDiagnostics/.test(downloads)) {
+  problems.push("src/routes/downloads.tsx is missing — the offline list is unreachable");
+} else if (/OfflineDiagnostics/.test(downloads)) {
   problems.push(
-    "/downloads does not render OfflineDiagnostics — a listener reporting broken\n" +
-      "        offline has nothing to show us",
+    "/downloads renders OfflineDiagnostics — a listener with no signal is shown a\n" +
+      "        fault report instead of their music. Diagnostics belong on the\n" +
+      "        OfflineRouteNotice, where a page actually failed to load.",
   );
 } else {
-  notes.push("/downloads shows offline status");
+  const notice = read("src/components/OfflineRouteNotice.tsx");
+  if (!notice || !/OfflineDiagnostics/.test(notice)) {
+    problems.push(
+      "OfflineRouteNotice does not render OfflineDiagnostics — nothing anywhere\n" +
+        "        explains why offline is failing, and support screenshots lose\n" +
+        "        their one source of truth",
+    );
+  } else {
+    notes.push("diagnostics only where a route truly failed; /downloads is a plain list");
+  }
 }
 
 // --- scroll restoration: returning to a long list should keep your place
