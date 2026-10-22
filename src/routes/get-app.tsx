@@ -28,7 +28,7 @@ export const Route = createFileRoute("/get-app")({
       {
         name: "description",
         content:
-          "Download the Wesu+ Android app for offline listening, background play and more.",
+          "Get the Wesu+ mobile app for Google Play or the App Store — offline listening, background play and more.",
       },
     ],
   }),
@@ -121,8 +121,8 @@ function GetAppPage() {
             Take Wesu+ anywhere
           </h1>
           <p className="text-muted-foreground text-lg leading-relaxed max-w-md mx-auto">
-            Download the Android app for offline listening, background play, and a
-            native music experience.
+            Get the mobile app for offline listening, background play, and a native
+            music experience — on Google Play and the App Store.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ function GetAppPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-4 font-bold hover:bg-accent transition-all"
             >
               <Smartphone className="size-5" />
-              Download for iPhone
+              Get it on the App Store
             </a>
           )}
         </div>
@@ -212,8 +212,9 @@ function GetAppPage() {
           </div>
         )}
 
-        {/* Desktop info card */}
-        {!isMobile && !isNative && (
+        {/* Desktop info card (direct-APK route only — once the store links are
+            set, installing is one tap and these transfer steps are obsolete) */}
+        {usingDirectApk && !isMobile && !isNative && (
           <div className="rounded-2xl border border-border bg-card p-5 mb-6">
             <p className="text-sm font-semibold mb-1">Downloading on a computer?</p>
             <p className="text-sm text-muted-foreground">

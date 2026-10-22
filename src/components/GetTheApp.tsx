@@ -132,7 +132,7 @@ export function GetTheApp() {
               ? "Install it for fullscreen playback, an icon on your home screen, and music that plays with no data."
               : showIos
                 ? "Add it to your home screen for fullscreen playback and offline music."
-                : `The Android app is ${APK_SIZE_MB} MB. Downloads keep working here in the browser too — the app just makes them easier to reach.`}
+                : `The app is ${APK_SIZE_MB} MB. Downloads keep working here in the browser too — the app just makes them easier to reach.`}
           </p>
 
           {showIosHelp ? (

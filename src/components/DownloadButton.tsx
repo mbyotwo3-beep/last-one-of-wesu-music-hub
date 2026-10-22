@@ -190,7 +190,7 @@ export function DownloadButton({
       <Link
         to="/get-app"
         className="inline-flex size-11 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full bg-secondary border border-border text-foreground transition-colors hover:bg-accent"
-        aria-label="Offline downloads are available in the Wesu+ Android app"
+        aria-label="Offline downloads are available in the Wesu+ mobile app"
         title="Offline downloads are available in the Wesu+ app"
       >
         <Download className={iconClass} />

@@ -400,7 +400,7 @@ export function BottomTabBar() {
               </button>
             ) : null}
 
-            {/* Get App — hidden inside the native APK */}
+            {/* Get the mobile app — hidden inside the native shell */}
             {!isNative && (
               <>
                 <h3 className="px-3 mb-2 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -414,7 +414,7 @@ export function BottomTabBar() {
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
                   <Smartphone className="size-5" />
-                  <span className="text-sm font-medium">Get the Android App</span>
+                  <span className="text-sm font-medium">Get Mobile App</span>
                 </button>
               </>
             )}
