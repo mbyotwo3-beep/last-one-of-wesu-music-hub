@@ -12,7 +12,19 @@ import { execFileSync } from "node:child_process";
  * Line-based, and the mutation must actually apply or it reports SKIP.
  */
 const FILE = "src/routes/library.tsx";
-const TEST = "src/routes/__tests__/library-render.test.tsx";
+// The test files here carry a leading dash on purpose ("-library-render.test.tsx"
+// sorts ahead of every other test). The old path without the dash did not exist:
+// every mutation "failed" its run because vitest could not collect a
+// nonexistent file, so the negative checks passed vacuously while the restored
+// check — the one that proves the suite still holds — always reported FAIL.
+const TEST = "src/routes/__tests__/-library-render.test.tsx";
+
+import { existsSync } from "node:fs";
+for (const [label, path] of [["library route", FILE], ["test file", TEST]]) {
+  if (!existsSync(path)) {
+    throw new Error(`${label} is missing: ${path} — the gate cannot prove anything about absent code`);
+  }
+}
 
 const eol = readFileSync(FILE, "utf8").includes("\r\n") ? "\r\n" : "\n";
 
