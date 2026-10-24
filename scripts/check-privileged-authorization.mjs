@@ -115,15 +115,20 @@ for (const file of PRIVILEGED) {
   }
 }
 
-// --- 5. paid content is not free for staff
+// --- 5. staff (admin + superadmin) ride free on paid music — deliberate
 //
-// getSignedAudioUrl and getDownloadAudioUrl used to hand FULL playback and
-// permanent downloads of every paid song to any admin or superadmin with no
-// purchase ("staff bypass — QA and moderation"). In practice that meant a
-// superadmin's phone accessed everything without buying — a straight revenue
-// leak, and a support trap the moment anyone else is granted an admin role.
-// entitlement is now one rule: completed purchase, or the song's own artist.
-// Moderation lost nothing: no admin surface ever consumed that bypass.
+// History: getSignedAudioUrl and getDownloadAudioUrl carried a staff bypass
+// that any admin or superadmin rode for full playback and permanent downloads
+// of every paid song ("QA and moderation"). Removed in fa36ac6 (2026-10-23);
+// owners subsequently decided a superadmin phone must reach every song,
+// including offline downloads, without buying — the bypass was restored on
+// 2026-10-24 as an explicit product decision.
+//
+// This gate now pins the PRESENCE of the staff leg (and the owner-artist leg)
+// in both server functions, so a future refactor cannot silently drop the
+// staff ride (or narrow it to shapes the client no longer mirrors). Comments
+// are stripped before scanning: the comment below explains the history and a
+// naive wildcard scan would match prose, not code.
 const listenerFunctions = "src/lib/listener.functions.ts";
 if (existsSync(listenerFunctions)) {
   const src = readFileSync(listenerFunctions, "utf8");
@@ -143,14 +148,21 @@ if (existsSync(listenerFunctions)) {
       );
       continue;
     }
-    // Braces are sliced, then comments stripped — a comment like "this used to
-    // call isStaffUser" matches prose in a naive wildcard scan, not the code
+    // Braces are sliced, then comments stripped — a comment like "restored the
+    // isStaffUser call" matches prose in a naive wildcard scan, not the code
     // (same trap as the ServiceWorkerController negatives).
     const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-    if (/\bisStaffUser\b/.test(code)) {
+    if (!/\bisStaffUser\s*\(/.test(code)) {
       problems.push(
-        `${listenerFunctions}: ${name} still calls isStaffUser — staff used to ride free\n` +
-          "          on every paid song; the only purchase-free access is the song's own artist",
+        `${listenerFunctions}: ${name} lost the staff leg — admin and superadmin must\n` +
+          "          ride free on paid music (QA and moderation), restored 2026-10-24",
+      );
+    }
+    if (!/!isStaff\s*&&\s*!isOwnerArtist/.test(code)) {
+      problems.push(
+        `${listenerFunctions}: ${name} no longer orders the paid gate as\n` +
+          "          (!isStaff && !isOwnerArtist) — the staff and owner-artist\n" +
+          "          exceptions must both short-circuit the purchase requirement",
       );
     }
     if (!/\bisOwnerArtist\b/.test(code)) {
@@ -159,33 +171,37 @@ if (existsSync(listenerFunctions)) {
           "          longer be able to hear their own uploads",
       );
     }
-    notes.push(`${name}: paid songs require a purchase for everyone but the song's own artist`);
+    notes.push(`${name}: staff (admin/superadmin) and the song's own artist ride free; everyone else needs a completed purchase`);
   }
 } else {
   problems.push(`${listenerFunctions} is missing — the entitlement functions cannot be checked`);
 }
 
-// The client mirror must agree with the server, or the UI offers an access
-// button the server then refuses — and, worse, must not keep consulting
-// user_roles to hand admin/superadmin a free pass the server no longer grants.
-//
-// Comments are stripped first: the file legitimately EXPLAINS the removed
-// bypass in prose, and a naive scan matches the explanation rather than the
-// code (same trap as the ServiceWorkerController negatives in
-// check-app-distribution.mjs).
+// The client mirror must agree with the server, or the UI offers a Buy button
+// to a staff member whom the server then plays (and downloads) for free — a
+// desync that shows in the app the moment a superadmin opens a paid song.
+// The staff leg consults user_roles (own rows are RLS-readable); that must
+// stay. Comments are stripped first — the file explains history in prose and
+// a naive scan matches the explanation rather than the code (same trap as the
+// negatives gates).
 const entitlementHook = "src/hooks/use-song-entitlement.ts";
 if (existsSync(entitlementHook)) {
   const code = readFileSync(entitlementHook, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/[^\n]*/g, "");
-  if (/\b(admin|superadmin|user_roles)\b/.test(code)) {
+  if (!(/\.from\("user_roles"\)/.test(code) && /\bin\("role",\s*\["admin",\s*"superadmin"\]\)/.test(code))) {
     problems.push(
-      `${entitlementHook}: the entitlement mirror still consults user_roles / admin roles —\n` +
-        "          the server charges staff now, and the UI free-passing them desyncs the two",
+      `${entitlementHook}: the staff leg (user_roles admin/superadmin select) is missing —\n` +
+        "          the mirror must keep granting staff the same ride the server does",
     );
-  } else {
-    notes.push("use-song-entitlement mirrors the owner-artist rule only");
   }
+  if (!/\bartist_id\b/.test(code)) {
+    problems.push(
+      `${entitlementHook}: the owner-artist leg is missing — artists would see Buy\n` +
+        "          on their own uploads",
+    );
+  }
+  notes.push("use-song-entitlement mirrors the staff ride + owner-artist rule");
 }
 
 console.log("  privileged functions verify who is calling");

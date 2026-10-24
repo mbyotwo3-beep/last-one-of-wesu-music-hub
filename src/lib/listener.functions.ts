@@ -509,17 +509,17 @@ export const getSignedAudioUrl = createServerFn({ method: "POST" })
       .single();
     if (!song) throw new Error("Song not found");
 
-    // The one purchase-free exception: the artist who uploaded this song can
-    // hear their own upload. There is NO staff ride any more — admin and
-    // superadmin used to get full playback and downloads of every paid song
-    // "for QA and moderation", which meant an admin phone accessed everything
-    // without buying. Paid music means one thing everywhere: a completed
-    // purchase.
+    // Staff ride — admin and superadmin get full playback of every song for QA
+    // and moderation, without a purchase. Removed 2026-10-23 (fa36ac6), then
+    // restored 2026-10-24 as an explicit product decision: a superadmin phone
+    // must reach every song, including offline downloads. The other
+    // purchase-free exception is the song's own artist.
+    const isStaff = await isStaffUser(context.supabase, context.userId);
     const isOwnerArtist = await ownsThisSong(context.supabase, context.userId, song);
 
     // Free if priced 0, purchased individually, purchased with its album,
-    // or accessed by the song's artist owner.
-    if (!isOwnerArtist && (song as any).price && Number((song as any).price) > 0) {
+    // accessed by staff, or accessed by the song's artist owner.
+    if (!isStaff && !isOwnerArtist && (song as any).price && Number((song as any).price) > 0) {
       const albumId = (song as any).album_id as string | null;
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
@@ -580,10 +580,11 @@ export const getDownloadAudioUrl = createServerFn({ method: "POST" })
     if (songError) throw new Error(songError.message);
     if (!song || song.status !== "approved") throw new Error("Song is not available for download");
 
+    const isStaff = await isStaffUser(context.supabase, context.userId);
     const isOwnerArtist = await ownsThisSong(context.supabase, context.userId, song);
-    // Everyone who is not the song's own artist needs a completed purchase —
-    // staff included. See getSignedAudioUrl for why the staff ride is gone.
-    if (!isOwnerArtist && Number(song.price ?? 0) > 0) {
+    // Staff and the song's own artist ride free; everyone else needs a
+    // completed purchase before the download URL is minted.
+    if (!isStaff && !isOwnerArtist && Number(song.price ?? 0) > 0) {
       const [{ data: songPurchase }, { data: albumPurchase }] = await Promise.all([
         context.supabase
           .from("purchases")
