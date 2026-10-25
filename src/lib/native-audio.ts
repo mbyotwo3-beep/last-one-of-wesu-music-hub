@@ -440,6 +440,7 @@ export async function playNative(id: string): Promise<boolean> {
  */
 export async function resumeNative(id: string): Promise<boolean> {
   markNativeCommand();
+  __dbg("resumeNative sel-state playing=" + (Date.now() % 100000));
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.resume({ assetId: id });
@@ -454,6 +455,7 @@ export async function resumeNative(id: string): Promise<boolean> {
  */
 export async function pauseNative(id: string): Promise<void> {
   markNativeCommand();
+  __dbg("pauseNative <- " + (new Error().stack ?? "").split("\n").slice(1, 4).join(" | "));
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.pause({ assetId: id });
@@ -704,6 +706,45 @@ let lastNativeCommandAt = 0;
  *  lock screen". */
 export function markNativeCommand() {
   lastNativeCommandAt = Date.now();
+}
+
+// TEMP DIAGNOSTICS (remove before final): DOM overlay tracing play-state
+// changes + the JS stack of every native pause/resume/play command.
+function __dbg(msg: string) {
+  try {
+    const w = window as any;
+    w.__wesuDbg = w.__wesuDbg ?? [];
+    w.__wesuDbg.push(Date.now() % 100000 + " " + msg);
+    if (w.__wesuDbg.length > 14) w.__wesuDbg.shift();
+    let el = document.getElementById("wesu-dbg");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "wesu-dbg";
+      el.style.cssText =
+        "position:fixed;top:2px;left:2px;z-index:2147483647;background:rgba(0,0,0,.85);color:#0f0;font:9px/1.25 monospace;padding:3px 5px;border-radius:4px;max-width:96vw;white-space:pre-wrap;pointer-events:none";
+      document.body.appendChild(el);
+    }
+    el.textContent = w.__wesuDbg.join("\n");
+  } catch { /* ignore */ }
+}
+
+export function __dbgStore() {
+  try {
+    // lazy import to avoid cycles
+    import("@/stores/player").then(({ usePlayer }) => {
+      usePlayer.subscribe((s, prev) => {
+        if (s.playing !== prev.playing) {
+          __dbg("STORE playing " + prev.playing + "->" + s.playing + " sel=" + s.selectionId);
+        }
+      });
+    });
+  } catch { /* ignore */ }
+}
+
+// TEMP DIAGNOSTICS: subscribe once on native.
+if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) {
+  __dbgStore();
+  __dbg("dbg on");
 }
 
 export function getLastNativeCommandAt(): number {
