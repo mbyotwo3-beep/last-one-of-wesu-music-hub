@@ -1153,6 +1153,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
       }
     };
     const onEnded = () => {
+      // Only REAL media may drive end-of-track. On native the element keeps
+      // the silent unlock placeholder as its src forever (the engine plays
+      // via ExoPlayer), and priming replays that placeholder on every resume
+      // and every skip — its "ended" event used to reach skipNext() here,
+      // which with a single-track queue stopped playback right after start
+      // ("plays for a second then pauses") and re-primed the clip in an
+      // endless ended→skip→prime loop, one phantom play-history write per
+      // loop. Native reports real completions via onNativeComplete instead.
+      if (!audio.src || audio.src.startsWith("data:")) return;
       const st = usePlayer.getState();
       if (track && user && !isPreview) {
         updatePlayProgressFn({
