@@ -174,16 +174,22 @@ function HomePage() {
   const recentTracks = Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
   const carouselList = Array.isArray(carousels) ? carousels : [];
 
-  const {
-    featured = [],
-    newReleases = [],
-    trending = [],
-    topArtists = [],
-    recentAlbums = [],
-    editorialPlaylists = [],
-    moods = [],
-  } = discoverData ?? {};
-  const moodList = Array.isArray(moods) ? moods : [];
+  // Shape guards on every shelf input. These values come from server fns, and
+  // during the session flip (e.g. the render right after sign-out) a list can
+  // transiently surface as a truthy error envelope. The destructure defaults
+  // below only cover `undefined` — an envelope passed straight through and
+  // threw "…map is not a function" in the hero memo (error ref XVFLAL).
+  const disc = (discoverData ?? {}) as Partial<Awaited<ReturnType<typeof getHomeDiscover>>>;
+  const featured = Array.isArray(disc.featured) ? disc.featured : [];
+  const newReleases = Array.isArray(disc.newReleases) ? disc.newReleases : [];
+  const trending = Array.isArray(disc.trending) ? disc.trending : [];
+  const topArtists = Array.isArray(disc.topArtists) ? disc.topArtists : [];
+  const recentAlbums = Array.isArray(disc.recentAlbums) ? disc.recentAlbums : [];
+  const editorialPlaylists = Array.isArray(disc.editorialPlaylists)
+    ? disc.editorialPlaylists
+    : [];
+  const moods = Array.isArray(disc.moods) ? disc.moods : [];
+  const moodList = moods;
 
   // Admin slides always win. Only when the table has no active rows does the
   // hero fall back to rotating through the catalogue.
@@ -198,7 +204,7 @@ function HomePage() {
 
   const adminHeroSlides: HeroSlide[] = useMemo(
     () =>
-      (heroSlides ?? []).map((slide) => ({
+      (Array.isArray(heroSlides) ? heroSlides : []).map((slide) => ({
         id: slide.id,
         title: slide.title,
         description: slide.description,
