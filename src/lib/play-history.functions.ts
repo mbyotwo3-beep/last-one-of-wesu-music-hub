@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /** Log that the signed-in user is playing this song. Fire-and-forget from the player. */
 export const recordPlay = createServerFn({ method: "POST" })
@@ -47,9 +47,12 @@ export const updatePlayProgress = createServerFn({ method: "POST" })
  * Powers the "Continue Listening" / "Recently Played" home shelf.
  */
 export const getRecentlyPlayed = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    // Anonymous / expired-token reads answer with a real (empty) list — same
+    // grace as getForYou; home boot must never receive a thrown envelope.
+    if (!userId) return [];
     const { data, error } = await supabase
       .from("play_history")
       .select(

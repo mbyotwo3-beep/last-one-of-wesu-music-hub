@@ -157,6 +157,23 @@ function HomePage() {
     enabled: mounted && !!user,
     staleTime: 60 * 1000,
   });
+  // Shape-guarded shelf reads. The feeds arrive through server-fn RPCs; any
+  // payload that is not the exact shape (e.g. an error envelope from a
+  // middleware rejection) must degrade to "shelf hidden", never to a
+  // TypeError that unmounts the whole home route.
+  const forYouLists = (forYouData && typeof forYouData === "object"
+    ? (forYouData as { forYou?: unknown[]; byFavoriteArtists?: unknown[]; favoriteArtists?: unknown[] })
+    : null);
+  const forYouTracks = Array.isArray(forYouLists?.forYou) ? forYouLists!.forYou! : [];
+  const byFavoriteArtists = Array.isArray(forYouLists?.byFavoriteArtists)
+    ? forYouLists!.byFavoriteArtists!
+    : [];
+  const favoriteArtists = Array.isArray(forYouLists?.favoriteArtists)
+    ? forYouLists!.favoriteArtists!
+    : [];
+  const recentTracks = Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
+  const carouselList = Array.isArray(carousels) ? carousels : [];
+
   const {
     featured = [],
     newReleases = [],
@@ -166,6 +183,7 @@ function HomePage() {
     editorialPlaylists = [],
     moods = [],
   } = discoverData ?? {};
+  const moodList = Array.isArray(moods) ? moods : [];
 
   // Admin slides always win. Only when the table has no active rows does the
   // hero fall back to rotating through the catalogue.
@@ -246,7 +264,7 @@ function HomePage() {
               <SkeletonShelf count={5} />
             ) : (
               carousels &&
-              carousels.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)
+              carouselList.map((carousel) => <CarouselShelf key={carousel.id} carousel={carousel} />)
             )}
 
             {/* The home feed booting: skeleton, not the empty state. Loading
@@ -277,40 +295,40 @@ function HomePage() {
               </div>
             ) : null}
 
-            {user && recentlyPlayed && recentlyPlayed.length > 0 && (
+            {user && recentTracks.length > 0 && (
               <HorizontalShelf title="Recently Played" showAllLink="/library">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                  {recentlyPlayed.map((s: any) => (
+                  {recentTracks.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
                   ))}
                 </div>
               </HorizontalShelf>
             )}
 
-            {user && forYouData && forYouData.forYou.length > 0 && (
+            {user && forYouTracks.length > 0 && (
               <HorizontalShelf title="Made For You">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                  {forYouData.forYou.map((s: any) => (
+                  {forYouTracks.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
                   ))}
                 </div>
               </HorizontalShelf>
             )}
 
-            {user && forYouData && forYouData.byFavoriteArtists.length > 0 && (
+            {user && byFavoriteArtists.length > 0 && (
               <HorizontalShelf title="More from artists you like">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                  {forYouData.byFavoriteArtists.map((s: any) => (
+                  {byFavoriteArtists.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
                   ))}
                 </div>
               </HorizontalShelf>
             )}
 
-            {user && forYouData && forYouData.favoriteArtists.length > 0 && (
+            {user && favoriteArtists.length > 0 && (
               <HorizontalShelf title="Your favorite artists" showAllLink="/artists">
                 <div className="grid grid-flow-col auto-cols-[8rem] md:auto-cols-[10rem] gap-4 min-w-max">
-                  {forYouData.favoriteArtists.map((a: any) => (
+                  {favoriteArtists.map((a: any) => (
                     <ArtistTile key={a.id} artist={a} />
                   ))}
                 </div>
@@ -410,8 +428,8 @@ function HomePage() {
               </HorizontalShelf>
             )}
 
-            {moods.map((mood) =>
-              mood.songs.length === 0 ? null : (
+            {moodList.map((mood) =>
+              !mood || !Array.isArray(mood.songs) || mood.songs.length === 0 ? null : (
                 <HorizontalShelf key={mood.genre} title={`${mood.genre} Essentials`}>
                   <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
                     {mood.songs.map((s) => (

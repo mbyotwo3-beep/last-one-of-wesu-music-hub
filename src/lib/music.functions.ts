@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getPublicSupabase } from "./supabase-public.server";
 import { normalizeGenre } from "./genres";
 
@@ -682,9 +682,12 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
  * (more from artists they've liked), and topArtists (their most-liked artists).
  */
 export const getForYou = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    // Anonymous OR an expired persisted token: an empty-shape beats a thrown
+    // envelope. This renders on home boot; a throw used to unmount the app.
+    if (!userId) return { forYou: [], byFavoriteArtists: [], favoriteArtists: [] };
 
     const savedRes = await supabase
       .from("saved_tracks")

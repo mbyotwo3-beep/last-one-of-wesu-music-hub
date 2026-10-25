@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const listSavedAlbumIds = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    // Graceful for anonymous AND for an expired persisted token — same reason
+    // as listSavedTrackIds (a thrown envelope used to crash home boot).
+    if (!userId) return [];
     const { data, error } = await supabase
       .from("saved_albums")
       .select("album_id")

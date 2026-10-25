@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /** List the signed-in user's saved (liked) tracks — newest first. */
 export const listSavedTracks = createServerFn({ method: "GET" })
@@ -19,9 +19,14 @@ export const listSavedTracks = createServerFn({ method: "GET" })
 
 /** IDs of songs the signed-in user has saved. Cheap for batch is-liked lookups. */
 export const listSavedTrackIds = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    // Anonymous or an EXPIRED token (e.g. a stale persisted session) must
+    // return a real list, not an Unauthorized throw: the calling hook renders
+    // on home boot, and a thrown envelope used to surface as a TypeError
+    // ("h.includes is not a function") that unmounted the whole app.
+    if (!userId) return [];
     const { data, error } = await supabase
       .from("saved_tracks")
       .select("song_id")
