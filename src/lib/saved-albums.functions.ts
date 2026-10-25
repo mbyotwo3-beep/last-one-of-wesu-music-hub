@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const listSavedAlbumIds = createServerFn({ method: "GET" })
   .middleware([optionalSupabaseAuth])

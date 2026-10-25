@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth, requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /** List the signed-in user's saved (liked) tracks — newest first. */
 export const listSavedTracks = createServerFn({ method: "GET" })
