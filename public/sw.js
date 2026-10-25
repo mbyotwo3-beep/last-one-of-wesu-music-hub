@@ -155,13 +155,19 @@ self.addEventListener("fetch", (event) => {
           event.waitUntil(precacheAllAssets());
           return res;
         } catch (err) {
-          const cache = await caches.open(SHELL_CACHE);
-          const exact = await cache.match(request, { ignoreSearch: true });
-          if (exact) return exact;
-          // Fall back to "/" so a deep link still opens the app rather than a
-          // dead end. The client-side router restores the intended route.
-          const root = await cache.match("/", { ignoreSearch: true });
-          if (root) return root;
+          // The cache itself can fail to open (quota, private mode): the
+          // original network error is still the honest answer then.
+          try {
+            const cache = await caches.open(SHELL_CACHE);
+            const exact = await cache.match(request, { ignoreSearch: true });
+            if (exact) return exact;
+            // Fall back to "/" so a deep link still opens the app rather than a
+            // dead end. The client-side router restores the intended route.
+            const root = await cache.match("/", { ignoreSearch: true });
+            if (root) return root;
+          } catch (cacheErr) {
+            console.warn("sw shell-fallback cache unavailable", cacheErr);
+          }
           throw err;
         }
       })(),
@@ -173,7 +179,19 @@ self.addEventListener("fetch", (event) => {
   if (isImmutableAsset(url)) {
     event.respondWith(
       (async () => {
-        const cache = await caches.open(ASSET_CACHE);
+        // A cache that cannot be created (quota, private mode) must degrade to
+        // plain network fetching instead of failing the whole response.
+        let cache;
+        try {
+          cache = await caches.open(ASSET_CACHE);
+        } catch (cacheErr) {
+          console.warn("sw asset cache unavailable", cacheErr);
+          try {
+            return await fetch(request);
+          } catch {
+            return new Response("", { status: 504, statusText: "Offline" });
+          }
+        }
         const hit = await cache.match(request);
         if (hit) return hit;
         try {

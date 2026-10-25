@@ -27,6 +27,7 @@ import { resumeRefreshDecision } from "../lib/resume-recovery";
 import { LAST_ROUTE_KEY, routeRestoreDecision } from "../lib/route-restore";
 import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
 import { isOfflineTransportFailure } from "../lib/loader-graceful";
+import { errorReference } from "../components/RouteError";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
 import { MiniPlayer } from "../components/mobile/MiniPlayer";
 import { NowPlayingSheet } from "../components/mobile/NowPlayingSheet";
@@ -109,6 +110,14 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  // TEMP DIAGNOSTIC (launch sweep): the root boundary is the last catch-all and
+  // its screenshot carried no identity — every cause then has to be guessed at
+  // (the RouteError header documents how many wrong guesses that costs). Stand
+  // the same short reference the route card shows THIS high, plus a capped
+  // one-line description, so an on-device report reads back the real cause.
+  // Remove once the native boot path is proven clean.
+  const diag = rootErrorDiagnostics(error);
+
   // The root boundary catches failures no route claimed, so it is the LAST place
   // a connectivity error can surface. Without this, losing signal on an
   // unrouted URL showed "Something went wrong on our end" — blaming us for the
@@ -143,9 +152,45 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
             Go home
           </Link>
         </div>
+        {/* TEMP DIAGNOSTIC (launch sweep): read the failure out on-device. */}
+        <p className="mt-4 text-[11px] font-mono text-muted-foreground/80 break-words">{diag}</p>
       </div>
     </div>
   );
+}
+
+/**
+ * TEMP DIAGNOSTIC (launch sweep): a short stable reference plus a capped
+ * one-line description of whatever escaped every route boundary. Same
+ * reference scheme the route card uses, so reports read back consistently.
+ * Remove once the native boot path is proven clean.
+ */
+function rootErrorDiagnostics(error: unknown): string {
+  let ref = "??????";
+  try {
+    ref = errorReference(error);
+  } catch {
+    /* the description below still carries the raw facts */
+  }
+  const e = error as {
+    name?: unknown;
+    code?: unknown;
+    digest?: unknown;
+    message?: unknown;
+    constructor?: { name?: string };
+  } | null;
+  const part = (v: unknown, max: number) => {
+    const s = typeof v === "string" ? v : v === undefined || v === null ? "" : String(v);
+    return s.replace(/\s+/g, " ").trim().slice(0, max);
+  };
+  const bits = [
+    `ref ${ref}`,
+    part(e?.name, 40),
+    part(e?.code, 20),
+    part(e?.digest, 20),
+    part(e?.message, 220),
+  ].filter(Boolean);
+  return bits.join(" | ");
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
