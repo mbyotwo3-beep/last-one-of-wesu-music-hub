@@ -21,14 +21,18 @@ export function useSavedAlbum(albumId: string | null | undefined) {
     staleTime: 30_000,
   });
 
-  const isSaved = !!(albumId && idsQ.data?.includes(albumId));
+  // Same type-guard as the track hook: an unrecognisable payload means
+  // "not saved", never a root-boundary TypeError.
+  const savedIds = Array.isArray(idsQ.data) ? idsQ.data : [];
+  const isSaved = !!(albumId && savedIds.includes(albumId));
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!albumId) return;
       // Read intent from the live cache, not the render closure — rapid
       // double-taps would otherwise send the same action twice.
-      const current = qc.getQueryData<string[]>(["saved-album-ids", user?.id]) ?? idsQ.data ?? [];
+      const cached = qc.getQueryData<string[]>(["saved-album-ids", user?.id]);
+      const current = Array.isArray(cached) ? cached : Array.isArray(idsQ.data) ? idsQ.data : [];
       if (current.includes(albumId)) {
         return unsaveFn({ data: { album_id: albumId } });
       }
@@ -37,7 +41,8 @@ export function useSavedAlbum(albumId: string | null | undefined) {
     onMutate: async () => {
       if (!albumId) return;
       await qc.cancelQueries({ queryKey: ["saved-album-ids", user?.id] });
-      const prev = qc.getQueryData<string[]>(["saved-album-ids", user?.id]) ?? [];
+      const cached = qc.getQueryData<string[]>(["saved-album-ids", user?.id]);
+      const prev = Array.isArray(cached) ? cached : [];
       const next = isSaved ? prev.filter((id) => id !== albumId) : [...prev, albumId];
       qc.setQueryData(["saved-album-ids", user?.id], next);
       return { prev };

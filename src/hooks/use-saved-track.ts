@@ -25,7 +25,13 @@ export function useSavedTrack(songId: string | null | undefined) {
     staleTime: 30_000,
   });
 
-  const isSaved = !!(songId && idsQ.data?.includes(songId));
+  // Membership reads must be type-guarded: the list comes from a server-fn
+  // RPC, and a non-array payload (an error envelope, a length, anything)
+  // previously exploded as "h.includes is not a function" — a TypeError that
+  // escaped every route boundary into the root error card and bricked the
+  // whole app. An unrecognisable payload means "not saved", never a crash.
+  const savedIds = Array.isArray(idsQ.data) ? idsQ.data : [];
+  const isSaved = !!(songId && savedIds.includes(songId));
 
   const mutation = useMutation({
     // `shouldSave` is the decision made at tap time, before any optimistic
@@ -98,7 +104,10 @@ export function useSavedTrack(songId: string | null | undefined) {
       // than the render closure still means two taps in one tick compute
       // opposite intents. The decision then travels as the mutation variable
       // instead of being re-derived downstream.
-      const current = qc.getQueryData<string[]>(["saved-track-ids", user?.id]) ?? idsQ.data ?? [];
+      // Same type-guard: a stale cache write from a bad payload must not
+      // feed a non-array into shouldSaveTrack.
+      const cached = qc.getQueryData<string[]>(["saved-track-ids", user?.id]);
+      const current = Array.isArray(cached) ? cached : Array.isArray(idsQ.data) ? idsQ.data : [];
       if (!mutation.isPending) mutation.mutate(shouldSaveTrack(current, songId));
     },
     loading: mutation.isPending,

@@ -177,12 +177,17 @@ function rootErrorDiagnostics(error: unknown): string {
     code?: unknown;
     digest?: unknown;
     message?: unknown;
+    stack?: unknown;
     constructor?: { name?: string };
   } | null;
   const part = (v: unknown, max: number) => {
     const s = typeof v === "string" ? v : v === undefined || v === null ? "" : String(v);
     return s.replace(/\s+/g, " ").trim().slice(0, max);
   };
+  // Stack first lines identify the module and exact call position (file URLs
+  // survive in ESM), which turns "which line threw" into a lookup rather than
+  // a guess.
+  const stackPart = part(typeof e?.stack === "string" ? e.stack : "", 560).replace(/\n/g, " || ");
   const bits = [
     `ref ${ref}`,
     part(e?.name, 40),
@@ -190,6 +195,7 @@ function rootErrorDiagnostics(error: unknown): string {
     part(e?.digest, 20),
     part(e?.message, 220),
   ].filter(Boolean);
+  if (stackPart) bits.push(`stack ${stackPart}`);
   return bits.join(" | ");
 }
 
