@@ -1433,12 +1433,22 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // Still buffering on a slow network (never seen playing, inside the
         // start window): skip this tick rather than flapping to paused.
         // Shade pauses during the window apply once it elapses.
-        if (
-          nativePlaying === false &&
-          nativeSeenPlayingRef.current !== selectionId &&
-          Date.now() - loadStartedAtRef.current < 10000
-        ) {
-          return;
+        // ALSO skip while the engine is demonstrably rendering: ExoPlayer's
+        // isPlaying drops to false during EVERY mid-track re-buffer, and a
+        // slow chunk boundary past the 10s start window used to be adopted
+        // as a user pause — killing playback seconds into a song. Fresh
+        // position ticks prove the engine is alive, so a false there is a
+        // buffering blip, not a shade pause. A real pause stops the ticks,
+        // so adoption only waits one tick (~1s).
+        if (nativePlaying === false) {
+          const engineAlive = Date.now() - getLastNativeTimeUpdateAt() < 2500;
+          if (
+            engineAlive ||
+            (nativeSeenPlayingRef.current !== selectionId &&
+              Date.now() - loadStartedAtRef.current < 10000)
+          ) {
+            return;
+          }
         }
         if (
           shouldSyncPlaying(st.playing, nativePlaying, Date.now(), getLastNativeCommandAt(), 1500)

@@ -440,7 +440,6 @@ export async function playNative(id: string): Promise<boolean> {
  */
 export async function resumeNative(id: string): Promise<boolean> {
   markNativeCommand();
-  __dbg("resumeNative sel-state playing=" + (Date.now() % 100000));
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.resume({ assetId: id });
@@ -455,7 +454,6 @@ export async function resumeNative(id: string): Promise<boolean> {
  */
 export async function pauseNative(id: string): Promise<void> {
   markNativeCommand();
-  __dbg("pauseNative <- " + (new Error().stack ?? "").split("\n").slice(1, 4).join(" | "));
   try {
     const { NativeAudio } = await import("@capgo/native-audio");
     await NativeAudio.pause({ assetId: id });
@@ -549,7 +547,10 @@ export async function onNativeTimeUpdate(
     const handle = await NativeAudio.addListener("currentTime", (event: any) => {
       if (!event || event.assetId === undefined || event.assetId === assetId) {
         const t = Number(event?.currentTime);
-        if (Number.isFinite(t) && t >= 0) callback(t);
+        if (Number.isFinite(t) && t >= 0) {
+          lastNativeTimeUpdateAt = Date.now();
+          callback(t);
+        }
       }
     });
     return () => handle.remove();
@@ -701,50 +702,21 @@ export function emitNativeSeek(seconds: number) {
 
 let lastNativeCommandAt = 0;
 
+/** Timestamp of the last native position tick. While these arrive the engine
+ *  is demonstrably rendering audio — the remote-control reconciler must never
+ *  adopt isPlaying=false (ExoPlayer drops it during every re-buffer!) as a
+ *  user pause while ticks are fresh. */
+let lastNativeTimeUpdateAt = 0;
+
+export function getLastNativeTimeUpdateAt(): number {
+  return lastNativeTimeUpdateAt;
+}
+
 /** Stamp every JS-initiated native command so the remote-control reconciler
  *  can tell "user pressed pause in-app" from "user pressed pause on the
  *  lock screen". */
 export function markNativeCommand() {
   lastNativeCommandAt = Date.now();
-}
-
-// TEMP DIAGNOSTICS (remove before final): DOM overlay tracing play-state
-// changes + the JS stack of every native pause/resume/play command.
-function __dbg(msg: string) {
-  try {
-    const w = window as any;
-    w.__wesuDbg = w.__wesuDbg ?? [];
-    w.__wesuDbg.push(Date.now() % 100000 + " " + msg);
-    if (w.__wesuDbg.length > 14) w.__wesuDbg.shift();
-    let el = document.getElementById("wesu-dbg");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "wesu-dbg";
-      el.style.cssText =
-        "position:fixed;top:2px;left:2px;z-index:2147483647;background:rgba(0,0,0,.85);color:#0f0;font:9px/1.25 monospace;padding:3px 5px;border-radius:4px;max-width:96vw;white-space:pre-wrap;pointer-events:none";
-      document.body.appendChild(el);
-    }
-    el.textContent = w.__wesuDbg.join("\n");
-  } catch { /* ignore */ }
-}
-
-export function __dbgStore() {
-  try {
-    // lazy import to avoid cycles
-    import("@/stores/player").then(({ usePlayer }) => {
-      usePlayer.subscribe((s, prev) => {
-        if (s.playing !== prev.playing) {
-          __dbg("STORE playing " + prev.playing + "->" + s.playing + " sel=" + s.selectionId);
-        }
-      });
-    });
-  } catch { /* ignore */ }
-}
-
-// TEMP DIAGNOSTICS: subscribe once on native.
-if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) {
-  __dbgStore();
-  __dbg("dbg on");
 }
 
 export function getLastNativeCommandAt(): number {
