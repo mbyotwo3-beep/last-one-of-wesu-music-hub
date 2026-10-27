@@ -188,11 +188,6 @@ export function RouteError({
     error,
     fallback ?? "We couldn't load this right now. Check your connection and try again.",
   );
-  // TEMP DIAGNOSTIC (launch sweep): the capped stack names the exact module
-  // and call position of whatever failed the route — a lookup instead of a
-  // guess. Remove once native boot is proven clean.
-  const stackRaw = typeof (error as { stack?: unknown }).stack === "string" ? (error as { stack: string }).stack : "";
-  const stackFirst = stackRaw ? stackRaw.replace(/\s+/g, " ").trim().slice(0, 560) : "";
 
   return (
     <div className="px-6 py-16 text-center max-w-md mx-auto">
@@ -215,12 +210,6 @@ export function RouteError({
         <span className="font-mono font-semibold text-muted-foreground">{ref}</span> when you report
         it.
       </p>
-      {/* TEMP DIAGNOSTIC (launch sweep): on-device stack readout. */}
-      {stackFirst && (
-        <p className="mt-3 text-[11px] font-mono text-muted-foreground/70 break-words">
-          stack {stackFirst}
-        </p>
-      )}
     </div>
   );
 }
