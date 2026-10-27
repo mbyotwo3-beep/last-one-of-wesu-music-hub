@@ -53,6 +53,24 @@ function hasId(value: unknown): value is { id: string } {
 }
 
 /**
+ * Render-side array guard, same class as the XVFLAL home-shelf fix: a list
+ * source that is neither null nor an array (stale snapshot shape, a future
+ * serialization envelope, corrupted cache) used to crash the whole page with
+ * "filter is not a function" instead of rendering an empty section. Logs
+ * once per offender shape so a future report names its source instead of a
+ * blind filter guard.
+ */
+function asArrayLenient<T>(value: unknown, label: string): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value != null) {
+    console.warn(
+      `[library] "${label}" arrived as ${typeof value} instead of an array — rendering it as empty`,
+    );
+  }
+  return [];
+}
+
+/**
  * Exported so it can be rendered in a test.
  *
  * This page has been reported broken repeatedly, and every diagnosis came from
@@ -86,7 +104,14 @@ export function Page() {
     refetch: refetchFollowed,
   } = useOfflineList("library:followed-playlists", {
     queryKey: ["followed-playlists", user?.id],
-    queryFn: () => followedFn(),
+    queryFn: async () => {
+      // The only library queryFn whose source is a server function (everything
+      // else goes straight through supabase), so also the only one whose
+      // transport could hand back a non-array envelope. Normalize at the
+      // boundary — the render-side guard below is the belt, this is braces.
+      const rows = await followedFn();
+      return Array.isArray(rows) ? rows : [];
+    },
     enabled: !!user?.id,
     staleTime: 30_000,
   });
@@ -252,12 +277,12 @@ export function Page() {
 
   // Relationships can be null when a referenced row was deleted or hidden by
   // RLS. Keep rendering defensive even if a cached query contains one.
-  const safePlaylists = (userPlaylists ?? []).filter(hasId);
-  const safeFollowedPlaylists = (followedPlaylists ?? []).filter(hasId);
-  const safeLikedSongs = (likedSongs ?? []).filter(hasId);
-  const safePurchasedSongs = (purchasedSongs ?? []).filter(hasId);
-  const safePurchasedAlbums = (purchasedAlbums ?? []).filter(hasId);
-  const safeFollowedArtists = (followedArtists ?? []).filter(hasId);
+  const safePlaylists = asArrayLenient(userPlaylists, "playlists").filter(hasId);
+  const safeFollowedPlaylists = asArrayLenient(followedPlaylists, "followed-playlists").filter(hasId);
+  const safeLikedSongs = asArrayLenient(likedSongs, "liked-songs").filter(hasId);
+  const safePurchasedSongs = asArrayLenient(purchasedSongs, "purchased-songs").filter(hasId);
+  const safePurchasedAlbums = asArrayLenient(purchasedAlbums, "purchased-albums").filter(hasId);
+  const safeFollowedArtists = asArrayLenient(followedArtists, "followed-artists").filter(hasId);
   const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
   return (
@@ -798,8 +823,11 @@ function PlaylistCard({ playlist }: { playlist: any }) {
   const replaceQueue = usePlayer((s) => s.setQueue);
 
   // PostgREST may return the embedded song as an object or a 1-array —
-  // unwrap defensively like the playlists pages do.
-  const songs = (playlist.playlist_songs ?? [])
+  // unwrap defensively like the playlists pages do. playlist_songs itself
+  // gets the same lenient-array treatment the library lists received: a
+  // non-array here crashed every card.
+  const songRows = asArrayLenient(playlist.playlist_songs, "playlist_songs") as any[];
+  const songs = songRows
     .slice()
     .sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
     .filter((ps: any) => ps != null)

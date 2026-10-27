@@ -62,6 +62,7 @@ import {
   isNativePlaying,
   setNativeSeekHook,
   shouldSyncPlaying,
+  getLastNativeTimeUpdateAt,
   getLastNativeCommandAt,
   markNativeCommand,
   buildNotificationMetadata,

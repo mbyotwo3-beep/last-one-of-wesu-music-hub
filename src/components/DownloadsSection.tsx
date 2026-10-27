@@ -132,7 +132,9 @@ export function DownloadsSection() {
     );
   }
 
-  const list = tracks ?? [];
+  // Same lenient-array guard as the library lists: listVaultMeta resolving a
+  // non-array (corrupted snapshot, future envelope) must not crash the page.
+  const list = Array.isArray(tracks) ? tracks : [];
   const mb = ((usage?.bytes ?? 0) / 1048576).toFixed(1);
 
   const playAll = () => {
