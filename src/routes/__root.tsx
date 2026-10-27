@@ -36,8 +36,101 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { registerDeepLinkHandler } from "../integrations/supabase/auth-deep-link";
 import { usePlayer } from "../stores/player";
 import { useCurrency } from "../stores/currency";
+// TEMP DIAGNOSTIC (launch sweep): native-only pause-stack overlay — remove once
+// the mid-play pause is proven fixed.
+import { getLastNativeTimeUpdateAt, getLastNativeCommandAt } from "../lib/native-audio";
 import { useServerFn } from "@tanstack/react-start";
 import { FX_STALE_MS, getFxRate } from "../lib/fx.functions";
+
+/**
+ * TEMP DIAGNOSTIC (launch sweep): every store `playing` flip, attributed to the
+ * store action or direct setState that caused it, with a capped stack and the
+ * ages of the last native position tick / native command. Native-only, zero
+ * effect on the open web. Remove once the mid-play pause is proven fixed.
+ */
+function PauseStackOverlay() {
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    const anyWin = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } };
+    if (!anyWin.Capacitor?.isNativePlatform || !anyWin.Capacitor.isNativePlatform()) return;
+    const push = (line: string, stack: string) => {
+      const frames = (stack || "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter((s) => s && !s.startsWith("Error"))
+        .slice(1, 4)
+        .map((s) => s.replace(/^at /, "").replace(/\?.*$/, "").slice(0, 110))
+        .join(" <- ");
+      setLines((prev) => [...prev.slice(-5), `${line} :: ${frames}`]);
+    };
+    const store = usePlayer as unknown as {
+      setState: (patch: unknown, replace?: unknown) => unknown;
+    };
+    const origSet = store.setState.bind(store);
+    let t0 = Date.now();
+    const age = () =>
+      `tickAge=${Date.now() - getLastNativeTimeUpdateAt()} cmdAge=${Date.now() - getLastNativeCommandAt()}`;
+    // Wrap store actions so flips inside store code name the action.
+    const state = usePlayer.getState() as unknown as Record<string, unknown>;
+    for (const key of Object.keys(state)) {
+      const orig = state[key];
+      if (typeof orig !== "function" || (orig as { __wesuWrapped?: boolean }).__wesuWrapped) continue;
+      const wrapped = (...args: unknown[]) => {
+        const before = usePlayer.getState().playing;
+        const out = (orig as (...a: unknown[]) => unknown).apply(usePlayer.getState(), args);
+        const after = usePlayer.getState().playing;
+        if (before !== after) {
+          push(`t+${((Date.now() - t0) / 1000).toFixed(2)}s ${before}->${after} ${key}() ${age()}`, new Error().stack || "");
+          if (after === true) t0 = Date.now();
+        }
+        return out;
+      };
+      (wrapped as { __wesuWrapped?: boolean }).__wesuWrapped = true;
+      origSet({ [key]: wrapped });
+    }
+    // Wrap direct setState calls (reconciler adoption, external-pause sync…).
+    store.setState = (patch: unknown, replace?: unknown) => {
+      const before = usePlayer.getState().playing;
+      const out = origSet(patch, replace);
+      const after = usePlayer.getState().playing;
+      if (before !== after) {
+        push(`t+${((Date.now() - t0) / 1000).toFixed(2)}s ${before}->${after} setState ${age()}`, new Error().stack || "");
+        if (after === true) t0 = Date.now();
+      }
+      return out;
+    };
+    // Catch-all: async flips that bypass both wrappers.
+    let lastFlip = 0;
+    const unsub = usePlayer.subscribe((s, prev) => {
+      if (s.playing !== prev.playing) {
+        if (Date.now() - lastFlip > 50) {
+          push(`t+${((Date.now() - t0) / 1000).toFixed(2)}s ${prev.playing}->${s.playing} ASYNC ${age()}`, "");
+        }
+        lastFlip = Date.now();
+        if (s.playing === true) t0 = Date.now();
+      }
+    });
+    return () => {
+      unsub();
+      store.setState = origSet;
+    };
+  }, []);
+  if (lines.length === 0) return null;
+  return (
+    <div
+      style={{
+        position: "fixed", top: 2, left: 2, right: 2, zIndex: 2147483647,
+        background: "rgba(0,0,0,0.88)", color: "#6f6", fontSize: 9, lineHeight: "12px",
+        padding: 3, maxHeight: 150, overflow: "hidden", pointerEvents: "none",
+        fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all",
+      }}
+    >
+      {lines.map((l, i) => (
+        <div key={i}>{l}</div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Hydrates the currency store with the live USD→ZMW rate once per session.
@@ -407,6 +500,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <StatusBarInit />
+        <PauseStackOverlay />
         <FxRateHydrator />
         <div className="flex min-h-screen">
           <div className="hidden lg:block shrink-0">
