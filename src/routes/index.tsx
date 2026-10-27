@@ -107,6 +107,8 @@ function HomePage() {
     queryKey: ["home-discover"],
     queryFn: () => getHomeDiscover(),
     staleTime: 5 * 60 * 1000,
+    // Shape: a shelf-bag object, not a list — see objectData in use-offline-list.
+    objectData: true,
     initialData: (boot?.discover ?? undefined) as
       | Awaited<ReturnType<typeof getHomeDiscover>>
       | undefined,
@@ -150,6 +152,8 @@ function HomePage() {
     queryFn: () => forYouFn(),
     enabled: mounted && !!user,
     staleTime: 5 * 60 * 1000,
+    // Shape: { forYou, byFavoriteArtists, favoriteArtists } — object, not a list.
+    objectData: true,
   });
   const { data: recentlyPlayed, isLoading: recentlyPlayedLoading } = useOfflineList("home:recent", {
     queryKey: ["recently-played", user?.id],

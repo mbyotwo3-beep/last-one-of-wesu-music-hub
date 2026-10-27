@@ -96,6 +96,50 @@ export function loadSnapshot<T>(key: string, scope?: string): T | null {
   }
 }
 
+/**
+ * Central shape guard for everything flowing through useOfflineList. Every
+ * list page's data crosses this one function — live query results, loader
+ * seeds and offline snapshots alike.
+ *
+ * Why it exists: the same page family kept crashing with
+ * "x.map is not a function" (home XVFLAL, library 4Y9EFV, browse 1UZXQ1,
+ * /new-music) because a server-fn response consumed through the app shell
+ * occasionally arrives as a corrupted non-array envelope (a string, an empty
+ * object). One normalized boundary degrades all of them to "no data" so the
+ * page renders an empty section / falls back to its offline snapshot, and the
+ * warn names the offending storage key so a device report pinpoints the
+ * source instead of a blind guard.
+ *
+ * Only strings / numbers / booleans / (for list keys) non-arrays are treated
+ * as corrupt. Legit payloads pass through untouched, so this cannot destroy
+ * real content.
+ */
+export function normalizeListData<T>(
+  value: unknown,
+  key: string,
+  expectArray = true,
+): T | undefined {
+  if (value === undefined) return undefined;
+  if (expectArray && !Array.isArray(value)) {
+    console.warn(
+      `[offline-list] "${key}" data arrived as ${value === null ? "null" : typeof value}` +
+        ` instead of an array — ignoring it (the page renders empty / falls back to its snapshot` +
+        ` rather than crashing with "map is not a function")`,
+    );
+    return undefined;
+  }
+  if (
+    !expectArray &&
+    (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+  ) {
+    console.warn(
+      `[offline-list] "${key}" data arrived as ${typeof value} instead of an object — ignoring it`,
+    );
+    return undefined;
+  }
+  return value as T;
+}
+
 export interface OfflineListOptions<T> {
   queryKey: unknown[];
   queryFn: () => Promise<T>;
@@ -108,6 +152,15 @@ export interface OfflineListOptions<T> {
    * hydration-mismatch error on every load.
    */
   initialData?: T;
+  /**
+   * Declare the payload as an OBJECT when the consumer reads fields off it
+   * rather than mapping it (home:discover, home:foryou, album:*). Default is
+   * false = list shape: anything that is not an array is treated as
+   * unavailable, so a corrupted server-fn envelope degrades to an empty
+   * section or the offline snapshot instead of "x.map is not a function"
+   * taking the whole page down.
+   */
+  objectData?: boolean;
 }
 
 export interface OfflineListResult<T> {
@@ -148,17 +201,30 @@ export function useOfflineList<T>(
     refetch: () => void;
   };
 
+  // Normalize BEFORE anything else. A corrupted server-fn envelope (string /
+  // empty object) must never reach the render, and must never be written as
+  // the offline snapshot — saving it would poison offline mode permanently.
+  // The normalized value flows into the snapshot write, the snapshot fallback
+  // decision and the returned `data`, so all three see the same thing.
+  const data = normalizeListData<T>(query.data, key, !options.objectData);
+
   useEffect(() => {
-    if (query.data !== undefined) saveSnapshot(key, query.data, scope);
-  }, [key, query.data, scope]);
+    if (data !== undefined) saveSnapshot(key, data, scope);
+  }, [key, data, scope]);
 
   const snapshot =
-    query.data !== undefined || online ? undefined : (loadSnapshot<T>(key, scope) ?? undefined);
-  const data = query.data ?? snapshot;
+    data !== undefined || online
+      ? undefined
+      : normalizeListData<T>(
+          (loadSnapshot<T>(key, scope) ?? undefined) as T | undefined,
+          key,
+          !options.objectData,
+        );
+  const resolved = data ?? snapshot;
   return {
-    data,
-    isLoading: query.isLoading && data === undefined,
-    isError: query.isError && data === undefined,
+    data: resolved,
+    isLoading: query.isLoading && resolved === undefined,
+    isError: query.isError && resolved === undefined,
     error: query.error,
     refetch: () => {
       query.refetch();
