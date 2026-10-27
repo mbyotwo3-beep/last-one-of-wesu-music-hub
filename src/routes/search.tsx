@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { asArrayLenient } from "@/lib/as-array";
 import { globalSearch } from "@/lib/music.functions";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Music, Disc3, Mic2 } from "lucide-react";
@@ -59,9 +60,9 @@ function SearchPage() {
     { id: "albums", label: "Albums" },
   ];
 
-  const songs = data?.songs ?? [];
-  const artists = data?.artists ?? [];
-  const albums = data?.albums ?? [];
+  const songs = asArrayLenient(data?.songs, "search:songs") as any[];
+  const artists = asArrayLenient(data?.artists, "search:artists") as any[];
+  const albums = asArrayLenient(data?.albums, "search:albums") as any[];
 
   // How many results the ACTIVE tab can show. The old check summed all three
   // lists, so switching to a tab with no matches (e.g. Artists when the query

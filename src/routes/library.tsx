@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { routeErrorComponent } from "@/components/RouteError";
+import { asArrayLenient } from "@/lib/as-array";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOfflineList } from "@/hooks/use-offline-list";
@@ -50,24 +51,6 @@ function hasId(value: unknown): value is { id: string } {
   if (!value || typeof value !== "object") return false;
   const id = (value as { id?: unknown }).id;
   return typeof id === "string" && id.length > 0;
-}
-
-/**
- * Render-side array guard, same class as the XVFLAL home-shelf fix: a list
- * source that is neither null nor an array (stale snapshot shape, a future
- * serialization envelope, corrupted cache) used to crash the whole page with
- * "filter is not a function" instead of rendering an empty section. Logs
- * once per offender shape so a future report names its source instead of a
- * blind filter guard.
- */
-function asArrayLenient<T>(value: unknown, label: string): T[] {
-  if (Array.isArray(value)) return value as T[];
-  if (value != null) {
-    console.warn(
-      `[library] "${label}" arrived as ${typeof value} instead of an array — rendering it as empty`,
-    );
-  }
-  return [];
 }
 
 /**

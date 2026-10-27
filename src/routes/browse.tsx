@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { asArrayLenient } from "@/lib/as-array";
 import { loaderGracefulAll } from "@/lib/loader-graceful";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
@@ -133,31 +134,53 @@ function BrowseRoute() {
 }
 
 function BrowsePage() {
-  const { data: featured } = useSuspenseQuery(featuredQO);
-  const { data: newReleases } = useSuspenseQuery(newReleasesQO);
-  const { data: trending } = useSuspenseQuery(trendingQO);
-  const { data: topArtists } = useSuspenseQuery(topArtistsQO);
-  const { data: recentAlbums } = useSuspenseQuery(recentAlbumsQO);
-  const { data: playlists } = useSuspenseQuery(playlistsQO);
-  const { data: genres } = useSuspenseQuery(genresQO);
-  const { data: topSongsByGenres } = useSuspenseQuery(topSongsByGenresQO);
+  const { data: featuredData } = useSuspenseQuery(featuredQO);
+  const { data: newReleasesData } = useSuspenseQuery(newReleasesQO);
+  const { data: trendingData } = useSuspenseQuery(trendingQO);
+  const { data: topArtistsData } = useSuspenseQuery(topArtistsQO);
+  const { data: recentAlbumsData } = useSuspenseQuery(recentAlbumsQO);
+  const { data: playlistsData } = useSuspenseQuery(playlistsQO);
+  const { data: genresData } = useSuspenseQuery(genresQO);
+  const { data: topSongsByGenresData } = useSuspenseQuery(topSongsByGenresQO);
   const { genre: activeGenre } = Route.useSearch();
   const setQueue = usePlayer((s) => s.setQueue);
   const { user } = useAuth();
   const forYouFn = useServerFn(getForYou);
-  const { data: forYou } = useQuery({
+  const { data: forYouData } = useQuery({
     queryKey: ["browse-for-you", user?.id],
     queryFn: () => forYouFn(),
     enabled: !!user && !activeGenre,
     staleTime: 5 * 60 * 1000,
   });
   const recentlyPlayedFn = useServerFn(getRecentlyPlayed);
-  const { data: recentlyPlayed } = useQuery({
+  const { data: recentlyPlayedData } = useQuery({
     queryKey: ["recently-played", user?.id],
     queryFn: () => recentlyPlayedFn(),
     enabled: !!user && !activeGenre,
     staleTime: 60_000,
   });
+
+  // Shape-guarded aliases (asArrayLenient): a list source that arrives as a
+  // non-array (stale snapshot shape, transport envelope, corrupted cache)
+  // renders as an empty shelf instead of crashing the page — the same
+  // XVFLAL/4Y9EFV class, seen live on /browse as 1UZXQ1 ("p.map is not a
+  // function" in the browse chunk).
+  const featured = asArrayLenient(featuredData, "browse:featured") as typeof featuredData;
+  const newReleases = asArrayLenient(newReleasesData, "browse:new-releases") as typeof newReleasesData;
+  const trending = asArrayLenient(trendingData, "browse:trending") as typeof trendingData;
+  const topArtists = asArrayLenient(topArtistsData, "browse:top-artists") as typeof topArtistsData;
+  const recentAlbums = asArrayLenient(recentAlbumsData, "browse:recent-albums") as typeof recentAlbumsData;
+  const playlists = asArrayLenient(playlistsData, "browse:playlists") as typeof playlistsData;
+  const genres = asArrayLenient(genresData, "browse:genres") as typeof genresData;
+  const topSongsByGenres = asArrayLenient(
+    topSongsByGenresData,
+    "browse:top-genre-songs",
+  ) as typeof topSongsByGenresData;
+  const recentlyPlayed = asArrayLenient(
+    recentlyPlayedData,
+    "browse:recently-played",
+  ) as NonNullable<typeof recentlyPlayedData>;
+  const forYouList = asArrayLenient(forYouData?.forYou, "browse:for-you");
 
   const empty =
     featured.length === 0 &&
@@ -221,10 +244,10 @@ function BrowsePage() {
               </HorizontalShelf>
             )}
 
-            {user && forYou && forYou.forYou && forYou.forYou.length > 0 && (
+            {user && forYouList.length > 0 && (
               <HorizontalShelf title="Songs You Might Like" showAllLink="/library">
                 <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                  {forYou.forYou.map((s: any) => (
+                  {forYouList.map((s: any) => (
                     <TrackCard key={s.id} song={s} />
                   ))}
                 </div>
@@ -265,8 +288,14 @@ function BrowsePage() {
             )}
 
             {topSongsByGenres.map(
-              ({ genre, songs }) =>
-                songs.length > 0 && (
+              ({ genre, songs }) => {
+                // Per-genre bucket gets the same guard: a non-array bucket
+                // must render as an absent shelf, not crash the page.
+                const bucket = asArrayLenient(
+                  songs,
+                  `browse:genre-bucket-${genre}`,
+                ) as NonNullable<typeof songs>;
+                return bucket.length > 0 ? (
                   <HorizontalShelf
                     key={genre}
                     title={`Top 10 ${genre}`}
@@ -274,12 +303,13 @@ function BrowsePage() {
                     showAllSearch={{ genre }}
                   >
                     <div className="grid grid-flow-col auto-cols-[9rem] md:auto-cols-[11rem] gap-4 min-w-max">
-                      {songs.map((s) => (
+                      {bucket.map((s) => (
                         <TrackCard key={s.id} song={s} />
                       ))}
                     </div>
                   </HorizontalShelf>
-                ),
+                ) : null;
+              },
             )}
 
             {topArtists.length > 0 && (
@@ -359,7 +389,8 @@ function BrowsePage() {
 }
 
 function GenreView({ genre }: { genre: string }) {
-  const { data: songs } = useSuspenseQuery(genreSongsQO(genre));
+  const { data: songsData } = useSuspenseQuery(genreSongsQO(genre));
+  const songs = asArrayLenient(songsData, `browse:genre-songs-${genre}`) as typeof songsData;
   if (songs.length === 0) {
     return <p className="text-center text-muted-foreground py-12">No {genre} songs yet.</p>;
   }
