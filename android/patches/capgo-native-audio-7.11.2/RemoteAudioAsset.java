@@ -215,6 +215,16 @@ public class RemoteAudioAsset extends AudioAsset {
                                     @Override
                                     public void onPlaybackStateChanged(int playbackState) {
                                         if (playbackState == Player.STATE_READY) {
+                                            // WESU PATCH (one-shot): remove ourselves
+                                            // before acting. This listener used to
+                                            // stay registered and re-fire on EVERY
+                                            // later READY — and each playInternal
+                                            // seek causes another READY — so a play()
+                                            // that raced prepare() locked the player
+                                            // in an infinite seek-to-0 loop (codec
+                                            // flush every ~400ms, position stuck,
+                                            // no JS involvement).
+                                            player.removeListener(this);
                                             isPrepared = true;
                                             try {
                                                 playInternal(player, time);
@@ -489,6 +499,12 @@ public class RemoteAudioAsset extends AudioAsset {
                                     @Override
                                     public void onPlaybackStateChanged(int playbackState) {
                                         if (playbackState == Player.STATE_READY) {
+                                            // WESU PATCH (one-shot): remove ourselves
+                                            // before acting — same infinite-seek hazard
+                                            // as the deferred-play listener above; a
+                                            // seek's own READY re-fired this listener
+                                            // forever.
+                                            player.removeListener(this);
                                             isPrepared = true;
                                             player.seekTo(Math.round(time * 1000));
                                         }

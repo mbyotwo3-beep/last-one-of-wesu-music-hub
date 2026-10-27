@@ -29,7 +29,7 @@ android {
         // 38 = first Play-Store-launch candidate build: ships on the latest
         //   web bundle (currency reactivity, honest list states, /now-playing
         //   deep-link state, /auth signed-in bump, preview-honest restore).
-        versionCode 38
+        versionCode 39
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
