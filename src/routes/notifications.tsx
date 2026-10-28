@@ -6,7 +6,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
-import { openExternalUrl } from "@/lib/external-url";
+import { openExternalUrl, sameOriginAppPath } from "@/lib/external-url";
 import { useEffect } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 
@@ -128,9 +128,14 @@ function Page() {
     }
     if (n.link) {
       // SPA navigation for internal links — avoids full document reload
-      // which wipes player queue / upload state.
+      // which wipes player queue / upload state. An absolute URL to the
+      // app's own site is ALSO internal (link generators store the full
+      // share URL); it resolves to its path, never to the browser.
       try {
-        if (typeof n.link === "string" && LINK_RE.test(n.link)) {
+        const selfPath = sameOriginAppPath(n.link);
+        if (selfPath) {
+          navigate({ to: selfPath as any });
+        } else if (typeof n.link === "string" && LINK_RE.test(n.link)) {
           navigate({ to: n.link as any });
         } else if (typeof n.link === "string" && n.link.startsWith("http")) {
           void openExternalUrl(n.link);

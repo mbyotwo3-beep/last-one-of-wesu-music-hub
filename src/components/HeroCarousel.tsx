@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Play, Pause, ExternalLink } from "lucide-rea
 import { Link } from "@tanstack/react-router";
 import { resolveImageUrl, peekImageUrl, invalidateImageUrl } from "@/lib/storage-url";
 import { useIsNative } from "@/hooks/use-platform";
+import { sameOriginAppPath } from "@/lib/external-url";
 import { toast } from "sonner";
 
 export interface HeroSlide {
@@ -39,6 +40,11 @@ export function resolveHeroCta(args: {
   isNative: boolean;
 }): { mode: HeroCtaMode; url: string } {
   const url = args.link || "/";
+  // FIRST: an absolute URL can still point at the app itself (admins paste
+  // the full share link). Those are internal — SPA-navigate to their path on
+  // web and in the native shell alike, never a browser.
+  const selfPath = sameOriginAppPath(url);
+  if (selfPath) return { mode: "spa", url: selfPath };
   const isExternal = args.external === true || /^https?:\/\//i.test(url) || !url.startsWith("/");
   if (!isExternal) return { mode: "spa", url };
   if (args.isNative) return { mode: "in-app", url };

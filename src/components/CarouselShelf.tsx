@@ -1,13 +1,15 @@
 import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Music2 } from "lucide-react";
-import { isNativeShell, openExternalUrl } from "@/lib/external-url";
+import { isNativeShell, openExternalUrl, sameOriginAppPath } from "@/lib/external-url";
 import type { Carousel } from "@/lib/carousel.functions";
 
 // CMS links are free text: internal paths ("/albums/...") must use SPA Link
 // (a full <a> reload wipes player queue + upload state), external URLs use <a>.
 // Unknown / malformed internal paths render as plain cards — passing them to
-// <Link> would throw inside the router and crash the shelf.
+// <Link> would throw inside the router and crash the shelf. Absolute URLs to
+// the app's own site count as internal too (admins paste the full share
+// link) — they resolve to their path and navigate in the app.
 const KNOWN_ROUTES = [
   "/albums/",
   "/artists/",
@@ -22,9 +24,11 @@ const KNOWN_ROUTES = [
   "/recently-added",
   "/",
 ];
-function isInternalLink(url: string) {
-  if (!url || !url.startsWith("/") || url.startsWith("//")) return false;
-  return KNOWN_ROUTES.some((r) => (r === "/" ? url === "/" : url.startsWith(r)));
+function internalPath(url: string): string | null {
+  const selfPath = sameOriginAppPath(url);
+  if (selfPath) return selfPath;
+  if (!url || !url.startsWith("/") || url.startsWith("//")) return null;
+  return KNOWN_ROUTES.some((r) => (r === "/" ? url === "/" : url.startsWith(r))) ? url : null;
 }
 
 interface Props {
@@ -45,6 +49,8 @@ export function CarouselShelf({ carousel }: Props) {
   }
 
   if (!carousel.items || carousel.items.length === 0) return null;
+
+  const seeAllPath = carousel.show_all_link ? internalPath(carousel.show_all_link) : null;
 
   return (
     <section className="mb-10">
@@ -73,9 +79,9 @@ export function CarouselShelf({ carousel }: Props) {
             <ChevronRight className="size-4" />
           </button>
           {carousel.show_all_link &&
-            (isInternalLink(carousel.show_all_link) ? (
+            (seeAllPath ? (
               <Link
-                to={carousel.show_all_link as any}
+                to={seeAllPath as any}
                 className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
                 See All
@@ -109,9 +115,10 @@ export function CarouselShelf({ carousel }: Props) {
           const href = item.link_url ?? "";
           const external = /^https?:\/\//i.test(href);
           const cardClass = "group flex-none w-36 md:w-44 snap-start cursor-pointer";
-          if (isInternalLink(href)) {
+          const internal = internalPath(href);
+          if (internal) {
             return (
-              <Link key={item.id} to={href as any} className={cardClass} aria-label={item.title}>
+              <Link key={item.id} to={internal as any} className={cardClass} aria-label={item.title}>
                 <CarouselCard item={item} />
               </Link>
             );

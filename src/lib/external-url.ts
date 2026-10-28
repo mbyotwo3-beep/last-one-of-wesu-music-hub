@@ -36,6 +36,36 @@ export async function openExternalUrl(url: string): Promise<void> {
   window.location.href = url;
 }
 
+/** Origins the app itself is served from (canonical www + apex). */
+const APP_SELF_HOSTS = ["www.wesuplus.com", "wesuplus.com"];
+
+/**
+ * If `url` points at the app's own site, return the internal path to
+ * SPA-navigate to (`https://www.wesuplus.com/albums/1` -> `/albums/1`),
+ * otherwise null.
+ *
+ * Why: admins paste hero/carousel/notification links as full URLs copied
+ * from the browser. Those are INTERNAL — the app's own pages — but every
+ * http(s) check downstream classified them "external", so the native app
+ * opened its own pages in a browser. Matching the host keeps genuinely
+ * foreign links on the browser path.
+ */
+export function sameOriginAppPath(url: unknown, currentOrigin?: string): string | null {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const origin = currentOrigin ?? (typeof window === "undefined" ? undefined : window.location.origin);
+  const isSelf =
+    APP_SELF_HOSTS.includes(parsed.hostname) || (origin ? parsed.origin === origin : false);
+  if (!isSelf) return null;
+  const path = parsed.pathname + parsed.search + parsed.hash;
+  return path || "/";
+}
+
 /** Copy text. Resolves true on success, false when unavailable/denied. */
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
