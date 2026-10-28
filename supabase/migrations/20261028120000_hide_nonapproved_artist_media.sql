@@ -39,7 +39,7 @@ CREATE POLICY "Songs authenticated read" ON public.songs
       SELECT 1 FROM public.artists a
       WHERE a.id = songs.artist_id AND a.user_id = auth.uid()
     )
-    OR public.is_staff(auth.uid())
+    OR private.is_staff(auth.uid())
     OR (
       status = 'approved'
       AND EXISTS (
@@ -66,7 +66,7 @@ CREATE POLICY "Artists readable by authenticated" ON public.artists
   FOR SELECT TO authenticated
   USING (
     auth.uid() = user_id
-    OR public.is_staff(auth.uid())
+    OR private.is_staff(auth.uid())
     OR status = 'approved'
   );
 
@@ -81,7 +81,7 @@ CREATE POLICY "Albums approved public" ON public.albums
       SELECT 1 FROM public.artists a
       WHERE a.id = albums.artist_id AND a.user_id = auth.uid()
     )
-    OR public.is_staff(auth.uid())
+    OR private.is_staff(auth.uid())
     OR (
       status = 'approved'
       AND EXISTS (
