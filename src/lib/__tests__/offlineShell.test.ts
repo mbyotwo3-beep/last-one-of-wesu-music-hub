@@ -101,7 +101,11 @@ describe("what must never be served from cache", () => {
 describe("assets", () => {
   it("are cache-first, because hashed filenames cannot go stale", () => {
     const h = fetchHandler();
-    expect(h).toMatch(/isImmutableAsset[\s\S]{0,200}cache\.match/);
+    // The window is generous because the cache-failure hardening (degrade to
+    // network when quota/private mode blocks caches.open) sits between the
+    // isImmutableAsset branch and the cache.match. What must hold is the
+    // ORDER: the immutable-asset branch is entered before any cache.match.
+    expect(h).toMatch(/isImmutableAsset[\s\S]{0,800}cache\.match/);
   });
 
   it("only cache a 200 response", () => {

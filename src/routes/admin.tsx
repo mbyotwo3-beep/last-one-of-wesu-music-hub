@@ -54,6 +54,7 @@ import {
   moderateArtist,
   suspendArtist,
   unsuspendArtist,
+  deleteArtistPermanently,
   listPendingVerifications,
   moderateArtistVerification,
   listPendingLabels,
@@ -1633,6 +1634,8 @@ function AllArtistsList({ onDrillDown }: { onDrillDown: (id: string, name: strin
   const listFn = useServerFn(listAllArtists);
   const suspendFn = useServerFn(suspendArtist);
   const unsuspendFn = useServerFn(unsuspendArtist);
+  const deletePermanentlyFn = useServerFn(deleteArtistPermanently);
+  const { isSuperAdmin } = useUserRoles();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1676,6 +1679,27 @@ function AllArtistsList({ onDrillDown }: { onDrillDown: (id: string, name: strin
       invalidate();
     },
     onError: (e) => toast.error(`Reinstate failed: ${(e as Error).message}`),
+  });
+
+  const deletePermanentlyMut = useMutation({
+    mutationFn: deletePermanentlyFn,
+    onSuccess: (res: any) => {
+      const failures = (res.media_failures ?? []).length;
+      toast.success(
+        `🗑️ ${res.name} permanently deleted: ${res.deletedSongs} song(s), ${res.deletedAlbums} album(s), storage cleaned${
+          res.authUserDeleted ? ", account removed" : ""
+        }${failures ? ` (${failures} file(s) need manual cleanup)` : ""}.`,
+      );
+      invalidate();
+      // Their tiles leave the homepage too (hero slides / carousel items /
+      // featured slots referencing their content were scrubbed server-side).
+      qc.invalidateQueries({ queryKey: ["home-discover"] });
+      qc.invalidateQueries({ queryKey: ["recent-albums"] });
+      qc.invalidateQueries({ queryKey: ["active-carousels"] });
+      qc.invalidateQueries({ queryKey: ["active-hero-slides"] });
+      qc.invalidateQueries({ queryKey: ["public-playlists"] });
+    },
+    onError: (e) => toast.error(`Permanent delete failed: ${(e as Error).message}`),
   });
 
   const artists = data ?? [];
@@ -1795,6 +1819,38 @@ function AllArtistsList({ onDrillDown }: { onDrillDown: (id: string, name: strin
                     <Ban className="size-3" /> Suspend
                   </button>
                 ) : null}
+
+                {/* Permanent delete — superadmin only, irreversible. Two
+                    confirms plus the exact name, mirrored server-side. */}
+                {isSuperAdmin && (
+                  <button
+                    disabled={deletePermanentlyMut.isPending}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `PERMANENTLY delete ${a.name}? This removes their account, ALL their songs and albums, stored audio/artwork, and their sign-in. This cannot be undone.`,
+                        )
+                      )
+                        return;
+                      if (
+                        !window.confirm(
+                          `Final check — money records (purchases, transactions) are kept for accounting, but everything else about ${a.name} will be destroyed forever. Continue?`,
+                        )
+                      )
+                        return;
+                      const typed = window.prompt(
+                        `Type the artist name exactly to confirm permanent deletion:`,
+                        "",
+                      );
+                      if (typed === null) return;
+                      deletePermanentlyMut.mutate({ data: { id: a.id, confirmName: typed } });
+                    }}
+                    className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-destructive/15 text-destructive cursor-pointer hover:bg-destructive/25 transition-colors font-semibold disabled:opacity-50"
+                    title="Superadmin only: irreversible removal of the artist, their media and their account"
+                  >
+                    <Trash2 className="size-3" /> Delete permanently
+                  </button>
+                )}
               </div>
             </div>
 

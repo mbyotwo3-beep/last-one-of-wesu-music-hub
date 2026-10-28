@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isStaffUser } from "./roles";
+import { isStaffUser, isSuperadminUser } from "./roles";
 
 async function assertStaff(supabase: any, userId: string) {
   if (!(await isStaffUser(supabase, userId))) throw new Error("Forbidden");
@@ -736,8 +736,220 @@ export const moderateArtist = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- Verification Moderation ----------
+// ---------- Permanent Deletion (superadmin) ----------
 
+/**
+ * PERMANENTLY delete an artist and everything they own.
+ *
+ * This is the irreversible counterpart to suspendArtist. Suspension keeps the
+ * account + media (hidden from the public, visible to the artist and staff) so
+ * the artist can reapply. Permanent deletion removes the artist everywhere:
+ *
+ *   - their songs and albums (rows) and the audio/covers in storage
+ *   - featured slots and CMS links (hero slides, carousel items) pointing at
+ *     any of their pages or content, so no ghost tiles render on the homepage
+ *   - library rows (saved tracks/albums, followers, label links) not covered
+ *     by FK cascades
+ *   - their artist profile row and their AUTH USER (they can never sign in)
+ *
+ * Money is untouched by design: purchases and payment_transactions are kept
+ * (receipts/ledger survive; FKs null out), revenue_splits.artist_id is SET NULL
+ * at the DB level.
+ */
+export const deleteArtistPermanently = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string; confirmName: string }) => d)
+  .handler(async ({ context, data }) => {
+    await assertStaff(context.supabase, context.userId);
+    if (!(await isSuperadminUser(context.supabase, context.userId))) {
+      throw new Error("Forbidden: superadmin only");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { deleteMediaWithReport } = await import("./media.server");
+
+    // 1. Fetch the artist.
+    const { data: artist, error: fetchErr } = await supabaseAdmin
+      .from("artists")
+      .select("id, name, user_id, avatar_url")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (fetchErr || !artist) throw new Error("Artist not found");
+
+    // 2. Confirmation guard. The client asks twice (window.confirm) and this
+    //    requires the artist's exact name, so an accidental click can never
+    //    destroy an account.
+    if ((data.confirmName ?? "").trim() !== artist.name) {
+      throw new Error(
+        `Confirmation name does not match. Type the artist name exactly: "${artist.name}"`,
+      );
+    }
+
+    // 3. Collect owned content BEFORE any deletes (paths + ids are needed to
+    //    scrub CMS links and storage afterwards).
+    const [{ data: songs }, { data: albums }] = await Promise.all([
+      supabaseAdmin
+        .from("songs")
+        .select("id, title, audio_url, cover_url")
+        .eq("artist_id", artist.id),
+      supabaseAdmin.from("albums").select("id, title, cover_url").eq("artist_id", artist.id),
+    ]);
+    const songRows = songs ?? [];
+    const albumRows = albums ?? [];
+    const songIds = songRows.map((s: any) => s.id as string);
+    const albumIds = albumRows.map((a: any) => a.id as string);
+    const songCount = songIds.length;
+    const albumCount = albumIds.length;
+
+    // 4. Featured slots pointing at their songs or albums (target_id has no
+    //    FK, so the tiles would keep rendering ghost covers otherwise).
+    try {
+      if (songIds.length > 0) {
+        await supabaseAdmin
+          .from("featured_slots")
+          .delete()
+          .eq("target_type", "song")
+          .in("target_id", songIds);
+      }
+      if (albumIds.length > 0) {
+        await supabaseAdmin
+          .from("featured_slots")
+          .delete()
+          .eq("target_type", "album")
+          .in("target_id", albumIds);
+      }
+    } catch {
+      /* ignore — featured slots are cosmetic */
+    }
+
+    // 5. CMS links: hero slides and home carousel items whose links point at
+    //    the artist page or any of their songs/albums. Links store paths like
+    //    "/artists/<uuid>" or "/albums/<uuid>", so matching on uuid presence
+    //    covers every route shape.
+    const contentIds = [artist.id, ...songIds, ...albumIds];
+    const linksToContent = (link: string | null | undefined) =>
+      !!link && contentIds.some((id) => link.includes(id));
+    try {
+      const [heroRes, itemsRes] = await Promise.all([
+        supabaseAdmin.from("hero_carousel_slides").select("id, link_target, cta_link"),
+        supabaseAdmin.from("home_carousel_items").select("id, link_url"),
+      ]);
+      const heroIds = (heroRes.data ?? [])
+        .filter((h: any) => linksToContent(h.link_target) || linksToContent(h.cta_link))
+        .map((h: any) => h.id as string);
+      const itemIds = (itemsRes.data ?? [])
+        .filter((i: any) => linksToContent(i.link_url))
+        .map((i: any) => i.id as string);
+      if (heroIds.length > 0) {
+        await supabaseAdmin.from("hero_carousel_slides").delete().in("id", heroIds);
+      }
+      if (itemIds.length > 0) {
+        await supabaseAdmin.from("home_carousel_items").delete().in("id", itemIds);
+      }
+    } catch {
+      /* ignore — CMS scrubbing is best-effort, rows are gone either way */
+    }
+
+    // 6. Library rows not covered by FK cascades.
+    if (songIds.length > 0) {
+      await supabaseAdmin.from("saved_tracks").delete().in("song_id", songIds);
+    }
+    if (albumIds.length > 0) {
+      await supabaseAdmin.from("saved_albums").delete().in("album_id", albumIds);
+    }
+    await supabaseAdmin.from("artist_followers").delete().eq("artist_id", artist.id);
+    await supabaseAdmin.from("label_artists").delete().eq("artist_id", artist.id);
+
+    // 7. Content rows. Deleting songs first lets FK CASCADE clean
+    //    playlist_songs, play_history and collaborators; purchases keep their
+    //    rows (money ledger). The artist row delete cascades any straggler
+    //    songs/albums.
+    if (songIds.length > 0) {
+      const { error: songsDelErr } = await supabaseAdmin.from("songs").delete().in("id", songIds);
+      if (songsDelErr) throw new Error(songsDelErr.message);
+    }
+    if (albumIds.length > 0) {
+      const { error: albumsDelErr } = await supabaseAdmin
+        .from("albums")
+        .delete()
+        .in("id", albumIds);
+      if (albumsDelErr) throw new Error(albumsDelErr.message);
+    }
+
+    // 8. The artist row itself.
+    const { error: artistDelErr } = await supabaseAdmin
+      .from("artists")
+      .delete()
+      .eq("id", artist.id);
+    if (artistDelErr) throw new Error(artistDelErr.message);
+
+    // 9. Storage cleanup, REPORTED. Collect distinct paths first, then never
+    //    delete artwork another surviving song/album still points at.
+    const mediaReport: import("./media.server").MediaDeleteReport[] = [];
+    const audioPaths = Array.from(
+      new Set(songRows.map((s: any) => s.audio_url).filter(Boolean)),
+    ) as string[];
+    const coverPaths = Array.from(
+      new Set(
+        [
+          ...albumRows.map((a: any) => a.cover_url),
+          ...songRows.map((s: any) => s.cover_url),
+        ].filter(Boolean),
+      ),
+    ) as string[];
+
+    for (const p of audioPaths) {
+      const r = await deleteMediaWithReport("song-audio", p);
+      if (r) mediaReport.push(r);
+    }
+    for (const p of coverPaths) {
+      const [{ data: s1 }, { data: s2 }] = await Promise.all([
+        supabaseAdmin.from("songs").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+        supabaseAdmin.from("albums").select("id").eq("cover_url", p).limit(1).maybeSingle(),
+      ]);
+      if (!s1 && !s2) {
+        const r = await deleteMediaWithReport("album-art", p);
+        if (r) mediaReport.push(r);
+      }
+    }
+    if (artist.avatar_url) {
+      const r = await deleteMediaWithReport("artist-images", artist.avatar_url);
+      if (r) mediaReport.push(r);
+    }
+
+    // 10. Delete the auth user (removes sign-in ability; profile row follows
+    //     via ON DELETE CASCADE). Their role rows cascade with it.
+    let authUserDeleted = false;
+    try {
+      const { error: userDelErr } = await supabaseAdmin.auth.admin.deleteUser(artist.user_id);
+      authUserDeleted = !userDelErr;
+      if (userDelErr) console.warn("[deleteArtistPermanently] auth user delete:", userDelErr.message);
+    } catch (err: any) {
+      console.warn("[deleteArtistPermanently] auth user delete failed:", err?.message);
+    }
+
+    // 11. Audit trail.
+    await audit(context.userId, "artist.delete_permanent", "artist", artist.id, {
+      name: artist.name,
+      user_id: artist.user_id,
+      song_count: songCount,
+      album_count: albumCount,
+      auth_user_deleted: authUserDeleted,
+      media_failures: mediaReport.filter((m) => !m.ok).map((m) => m.path),
+    });
+
+    return {
+      ok: true,
+      id: artist.id,
+      name: artist.name,
+      deletedSongs: songCount,
+      deletedAlbums: albumCount,
+      authUserDeleted,
+      media: mediaReport,
+      media_failures: mediaReport.filter((m) => !m.ok).map((m) => m.path),
+    };
+  });
+
+// ---------- Verification Moderation ----------
 export const listPendingVerifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

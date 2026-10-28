@@ -43,7 +43,7 @@ export const Route = createFileRoute("/artist-dashboard")({
     meta: [{ title: "Artist Dashboard — Wesu+" }],
   }),
   component: () => (
-    <RoleGate require="artist">
+    <RoleGate require="user">
       <ArtistDashboardPage />
     </RoleGate>
   ),
@@ -194,6 +194,69 @@ function ArtistDashboardPage() {
         >
           Apply now
         </Link>
+      </div>
+    );
+  }
+
+  if (data.artist.status === "suspended") {
+    // Suspended, not deleted: the account and its media are kept, but hidden
+    // from the public (RLS shows non-approved artists' media only to the
+    // owner and staff). The artist can reapply by re-agreeing to the T&C.
+    const suspendedSongs = (data as any).uploadedSongs ?? [];
+    const suspendedAlbums = myAlbums ?? [];
+    return (
+      <div className="max-w-2xl mx-auto p-6 py-12">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center size-14 rounded-full bg-destructive/10 mb-4">
+            <ShieldAlert className="size-6 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">Artist account suspended</h1>
+          <p className="text-muted-foreground mb-2">
+            Your artist account has been suspended by the moderation team. Your music and profile
+            are hidden from the public while suspended — only you and the moderation team can see
+            them. Nothing has been deleted.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            To restore your account, review and re-agree to the Artist Terms &amp; Conditions,
+            confirming you won't breach them again. An admin will then review your application.
+          </p>
+          <Link
+            to="/become-artist"
+            className="inline-block mt-6 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold cursor-pointer hover:scale-105 transition-transform"
+          >
+            I understand — Re-apply
+          </Link>
+        </div>
+
+        {(suspendedSongs.length > 0 || suspendedAlbums.length > 0) && (
+          <div className="bg-card border border-border rounded-2xl p-6 text-left">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+              Your media (only visible to you and moderation)
+            </p>
+            {suspendedAlbums.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-semibold mb-1">
+                  Albums ({suspendedAlbums.length})
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside">
+                  {suspendedAlbums.map((a: any) => (
+                    <li key={a.id}>{a.title}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {suspendedSongs.length > 0 && (
+              <div>
+                <p className="text-sm font-semibold mb-1">Songs ({suspendedSongs.length})</p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside">
+                  {suspendedSongs.map((s: any) => (
+                    <li key={s.id}>{s.title}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
