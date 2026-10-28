@@ -40,7 +40,7 @@
  * Signed audio URLs are single-use and expire, so they are excluded explicitly.
  */
 
-const VERSION = "v4";
+const VERSION = "v5";
 const SHELL_CACHE = `wesu-shell-${VERSION}`;
 const ASSET_CACHE = `wesu-assets-${VERSION}`;
 const KEEP = new Set([SHELL_CACHE, ASSET_CACHE]);
@@ -88,6 +88,14 @@ async function putShell(request, response) {
 /**
  * Cache every code file of this release, so any screen opens offline — not
  * only the ones visited while online. Failures are tolerated per file.
+ *
+ * PACED ON PURPOSE: right after a deploy every hashed filename changes, so the
+ * first navigation re-fetches the whole ~160-file asset set. Fetching all of
+ * them in parallel flooded the edge exactly while the hydrating page fired its
+ * own first server-fn data calls, and those calls came back empty — the
+ * "No music yet" Browse bug. The precache now waits a few seconds for the
+ * page's data to land, then fetches three files at a time a beat apart, so it
+ * always loses the race it used to win.
  */
 async function precacheAllAssets() {
   try {
@@ -96,16 +104,30 @@ async function precacheAllAssets() {
     const { files } = await res.json();
     if (!Array.isArray(files)) return;
     const cache = await caches.open(ASSET_CACHE);
-    await Promise.allSettled(
-      files.map(async (f) => {
-        if (await cache.match(f)) return;
-        const r = await fetch(f);
-        if (r && r.status === 200) await cache.put(f, r);
-      }),
-    );
+    const CHUNK = 3;
+    const GAP_MS = 150;
+    for (let i = 0; i < files.length; i += CHUNK) {
+      const slice = files.slice(i, i + CHUNK);
+      await Promise.allSettled(
+        slice.map(async (f) => {
+          if (await cache.match(f)) return;
+          const r = await fetch(f);
+          if (r && r.status === 200) await cache.put(f, r);
+        }),
+      );
+      await new Promise((ok) => setTimeout(ok, GAP_MS));
+    }
   } catch {
     /* offline at install, or no manifest — page loads still fill the cache */
   }
+}
+
+/** Precache that never competes with the page's own first data calls. */
+function deferredPrecache() {
+  return (async () => {
+    await new Promise((ok) => setTimeout(ok, 4000));
+    await precacheAllAssets();
+  })();
 }
 
 self.addEventListener("install", (event) => {
@@ -120,8 +142,10 @@ self.addEventListener("install", (event) => {
           await putShell(new Request(path), res);
         }),
       );
-      await precacheAllAssets();
       await self.skipWaiting();
+      // Install must not flood either: the page that triggered this install is
+      // busy with its own first data calls.
+      await deferredPrecache();
     })(),
   );
 });
@@ -152,7 +176,7 @@ self.addEventListener("fetch", (event) => {
         try {
           const res = await fetch(request);
           await putShell(request, res);
-          event.waitUntil(precacheAllAssets());
+          event.waitUntil(deferredPrecache());
           return res;
         } catch (err) {
           // The cache itself can fail to open (quota, private mode): the

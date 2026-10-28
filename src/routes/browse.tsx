@@ -32,57 +32,64 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { RouteError as SharedRouteError } from "@/components/RouteError";
 
+// A Vercel-edge burst can answer a client server-fn call with a non-array
+// payload. These options bound the damage: the payload is not treated as
+// fresh for more than 30s, and rejected calls are retried twice before the
+// empty state is accepted. (The SW precache flood that CAUSED those bursts
+// is paced in public/sw.js — this is the resilience net.)
+const burstResilient = { staleTime: 30_000, retry: 2, retryDelay: 800 } as const;
+
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
   queryFn: () => getFeaturedAlbums(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const newReleasesQO = queryOptions({
   queryKey: ["browse-new"],
   queryFn: () => getNewReleases(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const trendingQO = queryOptions({
   queryKey: ["browse-trending"],
   queryFn: () => getTrendingSongs(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const topArtistsQO = queryOptions({
   queryKey: ["browse-artists"],
   queryFn: () => getTopArtists(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const recentAlbumsQO = queryOptions({
   queryKey: ["browse-recent-albums"],
   queryFn: () => getRecentAlbums(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const playlistsQO = queryOptions({
   queryKey: ["browse-playlists"],
   queryFn: () => getPublicPlaylists(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 const genresQO = queryOptions({
   queryKey: ["browse-genres"],
   queryFn: () => getGenres(),
-  staleTime: 10 * 60 * 1000,
+  ...burstResilient,
 });
 const genreSongsQO = (genre: string) =>
   queryOptions({
     queryKey: ["browse-genre-songs", genre],
     queryFn: () => getSongsByGenre({ data: { genre, limit: 24 } }),
-    staleTime: 5 * 60 * 1000,
+    ...burstResilient,
     enabled: !!genre,
   });
 const topSongsByGenresQO = queryOptions({
   queryKey: ["browse-top-genre-songs"],
   queryFn: () => getTopSongsByGenres(),
-  staleTime: 10 * 60 * 1000,
+  ...burstResilient,
 });
 const forYouQO = queryOptions({
   queryKey: ["browse-for-you"],
   queryFn: () => getForYou(),
-  staleTime: 5 * 60 * 1000,
+  ...burstResilient,
 });
 
 export const Route = createFileRoute("/browse")({
