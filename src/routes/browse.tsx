@@ -39,39 +39,61 @@ import { RouteError as SharedRouteError } from "@/components/RouteError";
 // is paced in public/sw.js — this is the resilience net.)
 const burstResilient = { staleTime: 30_000, retry: 2, retryDelay: 800 } as const;
 
+/**
+ * Stagger the Browse shelves — in the browser only.
+ *
+ * Browse is the only screen that fires ~8 data calls at the same instant, and
+ * on constrained network paths (the test emulator's proxy spaces TCP dials
+ * 900ms apart and the edge rate-limits bursts) those parallel dials queue up
+ * and come back as empty 200s — which used to render as "No music yet" even
+ * though the same data rendered fine over SSR and in a plain browser. Spacing
+ * the calls out keeps every dial alone in its queue. Total added latency is
+ * under 3s, all overlapping with rendering.
+ *
+ * On the server this is a no-op: the loader awaits these same queries during
+ * SSR, and a server-side delay would slow every /browse render for crawlers
+ * and direct hits that never had the dial-queue problem.
+ */
+const stagger = (ms: number) => async <T,>(fn: () => Promise<T>): Promise<T> => {
+  if (ms > 0 && typeof window !== "undefined") {
+    await new Promise((ok) => setTimeout(ok, ms));
+  }
+  return fn();
+};
+
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
-  queryFn: () => getFeaturedAlbums(),
+  queryFn: () => stagger(0)(getFeaturedAlbums),
   ...burstResilient,
 });
 const newReleasesQO = queryOptions({
   queryKey: ["browse-new"],
-  queryFn: () => getNewReleases(),
+  queryFn: () => stagger(350)(getNewReleases),
   ...burstResilient,
 });
 const trendingQO = queryOptions({
   queryKey: ["browse-trending"],
-  queryFn: () => getTrendingSongs(),
+  queryFn: () => stagger(700)(getTrendingSongs),
   ...burstResilient,
 });
 const topArtistsQO = queryOptions({
   queryKey: ["browse-artists"],
-  queryFn: () => getTopArtists(),
+  queryFn: () => stagger(1050)(getTopArtists),
   ...burstResilient,
 });
 const recentAlbumsQO = queryOptions({
   queryKey: ["browse-recent-albums"],
-  queryFn: () => getRecentAlbums(),
+  queryFn: () => stagger(1400)(getRecentAlbums),
   ...burstResilient,
 });
 const playlistsQO = queryOptions({
   queryKey: ["browse-playlists"],
-  queryFn: () => getPublicPlaylists(),
+  queryFn: () => stagger(1750)(getPublicPlaylists),
   ...burstResilient,
 });
 const genresQO = queryOptions({
   queryKey: ["browse-genres"],
-  queryFn: () => getGenres(),
+  queryFn: () => stagger(2100)(getGenres),
   ...burstResilient,
 });
 const genreSongsQO = (genre: string) =>
@@ -83,7 +105,7 @@ const genreSongsQO = (genre: string) =>
   });
 const topSongsByGenresQO = queryOptions({
   queryKey: ["browse-top-genre-songs"],
-  queryFn: () => getTopSongsByGenres(),
+  queryFn: () => stagger(2450)(getTopSongsByGenres),
   ...burstResilient,
 });
 const forYouQO = queryOptions({
