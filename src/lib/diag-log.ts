@@ -124,12 +124,25 @@ export function installDiagLog() {
       const res = await origFetch(input as RequestInfo, init);
       if (isRpc) {
         const id = url.split("/_serverFn/")[1]?.slice(0, 12) ?? "?";
+        const ct = res.headers.get("content-type") ?? "-";
         logDiag(
           "rpc",
-          `${res.status} ct=${res.headers.get("content-type") ?? "-"} ser=${
+          `${res.status} ct=${ct} ser=${
             res.headers.get("x-tss-serialized") ?? "-"
+          } cc=${res.headers.get("cache-control") ?? "-"} vc=${
+            res.headers.get("x-vercel-cache") ?? "-"
           } ${Date.now() - started}ms fn=${id}`,
         );
+        // A non-JSON RPC answer IS the bug: capture what actually came back
+        // (first bytes only; the caller parses its own stream from the clone).
+        if (!ct.includes("json")) {
+          try {
+            const text = await res.clone().text();
+            logDiag("rpc-body", `${url.slice(0, 180)} => ${text.slice(0, 400)}`);
+          } catch {
+            /* body unreadable — the status/ct line above still helps */
+          }
+        }
       }
       return res;
     } catch (err) {
