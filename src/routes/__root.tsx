@@ -25,6 +25,11 @@ import { OfflineChip } from "../components/OfflineChip";
 import { ensureShellCache, shellCacheSupported } from "../lib/offline-shell";
 import { resumeRefreshDecision } from "../lib/resume-recovery";
 import { LAST_ROUTE_KEY, routeRestoreDecision } from "../lib/route-restore";
+import {
+  indexAssetFromHtml,
+  indexAssetFromScripts,
+  shouldAutoReload,
+} from "../lib/stale-client";
 import { OfflineRouteNotice } from "../components/OfflineRouteNotice";
 import { isOfflineTransportFailure } from "../lib/loader-graceful";
 import { DeviceSetupNudge } from "../components/DeviceSetupNudge";
@@ -291,6 +296,55 @@ function RootComponent() {
     window.addEventListener("load", go, { once: true });
     return () => window.removeEventListener("load", go);
   }, []);
+
+  // Self-heal a stale installed shell. The service worker keeps hashed assets
+  // forever; if a navigation fetch fails it serves the cached HTML, and the app
+  // keeps running an older bundle whose server-fn ids no longer match the live
+  // deploy (pages then render as false "no music" / no results). Wait until the
+  // first data reads have settled, compare the loaded index bundle with the live
+  // HTML, and reload once per five minutes if they differ.
+  useEffect(() => {
+    if (platform !== "native") return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled || !navigator.onLine) return;
+      try {
+        const KEY = "wesu:stale-check-at";
+        const last = Number(sessionStorage.getItem(KEY) || 0);
+        const html = await fetch("/", { cache: "no-store" }).then((r) => r.text());
+        if (cancelled) return;
+        const live = indexAssetFromHtml(html);
+        const loaded = indexAssetFromScripts(
+          Array.from(document.scripts)
+            .map((s) => s.src)
+            .filter(Boolean),
+        );
+        if (
+          shouldAutoReload({
+            isNative: true,
+            online: navigator.onLine,
+            loaded,
+            live,
+            lastCheckMs: Number.isFinite(last) ? last : 0,
+            nowMs: Date.now(),
+          })
+        ) {
+          try {
+            sessionStorage.setItem("wesu:stale-check-at", String(Date.now()));
+          } catch {
+            /* private mode: still reload, cooldown is best-effort */
+          }
+          window.location.reload();
+        }
+      } catch {
+        /* offline or a failed fetch: keep running the current bundle */
+      }
+    }, 9000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [platform]);
 
   // Register deep link auth handler on native platforms (Req 18.3)
   useEffect(() => {

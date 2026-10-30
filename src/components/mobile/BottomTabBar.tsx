@@ -19,7 +19,9 @@ import {
   Plus,
   Lock,
   Smartphone,
+  Bug,
 } from "lucide-react";
+import { DeviceDiagnostics } from "@/components/DeviceDiagnostics";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRoles } from "@/hooks/use-roles";
 import { useIsNative } from "@/hooks/use-platform";
@@ -115,6 +117,7 @@ export function BottomTabBar() {
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
 
   // React Query, not useState + useEffect. With raw state there was no query
   // key, so nothing could invalidate it: a playlist created from the track menu
@@ -443,6 +446,18 @@ export function BottomTabBar() {
               <Lock className="size-5" />
               <span className="text-sm font-medium">Privacy Policy</span>
             </button>
+            {isNative && (
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setDiagOpen(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+              >
+                <Bug className="size-5" />
+                <span className="text-sm font-medium">App diagnostics</span>
+              </button>
+            )}
 
             {/* User Section */}
             {user && (
@@ -560,6 +575,8 @@ export function BottomTabBar() {
           )}
         </div>
       )}
+
+      {diagOpen && <DeviceDiagnostics onClose={() => setDiagOpen(false)} />}
     </>
   );
 }

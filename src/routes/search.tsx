@@ -45,8 +45,24 @@ function SearchPage() {
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["globalSearch", q],
-    queryFn: () => searchFn({ data: { q, limit: 30 } }),
+    queryFn: async () => {
+      const value = await searchFn({ data: { q, limit: 30 } });
+      const ok =
+        value &&
+        typeof value === "object" &&
+        Array.isArray((value as { songs?: unknown }).songs) &&
+        Array.isArray((value as { albums?: unknown }).albums) &&
+        Array.isArray((value as { artists?: unknown }).artists);
+      if (!ok) {
+        // A malformed 200 used to render as "No results" while the catalogue
+        // clearly had the track. Treat it as a failed call so it retries.
+        throw new Error("Malformed search response — please try again");
+      }
+      return value;
+    },
     enabled: !!q.trim(),
+    retry: 2,
+    retryDelay: 800,
   });
 
   function setTab(t: "all" | "songs" | "artists" | "albums") {

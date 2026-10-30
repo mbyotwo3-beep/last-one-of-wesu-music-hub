@@ -2,8 +2,12 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { installViewTransitionNoiseFilter } from "./lib/view-transition-noise";
+import { installDiagLog } from "./lib/diag-log";
 
 export const getRouter = () => {
+  // Record the facts before the first request: RPC status/content-type, and any
+  // list-guard/console warnings. The native diagnostics panel reads this.
+  installDiagLog();
   // Chromium skips View Transitions that it cannot run (hidden tab, a new
   // transition aborting the old one) and the router's lifecycle promises turn
   // that skip into an unhandled rejection. Install the benign filter BEFORE

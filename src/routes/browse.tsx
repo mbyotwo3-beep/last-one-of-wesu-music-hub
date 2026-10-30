@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { asArrayLenient } from "@/lib/as-array";
+import { asArrayLenient, assertList } from "@/lib/as-array";
 import { loaderGracefulAll } from "@/lib/loader-graceful";
 import { HorizontalShelf } from "@/components/HorizontalShelf";
 import { StorageImage } from "@/components/StorageImage";
@@ -61,56 +61,70 @@ const stagger = (ms: number) => async <T,>(fn: () => Promise<T>): Promise<T> => 
   return fn();
 };
 
+/** A non-array payload is a failed call, so React Query retries it. */
+const listCall =
+  <T,>(label: string, fn: () => Promise<T>) =>
+  async () =>
+    assertList(await fn(), label);
+
 const featuredQO = queryOptions({
   queryKey: ["browse-featured"],
-  queryFn: () => stagger(0)(getFeaturedAlbums),
+  queryFn: () => stagger(0)(listCall("browse:featured", getFeaturedAlbums)),
   ...burstResilient,
 });
 const newReleasesQO = queryOptions({
   queryKey: ["browse-new"],
-  queryFn: () => stagger(350)(getNewReleases),
+  queryFn: () => stagger(350)(listCall("browse:new-releases", getNewReleases)),
   ...burstResilient,
 });
 const trendingQO = queryOptions({
   queryKey: ["browse-trending"],
-  queryFn: () => stagger(700)(getTrendingSongs),
+  queryFn: () => stagger(700)(listCall("browse:trending", getTrendingSongs)),
   ...burstResilient,
 });
 const topArtistsQO = queryOptions({
   queryKey: ["browse-artists"],
-  queryFn: () => stagger(1050)(getTopArtists),
+  queryFn: () => stagger(1050)(listCall("browse:top-artists", getTopArtists)),
   ...burstResilient,
 });
 const recentAlbumsQO = queryOptions({
   queryKey: ["browse-recent-albums"],
-  queryFn: () => stagger(1400)(getRecentAlbums),
+  queryFn: () => stagger(1400)(listCall("browse:recent-albums", getRecentAlbums)),
   ...burstResilient,
 });
 const playlistsQO = queryOptions({
   queryKey: ["browse-playlists"],
-  queryFn: () => stagger(1750)(getPublicPlaylists),
+  queryFn: () => stagger(1750)(listCall("browse:playlists", getPublicPlaylists)),
   ...burstResilient,
 });
 const genresQO = queryOptions({
   queryKey: ["browse-genres"],
-  queryFn: () => stagger(2100)(getGenres),
+  queryFn: () => stagger(2100)(listCall("browse:genres", getGenres)),
   ...burstResilient,
 });
 const genreSongsQO = (genre: string) =>
   queryOptions({
     queryKey: ["browse-genre-songs", genre],
-    queryFn: () => getSongsByGenre({ data: { genre, limit: 24 } }),
+    queryFn: listCall(`browse:genre-songs:${genre}`, () =>
+      getSongsByGenre({ data: { genre, limit: 24 } }),
+    ),
     ...burstResilient,
     enabled: !!genre,
   });
 const topSongsByGenresQO = queryOptions({
   queryKey: ["browse-top-genre-songs"],
-  queryFn: () => stagger(2450)(getTopSongsByGenres),
+  queryFn: () => stagger(2450)(listCall("browse:top-genre-songs", getTopSongsByGenres)),
   ...burstResilient,
 });
 const forYouQO = queryOptions({
   queryKey: ["browse-for-you"],
-  queryFn: () => getForYou(),
+  queryFn: async () => {
+    const value = await getForYou();
+    if (!value || typeof value !== "object" || !Array.isArray((value as { forYou?: unknown }).forYou)) {
+      throw new Error("Malformed for-you response");
+    }
+    return value;
+  },
   ...burstResilient,
 });
 
@@ -155,8 +169,36 @@ export const Route = createFileRoute("/browse")({
     ]);
   },
   component: BrowseRoute,
+  pendingComponent: BrowsePending,
   errorComponent: SharedRouteError,
 });
+
+/** Shown while the shelves load, so Browse is never an empty black screen. */
+function BrowsePending() {
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <div className="lg:max-w-[calc(100vw-16rem)] lg:ml-auto px-4 md:px-6 py-6 md:py-8 space-y-10">
+        <header>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Browse</h1>
+          <p className="text-muted-foreground mt-1">Loading music, charts and moods…</p>
+        </header>
+        {[0, 1].map((row) => (
+          <div key={row} className="space-y-4">
+            <div className="h-6 w-40 rounded bg-secondary/60 animate-pulse" />
+            <div className="grid grid-flow-col auto-cols-[9rem] gap-4 overflow-hidden">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="aspect-square rounded-xl bg-secondary/60 animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-secondary/60 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function BrowseRoute() {
   return <BrowsePage />;

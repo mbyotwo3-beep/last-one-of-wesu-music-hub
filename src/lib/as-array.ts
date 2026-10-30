@@ -18,3 +18,19 @@ export function asArrayLenient<T>(value: unknown, label: string): T[] {
   }
   return [];
 }
+
+/**
+ * Query-side guard: a list call that did not return an array is a FAILURE, not
+ * an empty shelf. Throwing lets React Query retry and, if it keeps failing,
+ * show an honest retry surface instead of "No music yet" while the catalogue is
+ * full. Render-side still uses asArrayLenient so a bad cache cannot crash a page.
+ */
+export function assertList<T>(value: T, label: string): T {
+  if (!Array.isArray(value)) {
+    console.warn(
+      `[list-guard] "${label}" arrived as ${typeof value} instead of an array — treating as a failed call`,
+    );
+    throw new Error(`Malformed list response from ${label}`);
+  }
+  return value;
+}

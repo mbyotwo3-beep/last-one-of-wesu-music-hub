@@ -69,7 +69,7 @@ export async function ensureShellCache(): Promise<boolean> {
 export async function hasShellCopy(): Promise<boolean> {
   if (!shellCacheSupported()) return false;
   try {
-    const cache = await caches.open("wesu-shell-v4");
+    const cache = await caches.open("wesu-shell-v6");
     const hit = await cache.match("/", { ignoreSearch: true });
     return !!hit;
   } catch {

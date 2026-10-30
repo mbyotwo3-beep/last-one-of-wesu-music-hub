@@ -40,7 +40,7 @@
  * Signed audio URLs are single-use and expire, so they are excluded explicitly.
  */
 
-const VERSION = "v5";
+const VERSION = "v6";
 const SHELL_CACHE = `wesu-shell-${VERSION}`;
 const ASSET_CACHE = `wesu-assets-${VERSION}`;
 const KEEP = new Set([SHELL_CACHE, ASSET_CACHE]);
