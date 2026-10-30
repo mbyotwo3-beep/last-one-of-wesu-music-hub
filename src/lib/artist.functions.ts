@@ -267,6 +267,13 @@ export const uploadSong = createServerFn({ method: "POST" })
     // a signed download URL for it via admin-signed URL helpers.
     if (!data.audio_url) throw new Error("Audio file is required");
     assertOwnStoragePath("audio", data.audio_url, userId, staff);
+    // Artwork is mandatory. A release without a cover renders as a grey
+    // placeholder on every shelf and cannot be told apart from broken
+    // content once live. Enforced here, in updates, and at approval — the
+    // client-side check alone is bypassable.
+    if (!data.cover_url?.trim()) {
+      throw new Error("Cover artwork is required — every song needs a cover image");
+    }
     assertOwnStoragePath("cover", data.cover_url, userId, staff);
 
     // If has_label is true, ensure artist is signed to a label
@@ -281,7 +288,7 @@ export const uploadSong = createServerFn({ method: "POST" })
       .insert({
         title,
         audio_url: data.audio_url,
-        cover_url: data.cover_url ?? null,
+        cover_url: data.cover_url.trim(),
         duration: data.duration ?? null,
         genre: normalizeGenre(data.genre) || null,
         price,
@@ -454,12 +461,15 @@ export const createAlbum = createServerFn({ method: "POST" })
     if (price > 0 && price < pricing.album_min) {
       throw new Error(`Paid albums must cost at least K${pricing.album_min}`);
     }
+    if (!data.cover_url?.trim()) {
+      throw new Error("Cover artwork is required — every album needs a cover image");
+    }
     assertOwnStoragePath("cover", data.cover_url, userId, staff);
     const { data: album, error } = await supabase
       .from("albums")
       .insert({
         title,
-        cover_url: data.cover_url ?? null,
+        cover_url: data.cover_url.trim(),
         release_date: data.release_date ?? null,
         genre: normalizeGenre(data.genre) || null,
         description: data.description ?? null,
@@ -948,6 +958,9 @@ export const updateAlbum = createServerFn({ method: "POST" })
     if (data.description !== undefined) updateData.description = data.description;
     if (data.genre !== undefined) updateData.genre = normalizeGenre(data.genre) || null;
     if (data.cover_url !== undefined) {
+      if (!data.cover_url.trim()) {
+        throw new Error("Cover artwork is required — an album cannot be saved without one");
+      }
       assertOwnStoragePath("cover", data.cover_url, userId, staff);
       updateData.cover_url = data.cover_url;
     }
@@ -1060,6 +1073,9 @@ export const updateSong = createServerFn({ method: "POST" })
       updateData.title = t;
     }
     if (data.cover_url !== undefined) {
+      if (!data.cover_url.trim()) {
+        throw new Error("Cover artwork is required — a song cannot be saved without one");
+      }
       assertOwnStoragePath("cover", data.cover_url, userId, staff);
       updateData.cover_url = data.cover_url;
     }

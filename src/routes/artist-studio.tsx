@@ -1048,6 +1048,12 @@ function UploadWizard() {
       toast.info("You're not signed to a label — uploading as an independent release.");
     }
 
+    if (!cover) {
+      return setError(
+        "Cover art is required — upload a cover image for this release before uploading.",
+      );
+    }
+
     setError(null);
     setBusy(true);
     // Re-entrancy guard (set here, after validation): the button's disabled
@@ -1992,9 +1998,14 @@ function UploadWizard() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">
-                  Cover art <span className="font-normal text-muted-foreground">(optional)</span>
+                  Cover art{" "}
+                  <span className="font-normal text-primary">
+                    (required {mode === "album" ? "for the album" : "for the release"})
+                  </span>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">JPG, PNG, or WEBP · max 10MB</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  JPG, PNG, or WEBP · max 10MB · shown on every shelf and player screen
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <label

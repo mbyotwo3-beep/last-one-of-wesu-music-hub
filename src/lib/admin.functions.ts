@@ -196,6 +196,22 @@ export const moderateAlbum = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertStaff(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Approval gate: artwork is mandatory. A legacy row without a cover can
+    // still be edited or withdrawn, but it cannot be published — a cover-less
+    // album renders as a grey placeholder across every shelf.
+    const { data: albumRow } = await supabaseAdmin
+      .from("albums")
+      .select("id,title,cover_url")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!albumRow) throw new Error("Album not found");
+    if (data.status === "approved" && !(albumRow as any).cover_url?.trim()) {
+      throw new Error(
+        `"${(albumRow as any).title ?? "This album"}" has no cover artwork — add one before approving it`,
+      );
+    }
+
     const { error } = await supabaseAdmin
       .from("albums")
       .update({ status: data.status } as any)
@@ -254,11 +270,30 @@ export const moderateSong = createServerFn({ method: "POST" })
 
     const { data: song, error: songReadErr } = await supabaseAdmin
       .from("songs")
-      .select("id, album_id, title")
+      .select("id, album_id, title, cover_url")
       .eq("id", data.id)
       .maybeSingle();
     if (songReadErr) throw new Error(songReadErr.message);
     if (!song) throw new Error("Song not found");
+
+    // Approval gate: a song needs its own cover, or an album cover it renders
+    // with. Legacy rows without either stay unpublished until artwork lands.
+    if (data.status === "approved" && !(song as any).cover_url?.trim()) {
+      let inheritedCover: string | null = null;
+      if (song.album_id) {
+        const { data: parent } = await supabaseAdmin
+          .from("albums")
+          .select("cover_url")
+          .eq("id", song.album_id)
+          .maybeSingle();
+        inheritedCover = (parent as any)?.cover_url ?? null;
+      }
+      if (!inheritedCover?.trim()) {
+        throw new Error(
+          `"${(song as any).title ?? "This song"}" has no cover artwork — add one before approving it`,
+        );
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from("songs")

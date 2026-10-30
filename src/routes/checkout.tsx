@@ -12,7 +12,22 @@ import { isNativeShell, openExternalUrl } from "@/lib/external-url";
 import { useCurrency } from "@/stores/currency";
 import { StorageImage } from "@/components/StorageImage";
 
-const methodsQO = queryOptions({ queryKey: ["methods"], queryFn: () => getPaymentMethods() });
+// An edge burst can answer a server-fn call with a 200 that is not the shape
+// the handler returned (the dial-queue artifact behind the empty-Browse bug).
+// A resolved-but-garbage payload bypasses react-query's default retry — it
+// looks like a successful fetch — so every checkout query validates its shape
+// and throws on garbage, letting the retry land after the burst has passed.
+const burstResilient = { staleTime: 30_000, retry: 2, retryDelay: 800 } as const;
+
+const methodsQO = queryOptions({
+  queryKey: ["methods"],
+  queryFn: async () => {
+    const list = await getPaymentMethods();
+    if (!Array.isArray(list)) throw new Error("Payment methods response was malformed");
+    return list;
+  },
+  ...burstResilient,
+});
 
 type CheckoutSearch = {
   item?: "song" | "album" | "playlist";
@@ -112,10 +127,28 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { data: methods } = useSuspenseQuery(methodsQO);
 
-  const { data: purchasable, isLoading: purchasableLoading } = useQuery({
+  const {
+    data: purchasable,
+    isLoading: purchasableLoading,
+    isError: purchasableError,
+    refetch: refetchPurchasable,
+  } = useQuery({
     queryKey: ["purchasable", search.item, search.id],
-    queryFn: () => getPurchasableItem({ data: { item_type: search.item as any, id: search.id! } }),
+    queryFn: async () => {
+      const item = await getPurchasableItem({
+        data: { item_type: search.item as any, id: search.id! },
+      });
+      // A genuine miss — unapproved, removed, wrong id — is null and must
+      // reach the "isn't available" screen. Anything truthy must carry the
+      // row shape; garbage means a burst answered instead of the handler.
+      if (item == null) return null;
+      if (typeof item !== "object" || !(item as any).id || !(item as any).title) {
+        throw new Error("Item lookup response was malformed");
+      }
+      return item;
+    },
     enabled: !!search.item && !!search.id,
+    ...burstResilient,
   });
 
   const [selectedMethodCode, setSelectedMethodCode] = useState(methods[0]?.code ?? "");
@@ -192,6 +225,28 @@ function CheckoutPage() {
 
   if (purchasableLoading) {
     return <div className="p-12 text-center text-muted-foreground">Loading item…</div>;
+  }
+
+  // The lookup itself failed (retries exhausted). Distinct from "isn't
+  // available": telling a buyer an existing song was removed reads as
+  // "buying is broken". A retry re-dials after the burst has passed.
+  if (purchasableError) {
+    return (
+      <div className="min-h-screen px-6 py-12">
+        <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 text-center">
+          <h1 className="text-xl font-semibold">We couldn't load this item</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A network hiccup interrupted checkout. Your payment has not been started.
+          </p>
+          <button
+            onClick={() => refetchPurchasable()}
+            className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Item resolved to null: unapproved / removed / wrong id. Never hang on

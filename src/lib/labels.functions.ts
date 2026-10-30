@@ -282,7 +282,7 @@ export const respondToLabelInvite = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ownArtist } = await supabaseAdmin
       .from("artists")
-      .select("id")
+      .select("id, label_id")
       .eq("user_id", userId)
       .maybeSingle();
     if (!ownArtist) throw new Error("Artist profile required");
@@ -295,6 +295,14 @@ export const respondToLabelInvite = createServerFn({ method: "POST" })
     if (!invite || invite.status !== "invited") throw new Error("Label invitation not found");
 
     if (data.accept) {
+      // An artist belongs to one label at a time. Accepting a second invite
+      // used to overwrite artists.label_id and leave the old roster row
+      // 'active' — two labels claiming the same artist and its revenue.
+      if ((ownArtist as any).label_id && (ownArtist as any).label_id !== invite.label_id) {
+        throw new Error(
+          "You're already signed to a label — ask that label to remove you before joining another",
+        );
+      }
       const { data: row, error } = await supabase
         .from("label_artists")
         .update({ status: "active", joined_at: new Date().toISOString() } as any)
@@ -368,7 +376,10 @@ export const removeArtistFromLabel = createServerFn({ method: "POST" })
     await supabaseAdmin
       .from("artists")
       .update({ label_id: null })
-      .eq("id", (row as any).artist_id);
+      .eq("id", (row as any).artist_id)
+      // Only detach when the artist is still signed to THIS label. A stale
+      // roster row must not pull an artist away from their current label.
+      .eq("label_id", (row as any).label_id);
     await audit(context.userId, "label.remove_artist", "label_artists", data.id);
     return { ok: true };
   });
@@ -560,6 +571,15 @@ export const requestLabelForRelease = createServerFn({ method: "POST" })
         .eq("artist_id", (artist as any).id)
         .maybeSingle();
       if (!album) throw new Error("Album not found or you don't have permission");
+      // Label attribution for albums lives on the tracks. A partially labelled
+      // album would pay two labels for one purchase — refuse the request.
+      const { data: albumTracks } = await supabaseAdmin
+        .from("songs")
+        .select("id, label_id")
+        .eq("album_id", data.album_id!);
+      if ((albumTracks ?? []).some((t: any) => t.label_id)) {
+        throw new Error("This album already has a label");
+      }
     }
 
     const { data: label } = await supabaseAdmin
@@ -690,14 +710,19 @@ export const respondToLabelReleaseRequest = createServerFn({ method: "POST" })
       } else if (payload.album_id) {
         const { data: tracks } = await supabaseAdmin
           .from("songs")
-          .select("id")
+          .select("id, label_id")
           .eq("album_id", payload.album_id);
         if (!tracks || tracks.length === 0) throw new Error("Album has no songs");
+        // Mixed labels would split one album's revenue between them. The
+        // request path refuses labelled albums too; this covers races and
+        // rows labelled after the request was sent.
+        if ((tracks as any[]).some((t: any) => t.label_id && t.label_id !== payload.label_id)) {
+          throw new Error("Some album tracks are already assigned to another label");
+        }
         const { error } = await supabaseAdmin
           .from("songs")
           .update({ label_id: payload.label_id } as any)
-          .eq("album_id", payload.album_id)
-          .is("label_id", null);
+          .eq("album_id", payload.album_id);
         if (error) throw new Error(error.message);
       } else {
         throw new Error("Request has no release attached");

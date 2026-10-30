@@ -126,7 +126,7 @@ export const respondToCollabInvite = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // SECURITY: only the invited artist, the inviter/song owner, or staff
-    // may accept or decline an invite — previously any authed user could.
+    // may respond to an invite — previously any authed user could.
     const { data: invite } = await supabaseAdmin
       .from("song_collaborators")
       .select("id, artist_id, invited_by, songs!inner(id, artist_id)")
@@ -134,7 +134,7 @@ export const respondToCollabInvite = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!invite) throw new Error("Invite not found");
     const staff = await isStaffUser(supabase, userId);
-    if (!staff && (invite as any).invited_by !== userId) {
+    if (!staff) {
       const { data: artist } = await supabase
         .from("artists")
         .select("id")
@@ -143,7 +143,15 @@ export const respondToCollabInvite = createServerFn({ method: "POST" })
       const songArtistId = (invite as any).songs?.artist_id;
       const isInvited = artist && (artist as any).id === (invite as any).artist_id;
       const isOwner = artist && (artist as any).id === songArtistId;
-      if (!isInvited && !isOwner) {
+      const isInviter = (invite as any).invited_by === userId;
+      if (data.accept) {
+        // Consent is the point of the invite. An owner/inviter accepting on
+        // the invited artist's behalf would fabricate that person's agreement
+        // to the credit and its share of the money.
+        if (!isInvited) {
+          throw new Error("Forbidden: only the invited artist can accept this invite");
+        }
+      } else if (!isInvited && !isOwner && !isInviter) {
         throw new Error("Forbidden: you cannot respond to this invite");
       }
     }
