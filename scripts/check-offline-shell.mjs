@@ -223,7 +223,7 @@ if (docStart === -1) {
 // branch matched the word "cookie" in the explanatory comment and the whole
 // check could never fire. Seventh time a check was weaker than it looked, and
 // again the gate was the defect, not the code.
-const fetchStart = shell.indexOf("private static byte[] fetch(");
+const fetchStart = shell.indexOf("private static Fetched fetch(");
 const fetchBody =
   fetchStart === -1 ? "" : shell.slice(fetchStart, shell.indexOf("\n    }", fetchStart));
 // The headers must be forwarded BY VARIABLE. Checking merely for
@@ -397,6 +397,11 @@ public class ShellProbe {
       ["https://www.wesuplus.com/albums/abc-123", { document: "true" }],
       ["https://www.wesuplus.com/downloads", { document: "true" }],
       ["https://www.wesuplus.com/api/purchases", { document: "false", volatile: true }],
+      // vc39 regression: _serverFn GETs fell through to isDocument, were fetched
+      // natively, and came back relabeled text/html — valid JSON body, lying
+      // header — so the installed app's Browse/Search parsed nothing. RPCs are
+      // volatile data, forever.
+      ["https://www.wesuplus.com/_serverFn/x", { document: "false", volatile: true }],
       ["https://abcd.supabase.co/rest/v1/songs?select=*", { document: "false", volatile: true }],
       ["https://abcd.supabase.co/auth/v1/token", { document: "false", volatile: true }],
       ["https://abcd.supabase.co/storage/v1/object/public/art/a.jpg", { document: "false", volatile: true }],
@@ -458,7 +463,7 @@ if (!rootValue || rootValue === anyRouteCache || !rootValue.includes("root")) {
 
     if (!failures.length) {
       notes.push(
-        `the real classification was executed on ${expect.length} URLs: purchase, storage, ` +
+        `the real classification was executed on ${expect.length} URLs: server-fn RPCs, purchase, storage, ` +
           "Lenco and audio never touch the cache, hashed assets never touch the network",
       );
     }

@@ -29,7 +29,14 @@ android {
         // 38 = first Play-Store-launch candidate build: ships on the latest
         //   web bundle (currency reactivity, honest list states, /now-playing
         //   deep-link state, /auth signed-in bump, preview-honest restore).
-        versionCode 39
+        // 39 = launch deliverables (release-out v39, /wesuplus.apk sideload).
+        // 40 = ROOT-CAUSE FIX for "pages don't load in the app": OfflineShell
+        //   intercepted /_serverFn GETs and served the JSON bytes relabeled
+        //   text/html, so every GET-loader page (Browse/Search shelves) failed
+        //   in the installed app while browsers were fine. RPCs are now
+        //   volatile (never intercepted, never cached) and serveDocument serves
+        //   non-HTML answers with their real content type.
+        versionCode 40
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

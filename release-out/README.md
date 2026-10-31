@@ -1,18 +1,38 @@
-# Wesu+ v39 launch artifacts — 2026-10-25/26
+# Wesu+ launch artifacts
 
-Play Store + sideload deliverables, built from the launch-sweep state
-(signing material is the repo's release keystore, Android-side only).
+## v40 — 2026-10-31: root-cause fix for "pages don't load in the app"
+
+Play Store + sideload deliverables (signing material is the repo's release
+keystore, Android-side only).
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `wesu-plus-v40.apk` | 7.40 MB (7,756,695 B) | `d60929dc98c3123207531f5f04e72264971bac3efa661b20159106a281a05870` |
+| `wesu-plus-v40.aab` | 7.04 MB (7,381,250 B) | `37f77860387cfc07656d356bc15155ecf9e3ec3d677c2356712bad52f4de8c2c` |
+
+- Packaging: `com.wesu.music`, `versionCode 40`, `versionName 0.0.1`, minSdk 24.
+- `public/wesuplus.apk` (the privately hosted sideload at `/wesuplus.apk`,
+  not advertised in the UI) is a byte copy of this same v40 build.
+- **What changed vs v39 (native side — the one real fix):** `OfflineShell`
+  classified `_serverFn` GETs as "documents", fetched them natively, and
+  served the valid JSON bytes back relabeled as `text/html` with its own
+  no-store headers. The page's parser therefore saw a lying content type,
+  yielded nothing, and every GET-loader surface (Browse/Search shelves,
+  purchase state reads) failed ONLY in the installed app while browsers were
+  fine. RPCs are now volatile (never intercepted, never cached natively), and
+  `serveDocument` serves any non-HTML answer with its real content type and
+  caches only genuine HTML. Gate: `check-offline-shell.mjs` now asserts the
+  `_serverFn` classification on the compiled class.
+- The web side was already correct (`cfefab7`: per-user RPC responses are
+  `Cache-Control: private, no-store`); that deploy shipped with this bug
+  masked by the native relabeling.
+
+## v39 — 2026-10-25/26 (superseded for sideload; Play AAB fallback)
 
 | File | Size | SHA-256 |
 |---|---|---|
 | `wesu-plus-v39.apk` | 7.40 MB (7,756,339 B) | `593decb61e1560128ea4fe6e281238e639742d68dc5c098266c628acbf922efa` |
 | `wesu-plus-v39.aab` | 7.04 MB (7,380,896 B) | `23a455b43bc3483b108f91aa38b5aac7800007c838055fafb3aa87e1faff3d9e` |
-
-- Packaging: `com.wesu.music`, `versionCode 39`, `versionName 0.0.1`, minSdk 24.
-- APK verified via aapt2 badging: label "Wesu+", correct launcher activity, icon set.
-- The APK/AAB are native WebView shells around the live site
-  (`https://www.wesuplus.com/`), so web deploys reach installed users without a
-  new versionCode — the v39 bump exists to ship the native playback fixes below.
 - `public/wesuplus.apk` in the web app (the privately hosted sideload download
   at `/wesuplus.apk`, not advertised in the UI) is a byte copy of this same v39
   build (hash 593decb6…).

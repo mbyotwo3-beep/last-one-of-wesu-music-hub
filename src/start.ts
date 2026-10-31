@@ -26,6 +26,14 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
  * call with an earlier deployment's HTML — which is exactly the app-side
  * "rpc 200 ct=text/html" that rendered Browse and Search falsely empty.
  * Personalized RPC responses must never be shared-cacheable at all.
+ *
+ * vc40 root-cause note: the on-device "rpc 200 ct=text/html" was NOT a
+ * middlebox — the native shell itself (OfflineShell) fetched RPC GETs and
+ * served the valid JSON bytes back relabeled as text/html with its own
+ * no-store headers, which is why cc=no-store + vc=- appeared on device while
+ * replays off-device got application/json + Vercel headers. Fixed in
+ * OfflineShell (RPCs now volatile + content-type honesty). This middleware
+ * stays: per-user responses must never be shared-cacheable regardless.
  */
 const serverFnNoStoreMiddleware = createMiddleware().server(async ({ request, next }) => {
   const response = await next();

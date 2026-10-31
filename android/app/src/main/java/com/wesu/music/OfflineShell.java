@@ -53,10 +53,11 @@ import java.util.Map;
  *
  * NEVER SERVED FROM ANY CACHE
  *
- *   /api, Supabase, storage, Lenco, audio.
+ *   /_serverFn (server-function RPCs), /api, Supabase, storage, Lenco, audio.
  *       Purchase state must never come from a cache, and a cached signed-audio
  *       URL is a dead stream. These go to the network and fail offline exactly
  *       as they should, which is what the offline UI is built to explain.
+ *       (vc40: RPCs also must never be RELABELED — see isVolatile.)
  *
  * The listener's own data — library, likes, playlists — is not here at all. That
  * lives in the encrypted IndexedDB vault inside the app, untouched by this class.
@@ -114,7 +115,15 @@ final class OfflineShell {
      */
     private static boolean isVolatile(String url) {
         String u = url.toLowerCase(java.util.Locale.ROOT);
-        return u.contains("/api/")
+        // /_serverFn/ is a TanStack server function: a per-user JSON answer whose
+        // client contract includes its content type. Until vc40 these GETs fell
+        // through to isDocument(), were fetched here, and were served back
+        // relabeled as text/html — the page saw valid JSON bytes behind a lying
+        // header, parsed nothing, and Browse/Search in the installed app drew
+        // honest error states for data that was in fact on the wire. RPCs are
+        // data, not documents: they go to the WebView's own network path, always.
+        return u.contains("/_serverfn/")
+                || u.contains("/api/")
                 || u.contains("supabase.co")
                 || u.contains("lenco")
                 || u.contains("/storage/v1/")
@@ -191,15 +200,39 @@ final class OfflineShell {
     private static WebResourceResponse serveDocument(
             Context ctx, String url, Map<String, String> requestHeaders) {
         try {
-            byte[] fresh = fetch(url, requestHeaders);
-            if (fresh != null && fresh.length > 0) {
-                save(ctx, url, fresh);
-                return html(fresh);
+            Fetched fresh = fetch(url, requestHeaders);
+            if (fresh != null && fresh.body.length > 0) {
+                String mime = mimeOf(fresh.contentType);
+                if (mime.isEmpty() || mime.equals("text/html")) {
+                    // A real HTML document — what this path exists for. Saved as
+                    // the offline fallback for exactly this route.
+                    save(ctx, url, fresh.body);
+                    return html(fresh.body);
+                }
+                // A 2xx that is NOT HTML: serve it as what it actually is, and
+                // never cache it. Relabeling foreign bytes as text/html corrupts
+                // the page's parser (valid body, lying header — the vc39
+                // /_serverFn bug's exact shape). isVolatile now keeps RPCs off
+                // this path entirely; this branch is the last line of defense
+                // for anything else that might ever be misclassified.
+                return new WebResourceResponse(
+                        mime, "utf-8", 200, "OK", noStore(), new ByteArrayInputStream(fresh.body));
             }
         } catch (Throwable ignored) {
             // Offline, DNS failure, timeout — all the same: try the cache.
         }
         return serveCachedDocument(ctx, url);
+    }
+
+    /** A network answer: the body bytes and the content type they were served as. */
+    private static final class Fetched {
+        final byte[] body;
+        final String contentType;
+
+        Fetched(byte[] body, String contentType) {
+            this.body = body;
+            this.contentType = contentType;
+        }
     }
 
     /**
@@ -209,7 +242,7 @@ final class OfflineShell {
      * render the ANONYMOUS shell while the client boots signed in, and React
      * hydration would tear the page down and rebuild it.
      */
-    private static byte[] fetch(String url, Map<String, String> requestHeaders) throws Exception {
+    private static Fetched fetch(String url, Map<String, String> requestHeaders) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         try {
             if (requestHeaders != null) {
@@ -244,7 +277,9 @@ final class OfflineShell {
             } finally {
                 in.close();
             }
-            return out.toByteArray();
+            // The content type must be captured before disconnect — it decides
+            // whether serveDocument may label these bytes text/html.
+            return new Fetched(out.toByteArray(), conn.getContentType());
         } finally {
             conn.disconnect();
         }
@@ -403,6 +438,12 @@ final class OfflineShell {
     }
 
     // ------------------------------------------------------------------ utils
+
+    /** "application/json; charset=utf-8" → "application/json" ("" when absent). */
+    private static String mimeOf(String contentType) {
+        if (contentType == null) return "";
+        return contentType.split(";", 2)[0].trim().toLowerCase(java.util.Locale.ROOT);
+    }
 
     private static WebResourceResponse html(byte[] body) {
         return new WebResourceResponse(
