@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, memo } from "react";
-import { Search, LogOut, UserCircle, Shield, Menu, X, FileText, Mic2 } from "lucide-react";
+import { Search, LogOut, UserCircle, Shield, Menu, X, FileText, Mic2, Landmark } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { useUserRoles } from "../hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ const NavbarComponent = function Navbar() {
   const { user, loading: authLoading } = useAuth();
   // `checked` gates every claim about the account: while the roles read is in flight
 // or has failed we must not tell anyone they are or are not an artist.
-const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useUserRoles();
+const { isArtist, isAdmin, isSuperAdmin, isLabel, loading: rolesLoading, checked } = useUserRoles();
 
   // Use React Query for avatar fetch with proper caching and optimistic UI
   const { data: avatarPath } = useQuery({
@@ -113,7 +113,7 @@ const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useU
           <div className="px-4 py-3 border-b border-border">
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             <p className="text-xs font-semibold text-primary mt-0.5">
-              {isSuperAdmin ? "Superadmin" : isAdmin ? "Admin" : isArtist ? "Artist" : "Listener"}
+              {isSuperAdmin ? "Superadmin" : isAdmin ? "Admin" : isArtist ? "Artist" : isLabel ? "Label" : "Listener"}
             </p>
           </div>
           <Link
@@ -149,6 +149,17 @@ const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useU
             >
               <span className="inline-flex items-center gap-2">
                 <Mic2 className="size-4" /> Artist Portal
+              </span>
+            </Link>
+          )}
+          {isLabel && (
+            <Link
+              to="/label-dashboard"
+              className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Landmark className="size-4" /> Label Dashboard
               </span>
             </Link>
           )}
@@ -277,6 +288,16 @@ const { isArtist, isAdmin, isSuperAdmin, loading: rolesLoading, checked } = useU
                   >
                     <Mic2 className="size-5" />
                     Artist Portal
+                  </Link>
+                )}
+                {isLabel && (
+                  <Link
+                    to="/label-dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                  >
+                    <Landmark className="size-5" />
+                    Label Dashboard
                   </Link>
                 )}
                 {isAdmin && (

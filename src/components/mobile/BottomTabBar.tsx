@@ -16,6 +16,7 @@ import {
   Heart,
   Music,
   Mic2,
+  Landmark,
   Plus,
   Lock,
   Smartphone,
@@ -111,7 +112,7 @@ function AppVersionFooter() {
 
 export function BottomTabBar() {
   const { user } = useAuth();
-  const { isArtist, isAdmin, isSuperAdmin, checked } = useUserRoles();
+  const { isArtist, isAdmin, isSuperAdmin, isLabel, checked } = useUserRoles();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
@@ -472,7 +473,9 @@ export function BottomTabBar() {
                         ? "Admin"
                         : isArtist
                           ? "Artist"
-                          : "Listener"}
+                          : isLabel
+                            ? "Label"
+                            : "Listener"}
                   </p>
                 </div>
                 <button
@@ -517,6 +520,18 @@ export function BottomTabBar() {
                   >
                     <Mic2 className="size-5" />
                     <span className="text-sm font-medium">Artist Studio</span>
+                  </button>
+                )}
+                {isLabel && (
+                  <button
+                    onClick={() => {
+                      navigate({ to: "/label-dashboard" });
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                  >
+                    <Landmark className="size-5" />
+                    <span className="text-sm font-medium">Label Dashboard</span>
                   </button>
                 )}
                 {isAdmin && (
