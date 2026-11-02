@@ -17,7 +17,6 @@ import { usePlayer } from "@/stores/player";
 import { useOfflineMode } from "@/stores/offline-mode";
 import {
   getVaultArtObjectUrl,
-  getVaultUsage,
   isVaultSupported,
   listVaultMeta,
   refreshVaultIdCache,
@@ -96,11 +95,6 @@ export function DownloadsSection() {
     queryFn: () => listVaultMeta(),
     staleTime: 30_000,
   });
-  const { data: usage } = useQuery({
-    queryKey: ["vault-track", "usage"],
-    queryFn: () => getVaultUsage(),
-    staleTime: 30_000,
-  });
 
   // IndexedDB only exists in the browser, so the old `if (!isVaultSupported())
   // return null` AFTER the hooks made SSR render nothing and the client's first
@@ -135,7 +129,10 @@ export function DownloadsSection() {
   // Same lenient-array guard as the library lists: listVaultMeta resolving a
   // non-array (corrupted snapshot, future envelope) must not crash the page.
   const list = Array.isArray(tracks) ? tracks : [];
-  const mb = ((usage?.bytes ?? 0) / 1048576).toFixed(1);
+  // Size shown is THIS account's downloads, summed from the (owner-filtered)
+  // list itself — never the device-wide vault total, which would show another
+  // account's storage against an empty page.
+  const mb = ((list.reduce((sum, t) => sum + (t.size || 0), 0)) / 1048576).toFixed(1);
 
   const playAll = () => {
     if (list.length === 0) return;

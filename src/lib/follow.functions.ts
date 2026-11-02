@@ -83,8 +83,10 @@ export const getSimilarArtists = createServerFn({ method: "GET" })
       .maybeSingle();
     let q = supabase
       .from("artists")
-      .select("id,name,avatar_url,genre,verified,monthly_listeners")
+      .select("id,name,avatar_url,genre,verified,monthly_listeners,songs!inner(id)")
       .eq("status", "approved")
+      // Same public rule as the shelves: no approved song, not listed.
+      .eq("songs.status", "approved")
       .neq("id", data.artist_id)
       .order("monthly_listeners", { ascending: false })
       .limit(8);

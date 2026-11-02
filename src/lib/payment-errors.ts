@@ -34,6 +34,12 @@ export function friendlyPaymentError(raw: unknown): string {
   ) {
     return "That mobile money number isn't valid. Check it and try again.";
   }
+  // Lenco's wording when the MSISDN is well-formed but no wallet exists for
+  // it at the operator ("Account details was not found"). The number passes
+  // local validation, so the fix belongs to the buyer's number, not the app.
+  if (m.includes("account details") || m.includes("account_not_found")) {
+    return "That mobile money number isn't registered for mobile money. Check the number and try again, or use a different method.";
+  }
   if (
     m.includes("timeout") ||
     m.includes("timed out") ||

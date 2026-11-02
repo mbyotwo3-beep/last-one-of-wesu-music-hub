@@ -148,10 +148,13 @@ export const getHomeFeatured = createServerFn({ method: "GET" }).handler(async (
           .maybeSingle();
         target = data;
       } else if (s.target_type === "artist") {
+        // Same public rule as every shelf: an artist slot resolves only once
+        // the artist has at least one approved song to listen to.
         const { data } = await sb
           .from("artists")
-          .select("id, name, avatar_url")
+          .select("id, name, avatar_url, songs!inner(id)")
           .eq("id", s.target_id)
+          .eq("songs.status", "approved")
           .maybeSingle();
         target = data;
       } else if (s.target_type === "label") {

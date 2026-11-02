@@ -20,17 +20,36 @@ function emit() {
 function ensureInit() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
+  /**
+   * Downloads are per-account (Apple-style). On every identity change the
+   * vault is re-pointed and its synchronous index rebuilt, so the player,
+   * checkmarks and the downloads page all flip to the new account's set at
+   * the same moment the rest of the UI does. Lazily imported: the vault
+   * touches IndexedDB and this module must stay SSR-safe.
+   */
+  const syncVaultOwner = (userId: string | null) => {
+    void import("@/lib/offline-vault")
+      .then((m) => {
+        m.setVaultOwner(userId);
+        return m.refreshVaultIdCache();
+      })
+      .catch(() => {
+        /* no vault here (SSR, storage blocked) — nothing to scope */
+      });
+  };
   supabase.auth
     .getSession()
     .then(({ data: { session } }) => {
       cachedUser = session?.user ?? null;
       cachedLoading = false;
+      syncVaultOwner(cachedUser?.id ?? null);
       emit();
     })
     .catch(() => {
       // Storage-blocked / network failure must not hang the app on the
       // loading skeleton forever with an unhandled rejection.
       cachedLoading = false;
+      syncVaultOwner(null);
       emit();
     });
   supabase.auth.onAuthStateChange((_event, session) => {
@@ -41,6 +60,7 @@ function ensureInit() {
     if (nextId !== prevId || cachedLoading) {
       cachedUser = session?.user ?? null;
       cachedLoading = false;
+      syncVaultOwner(nextId);
       emit();
     } else if (session?.user) {
       cachedUser = session.user;

@@ -95,8 +95,10 @@ export const globalSearch = createServerFn({ method: "GET" })
         .limit(limit * 3),
       supabase
         .from("artists")
-        .select("id,name,avatar_url,genre,verified,monthly_listeners")
+        .select("id,name,avatar_url,genre,verified,monthly_listeners,songs!inner(id)")
         .eq("status", "approved")
+        // Same public rule as the shelves: no approved song, not listed.
+        .eq("songs.status", "approved")
         .ilike("name", like)
         .order("monthly_listeners", { ascending: false })
         .limit(limit * 3),
@@ -210,8 +212,13 @@ export const listArtists = createServerFn({ method: "GET" }).handler(async () =>
   const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("artists")
-    .select("id,name,genre,avatar_url,verified,monthly_listeners")
+    .select("id,name,genre,avatar_url,verified,monthly_listeners,songs!inner(id)")
     .eq("status", "approved")
+    // Public listing rule: an approved artist is only listed once they have
+    // at least one approved song. The !inner join turns the nested songs
+    // filter into "has at least one matching song", so brand-new approved
+    // artists (nothing to listen to yet) stay off every public shelf.
+    .eq("songs.status", "approved")
     .order("created_at", { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
@@ -221,9 +228,10 @@ export const listArtists = createServerFn({ method: "GET" }).handler(async () =>
 // ---------- Artist & Album detail ----------
 
 export const getArtistById = createServerFn({ method: "GET" })
+  .middleware([optionalSupabaseAuth])
   .validator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const supabase = getPublicSupabase();
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
     const [artist, albums, songs] = await Promise.all([
       supabase.from("artists").select("*").eq("id", data.id).eq("status", "approved").maybeSingle(),
       supabase
@@ -241,6 +249,28 @@ export const getArtistById = createServerFn({ method: "GET" })
         .limit(20),
     ]);
     if (artist.error) throw new Error(artist.error.message);
+
+    // Public visibility rule: an approved artist with no approved song or
+    // album is still setting up, so the profile stays private until there is
+    // something to hear — except to the artist themselves (their empty
+    // profile is their onboarding surface) and to staff.
+    let artistRow = artist.data;
+    if (artistRow) {
+      const hasMusic =
+        (songs.data?.length ?? 0) > 0 || (albums.data?.length ?? 0) > 0;
+      if (!hasMusic) {
+        let allowed = context.userId != null && artistRow.user_id === context.userId;
+        if (!allowed && context.userId) {
+          const { data: roles } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", context.userId)
+            .in("role", ["admin", "superadmin"]);
+          allowed = (roles?.length ?? 0) > 0;
+        }
+        if (!allowed) artistRow = null;
+      }
+    }
 
     let appearsOn: any[] = [];
     try {
@@ -269,7 +299,7 @@ export const getArtistById = createServerFn({ method: "GET" })
     }
 
     return {
-      artist: artist.data,
+      artist: artistRow,
       albums: albums.data ?? [],
       topSongs: songs.data ?? [],
       appearsOn,
@@ -595,8 +625,10 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .limit(10),
     supabase
       .from("artists")
-      .select("id,name,genre,avatar_url,verified,monthly_listeners")
+      .select("id,name,genre,avatar_url,verified,monthly_listeners,songs!inner(id)")
       .eq("status", "approved")
+      // Same public rule as the shelves: no approved song, not listed.
+      .eq("songs.status", "approved")
       .order("monthly_listeners", { ascending: false })
       .limit(10),
     supabase

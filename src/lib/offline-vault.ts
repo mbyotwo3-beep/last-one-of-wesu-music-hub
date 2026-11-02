@@ -33,6 +33,32 @@ const DEVICE_KEY_ID = "aes-gcm-256";
 /** Hard cap so one device can't fill its disk (bounded offline cache). */
 export const MAX_VAULT_BYTES = 1_500_000_000;
 
+/**
+ * The signed-in account every vault write is stamped with and every read is
+ * filtered by. Device state (the encryption key) is shared; the MUSIC inside
+ * is not. Kept in module state — not React — because the player's synchronous
+ * index reads must already reflect the right account, and because this module
+ * must stay framework-free.
+ */
+let currentOwnerUserId: string | null = null;
+
+/**
+ * Point the vault at an account (null when signed out). The caller — the auth
+ * bootstrap — re-runs `refreshVaultIdCache()` right after, so the player's
+ * index and every checkmark flip to the new account's set in one step.
+ */
+export function setVaultOwner(userId: string | null): void {
+  currentOwnerUserId = userId ?? null;
+}
+
+/** True when a vault row belongs to the currently signed-in account. */
+function rowBelongsToCurrentUser(row: { ownerUserId?: string | null }): boolean {
+  // Rows saved while signed out (no entitlement flow reaches here today, but
+  // be lenient) belong to the device's signed-out state: they show only when
+  // nobody is signed in, and never bleed into an account's library.
+  return (row.ownerUserId ?? null) === currentOwnerUserId;
+}
+
 export interface VaultTrackMeta {
   songId: string;
   title: string;
@@ -41,6 +67,16 @@ export interface VaultTrackMeta {
   mime: string;
   size: number;
   downloadedAt: number;
+  /**
+   * Apple-style account scoping: downloads belong to the account that
+   * downloaded them, not to the device. Listing, the card checkmark and
+   * playback all compare this against the signed-in user, so signing into
+   * another account on the same phone never shows (or plays) someone else's
+   * music. Rows written before this field existed have no owner at all —
+   * ownership cannot be proven for them, so they are purged once (the
+   * entitlement they were downloaded under may no longer even exist).
+   */
+  ownerUserId?: string | null;
   /**
    * Plaintext cover bytes (decorative, not sensitive) fetched at download
    * time so the lock-screen/shade player shows artwork with zero network —
@@ -226,6 +262,7 @@ export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
     // full vault costs kilobytes rather than gigabytes.
     const recs = await tx<VaultTrackMeta[]>(META_STORE, "readonly", (s) => s.getAll());
     return recs
+      .filter(rowBelongsToCurrentUser)
       .map((r) => ({
         songId: r.songId,
         title: r.title,
@@ -234,6 +271,7 @@ export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
         mime: r.mime,
         size: r.size ?? 0,
         downloadedAt: r.downloadedAt ?? 0,
+        ownerUserId: r.ownerUserId ?? null,
       }))
       .sort((a, b) => b.downloadedAt - a.downloadedAt);
   } catch {
@@ -245,6 +283,13 @@ export async function listVaultMeta(): Promise<VaultTrackMeta[]> {
  * Rows written before the metadata mirror existed have no META entry. Rebuild
  * them once (a full read, but only ever once per device) so upgrading users
  * don't find their downloads page suddenly empty.
+ *
+ * The same pass purges rows with no `ownerUserId`: they predate account
+ * scoping, so the entitlement they were downloaded under can no longer be
+ * proven — the account may have been deleted outright. Showing them to
+ * whichever account is next signed in would let someone play music this
+ * account never bought, so unowned rows are removed rather than claimed.
+ * Owners re-download in one tap (their entitlement is intact).
  */
 let metaBackfillDone = false;
 async function ensureMetaBackfill(): Promise<void> {
@@ -273,8 +318,30 @@ async function ensureMetaBackfill(): Promise<void> {
           mime: rec.mime,
           size: rec.size ?? 0,
           downloadedAt: rec.downloadedAt ?? 0,
+          ownerUserId: rec.ownerUserId ?? null,
         }),
       );
+    }
+    // Purge unownable rows (see the doc comment above). Checked on the meta
+    // mirror — cheap — and both stores are cleaned so no ciphertext is left
+    // stranded on disk.
+    const metaRows = await tx<VaultTrackMeta[]>(META_STORE, "readonly", (s) => s.getAll());
+    const unowned = metaRows
+      .filter((r) => r.ownerUserId === undefined || r.ownerUserId === null)
+      .map((r) => r.songId);
+    for (const id of unowned) {
+      await tx(TRACKS_STORE, "readwrite", (s) => s.delete(id));
+      await tx(META_STORE, "readwrite", (s) => s.delete(id));
+      noteVaultChanged(id, false);
+    }
+    if (unowned.length) {
+      try {
+        console.info(
+          `[offline-vault] removed ${unowned.length} download(s) with no account owner (pre-account-scoping rows)`,
+        );
+      } catch {
+        /* console may be absent in some hosts */
+      }
     }
     metaBackfillDone = true;
   } catch {
@@ -305,6 +372,7 @@ export async function getVaultArtwork(songId: string): Promise<ArrayBuffer | nul
   if (!supported() || !songId) return null;
   try {
     const rec = await tx<VaultRecord | undefined>(TRACKS_STORE, "readonly", (s) => s.get(songId));
+    if (!rec || !rowBelongsToCurrentUser(rec)) return null;
     const art = rec?.artwork;
     if (!art || !(art instanceof ArrayBuffer) || art.byteLength === 0) return null;
     return art;
@@ -331,16 +399,15 @@ export async function getVaultArtObjectUrl(songId: string): Promise<string | nul
   }
 }
 
-/** Cheap existence probe — reads the key only, never the audio bytes. */
+/** Cheap existence probe — reads the mirror, never the audio bytes. */
 export async function isTrackDownloaded(songId: string): Promise<boolean> {
   if (!supported() || !songId) return false;
   try {
-    const key = await tx<unknown>(
-      TRACKS_STORE,
-      "readonly",
-      (s) => s.getKey(songId) as IDBRequest<unknown>,
-    );
-    return key != null;
+    // Owner-aware: the checkmark means "downloaded by THIS account". The meta
+    // mirror read costs kilobytes; reading TRACKS keys alone cannot tell who
+    // owns the row.
+    const rec = await tx<VaultTrackMeta | undefined>(META_STORE, "readonly", (s) => s.get(songId));
+    return !!rec && rowBelongsToCurrentUser(rec);
   } catch {
     return false;
   }
@@ -531,6 +598,10 @@ export async function saveTrackToVault(
     mime: meta.mime,
     size: plaintext.byteLength + (meta.artwork?.byteLength ?? 0),
     downloadedAt: Date.now(),
+    // Account scoping: this download belongs to whoever is signed in at the
+    // moment of download. Every later read (listing, checkmark, playback)
+    // compares against the then-signed-in account.
+    ownerUserId: meta.ownerUserId ?? currentOwnerUserId,
     iv: Array.from(iv),
     data: ciphertext,
     artwork: meta.artwork ?? null,
@@ -558,8 +629,9 @@ export async function saveTrackToVault(
     throw new Error("Could not save this download");
   }
   revokeOfflineObjectUrl(record.songId);
-  const { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork } = record;
-  return { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork };
+  const { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork, ownerUserId } =
+    record;
+  return { songId, title, artistName, coverUrl, mime, size, downloadedAt, artwork, ownerUserId };
 }
 
 export async function removeTrackFromVault(songId: string): Promise<void> {
@@ -669,6 +741,10 @@ export async function readVaultTrack(
     s.get(songId),
   ).catch(() => undefined);
   if (!rec) return null;
+  // Account scoping, enforced at the decrypt boundary too: another account's
+  // download on this device is treated as not downloaded — the player's index
+  // already filters, this closes any path that skips it.
+  if (!rowBelongsToCurrentUser(rec)) return null;
   const key = await getDeviceKey();
   try {
     const bytes = await window.crypto.subtle.decrypt(
@@ -676,7 +752,16 @@ export async function readVaultTrack(
       key,
       rec.data,
     );
-    const { songId: id, title, artistName, coverUrl, mime, size, downloadedAt } = rec;
+    const {
+      songId: id,
+      title,
+      artistName,
+      coverUrl,
+      mime,
+      size,
+      downloadedAt,
+      ownerUserId,
+    } = rec;
     return {
       bytes,
       mime,
@@ -689,6 +774,7 @@ export async function readVaultTrack(
         size,
         downloadedAt,
         artwork: rec.artwork ?? null,
+        ownerUserId: ownerUserId ?? null,
       },
     };
   } catch {

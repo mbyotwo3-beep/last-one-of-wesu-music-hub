@@ -447,7 +447,7 @@ export function BottomTabBar() {
               <Lock className="size-5" />
               <span className="text-sm font-medium">Privacy Policy</span>
             </button>
-            {isNative && (
+            {isNative && (isAdmin || isSuperAdmin) && (
               <button
                 onClick={() => {
                   setMenuOpen(false);

@@ -205,6 +205,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // Every cover photo and artist image is a signed URL on the Supabase
+      // storage host. Warming that connection in parallel with the document
+      // fetch removes one full TLS handshake from the first shelf paint.
+      {
+        rel: "preconnect",
+        href: "https://spoipjjfvhqwnhfrftax.supabase.co",
+        crossOrigin: "anonymous",
+      },
+      { rel: "dns-prefetch", href: "https://spoipjjfvhqwnhfrftax.supabase.co" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
