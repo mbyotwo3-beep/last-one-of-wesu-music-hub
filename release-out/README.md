@@ -1,5 +1,48 @@
 # Wesu+ launch artifacts
 
+## v41 — 2026-11-02: per-account downloads, smoothness, visibility rules
+
+Play Store + sideload deliverables (signing material is the repo's release
+keystore, Android-side only).
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `wesu-plus-v41.apk` | 7.40 MB (7,756,759 B) | `9600d53c1ae4922cd11efd3e79ac10d9d8efd43e3e2df2469f329dff2a4c6b71` |
+| `wesu-plus-v41.aab` | 7.04 MB (7,381,320 B) | `d62aa9aed8bfdb3f75696ea0cd5925cd47dabc92a8ff8bee8cc4bd86a7790f11` |
+
+- Packaging: `com.wesu.music`, `versionCode 41`, `versionName 0.0.1`, minSdk 24.
+- `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
+  sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
+  this same v41 build.
+- **What changed vs v40:**
+  - **Per-account downloads (Apple-style).** Vault rows now carry the owning
+    user id; the downloads list, card checkmarks and offline playback are all
+    scoped to the signed-in account, and the decrypt boundary refuses rows
+    from another account. Rows from before scoping (no owner — unprovable
+    entitlement) are purged once on first read. Fixes: downloads made under
+    one account showed under any account on the same device.
+  - **WebView smoothness (native).** Offscreen pre-raster (API 23+),
+    renderer kept alive when paused (API 29+, `RENDERER_PRIORITY_IMPORTANT`
+    never waived — no cold rebuild on resume), media playback without
+    gesture so queue advance/resume never needs a tap.
+  - **Web perf.** Storage-CDN preconnect + dns-prefetch (covers, artist
+    images) — one TLS handshake off the first shelf paint.
+  - **Artist public visibility rule.** Approved artists appear in public
+    shelves, search, home and similar-artist slots only once they have ≥1
+    approved song (nested `songs!inner` filter on every public listing).
+    Their own profile stays visible to themselves and to staff; the public
+    route 404s for everyone else.
+  - **App diagnostics least privilege.** The native App diagnostics entry is
+    admin/superadmin only.
+  - **Actionable mobile-money error.** Lenco's "Account details was not
+    found" (number not registered for MoMo) now maps to a message the buyer
+    can act on instead of the generic retry line.
+- **iOS (build on your Mac):** `CURRENT_PROJECT_VERSION = 41` already set in
+  `ios/App/App.xcodeproj/project.pbxproj`; `MARKETING_VERSION = 0.0.1`,
+  bundle id `com.wesu.music` unchanged. Open `ios/App/App.xcworkspace`, set
+  your signing team → Product > Archive → distribute via
+  Transporter/TestFlight.
+
 ## v40 — 2026-10-31: root-cause fix for "pages don't load in the app"
 
 Play Store + sideload deliverables (signing material is the repo's release
@@ -69,7 +112,7 @@ keystore, Android-side only).
 ## iOS (build on your Mac)
 Everything Xcode needs is committed:
 - `ios/App/App.xcworkspace` — open this, not the .xcodeproj.
-- `CURRENT_PROJECT_VERSION = 39`, `MARKETING_VERSION = 0.0.1`,
+- `CURRENT_PROJECT_VERSION = 41`, `MARKETING_VERSION = 0.0.1`,
   bundle id `com.wesu.music`.
 - `UIBackgroundModes: [audio]`, AppIcon 1024 single-size, PrivacyInfo.xcprivacy
   present, deployment target 15.0.

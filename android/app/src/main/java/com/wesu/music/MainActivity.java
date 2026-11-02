@@ -10,6 +10,7 @@ import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -50,9 +51,48 @@ public class MainActivity extends BridgeActivity {
         // request may arrive synchronously during loadUrl and needs this.
         OfflineShell.AppContextHolder.set(getApplicationContext());
         if (bridge != null && bridge.getWebView() != null) {
+            tuneWebViewForSmoothness(bridge.getWebView());
             bridge.getWebView().setWebViewClient(new WesuWebViewClient(bridge));
         }
         checkWebViewIsUsable(bridge);
+    }
+
+    /**
+     * Apple-Music-feel scroll and playback smoothness, done in the shell where
+     * it costs nothing in the web bundle. Each setting is independent and
+     * guarded: a WebView that rejects one must still get the others.
+     *
+     *  - setOffscreenPreRaster: rasterise while the app is animating back
+     *    (recents, notification shade), so the first frame after a resume is
+     *    the real page instead of a flash of blank.
+     *  - Renderer priority: the activity is routinely paused — with the shade
+     *    player open or after back (which backgrounds the app, never kills
+     *    playback). The default policy may tear the renderer down in that
+     *    state and rebuild it cold on return (visible jank + scroll jump).
+     *    Keeping it alive while the process lives removes that resume cost.
+     *  - Media without gesture: a music app must be able to resume playback
+     *    programmatically (queue advance, reconnect after offline) — waiting
+     *    for a tap is both unnecessary and wrong here.
+     */
+    private void tuneWebViewForSmoothness(WebView webView) {
+        try {
+            WebSettings s = webView.getSettings();
+            if (Build.VERSION.SDK_INT >= 23) {
+                s.setOffscreenPreRaster(true);
+            }
+            if (Build.VERSION.SDK_INT >= 29) {
+                // IMPORTANT + never waived: the default policy tears the
+                // renderer down whenever the activity is paused (shade player
+                // open, app backgrounded by back) and rebuilds it cold on
+                // return — the visible jank and scroll jump this targets.
+                webView.setRendererPriorityPolicy(
+                        WebView.RENDERER_PRIORITY_IMPORTANT,
+                        /* waiveWhenNotVisible */ false);
+            }
+            s.setMediaPlaybackRequiresUserGesture(false);
+        } catch (Throwable ignored) {
+            // Cosmetics must never block a launch.
+        }
     }
 
     /**
