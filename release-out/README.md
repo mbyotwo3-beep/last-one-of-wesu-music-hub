@@ -7,15 +7,15 @@ keystore, Android-side only).
 
 | File | Size | SHA-256 |
 |---|---|---|
-| `wesu-plus-v41.apk` | 7.40 MB (7,756,811 B) | `0327057502dcada23d246a58b03a21623f2316a306f4944a702934a19d6b93b7` |
-| `wesu-plus-v41.aab` | 7.04 MB (7,381,373 B) | `ce394892153286c59302ed24cdeda8e189f7763238cc8f15614e0a11ea155cc5` |
+| `wesu-plus-v41.apk` | 7.40 MB (7,756,675 B) | `16034e9fc527a9ff2aefa389f65bdd5821eb8ff2d61959ab1f97d730da03905e` |
+| `wesu-plus-v41.aab` | 7.04 MB (7,381,226 B) | `a6d709b5ad839935e4b8b918fb59d8f6599027c8697f5081686d9d2a1ceb2c05` |
 
 - Packaging: `com.wesu.music`, `versionCode 41`, `versionName 0.0.1`, minSdk 24.
 - `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
   sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
   this same v41 build.
 - **What changed vs v40:**
-  - **Songs no longer stop or pause by themselves (native).** Two root
+  - **Songs no longer stop or pause by themselves (native).** Three root
     causes fixed: a mid-track engine error (dropped connection killing the
     ExoPlayer source) used to surface a message and leave dead air — the
     player now silently reloads once with a fresh signed URL and rewinds to
@@ -23,7 +23,13 @@ keystore, Android-side only).
     dead source auto-advances; offline parks with an honest message). And
     the background-priority watchdog released the foreground service after
     only ~15s of silence — long re-buffering in the background let OEM job
-    killers reap playback mid-song; the window is now ~60s.
+    killers reap playback mid-song; the window is now ~60s. And the WebView's
+    Chromium AudioFocusDelegate requests then abandons audio focus, which
+    dispatched AUDIOFOCUS_LOSS to the NativeAudio engine — the old handler
+    only tracked assets already marked playing, so a focus loss landing in
+    the tiny window between play() and the engine marking the asset playing
+    left the song paused forever; the handler now tracks every asset on
+    focus loss so GAIN always resumes playback.
   - **Per-account downloads (Apple-style).** Vault rows now carry the owning
     user id; the downloads list, card checkmarks and offline playback are all
     scoped to the signed-in account, and the decrypt boundary refuses rows

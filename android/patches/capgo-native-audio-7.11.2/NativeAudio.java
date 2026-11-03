@@ -150,15 +150,16 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                     }
                 }
             } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                // WESU PATCH: another media app took over (YouTube, TikTok…).
-                // Pause — don't stop — and stay in the focus stack so its end
-                // hands focus back to us (Spotify rules: the active media app
-                // has priority, and we resume when it releases). Abandoning
-                // here would strand us paused forever.
+                // WESU PATCH: another media app took over (YouTube, TikTok…) — or the
+                // WebView's Chromium AudioFocusDelegate requested then abandoned focus,
+                // which dispatches AUDIOFOCUS_LOSS to us. Pause — don't stop — and track
+                // every asset for resume on GAIN. The old isPlaying() guard had a race:
+                // LOSS can arrive between play() being called and the asset being marked
+                // playing, so isPlaying() was false and the asset was never added to the
+                // resume list → GAIN never resumed it → song pauses by itself.
                 for (AudioAsset audio : audioAssetList.values()) {
                     try {
-                        if (audio.isPlaying()) {
-                            audio.pause();
+                        if (audio.pause()) {
                             if (focusResumeList != null) {
                                 focusResumeList.add(audio);
                             }
