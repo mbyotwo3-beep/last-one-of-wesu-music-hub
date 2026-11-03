@@ -819,18 +819,48 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 }
                 if (previewMode) {
                   const previewSelection = selectionId;
-                  const previewStartedAt = Date.now();
+                  // Give-up clock for the cap below measures STALL — time
+                  // actually PLAYING without progress — never wall-clock
+                  // since load. The old elapsed-since-load input killed
+                  // RESUMED previews: pause a preview for 2+ minutes (a
+                  // call, backgrounded, overnight), resume, and the next
+                  // tick force-advanced — on a one-track queue skipNext
+                  // has nowhere to go and STOPS playback. That was the
+                  // users' "song stops/pauses by itself" report.
+                  let lastHeard = 0;
+                  let lastProgressAt = Date.now();
                   const tickPreviewCap = () => {
                     if (currentSelectionRef.current !== previewSelection) return;
                     const st = usePlayer.getState();
+                    const heard = st.progressSeconds;
+                    if (!st.playing) {
+                      // Paused: freeze the stall clock and KEEP the timer
+                      // alive — dropping it here used to strand a resumed
+                      // preview with no cap ticking at all.
+                      lastHeard = heard;
+                      lastProgressAt = Date.now();
+                      previewTimerRef.current = setTimeout(tickPreviewCap, 2000);
+                      return;
+                    }
+                    if (heard > lastHeard) {
+                      lastHeard = heard;
+                      lastProgressAt = Date.now();
+                    }
                     const action = previewCapDecision({
                       playing: st.playing,
-                      heardSeconds: st.progressSeconds,
-                      elapsedMs: Date.now() - previewStartedAt,
+                      heardSeconds: heard,
+                      elapsedMs: Date.now() - lastProgressAt,
                       repeatOne: st.repeat === "one",
                     });
-                    if (action === "idle") return;
+                    if (action === "idle") {
+                      previewTimerRef.current = setTimeout(tickPreviewCap, 2000);
+                      return;
+                    }
                     if (action === "replay") {
+                      // The engine restarts from 0: reset the heard baseline
+                      // so the stall clock tracks the NEW pass, not the old.
+                      lastHeard = 0;
+                      lastProgressAt = Date.now();
                       seekNative(track!.id, 0).catch(() => {});
                       return;
                     }
