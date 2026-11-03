@@ -26,18 +26,26 @@ import androidx.core.app.ServiceCompat;
  * that exists only while the service runs.
  *
  * Self-healing: a watchdog polls AudioManager.isMusicActive() and stops the
- * service after ~15s of silence, so a pause issued on the player
+ * service after ~60s of silence, so a pause issued on the player
  * notification (which bypasses JS when the WebView is dead) can never leave
  * a stale "Playing" notification or a pointless held process behind. If the
  * OS kills the process, START_STICKY restarts the service with no playback
  * and the same watchdog shuts it straight back down.
+ *
+ * The window is deliberately generous: on a slow connection the ExoPlayer
+ * can sit re-buffering for tens of seconds with isMusicActive() false —
+ * during that stretch this service is the only thing holding the process at
+ * foreground priority. Cutting it at ~15s (the old setting) let OEM job
+ * killers reap mid-buffer background playback, which users heard as songs
+ * "pausing by themselves". 12 ticks × 5s covers a worst-case re-buffer and
+ * still cleans up a genuinely stopped player within a minute.
  */
 public class WesuPlaybackService extends Service {
 
     private static final String CHANNEL_ID = "wesu_playback";
     private static final int NOTIFICATION_ID = 4201;
     private static final long WATCHDOG_INTERVAL_MS = 5000;
-    private static final int MAX_QUIET_TICKS = 3;
+    private static final int MAX_QUIET_TICKS = 12;
 
     private Handler handler;
     private int quietTicks = 0;

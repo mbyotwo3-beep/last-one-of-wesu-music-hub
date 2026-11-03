@@ -1,20 +1,29 @@
 # Wesu+ launch artifacts
 
-## v41 — 2026-11-02: per-account downloads, smoothness, visibility rules
+## v41 — 2026-11-03: playback self-pause fix, per-account downloads, smoothness, visibility rules
 
 Play Store + sideload deliverables (signing material is the repo's release
 keystore, Android-side only).
 
 | File | Size | SHA-256 |
 |---|---|---|
-| `wesu-plus-v41.apk` | 7.40 MB (7,756,759 B) | `9600d53c1ae4922cd11efd3e79ac10d9d8efd43e3e2df2469f329dff2a4c6b71` |
-| `wesu-plus-v41.aab` | 7.04 MB (7,381,320 B) | `d62aa9aed8bfdb3f75696ea0cd5925cd47dabc92a8ff8bee8cc4bd86a7790f11` |
+| `wesu-plus-v41.apk` | 7.40 MB (7,756,811 B) | `0327057502dcada23d246a58b03a21623f2316a306f4944a702934a19d6b93b7` |
+| `wesu-plus-v41.aab` | 7.04 MB (7,381,373 B) | `ce394892153286c59302ed24cdeda8e189f7763238cc8f15614e0a11ea155cc5` |
 
 - Packaging: `com.wesu.music`, `versionCode 41`, `versionName 0.0.1`, minSdk 24.
 - `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
   sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
   this same v41 build.
 - **What changed vs v40:**
+  - **Songs no longer stop or pause by themselves (native).** Two root
+    causes fixed: a mid-track engine error (dropped connection killing the
+    ExoPlayer source) used to surface a message and leave dead air — the
+    player now silently reloads once with a fresh signed URL and rewinds to
+    where the song died, so it CONTINUES instead of stopping (a persistently
+    dead source auto-advances; offline parks with an honest message). And
+    the background-priority watchdog released the foreground service after
+    only ~15s of silence — long re-buffering in the background let OEM job
+    killers reap playback mid-song; the window is now ~60s.
   - **Per-account downloads (Apple-style).** Vault rows now carry the owning
     user id; the downloads list, card checkmarks and offline playback are all
     scoped to the signed-in account, and the decrypt boundary refuses rows

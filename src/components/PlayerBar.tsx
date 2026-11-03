@@ -205,6 +205,15 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
   // Selections that already burned their one auto-retry after a native
   // start failure (e.g. notification-STOP unloaded the asset).
   const nativeRetryRef = useRef<number | null>(null);
+  // Mid-track recovery (user-reported "song stops by itself"): where the
+  // native engine died, so the one-shot error retry below can rewind the
+  // reloaded asset there instead of restarting the song from 0.
+  const resumeAtRef = useRef<{ trackId: string; seconds: number } | null>(null);
+  // Auto-recoveries used by the CURRENT track. Reset whenever a different
+  // track loads; bounds the reload loop if a source is persistently dead
+  // (every error retry that "starts" clears nativeRetryRef via the success
+  // path, so the counter — not the ref — is what stops the ping-pong).
+  const nativeRecoveriesRef = useRef(0);
   // Native pre-warm of the upcoming track. Consumed (not re-preloaded)
   // when the selection advances to it; unloaded when the selection moves
   // elsewhere. The warmed URL travels along: entitlements can change between
@@ -510,6 +519,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
 
     currentSelectionRef.current = selectionId;
     appliedRetryRef.current = retryNonce;
+    // Recovery state belongs to the track that errored: loading any OTHER
+    // track drops the rewind position and refills the recovery budget, or
+    // a later re-select of that track would seek to a minutes-old position
+    // on a fresh play. A retry re-run of the SAME track keeps both.
+    if (currentTrackIdRef.current !== track.id) {
+      resumeAtRef.current = null;
+      nativeRecoveriesRef.current = 0;
+    }
     currentTrackIdRef.current = track.id;
     // Seed lock-screen duration from the row immediately (see ref note).
     durationRef.current = track.durationSeconds ?? 0;
@@ -849,15 +866,47 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 // the UI stayed frozen on "playing"). Drop the cached signed
                 // URL first — replaying a 403'd URL is permanent until it is
                 // evicted, so without this a retry could never succeed.
+                //
+                // This is the user-reported "song stops by itself" bug: the
+                // handler used to just surface a message and leave dead air
+                // when a transient network drop killed the ExoPlayer source
+                // mid-track. Now it recovers the way the web stall watchdog
+                // does — one automatic reload per failure (fresh signed URL
+                // → preload → play), rewound to the last reported position
+                // so the song CONTINUES instead of restarting. A persistently
+                // dead source gets at most two reloads, then auto-advances
+                // when online; offline it parks as paused with the reconnect
+                // message instead of burning data on doomed reloads.
                 const errorCleanup = await onNativePlaybackError(track!.id, (code) => {
                   if (!isCurrentTrack()) return;
                   console.error("[player] native playback error", code, track!.id);
                   evictCachedAudioUrlForUser(track!.id, user?.id ?? null);
                   setLoading(false);
-                  const message =
-                    typeof navigator !== "undefined" && navigator.onLine === false
-                      ? "Connection lost — reconnect to keep listening"
-                      : "Playback stopped — tap play to try again";
+                  const offline =
+                    typeof navigator !== "undefined" && navigator.onLine === false;
+                  const sel = currentSelectionRef.current;
+                  if (
+                    !offline &&
+                    nativeRetryRef.current !== sel &&
+                    nativeRecoveriesRef.current < 2
+                  ) {
+                    nativeRecoveriesRef.current++;
+                    nativeRetryRef.current = sel;
+                    // Capture BEFORE retry() — it zeroes progressSeconds.
+                    const pos = usePlayer.getState().progressSeconds;
+                    if (pos > 1) resumeAtRef.current = { trackId: track!.id, seconds: pos };
+                    usePlayer.getState().retry();
+                    return;
+                  }
+                  nativeRetryRef.current = null;
+                  if (!offline) {
+                    // Retry budget burned and the source is still dying:
+                    // advance the queue rather than strand it on dead air.
+                    usePlayer.getState().skipNext();
+                    return;
+                  }
+                  usePlayer.setState({ playing: false });
+                  const message = "Connection lost — reconnect to keep listening";
                   setError(message);
                   usePlayer.getState().setError(message);
                 });
@@ -888,6 +937,25 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                 const timeCleanup = await onNativeTimeUpdate(track!.id, (seconds) => {
                   if (currentTrackIdRef.current !== track!.id) return;
                   const st = usePlayer.getState();
+                  // One-shot mid-track recovery: the first tick after an
+                  // error-retry reload rewinds to where the engine died, so
+                  // the song continues instead of restarting from 0. Only a
+                  // rewind INTO the remaining track actually seeks — a
+                  // position at/past the end just lets the reload finish
+                  // naturally (complete → skip, same as the user left it).
+                  const resumeAt = resumeAtRef.current;
+                  if (resumeAt && resumeAt.trackId === track!.id) {
+                    resumeAtRef.current = null;
+                    const dur = durationRef.current;
+                    if (
+                      resumeAt.seconds > 1 &&
+                      (!dur || resumeAt.seconds < dur - 1)
+                    ) {
+                      seekNative(track!.id, resumeAt.seconds).catch(() => {});
+                      setProgress(Math.floor(resumeAt.seconds));
+                      return;
+                    }
+                  }
                   if (st.isPreview && seconds >= 15) {
                     // Backstop for the wall-clock timer: previews flow onward,
                     // never stop on an error (repeat-one replays).
