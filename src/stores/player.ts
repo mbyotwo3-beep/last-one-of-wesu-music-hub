@@ -463,8 +463,14 @@ export const usePlayer = create<PlayerState>()(
         }
         const audio = getAudio();
         if (!playing) primeAudio();
-        // If a 15-second preview has reached the end and user clicks Play, replay from 0
-        if (!playing && isPreview && progressSeconds >= 15) {
+        // If a 15-second preview has reached the end and user clicks Play, replay from 0.
+        // >= 14, not >= 15: the position mirror floors the engine's ticks
+        // (14.87 → 14), so a preview that ran to its natural end stalls here
+        // at 14 and the old >= 15 guard never fired — the engine resumed an
+        // ENDED asset at its tail, "played" the last 0.2s of silence, and
+        // stopped again: tapping Play did nothing at all (device log
+        // 10:57:34 — first tick 15.116, ended 0.4s later).
+        if (!playing && isPreview && progressSeconds >= 14) {
           if (audio?.src) audio.currentTime = 0;
           emitNativeSeek(0);
           set({ progressSeconds: 0, playing: true });
