@@ -1201,6 +1201,11 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                     .setSmallIcon(android.R.drawable.ic_media_play)
                     .setContentTitle(lastNotifTitle)
                     .setContentText(lastNotifArtist)
+                    // WESU PATCH: tapping the notification body (anywhere that
+                    // isn't a transport button) opens the app — the launcher
+                    // intent brings the existing task to the front, where the
+                    // MiniPlayer is one tap away on any route.
+                    .setContentIntent(openAppIntent())
                     .setStyle(
                         new androidx.media.app.NotificationCompat.MediaStyle()
                             .setMediaSession(mediaSession.getSessionToken())
@@ -1242,6 +1247,26 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
             return android.app.PendingIntent.getBroadcast(getContext(), requestCode, intent, flags);
         } catch (Exception e) {
             Log.e(TAG, "Error building transport intent", e);
+            return null;
+        }
+    }
+
+    // WESU PATCH (not upstream): content intent for the notification BODY —
+    // tapping anywhere that isn't a transport button opens the app. Resolved
+    // through the package's own launcher intent (no hard-coded activity
+    // class inside the plugin); immutable like the transport intents.
+    private android.app.PendingIntent openAppIntent() {
+        try {
+            android.content.Intent intent =
+                getContext().getPackageManager().getLaunchIntentForPackage(getContext().getPackageName());
+            if (intent == null) return null;
+            int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= android.app.PendingIntent.FLAG_IMMUTABLE;
+            }
+            return android.app.PendingIntent.getActivity(getContext(), 20, intent, flags);
+        } catch (Exception e) {
+            Log.e(TAG, "Error building open-app intent", e);
             return null;
         }
     }

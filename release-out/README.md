@@ -1,5 +1,38 @@
 # Wesu+ launch artifacts
 
+## v42 — 2026-11-03: notification tap-to-open + the self-pause fixes ship to phones
+
+Play Store + sideload deliverables (signing material is the repo's release
+keystore, Android-side only).
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `wesu-plus-v42.apk` | 7.40 MB (7,757,027 B) | `03a743e82c61517a47bfbefe6ce95044273321f49397952c86d7d9e82b277fa2` |
+| `wesu-plus-v42.aab` | 7.04 MB (7,381,572 B) | `85e76532740f453027c5730c0efcb59598060c34ff521583dd59696e0467bff6` |
+
+- Packaging: `com.wesu.music`, `versionCode 42`, `versionName 0.0.1`, minSdk 24.
+- `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
+  sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
+  this same v42 build.
+- **What changed vs v41:**
+  - **Tapping the player notification opens the app.** The media
+    notification body (anywhere that isn't the Previous / Play-Pause / Next
+    buttons) had no content intent — taps were a dead zone. It now carries a
+    launcher PendingIntent that brings the existing task to the front.
+  - **The v41 self-pause fixes actually reach phones.** v41 binaries kept
+    the same versionCode as the original build, so Android blocked
+    same-version reinstalls and users kept running the old code — which is
+    why online playback still "paused itself mostly at 9 seconds" for them.
+    v42 bumps `versionCode` to 42 (iOS `CURRENT_PROJECT_VERSION` to 42), so
+    the audio-focus race fix, the engine-error recovery, and the 60s
+    watchdog all install over the old build. The Menu footer's build stamp
+    confirms which binary a phone runs.
+- **iOS (build on your Mac):** `CURRENT_PROJECT_VERSION = 42` already set in
+  `ios/App/App.xcodeproj/project.pbxproj`; `MARKETING_VERSION = 0.0.1`,
+  bundle id `com.wesu.music` unchanged. Open `ios/App/App.xcworkspace`, set
+  your signing team → Product > Archive → distribute via
+  Transporter/TestFlight.
+
 ## v41 — 2026-11-03: playback self-pause fix, per-account downloads, smoothness, visibility rules
 
 Play Store + sideload deliverables (signing material is the repo's release
