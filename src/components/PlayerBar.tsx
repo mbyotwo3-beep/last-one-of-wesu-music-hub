@@ -1122,6 +1122,25 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         audio.addEventListener("error", onError);
         audioEventsCleanupRef.current = cleanupEvents;
 
+        // COLD-START GATE (synchronous — the checks above read React state,
+        // which still says "web" on the first render inside the Capacitor
+        // shell; the hook flips only after mount). A web-path run that
+        // resolved its signed URL in that window attached it HERE and
+        // started a second engine beside the live native one (Chromium
+        // AudioFocusDelegate + AAudio stream beside ExoPlayer — the +1.4s
+        // focus dance in the 09:39 device run). Ask the bridge directly:
+        // on true, drop the listeners and leave the element untouched; the
+        // native flip re-runs this effect through the engine.
+        if (
+          typeof window !== "undefined" &&
+          (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+            .Capacitor?.isNativePlatform?.()
+        ) {
+          cleanupEvents();
+          audioEventsCleanupRef.current = null;
+          return;
+        }
+
         audio.src = url;
         audio.volume = muted ? 0 : volume;
         // The source is now attached, so mobile controls can safely enable
@@ -1564,6 +1583,18 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
             streak.n = 0;
           }
           streak.n += 1;
+          // Fresh position ticks prove the ENGINE is alive: bridge nulls
+          // while it renders are transport hiccups, not truth. The 09:39
+          // device run — engine READY and ticking, then 4 bridge nulls in a
+          // row while the WebView main thread was busy — was adopted as a
+          // "user pause" and the engine was killed 4s in (the last open gap
+          // in the "stops by itself a few seconds in" chain). Reset the
+          // streak while ticks are recent; a real pause/STOP stops the
+          // ticks, so this only delays adoption by the stale-tick window.
+          if (Date.now() - getLastNativeTimeUpdateAt() < 8000) {
+            streak.n = 0;
+            return;
+          }
           if (
             shouldAdoptNullAsPaused({
               nullStreak: streak.n,

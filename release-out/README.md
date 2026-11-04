@@ -1,5 +1,49 @@
 # Wesu+ launch artifacts
 
+## v44 — 2026-11-04: the last self-pause gap (bridge-null adoption while ticking)
+
+Play Store + sideload deliverables (signing material is the repo's release
+keystore, Android-side only).
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `wesu-plus-v44.apk` | 7.40 MB (7,757,139 B) | `8ac5a6e004824c18020d2b8f4db57ccd1bd285deef7a6f0f158ce38cac70142f` |
+| `wesu-plus-v44.aab` | 7.04 MB (7,381,707 B) | `f71169ff609834a5b3fe584d1d38d7aac8331b8e3f0902a79aef1b7a1c784756` |
+
+- Packaging: `com.wesu.music`, `versionCode 44`, `versionName 0.0.1`, minSdk 24.
+- `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
+  sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
+  this same v44 build.
+- **What changed vs v43 — v43's device retest still caught the engine being
+  paused BY OUR OWN reconciler (a bridge hiccup read as a user pause):**
+  - **Bridge nulls while the engine is ticking are no longer adopted as a
+    pause.** `isNativePlaying()` returned `null` 4× in a row on device
+    (WebView main thread busy) while the engine was READY and streaming;
+    the reconciler's `shouldAdoptNullAsPaused` fired at ~11s past load and
+    killed playback 4s into the song. The null branch now resets its streak
+    while a position tick arrived in the last 8s — a real pause/STOP stops
+    the ticks, so a genuine shade pause still adopts (delayed at most one
+    stale-tick window).
+  - **Cold-start web-path runs can no longer attach a real URL to the
+    `<audio>` element.** The platform hook still said "web" on the very
+    first render inside the Capacitor shell, so the first load resolved a
+    signed URL and set `audio.src` synchronously — the +1.4s Chromium
+    focus dance beside ExoPlayer seen on device. The attach point now asks
+    `window.Capacitor.isNativePlatform()` directly (synchronous, beyond
+    React state) and refuses to touch the element.
+  - Also carries v43's fixes (double-engine detach, ticks survive
+    re-buffer, shade pause/play announcements) and v42's (notification
+    body tap opens the app).
+  - The JS half of these fixes ships via the Vercel deploy of this commit;
+    the WebView loads `https://www.wesuplus.com/`, so v44's APK bytes are
+    identical to v43 apart from `versionCode` — installing v44 is what
+    guarantees the Java-side fixes land on phones that still run v42.
+- **iOS (build on your Mac):** `CURRENT_PROJECT_VERSION = 44` already set in
+  `ios/App/App.xcodeproj/project.pbxproj`; `MARKETING_VERSION = 0.0.1`,
+  bundle id `com.wesu.music` unchanged. Open `ios/App/App.xcworkspace`, set
+  your signing team → Product > Archive → distribute via
+  Transporter/TestFlight.
+
 ## v43 — 2026-11-04: the real "stops at ~9 seconds online" fix (double engine + reconciler)
 
 Play Store + sideload deliverables (signing material is the repo's release

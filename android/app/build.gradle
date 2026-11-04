@@ -43,7 +43,7 @@ android {
         //   without gesture), storage-CDN preconnect, artist profiles list
         //   publicly only with ≥1 approved song, App diagnostics hidden from
         //   non-staff, actionable mobile-money error for unregistered numbers.
-        versionCode 43
+        versionCode 44
         versionName "0.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
