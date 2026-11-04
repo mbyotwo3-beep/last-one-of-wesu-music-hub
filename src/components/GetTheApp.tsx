@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Download, Smartphone, Share, PlusSquare, X } from "lucide-react";
+import { Download, Smartphone, Share, X } from "lucide-react";
 
 import { useIsMobile, useIsNative } from "@/hooks/use-platform";
 
@@ -65,7 +65,6 @@ export function GetTheApp() {
 
   const [dismissed, setDismissed] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIosHelp, setShowIosHelp] = useState(false);
 
   // Already inside the app, or already installed from the web: nothing to offer.
   // Also nothing to offer on a desktop browser that has not offered a prompt.
@@ -105,11 +104,9 @@ export function GetTheApp() {
       if (choice.outcome === "dismissed") setDismissed(true);
       return;
     }
-    if (showIos) {
-      setShowIosHelp((v) => !v);
-      return;
-    }
     // Android without a captured prompt: the APK is the reliable route.
+    // (iOS never reaches here — its guidance to use desktop/Android replaced the
+    // install action.)
     window.location.href = APK_URL;
   };
 
@@ -131,38 +128,68 @@ export function GetTheApp() {
             {canPrompt
               ? "Install it for fullscreen playback, an icon on your home screen, and music that plays with no data."
               : showIos
-                ? "Add it to your home screen for fullscreen playback and offline music."
+                ? "A native iOS app is on the way — until then, take Wesu+ with you through the browser or an Android phone."
                 : `The app is ${APK_SIZE_MB} MB. Downloads keep working here in the browser too — the app just makes them easier to reach.`}
           </p>
 
-          {showIosHelp ? (
-            <ol className="mt-3 text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Tap the Share button in Safari</li>
-              <li>
-                Choose <strong>Add to Home Screen</strong>
-              </li>
-              <li>Tap Add — Wesu+ opens fullscreen, like an app</li>
-            </ol>
+          {showIos ? (
+            <div className="mt-3 text-xs text-muted-foreground space-y-2">
+              <p>
+                Wesu+&apos;s native iOS app isn&apos;t here yet, so an iPhone can&apos;t install the
+                APK we ship today — iOS simply doesn&apos;t allow it.
+              </p>
+              <p>
+                To take the music with you <strong>now</strong>, point your phone at one of the two
+                working routes:
+              </p>
+              <ul className="space-y-1 list-disc list-inside">
+                <li>
+                  <strong className="text-foreground">Desktop browser</strong> — open Wesu+ and
+                  download; the offline vault lives in browser storage there too.
+                </li>
+                <li>
+                  <strong className="text-foreground">Android phone</strong> — install the real
+                  APK and download straight into the app&apos;s vault.
+                </li>
+              </ul>
+              <p>
+                And a <strong className="text-foreground">native iOS mobile app</strong> is coming
+                soon — then downloads, fullscreen playback and offline music arrive on iPhone directly.
+              </p>
+            </div>
           ) : null}
 
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={install}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-bold cursor-pointer"
-            >
-              {showIos ? <PlusSquare className="size-4" /> : <Smartphone className="size-4" />}
-              {label}
-            </button>
+          {showIos ? (
             <button
               type="button"
               onClick={() => setDismissed(true)}
               aria-label="Dismiss"
-              className="p-1.5 rounded-full text-muted-foreground hover:bg-muted cursor-pointer"
+              className="mt-2 p-1.5 rounded-full text-muted-foreground hover:bg-muted cursor-pointer inline-flex items-center"
             >
               <X className="size-4" />
             </button>
-          </div>
+          ) : null}
+
+          {!showIos ? (
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={install}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-bold cursor-pointer"
+              >
+                <Smartphone className="size-4" />
+                {label}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissed(true)}
+                aria-label="Dismiss"
+                className="p-1.5 rounded-full text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          ) : null}
 
           {/* A listener whose downloads already work has no reason to install.
               Saying so is more useful than implying the browser is limited. */}
