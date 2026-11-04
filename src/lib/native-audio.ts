@@ -609,6 +609,45 @@ export async function onNativeSkip(
 }
 
 /**
+ * Shade/lock-screen play & pause (WESU PATCH in the plugin's MediaSession
+ * callbacks — see android/patches/capgo-native-audio-7.11.2). The plugin
+ * applies the pause/resume natively AND announces it here, so the UI follows
+ * the shade instantly. Without the announcement the reconciler had to infer
+ * the pause from stale position ticks, and on slow networks it mistook a
+ * long re-buffer for a lock-screen pause — pausing the engine mid-buffer
+ * ("stops by itself a few seconds in").
+ */
+export async function onNativeRemotePlayState(
+  assetId: string,
+  callback: (state: "play" | "pause") => void,
+): Promise<() => void> {
+  const cleanups: Array<() => void> = [];
+  try {
+    const { NativeAudio } = await import("@capgo/native-audio");
+    const match = (event: any) =>
+      !event || event.assetId === undefined || event.assetId === assetId;
+    const remove = (handle: any) => () => {
+      try {
+        handle.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+    const pause = await (NativeAudio as any).addListener("remotePause", (event: any) => {
+      if (match(event)) callback("pause");
+    });
+    cleanups.push(remove(pause));
+    const play = await (NativeAudio as any).addListener("remotePlay", (event: any) => {
+      if (match(event)) callback("play");
+    });
+    cleanups.push(remove(play));
+  } catch {
+    /* stock plugin / web: no remote play-state events */
+  }
+  return () => cleanups.forEach((fn) => fn());
+}
+
+/**
  * Register a listener for when native audio playback completes.
  * Only fires for the given asset id — a stale listener from a skipped track
  * must never advance the queue. If the plugin payload carries no asset id,

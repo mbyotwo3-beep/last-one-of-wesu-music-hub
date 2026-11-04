@@ -1084,6 +1084,9 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                             Log.e(TAG, "Error resuming audio from media session", e);
                         }
                     }
+                    // WESU PATCH: tell JS so the UI follows the shade instantly
+                    // instead of waiting out the stale-tick reconciler window.
+                    dispatchTransportEvent("remotePlay");
                 }
 
                 @Override
@@ -1099,6 +1102,8 @@ public class NativeAudio extends Plugin implements AudioManager.OnAudioFocusChan
                             Log.e(TAG, "Error pausing audio from media session", e);
                         }
                     }
+                    // WESU PATCH: see onPlay above.
+                    dispatchTransportEvent("remotePause");
                 }
 
                 @Override

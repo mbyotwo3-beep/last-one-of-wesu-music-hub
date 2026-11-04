@@ -675,6 +675,23 @@ public class RemoteAudioAsset extends AudioAsset {
                 try {
                     if (!players.isEmpty()) {
                         ExoPlayer player = players.get(playIndex);
+                        // WESU PATCH: keep ticking THROUGH re-buffers. While
+                        // playWhenReady is set, a BUFFERING state is a network
+                        // stall, not a pause: the old loop stopped ticking the
+                        // moment isPlaying dropped, and the JS reconciler then
+                        // read the stale ticks as a lock-screen pause and
+                        // paused the engine mid-buffer — the song "stopped by
+                        // itself a few seconds in" on slow connections. Emit
+                        // the frozen position so the JS side sees the engine
+                        // is alive until audio truly resumes; only a real
+                        // pause (playWhenReady=false) stops the ticks.
+                        if (player.getPlayWhenReady()
+                                && player.getPlaybackState() == Player.STATE_BUFFERING) {
+                            double frozen = player.getCurrentPosition() / 1000.0;
+                            owner.notifyCurrentTime(assetId, frozen);
+                            currentTimeHandler.postDelayed(this, 250);
+                            return;
+                        }
                         if (player.getPlaybackState() == Player.STATE_READY && player.isPlaying()) {
                             double currentTime = player.getCurrentPosition() / 1000.0; // Get time directly
                             Log.d(TAG, "Timer update: currentTime = " + currentTime);

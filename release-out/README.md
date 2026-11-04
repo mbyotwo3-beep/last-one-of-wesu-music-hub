@@ -1,5 +1,52 @@
 # Wesu+ launch artifacts
 
+## v43 — 2026-11-04: the real "stops at ~9 seconds online" fix (double engine + reconciler)
+
+Play Store + sideload deliverables (signing material is the repo's release
+keystore, Android-side only).
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `wesu-plus-v43.apk` | 7.40 MB (7,757,139 B) | `3cfb4b530594ce0a312840f18be66acb499e4e2c4e21c2d1ee40e3b4b11321c1` |
+| `wesu-plus-v43.aab` | 7.04 MB (7,381,717 B) | `7e971297c4a8551572f369b1dfbb77074cedae1ef0ad959a8059f1b78208a339` |
+
+- Packaging: `com.wesu.music`, `versionCode 43`, `versionName 0.0.1`, minSdk 24.
+- `public/wesuplus.apk` + `public/wesuplus.aab` (the privately hosted
+  sideload at `/wesuplus.apk`, not advertised in the UI) are byte copies of
+  this same v43 build.
+- **What changed vs v42 — the actual "song stops/pauses by itself online"
+  root cause chain, reproduced and fixed on device:**
+  - **Two engines played the same song at once.** On a cold start the web
+    view resolved the track's signed URL through the HTML `<audio>` element
+    first (the platform probe reports "web" on the very first render), and
+    its late-finishing `canplay` listener started the element UNDER the live
+    native ExoPlayer engine. Both engines streamed the same URL, splitting
+    bandwidth. The element is now detached the moment the native branch
+    owns the selection, and every late web-path continuation (URL resolution,
+    retry passes, `canplay`, play-state sync) refuses to touch the element
+    while native is available.
+  - **A network re-buffer was mistaken for a lock-screen pause.** ExoPlayer
+    drops `isPlaying` and stops position ticks during every re-buffer; the
+    remote-control reconciler adopted that as a user pause after ~2.5s of
+    stale ticks and paused the engine mid-buffer — dead air a few seconds
+    into the song (the "mostly at 9 seconds" report: the still-alive HTML
+    element kept rendering alone for ~9s, then hit its clip end and
+    everything stopped). Two layers: the native `RemoteAudioAsset` timer now
+    keeps ticking through `BUFFERING` (with play intent) so the JS side
+    always knows the engine is alive, and the reconciler's stale-tick window
+    widened to 8s as the belt for engines that can't do this (iOS).
+  - **Shade play/pause now announces itself.** The plugin's MediaSession
+    callbacks dispatch `remotePause`/`remotePlay` to JS, so the UI follows a
+    real shade pause instantly instead of waiting out the stale-tick window.
+  - Also carries v42's fixes (notification body tap opens the app;
+    versionCode bump so the self-pause fixes actually install over field
+    builds).
+- **iOS (build on your Mac):** `CURRENT_PROJECT_VERSION = 43` already set in
+  `ios/App/App.xcodeproj/project.pbxproj`; `MARKETING_VERSION = 0.0.1`,
+  bundle id `com.wesu.music` unchanged. Open `ios/App/App.xcworkspace`, set
+  your signing team → Product > Archive → distribute via
+  Transporter/TestFlight.
+
 ## v42 — 2026-11-03: notification tap-to-open + the self-pause fixes ship to phones
 
 Play Store + sideload deliverables (signing material is the repo's release

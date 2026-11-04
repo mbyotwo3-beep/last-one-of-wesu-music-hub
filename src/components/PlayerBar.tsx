@@ -49,6 +49,7 @@ import {
   onNativeTimeUpdate,
   onNativePlaybackError,
   onNativeSkip,
+  onNativeRemotePlayState,
   isNativeAudioAvailable,
   isNativePreloaded,
   configureNativeAudio,
@@ -998,6 +999,21 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   }
                   setProgress(Math.floor(seconds));
                 });
+                // Shade/lock-screen play & pause (WESU PATCH): the plugin
+                // applies the action natively and announces it — the store
+                // follows instantly instead of inferring from stale ticks
+                // (which mistook re-buffers for pauses). markNativeCommand
+                // arms the reconciler's grace so the flip can't be undone.
+                const remoteStateCleanup = await onNativeRemotePlayState(
+                  track!.id,
+                  (state) => {
+                    if (currentTrackIdRef.current !== track!.id) return;
+                    markNativeCommand();
+                    if (usePlayer.getState().playing !== (state === "play")) {
+                      usePlayer.setState({ playing: state === "play" });
+                    }
+                  },
+                );
                 getNativeDuration(track!.id)
                   .then((d) => {
                     if (d && currentTrackIdRef.current === track!.id) {
@@ -1011,12 +1027,23 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
                   cleanup();
                   skipCleanup();
                   timeCleanup();
+                  remoteStateCleanup();
                 };
                 return;
               } // preloaded
             } // nativeViable
           } // _nativeAvailable
         } // isNative
+
+        // Native availability can resolve WHILE this web-path load was
+        // awaiting (first-run probe, cold-start platform flip): the native
+        // branch owns playback now, so abandon the element entirely. This
+        // late web run is what re-attached a real signed URL to the
+        // <audio> element under live native playback — two engines playing
+        // the same song at once (the element kept rendering after the
+        // engine paused, then died when its clip ended → "stops by itself
+        // a few seconds in").
+        if (isNativeRef.current && _nativeAvailable) return;
 
         // Attach event-driven loading state so the spinner clears the moment
         // the browser reports the media is ready — not just when play() resolves.
@@ -1032,6 +1059,23 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         const onCanPlay = () => {
           if (isCurrentTrack()) {
             setLoading(false);
+            // A web-path run that resolved late (or its retry pass) can leave
+            // this listener attached after the native branch took over. When
+            // the element's canplay finally fires, playing is true — and the
+            // old code started the element UNDER the live native engine:
+            // two engines on one song, the element kept rendering after the
+            // engine paused, then died at its clip end ("stops by itself a
+            // few seconds in"). Native owns playback → detach and defer.
+            if (isNativeRef.current && _nativeAvailable && nativeCleanupRef.current) {
+              try {
+                audio.pause();
+                audio.removeAttribute("src");
+                audio.load();
+              } catch {
+                /* ignore — element already empty */
+              }
+              return;
+            }
             if (
               usePlayer.getState().playing &&
               audio.paused &&
@@ -1205,6 +1249,11 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         } else await pauseNative(track.id).catch(() => {});
         return;
       }
+      // Native plugin available but the engine isn't wired yet (still
+      // loading): NEVER fall through to the element — a stale real src on
+      // it would start a SECOND engine beside ExoPlayer. Silence here is
+      // correct; the engine finishes loading and plays.
+      if (isNative && _nativeAvailable) return;
       if (playing && audio.paused && audio.src) {
         // If preview has ended, replay from 0
         if (usePlayer.getState().isPreview && audio.currentTime >= 15) {
@@ -1540,7 +1589,14 @@ export function PlayerBar({ audioOnly = false }: { audioOnly?: boolean } = {}) {
         // buffering blip, not a shade pause. A real pause stops the ticks,
         // so adoption only waits one tick (~1s).
         if (nativePlaying === false) {
-          const engineAlive = Date.now() - getLastNativeTimeUpdateAt() < 2500;
+          // 8s, not 2.5s: engines stop ticking through long re-buffers on
+          // slow networks (a stall can run 5-10s mid-song), and adopting
+          // such a blip as a user pause paused the engine mid-buffer — the
+          // "stops by itself a few seconds in" report. On Android the
+          // RemoteAudioAsset patch now keeps ticking THROUGH buffering, so
+          // a stale-tick pause is unambiguous; this wider window is the
+          // belt for engines that can't (iOS/AVPlayer).
+          const engineAlive = Date.now() - getLastNativeTimeUpdateAt() < 8000;
           if (
             engineAlive ||
             (nativeSeenPlayingRef.current !== selectionId &&
