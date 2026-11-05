@@ -280,10 +280,19 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   // resolveHeroLayout. Desktop and square-art slides keep the original look.
   const layout = resolveHeroLayout({ ratio: currentRatio, isMobile, hasVideo });
 
-  // Cross-fading slide layers, shared by both layouts. `withDim` adds the
-  // darkening overlays that keep overlay text readable in the full-bleed
-  // layout; the stacked layout shows the banner untouched below the text.
-  const renderLayers = (withDim: boolean) => (
+  // Cross-fading slide layers, shared by both layouts.
+  //
+  //   "dim"  — the full-bleed overlay look: art is cropped to fill the box
+  //            and darkened so the overlay text stays readable.
+  //
+  //   "fill" — the stacked card's media block: the box must never show a
+  //            blank band, and the banner must never be cropped. A blurred,
+  //            scaled copy of the image fills the whole box; the sharp image
+  //            sits complete (contain) on top of it. A wide banner therefore
+  //            spans the full width with its own blurred artwork filling the
+  //            bands above and below — the way YouTube and Apple Music treat
+  //            artwork that does not match the box.
+  const renderLayers = (mode: "dim" | "fill") => (
     <>
       {slides.map((slide, idx) => {
         const isCurrent = idx === currentIndex;
@@ -310,8 +319,37 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                   allowFullScreen
                   style={{ pointerEvents: "none" }}
                 />
-                {withDim && <div className="absolute inset-0 bg-black/60" />}
+                {mode === "dim" && <div className="absolute inset-0 bg-black/60" />}
               </div>
+            ) : mode === "fill" ? (
+              paintable ? (
+                <div className="absolute inset-0 overflow-hidden">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: `url(${signedUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      filter: "blur(28px)",
+                      // The blur bleeds past the element's edge; scaling the
+                      // layer hides the soft border entirely.
+                      transform: "scale(1.35)",
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/20" />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: `url(${signedUrl})`,
+                      backgroundSize: "contain",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="absolute inset-0 bg-secondary" />
+              )
             ) : (
               <div
                 className="absolute inset-0"
@@ -325,7 +363,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                     : undefined
                 }
               >
-                {withDim && (
+                {mode === "dim" && (
                   <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
                 )}
               </div>
@@ -429,11 +467,11 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     </div>
   );
 
-  // MOBILE STACKED LAYOUT — wide admin banners (and video) show the full
-  // uncropped media on top and the text in a block below, inside the same
-  // rounded card. The media box is pinned to the image's natural shape so
-  // "cover" cannot cut anything; video keeps a 16/9 box (iframes have no
-  // natural ratio to preserve).
+  // MOBILE STACKED LAYOUT — wide admin banners (and video) show the media
+  // full and the text in a block below, inside the same rounded card. The
+  // media box is a 16:9 stage that is ALWAYS completely filled: the artwork
+  // appears in full (never cropped) over a blurred copy of itself, so no
+  // admin image geometry can leave a blank band.
   if (layout === "stacked") {
     return (
       <div
@@ -441,11 +479,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        <div
-          className="relative w-full overflow-hidden"
-          style={{ aspectRatio: hasVideo ? "16 / 9" : `${currentRatio}` }}
-        >
-          {renderLayers(false)}
+        <div className="relative w-full overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
+          {renderLayers("fill")}
           {renderArrows()}
           {renderPauseButton()}
           {renderProgress()}
@@ -475,7 +510,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Background with video or image cross-fade */}
-      <div className="absolute inset-0">{renderLayers(true)}</div>
+      <div className="absolute inset-0">{renderLayers("dim")}</div>
 
       {/* Content */}
       <div className="absolute inset-0 flex items-center px-8 md:px-12 lg:px-16">
