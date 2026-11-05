@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Play, Pause, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { resolveImageUrl, peekImageUrl, invalidateImageUrl } from "@/lib/storage-url";
-import { useIsNative } from "@/hooks/use-platform";
+import { useIsNative, useIsMobile } from "@/hooks/use-platform";
 import { sameOriginAppPath } from "@/lib/external-url";
 import { toast } from "sonner";
 
@@ -51,6 +51,39 @@ export function resolveHeroCta(args: {
   return { mode: args.target === "_blank" ? "new-tab" : "same-tab", url };
 }
 
+export type HeroLayout = "full-bleed" | "stacked";
+
+/**
+ * Pure layout decision for a hero slide (unit-tested).
+ *
+ * Admin slides often ship as wide promotional banners (e.g. 820×320 ≈ 2.56:1)
+ * with the title and artwork baked into the image. On desktop the hero box is
+ * 2.4:1 so those banners fit almost exactly. On mobile the hero box is 16:9
+ * (1.78:1) and "cover" would center-crop ~30% of the banner's width — cutting
+ * the baked artwork mid-subject and colliding with the overlay text.
+ *
+ * So on mobile a slide whose image is at least 1.9:1 — or a video slide,
+ * whose iframe has no natural shape to preserve — renders STACKED: the full
+ * uncropped media on top and the title/description/CTA in a block below it.
+ * Square artwork (the system-generated hero's album art) and desktop keep
+ * the full-bleed overlay look.
+ *
+ * An unknown ratio (the image has not been measured yet, or the probe
+ * failed) always returns "full-bleed": that is today's box, and it keeps
+ * server-rendered and first-client-render markup identical (the ratio only
+ * becomes known after hydration, when the image probe completes).
+ */
+export function resolveHeroLayout(args: {
+  /** Natural image ratio (width / height). null when not yet measured. */
+  ratio: number | null;
+  isMobile: boolean;
+  hasVideo: boolean;
+}): HeroLayout {
+  if (!args.isMobile) return "full-bleed";
+  if (args.ratio === null || args.ratio <= 0) return "full-bleed";
+  return args.hasVideo || args.ratio >= 1.9 ? "stacked" : "full-bleed";
+}
+
 interface HeroCarouselProps {
   slides: HeroSlide[];
 }
@@ -76,6 +109,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   const progressRef = useRef<NodeJS.Timeout | null>(null);
   // Native apps have no tabs: external "new tab" links open in-app instead.
   const isNative = useIsNative();
+  // Mobile viewports stack wide admin banners instead of cropping them.
+  const isMobile = useIsMobile();
+  // Natural aspect ratio (width / height) per slide id, measured once the
+  // signed URL is known. Decides stacked vs full-bleed on mobile.
+  const [imageRatios, setImageRatios] = useState<Map<string, number>>(new Map());
+  const ratioProbedRef = useRef<Map<string, string>>(new Map());
 
   // Only auto-rotate if there are 2 or more slides
   const shouldAutoRotate = slides.length >= 2;
@@ -178,6 +217,38 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     };
   }, [slides]);
 
+  // Measure each slide image's natural aspect ratio once its URL is known.
+  // Admin banners are often very wide (e.g. 820×320 ≈ 2.56:1); that ratio is
+  // what decides stacked vs full-bleed on mobile (resolveHeroLayout). Probes
+  // are deduped per slide+URL so re-renders and signed-URL refreshes never
+  // re-measure an unchanged image.
+  useEffect(() => {
+    let cancelled = false;
+
+    for (const slide of slides) {
+      const url = signedUrls.get(slide.id) ?? "";
+      if (!/^(https?:|data:|blob:)/i.test(url)) continue;
+      if (ratioProbedRef.current.get(slide.id) === url) continue;
+      ratioProbedRef.current.set(slide.id, url);
+
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled || img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        setImageRatios((prev) => {
+          const next = new Map(prev);
+          next.set(slide.id, ratio);
+          return next;
+        });
+      };
+      img.src = url;
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [signedUrls, slides]);
+
   if (slides.length === 0) return null;
 
   const currentSlide = slides[currentIndex];
@@ -202,102 +273,107 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     }
   }
 
-  return (
-    <div
-      className="relative w-full aspect-[16/9] md:aspect-[2.4/1] overflow-hidden rounded-2xl mb-8"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      {/* Background with video or image cross-fade */}
-      <div className="absolute inset-0">
-        {slides.map((slide, idx) => {
-          const isCurrent = idx === currentIndex;
-          // Only absolute URLs (signed, external) may be painted. A raw
-          // storage path in background-image resolves against the SITE root
-          // and 404s on every page load; until the signed URL arrives the
-          // deterministic placeholder shows instead.
-          const signedUrl = signedUrls.get(slide.id) ?? "";
-          const paintable = /^(https?:|data:|blob:)/i.test(signedUrl);
-          return (
-            <div
-              key={slide.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                isCurrent ? "opacity-100 z-0" : "opacity-0 -z-10 pointer-events-none"
-              }`}
-            >
-              {slide.videoUrl && isCurrent ? (
-                <div className="relative w-full h-full">
-                  <iframe
-                    src={slide.videoUrl}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    title={slide.title}
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                    style={{ pointerEvents: "none" }}
-                  />
-                  <div className="absolute inset-0 bg-black/60" />
-                </div>
-              ) : (
-                <div
-                  className="absolute inset-0"
-                  style={
-                    paintable
-                      ? {
-                          backgroundImage: `url(${signedUrl})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                        }
-                      : undefined
-                  }
-                >
+  const currentRatio = imageRatios.get(currentSlide.id) ?? null;
+  const hasVideo = !!currentSlide.videoUrl;
+
+  // Stacked (media on top, text below) vs full-bleed (text overlay) — see
+  // resolveHeroLayout. Desktop and square-art slides keep the original look.
+  const layout = resolveHeroLayout({ ratio: currentRatio, isMobile, hasVideo });
+
+  // Cross-fading slide layers, shared by both layouts. `withDim` adds the
+  // darkening overlays that keep overlay text readable in the full-bleed
+  // layout; the stacked layout shows the banner untouched below the text.
+  const renderLayers = (withDim: boolean) => (
+    <>
+      {slides.map((slide, idx) => {
+        const isCurrent = idx === currentIndex;
+        // Only absolute URLs (signed, external) may be painted. A raw
+        // storage path in background-image resolves against the SITE root
+        // and 404s on every page load; until the signed URL arrives the
+        // deterministic placeholder shows instead.
+        const signedUrl = signedUrls.get(slide.id) ?? "";
+        const paintable = /^(https?:|data:|blob:)/i.test(signedUrl);
+        return (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isCurrent ? "opacity-100 z-0" : "opacity-0 -z-10 pointer-events-none"
+            }`}
+          >
+            {slide.videoUrl && isCurrent ? (
+              <div className="relative w-full h-full">
+                <iframe
+                  src={slide.videoUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  title={slide.title}
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  style={{ pointerEvents: "none" }}
+                />
+                {withDim && <div className="absolute inset-0 bg-black/60" />}
+              </div>
+            ) : (
+              <div
+                className="absolute inset-0"
+                style={
+                  paintable
+                    ? {
+                        backgroundImage: `url(${signedUrl})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }
+                    : undefined
+                }
+              >
+                {withDim && (
                   <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 
-      {/* Content */}
-      <div className="absolute inset-0 flex items-center px-8 md:px-12 lg:px-16">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-3 md:mb-4">
-            {currentSlide.title}
-          </h2>
-          <p className="text-sm md:text-lg lg:text-xl text-zinc-300 mb-6 md:mb-8 line-clamp-2">
-            {currentSlide.description}
-          </p>
-          {cta.mode === "spa" ? (
-            <Link
-              to={cta.url as any}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {currentSlide.ctaText}
-              <Play className="size-4 fill-primary-foreground" />
-            </Link>
-          ) : cta.mode === "in-app" ? (
-            <button
-              type="button"
-              onClick={() => void openInApp(cta.url)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {currentSlide.ctaText}
-              <ExternalLink className="size-4" />
-            </button>
-          ) : (
-            <a
-              href={cta.url}
-              {...(cta.mode === "new-tab" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {currentSlide.ctaText}
-              <ExternalLink className="size-4" />
-            </a>
-          )}
-        </div>
-      </div>
+  const renderCta = () => {
+    if (cta.mode === "spa") {
+      return (
+        <Link
+          to={cta.url as any}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
+        >
+          {currentSlide.ctaText}
+          <Play className="size-4 fill-primary-foreground" />
+        </Link>
+      );
+    }
+    if (cta.mode === "in-app") {
+      return (
+        <button
+          type="button"
+          onClick={() => void openInApp(cta.url)}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
+        >
+          {currentSlide.ctaText}
+          <ExternalLink className="size-4" />
+        </button>
+      );
+    }
+    return (
+      <a
+        href={cta.url}
+        {...(cta.mode === "new-tab" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-sm md:text-base font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
+      >
+        {currentSlide.ctaText}
+        <ExternalLink className="size-4" />
+      </a>
+    );
+  };
 
-      {/* Navigation Arrows */}
+  const renderArrows = () => (
+    <>
       <button
         onClick={prevSlide}
         className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/50 backdrop-blur-md border border-white/20 items-center justify-center text-white hover:bg-black/70 transition-colors"
@@ -312,43 +388,112 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       >
         <ChevronRight className="size-6" />
       </button>
+    </>
+  );
 
-      {/* Pause/Play Button */}
-      {shouldAutoRotate && (
-        <button
-          onClick={togglePause}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 items-center justify-center text-white hover:bg-black/70 transition-colors"
-          aria-label={isPaused ? "Play slideshow" : "Pause slideshow"}
-          title={isPaused ? "Play slideshow" : "Pause slideshow"}
-        >
-          {isPaused ? <Play className="size-4 fill-current" /> : <Pause className="size-4" />}
-        </button>
-      )}
+  const renderPauseButton = () =>
+    shouldAutoRotate ? (
+      <button
+        onClick={togglePause}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 items-center justify-center text-white hover:bg-black/70 transition-colors"
+        aria-label={isPaused ? "Play slideshow" : "Pause slideshow"}
+        title={isPaused ? "Play slideshow" : "Pause slideshow"}
+      >
+        {isPaused ? <Play className="size-4 fill-current" /> : <Pause className="size-4" />}
+      </button>
+    ) : null;
 
-      {/* Progress Bar */}
-      {shouldAutoRotate && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-          <div
-            className="h-full bg-primary transition-all duration-100 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
-
-      {/* Pagination Dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-        {slides.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              index === currentIndex ? "bg-white w-8" : "bg-white/40 hover:bg-white/60"
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-            aria-current={index === currentIndex ? "true" : "false"}
-          />
-        ))}
+  const renderProgress = () =>
+    shouldAutoRotate ? (
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+        <div
+          className="h-full bg-primary transition-all duration-100 ease-linear"
+          style={{ width: `${progress}%` }}
+        />
       </div>
+    ) : null;
+
+  const renderDots = () => (
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+      {slides.map((_, index) => (
+        <button
+          key={index}
+          onClick={() => goToSlide(index)}
+          className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+            index === currentIndex ? "bg-white w-8" : "bg-white/40 hover:bg-white/60"
+          }`}
+          aria-label={`Go to slide ${index + 1}`}
+          aria-current={index === currentIndex ? "true" : "false"}
+        />
+      ))}
+    </div>
+  );
+
+  // MOBILE STACKED LAYOUT — wide admin banners (and video) show the full
+  // uncropped media on top and the text in a block below, inside the same
+  // rounded card. The media box is pinned to the image's natural shape so
+  // "cover" cannot cut anything; video keeps a 16/9 box (iframes have no
+  // natural ratio to preserve).
+  if (layout === "stacked") {
+    return (
+      <div
+        className="relative w-full overflow-hidden rounded-2xl mb-8 bg-card ring-1 ring-white/5"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        <div
+          className="relative w-full overflow-hidden"
+          style={{ aspectRatio: hasVideo ? "16 / 9" : `${currentRatio}` }}
+        >
+          {renderLayers(false)}
+          {renderArrows()}
+          {renderPauseButton()}
+          {renderProgress()}
+          {renderDots()}
+        </div>
+
+        <div className="px-6 py-5">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">
+            {currentSlide.title}
+          </h2>
+          {currentSlide.description ? (
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+              {currentSlide.description}
+            </p>
+          ) : null}
+          {renderCta()}
+        </div>
+      </div>
+    );
+  }
+
+  // FULL-BLEED LAYOUT — desktop, and mobile slides with square-ish artwork.
+  return (
+    <div
+      className="relative w-full aspect-[16/9] md:aspect-[2.4/1] overflow-hidden rounded-2xl mb-8"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Background with video or image cross-fade */}
+      <div className="absolute inset-0">{renderLayers(true)}</div>
+
+      {/* Content */}
+      <div className="absolute inset-0 flex items-center px-8 md:px-12 lg:px-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-3 md:mb-4">
+            {currentSlide.title}
+          </h2>
+          <p className="text-sm md:text-lg lg:text-xl text-zinc-300 mb-6 md:mb-8 line-clamp-2">
+            {currentSlide.description}
+          </p>
+          {renderCta()}
+        </div>
+      </div>
+
+      {renderArrows()}
+      {renderPauseButton()}
+      {renderProgress()}
+      {renderDots()}
     </div>
   );
 }
