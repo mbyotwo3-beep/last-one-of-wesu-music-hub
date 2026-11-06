@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { usePlayer } from "@/stores/player";
 import { StorageImage } from "@/components/StorageImage";
 import { PriceTag } from "@/components/PriceTag";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 
 interface AlbumCardProps {
   id: string;
@@ -23,7 +24,6 @@ export function AlbumCard({
   duration,
   price,
 }: AlbumCardProps) {
-  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -40,22 +40,17 @@ export function AlbumCard({
       togglePlay();
       return;
     }
-    // Single-track queue (not bare setTrack) so Next/Prev and the queue
-    // screen keep working instead of jumping into a stale queue.
-    setQueue(
-      [
-        {
-          id,
-          title,
-          artistName: subtitle,
-          coverUrl: imageUrl,
-          audioUrl: audioUrl || undefined,
-          durationSeconds: duration,
-          price: price ?? undefined,
-        },
-      ],
-      0,
-    );
+    // Auto-queue: seed plays now; tail (downloads → liked → similar) fills in
+    // the background so a one-song queue never strands Next/Prev.
+    startWithAutoQueue({
+      id,
+      title,
+      artistName: subtitle,
+      coverUrl: imageUrl,
+      audioUrl: audioUrl || undefined,
+      durationSeconds: duration,
+      price: price ?? undefined,
+    });
   };
 
   return (

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CoverArt } from "@/components/CoverArt";
 import { ShareMenu } from "@/components/ShareMenu";
 import { PlaylistCover } from "@/components/PlaylistCover";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 
 type Artist = { id: string; name: string } | null | undefined;
 
@@ -28,7 +29,6 @@ export interface TrackCardSong {
 
 /** Cover-first tile for New Music / Made For You style shelves. */
 export function TrackCard({ song }: { song: TrackCardSong }) {
-  const setQueue = usePlayer((s) => s.setQueue);
   const { warm } = useIntentWarm();
   const isActive = usePlayer((s) => s.track?.id) === song.id;
   // Offline: the shelf stays full — hiding it would leave a blank screen with no
@@ -79,21 +79,17 @@ export function TrackCard({ song }: { song: TrackCardSong }) {
       togglePlay();
       return;
     }
-    // Seed a single-track queue (not bare setTrack) so skip/queue screens
-    // keep working after playing from a shelf.
-    setQueue(
-      [
-        {
-          id: song.id,
-          title: song.title,
-          artistName,
-          coverUrl: song.cover_url,
-          durationSeconds: song.duration ?? undefined,
-          price: song.price ?? undefined,
-        },
-      ],
-      0,
-    );
+    // Start this track now, then let auto-queue fill in what plays next
+    // (downloads → liked → similar) in the background — a lone-track queue
+    // stranded every skip and the queue screen after playing from a shelf.
+    startWithAutoQueue({
+      id: song.id,
+      title: song.title,
+      artistName,
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration ?? undefined,
+      price: song.price ?? undefined,
+    });
   };
 
   return (

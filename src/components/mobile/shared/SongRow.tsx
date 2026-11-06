@@ -4,6 +4,7 @@ import { Play, Pause, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useOfflineItem } from "@/hooks/use-offline-availability";
 import { CoverArt } from "@/components/CoverArt";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 
 interface SongRowProps {
   song: {
@@ -23,7 +24,6 @@ interface SongRowProps {
  * Feature: wesu-plus-completion
  */
 export function SongRow({ song }: SongRowProps) {
-  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrack = usePlayer((s) => s.track);
@@ -60,21 +60,9 @@ export function SongRow({ song }: SongRowProps) {
       return;
     }
 
-    // Single-track queue (not bare setTrack) so Next/Prev and the queue
-    // screen keep working instead of jumping into a stale queue.
-    setQueue(
-      [
-        {
-          id: song.id,
-          title: song.title,
-          artistName: song.artistName,
-          coverUrl: song.coverUrl,
-          durationSeconds: song.durationSeconds,
-          price: song.price ?? undefined,
-        },
-      ],
-      0,
-    );
+    // Auto-queue: seed plays now; tail (downloads → liked → similar) fills in
+    // the background so a one-song queue never strands Next/Prev.
+    startWithAutoQueue(song);
   };
 
   return (

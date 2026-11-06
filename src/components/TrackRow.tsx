@@ -10,6 +10,7 @@ import { ShareMenu } from "@/components/ShareMenu";
 import { useOfflineItem } from "@/hooks/use-offline-availability";
 import { toast } from "sonner";
 import { CoverArt } from "@/components/CoverArt";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 
 interface TrackRowProps {
   id: string;
@@ -34,7 +35,6 @@ export function TrackRow({
   index,
   price,
 }: TrackRowProps & { artistId?: string }) {
-  const setQueue = usePlayer((s) => s.setQueue);
   const togglePlay = usePlayer((s) => s.togglePlay);
   const playing = usePlayer((s) => s.playing);
   const currentTrackId = usePlayer((s) => s.track?.id);
@@ -77,7 +77,9 @@ export function TrackRow({
       return;
     }
 
-    setQueue([{ id, title, artistName: artist, coverUrl, price: price ?? undefined }], 0);
+    // Auto-queue: the seed plays now; the tail (downloads → liked → similar)
+    // is filled in the background.
+    startWithAutoQueue({ id, title, artistName: artist, coverUrl, price: price ?? undefined });
   };
 
   return (

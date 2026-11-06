@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePlayer } from "@/stores/player";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 import { useOfflineMode } from "@/stores/offline-mode";
 import {
   getVaultArtObjectUrl,
@@ -200,17 +201,12 @@ export function DownloadsSection() {
                 <button
                   type="button"
                   onClick={() =>
-                    setQueue(
-                      [
-                        {
-                          id: t.songId,
-                          title: t.title,
-                          artistName: t.artistName,
-                          coverUrl: t.coverUrl,
-                        },
-                      ],
-                      0,
-                    )
+                    startWithAutoQueue({
+                      id: t.songId,
+                      title: t.title,
+                      artistName: t.artistName,
+                      coverUrl: t.coverUrl,
+                    })
                   }
                   className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
                   aria-label={`Play ${t.title} offline`}

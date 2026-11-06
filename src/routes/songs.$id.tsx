@@ -10,6 +10,7 @@ import { StorageImage } from "@/components/StorageImage";
 import { DownloadButton } from "@/components/DownloadButton";
 import { ShareMenu } from "@/components/ShareMenu";
 import { usePlayer } from "@/stores/player";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 import { useCurrency } from "@/stores/currency";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { useSongEntitlement } from "@/hooks/use-song-entitlement";
@@ -55,7 +56,6 @@ function SongPage() {
     ...songQO(id),
     initialData: bootData,
   });
-  const setQueue = usePlayer((state) => state.setQueue);
   const togglePlay = usePlayer((state) => state.togglePlay);
   const playing = usePlayer((state) => state.playing);
   const currentTrackId = usePlayer((state) => state.track?.id);
@@ -85,19 +85,16 @@ function SongPage() {
       return;
     }
 
-    setQueue(
-      [
-        {
-          id: song!.id,
-          title: song!.title,
-          artistName: artist?.name ?? "Unknown",
-          coverUrl: song!.cover_url,
-          durationSeconds: song!.duration,
-          price: song!.price,
-        },
-      ],
-      0,
-    );
+    // Auto-queue: seed plays now; tail (downloads → liked → similar) fills in
+    // the background so a one-song queue never strands Next/Prev.
+    startWithAutoQueue({
+      id: song!.id,
+      title: song!.title,
+      artistName: artist?.name ?? "Unknown",
+      coverUrl: song!.cover_url,
+      durationSeconds: song!.duration,
+      price: song!.price,
+    });
   };
 
   // Co-leads are performers and belong in the artist line; featured artists

@@ -795,6 +795,62 @@ export const getForYou = createServerFn({ method: "GET" })
     };
   });
 
+/**
+ * The auto-queue source: songs that resemble a seed song, for a listener who
+ * started playback outside any list context (a shelf card, a search row…).
+ *
+ * Preference order: the seed's own artist first (their most played), then the
+ * seed's genre, then the catalogue's most played — each pool excluding the
+ * seed and everything an earlier pool already returned. The seed itself is
+ * never in the result.
+ */
+export const getSimilarSongs = createServerFn({ method: "GET" })
+  .validator((d: { song_id: string; limit?: number }) => d)
+  .handler(async ({ data }) => {
+    const supabase = getPublicSupabase();
+    const limit = Math.max(1, Math.min(data.limit ?? 50, 50));
+
+    const { data: seed, error: seedError } = await supabase
+      .from("songs")
+      .select("id, artist_id, genre")
+      .eq("id", data.song_id)
+      .single();
+    if (seedError) throw new Error(seedError.message);
+    if (!seed) throw new Error("Song not found");
+
+    // An empty pool object means "no extra filter" — the trending top-up.
+    const pools: Array<Record<string, string>> = [];
+    if (seed.artist_id) pools.push({ artist_id: seed.artist_id });
+    if (seed.genre) pools.push({ genre: seed.genre });
+    pools.push({});
+
+    const picked: any[] = [];
+    const pickedIds = new Set<string>([seed.id]);
+
+    for (const pool of pools) {
+      if (picked.length >= limit) break;
+      let q = supabase
+        .from("songs")
+        .select("id,title,duration,price,cover_url,artist:artists(id,name)")
+        .eq("status", "approved")
+        .order("play_count", { ascending: false })
+        // Always at least the seed id, so the `in` list is never empty SQL.
+        .not("id", "in", `(${Array.from(pickedIds).join(",")})`)
+        .limit(limit - picked.length);
+      for (const [col, val] of Object.entries(pool)) q = q.eq(col, val);
+      const { data: rows, error } = await q;
+      if (error) throw new Error(error.message);
+      for (const row of rows ?? []) {
+        if (picked.length >= limit) break;
+        if (pickedIds.has(row.id)) continue;
+        pickedIds.add(row.id);
+        picked.push(row);
+      }
+    }
+
+    return picked;
+  });
+
 export const getSongArtists = createServerFn({ method: "GET" })
   .validator((d: { song_id: string }) => d)
   .handler(async ({ data }) => {

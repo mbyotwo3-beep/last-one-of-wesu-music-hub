@@ -23,6 +23,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useSavedTrack } from "@/hooks/use-saved-track";
 import { usePlayer } from "@/stores/player";
+import { startWithAutoQueue } from "@/lib/auto-queue";
 import { supabase } from "@/integrations/supabase/client";
 import { StorageImage } from "@/components/StorageImage";
 import { PlaylistCover } from "@/components/PlaylistCover";
@@ -554,7 +555,6 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
   const isPlayingNow = usePlayer((s) => s.playing);
   const nowPlayingId = usePlayer((s) => s.track?.id);
   const togglePlayback = usePlayer((s) => s.togglePlay);
-  const replaceQueue = usePlayer((s) => s.setQueue);
 
   const isPlaying = isPlayingNow && nowPlayingId === song.id;
 
@@ -564,21 +564,16 @@ function LikedSongCard({ song, userId }: { song: any; userId: string | null }) {
       togglePlayback();
       return;
     }
-    // Single-track queue (not bare setTrack) so Next/Prev and the queue
-    // screen keep working instead of jumping into a stale queue.
-    replaceQueue(
-      [
-        {
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          durationSeconds: song.duration,
-          price: song.price ?? undefined,
-        },
-      ],
-      0,
-    );
+    // Auto-queue: seed plays now; tail (downloads → liked → similar) fills in
+    // the background so a one-song queue never strands Next/Prev.
+    startWithAutoQueue({
+      id: song.id,
+      title: song.title,
+      artistName: song.artists?.name ?? "Unknown",
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration,
+      price: song.price ?? undefined,
+    });
   };
 
   const removeMutation = useMutation({
@@ -698,7 +693,6 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
   const isPlayingNow = usePlayer((s) => s.playing);
   const nowPlayingId = usePlayer((s) => s.track?.id);
   const togglePlayback = usePlayer((s) => s.togglePlay);
-  const replaceQueue = usePlayer((s) => s.setQueue);
 
   const isPlaying = isPlayingNow && nowPlayingId === song.id;
 
@@ -708,21 +702,16 @@ function PurchasedSongCard({ song, userId }: { song: any; userId: string | null 
       togglePlayback();
       return;
     }
-    // Single-track queue (not bare setTrack) so Next/Prev and the queue
-    // screen keep working instead of jumping into a stale queue.
-    replaceQueue(
-      [
-        {
-          id: song.id,
-          title: song.title,
-          artistName: song.artists?.name ?? "Unknown",
-          coverUrl: song.cover_url,
-          durationSeconds: song.duration,
-          price: song.price ?? undefined,
-        },
-      ],
-      0,
-    );
+    // Auto-queue: seed plays now; tail (downloads → liked → similar) fills in
+    // the background so a one-song queue never strands Next/Prev.
+    startWithAutoQueue({
+      id: song.id,
+      title: song.title,
+      artistName: song.artists?.name ?? "Unknown",
+      coverUrl: song.cover_url,
+      durationSeconds: song.duration,
+      price: song.price ?? undefined,
+    });
   };
 
   return (

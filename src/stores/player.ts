@@ -108,6 +108,13 @@ interface PlayerState {
   setAudioUrl: (url: string | null | undefined) => void;
   setQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
   addToQueue: (track: PlayerTrack) => void;
+  /**
+   * Append several tracks in ONE update (auto-queue expansion). Same rules
+   * as addToQueue — nothing reaches the queue that cannot play right now —
+   * but a batch is filtered rather than refused: the expansion is best-effort
+   * ambience around a track that is already playing.
+   */
+  addManyToQueue: (tracks: PlayerTrack[]) => void;
   removeFromQueue: (index: number) => void;
   skipNext: () => void;
   skipPrev: () => void;
@@ -268,6 +275,35 @@ export const usePlayer = create<PlayerState>()(
             // Appending does not move existing positions, so the deck stays
             // valid — but the new track has to be reachable under shuffle.
             shuffleDeck: addToShuffleDeck(state.shuffleDeck, at),
+          };
+        });
+      },
+
+      addManyToQueue: (tracks) => {
+        // Mirror of addToQueue's offline rule, applied per entry — but a
+        // batch is FILTERED rather than refused: the expansion is best-effort
+        // ambience around a track that is already playing, so one
+        // un-downloadable row must not silence the whole tail.
+        const usable = tracks.filter((t) => {
+          if (!t) return false;
+          if (offlineModeEnabled() && isVaultIndexReady()) {
+            return getCachedVaultIds().has(t.id);
+          }
+          return true;
+        });
+        if (usable.length === 0) return;
+        primeAudio();
+        set((state) => {
+          const base = state.queue.length;
+          return {
+            queue: [...state.queue, ...usable],
+            // Appending never moves existing positions; each new position
+            // joins the deck's remaining (unplayed) order at a random spot,
+            // exactly as addToQueue does one at a time.
+            shuffleDeck: usable.reduce(
+              (deck, _, i) => addToShuffleDeck(deck, base + i),
+              state.shuffleDeck,
+            ),
           };
         });
       },
