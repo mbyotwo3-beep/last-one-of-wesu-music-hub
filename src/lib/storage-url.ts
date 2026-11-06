@@ -13,6 +13,58 @@ export type ImageBucket =
 const cache = new Map<string, string>();
 const inflight = new Map<string, Promise<string>>();
 
+// --- localStorage mirror (kept on the phone so the next load is fast) ------
+// Without it every cold start re-mints every cover/hero URL (one batched
+// RPC) and, worse, re-downloads every image, because a freshly minted
+// signed URL busts any HTTP cache. Keeping the resolved URLs on the phone
+// with a TTL safely below the server-side 60-minute signature means the
+// next launch resolves covers synchronously — and the service worker's
+// image cache serves the bytes without touching the network at all.
+const IMAGE_URL_STORE_KEY = "wesu:image-url-cache";
+const IMAGE_URL_TTL_MS = 50 * 60 * 1000;
+const IMAGE_URL_PERSIST_MAX = 250;
+
+const cachedAt = new Map<string, number>();
+
+function persistImageUrlCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const now = Date.now();
+    const entries = [...cachedAt.entries()]
+      .filter(([, at]) => now - at < IMAGE_URL_TTL_MS)
+      .slice(-IMAGE_URL_PERSIST_MAX)
+      .map(([k, at]) => ({ k, url: cache.get(k) ?? "", at }));
+    window.localStorage.setItem(
+      IMAGE_URL_STORE_KEY,
+      JSON.stringify({ v: 1, entries: entries.filter((e) => e.url) }),
+    );
+  } catch {
+    /* quota / private mode — the in-memory cache still works */
+  }
+}
+
+/** Re-read the localStorage mirror into memory (init + tests). */
+export function hydrateImageUrlCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(IMAGE_URL_STORE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { entries?: { k: string; url: string; at: number }[] };
+    if (!Array.isArray(parsed?.entries)) return;
+    const now = Date.now();
+    for (const e of parsed.entries) {
+      if (!e || typeof e.k !== "string" || typeof e.url !== "string" || e.url.length === 0) continue;
+      if (typeof e.at !== "number" || now - e.at >= IMAGE_URL_TTL_MS) continue;
+      cache.set(e.k, e.url);
+      cachedAt.set(e.k, e.at);
+    }
+  } catch {
+    /* corrupt mirror — ignore; the next flush rewrites it */
+  }
+}
+
+if (typeof window !== "undefined") hydrateImageUrlCache();
+
 // ---------------------------------------------------------------------------
 // Request batcher: cover grids mount dozens of StorageImage instances in one
 // render pass. Without batching each one fired its own signImageUrl RPC
@@ -86,12 +138,14 @@ async function flushBatch(): Promise<void> {
       const url = urls[key];
       if (typeof url === "string" && url.length > 0) {
         cache.set(key, url);
+        cachedAt.set(key, Date.now());
         for (const item of waiters.get(key)!) item.resolve(url);
       } else {
         const err = new Error(`Failed to sign image: ${key}`);
         for (const item of waiters.get(key)!) item.reject(err);
       }
     }
+    persistImageUrlCache();
   } catch (err) {
     for (const key of current) {
       for (const item of waiters.get(key)!) item.reject(err);
@@ -136,6 +190,8 @@ export function invalidateImageUrl(bucket: ImageBucket, path: string | null | un
   if (!path || isAbsolute(path)) return;
   const key = `${bucket}:${path}`;
   cache.delete(key);
+  cachedAt.delete(key);
+  persistImageUrlCache();
   inflight.delete(key);
   // Also drop any request still sitting in the batch window so a stale
   // entry can't re-populate the cache after invalidate. Rejected (not left

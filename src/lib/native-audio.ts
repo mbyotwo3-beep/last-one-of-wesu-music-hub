@@ -23,6 +23,21 @@ export interface NativeTrackMetadata {
   artworkUrl?: string;
 }
 
+// The plugin module was re-imported on EVERY call (preload/play/pause/seek…).
+// Each dynamic import is an async hop through the bundler's chunk loader —
+// dead latency on the play path and on every bridge command. Modules cache,
+// so keep one promise. A transient import failure must not poison it.
+let nativeAudioImport: Promise<typeof import("@capgo/native-audio")> | null = null;
+function loadNativeAudio(): Promise<typeof import("@capgo/native-audio")> {
+  if (!nativeAudioImport) {
+    nativeAudioImport = import("@capgo/native-audio").catch((err) => {
+      nativeAudioImport = null; // retry on the next call
+      throw err;
+    });
+  }
+  return nativeAudioImport;
+}
+
 export async function preloadNative(
   id: string,
   url: string,
@@ -30,7 +45,7 @@ export async function preloadNative(
   metadata?: NativeTrackMetadata | null,
 ): Promise<boolean> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.preload({
       assetId: id,
       assetPath: url,
@@ -48,7 +63,7 @@ export async function preloadNative(
 /** Whether an asset id is already loaded natively (pre-warmed or current). */
 export async function isNativePreloaded(id: string): Promise<boolean> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const { found } = await (NativeAudio as any).isPreloaded({ assetId: id });
     return found === true;
   } catch {
@@ -66,7 +81,7 @@ let _configured: boolean | null = null;
 export async function configureNativeAudio(): Promise<boolean> {
   if (_configured !== null) return _configured;
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.configure({
       background: true,
       showNotification: true,
@@ -416,7 +431,7 @@ export function shouldRetryNativePlay(
 
 export async function playNative(id: string): Promise<boolean> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     for (let attempt = 0; ; attempt++) {
       // Re-stamp every attempt: retries can span the reconciler's grace
       // window, and the store must not mistake "still starting" for a
@@ -441,7 +456,7 @@ export async function playNative(id: string): Promise<boolean> {
 export async function resumeNative(id: string): Promise<boolean> {
   markNativeCommand();
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.resume({ assetId: id });
     return true;
   } catch {
@@ -455,7 +470,7 @@ export async function resumeNative(id: string): Promise<boolean> {
 export async function pauseNative(id: string): Promise<void> {
   markNativeCommand();
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.pause({ assetId: id });
   } catch {
     // Silently ignore — HTMLAudioElement fallback handles this
@@ -467,7 +482,7 @@ export async function seekNative(id: string, seconds: number): Promise<void> {
   markNativeCommand();
   if (!Number.isFinite(seconds) || seconds < 0) return;
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.setCurrentTime({ assetId: id, time: seconds });
   } catch {
     /* fallback element handles web */
@@ -484,7 +499,7 @@ export async function setNativeVolume(id: string, volume: number): Promise<void>
   // session is what left the slider at 100% playing at ~0.01.
   await configureNativeAudio();
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     // The plugin documents 0.1–1.0; a 0.01 floor keeps mute effectively
     // silent without risking a range rejection that would leave audio loud.
     const v = clampNativeVolume(volume);
@@ -504,7 +519,7 @@ export function clampNativeVolume(volume: number): number {
 /** Duration in seconds, or null when unknown/unavailable. */
 export async function getNativeDuration(id: string): Promise<number | null> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const { duration } = await NativeAudio.getDuration({ assetId: id });
     return Number.isFinite(duration) && duration > 0 ? duration : null;
   } catch {
@@ -515,7 +530,7 @@ export async function getNativeDuration(id: string): Promise<number | null> {
 /** Current position in seconds, or null when unknown/unavailable. */
 export async function getNativeCurrentTime(id: string): Promise<number | null> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const { currentTime } = await NativeAudio.getCurrentTime({ assetId: id });
     return Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : null;
   } catch {
@@ -526,7 +541,7 @@ export async function getNativeCurrentTime(id: string): Promise<number | null> {
 /** Whether the native asset is currently playing. Null when unknowable. */
 export async function isNativePlaying(id: string): Promise<boolean | null> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const { isPlaying } = await NativeAudio.isPlaying({ assetId: id });
     return typeof isPlaying === "boolean" ? isPlaying : null;
   } catch {
@@ -543,7 +558,7 @@ export async function onNativeTimeUpdate(
   callback: (seconds: number) => void,
 ): Promise<() => void> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const handle = await NativeAudio.addListener("currentTime", (event: any) => {
       if (!event || event.assetId === undefined || event.assetId === assetId) {
         const t = Number(event?.currentTime);
@@ -564,7 +579,7 @@ export async function onNativeTimeUpdate(
  */
 export async function stopNative(id: string): Promise<void> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     await NativeAudio.stop({ assetId: id });
     await NativeAudio.unload({ assetId: id });
   } catch {
@@ -584,7 +599,7 @@ export async function onNativeSkip(
 ): Promise<() => void> {
   const cleanups: Array<() => void> = [];
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const match = (event: any) =>
       !event || event.assetId === undefined || event.assetId === assetId;
     const remove = (handle: any) => () => {
@@ -623,7 +638,7 @@ export async function onNativeRemotePlayState(
 ): Promise<() => void> {
   const cleanups: Array<() => void> = [];
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const match = (event: any) =>
       !event || event.assetId === undefined || event.assetId === assetId;
     const remove = (handle: any) => () => {
@@ -656,7 +671,7 @@ export async function onNativeRemotePlayState(
  */
 export async function onNativeComplete(assetId: string, callback: () => void): Promise<() => void> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const handle = await NativeAudio.addListener("complete", (event: any) => {
       if (!event || event.assetId === undefined || event.assetId === assetId) {
         callback();
@@ -686,7 +701,7 @@ export async function onNativePlaybackError(
   callback: (errorCode: string | null) => void,
 ): Promise<() => void> {
   try {
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     const handle = await (NativeAudio as any).addListener("playbackError", (event: any) => {
       if (!event || event.assetId === undefined || event.assetId === assetId) {
         callback(event?.errorCode ?? null);
@@ -709,7 +724,7 @@ export async function isNativeAudioAvailable(): Promise<boolean> {
     if (typeof window === "undefined") return false;
     const registered = (window as any).Capacitor?.Plugins?.NativeAudio;
     if (!registered) return false;
-    const { NativeAudio } = await import("@capgo/native-audio");
+    const { NativeAudio } = await loadNativeAudio();
     return !!NativeAudio;
   } catch {
     return false;

@@ -29,7 +29,10 @@
  *   navigation  -> network first, fall back to the last good copy of that route
  *   /assets/*   -> cache first (filenames contain a content hash, so they are
  *                  immutable and a cached one is always correct)
- *   everything else (API, Supabase, Lenco, signed audio URLs)
+ *   images      -> cache first, cross-origin only, bounded (covers and hero
+ *                  banners were re-downloaded on every app start; the client
+ *                  reuses the same resolved URL across reloads)
+ *   everything else (API, Supabase non-image, Lenco, signed audio URLs)
  *               -> NEVER cached. Music bytes must not be served stale, and
  *                  purchase state must never come from a cache.
  *
@@ -40,10 +43,11 @@
  * Signed audio URLs are single-use and expire, so they are excluded explicitly.
  */
 
-const VERSION = "v6";
+const VERSION = "v7";
 const SHELL_CACHE = `wesu-shell-${VERSION}`;
 const ASSET_CACHE = `wesu-assets-${VERSION}`;
-const KEEP = new Set([SHELL_CACHE, ASSET_CACHE]);
+const IMAGE_CACHE = `wesu-images-${VERSION}`;
+const KEEP = new Set([SHELL_CACHE, ASSET_CACHE, IMAGE_CACHE]);
 
 /** Routes worth keeping a fallback copy of. */
 const SHELL_PATHS = ["/", "/browse", "/downloads", "/library", "/liked-songs", "/search", "/albums", "/artists"];
@@ -69,6 +73,38 @@ function isImmutableAsset(url) {
     (url.pathname.startsWith("/assets/") ||
       /\.(js|css|woff2?|png|jpg|jpeg|webp|svg|ico)$/i.test(url.pathname))
   );
+}
+
+// --- cover/hero images: the YouTube-Music-style "artwork is just there" ---
+// Covers, artist photos and hero banners were re-downloaded on EVERY app
+// start: signed URLs are minted fresh per session, so each start busted any
+// HTTP cache. Public bucket URLs and the app-kept URL mirror in
+// localStorage (storage-url.ts) make the same URL come back after a
+// reload — so the service worker can serve the bytes itself, cache-first.
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+const IMAGE_CACHE_MAX = 300;
+
+function isCacheableImageUrl(url) {
+  if (!IMAGE_EXT.test(url.pathname)) return false;
+  // Private (authenticating) Supabase objects: never serve from a cache.
+  if (url.pathname.includes("/object/auth/")) return false;
+  if (/\/api\//.test(url.pathname)) return false;
+  if (/lenco/i.test(url.href) || url.href.includes("/signed-url")) return false;
+  return true;
+}
+
+/** Bound the image cache (LRU-by-insertion): opaque responses can be padded. */
+async function trimImageCache(max) {
+  try {
+    const cache = await caches.open(IMAGE_CACHE);
+    const keys = await cache.keys();
+    if (keys.length <= max) return;
+    for (const key of keys.slice(0, keys.length - max)) {
+      await cache.delete(key);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 async function putShell(request, response) {
@@ -165,6 +201,47 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+
+  // --- cover/hero images: cache first (cross-origin only). The app keeps
+  // resolved image URLs in localStorage, so the SAME url is requested again
+  // after a reload and a cached copy is always the right artwork. Same-origin
+  // files stay with the hashed-asset cache below. Bounded by trimImageCache.
+  if (url.origin !== self.location.origin && isCacheableImageUrl(url)) {
+    event.respondWith(
+      (async () => {
+        let cache;
+        try {
+          cache = await caches.open(IMAGE_CACHE);
+        } catch (cacheErr) {
+          console.warn("sw image cache unavailable", cacheErr);
+          try {
+            return await fetch(request);
+          } catch {
+            return new Response("", { status: 504, statusText: "Offline" });
+          }
+        }
+        const hit = await cache.match(request);
+        if (hit) return hit;
+        try {
+          const res = await fetch(request);
+          // 200 = normal; opaque = cross-origin <img>/CSS load, which is how
+          // covers are requested. Both are safe to reuse for artwork.
+          if (res && (res.status === 200 || res.type === "opaque")) {
+            try {
+              await cache.put(request, res.clone());
+              void trimImageCache(IMAGE_CACHE_MAX);
+            } catch {
+              /* quota or put rejection — the network response still returns */
+            }
+          }
+          return res;
+        } catch (err) {
+          return new Response("", { status: 504, statusText: "Offline" });
+        }
+      })(),
+    );
+    return;
+  }
 
   // Never intercept music, purchases, or the API.
   if (shouldNeverCache(url)) return;

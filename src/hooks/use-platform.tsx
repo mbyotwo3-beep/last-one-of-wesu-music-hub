@@ -8,16 +8,27 @@ export type Platform = "web" | "native";
  * integrations rather than maintaining separate feature implementations.
  */
 export function usePlatform(): Platform {
-  const [platform, setPlatform] = useState<Platform>("web");
+  // Synchronous detection, same pattern as useIsMobile below: the WebView
+  // flip after mount used to cost a full wasted audio-resolve chain on
+  // every cold start (the restored track resolved through the HTML engine,
+  // then again through native once the platform state caught up).
+  const [platform, setPlatform] = useState<Platform>(() => {
+    if (typeof window === "undefined") return "web";
+    // Capacitor injects window.Capacitor when running inside the native shell.
+    const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } };
+    return w.Capacitor?.isNativePlatform?.() ? "native" : "web";
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Capacitor injects window.Capacitor when running inside the native shell.
+    if (platform === "native") return;
+    // Late injection fallback (defensive; isNativePlatform is available at
+    // first render on every Capacitor version we ship).
     const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } };
     if (w.Capacitor?.isNativePlatform?.()) {
       setPlatform("native");
     }
-  }, []);
+  }, [platform]);
 
   return platform;
 }

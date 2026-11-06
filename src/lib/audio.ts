@@ -56,9 +56,12 @@ export function primeAudio(): HTMLAudioElement | null {
   }
 }
 
-// In-memory cache for resolved audio URLs to enable 0ms instant playback on repeat plays.
-// Keys are scoped to the listener: an anonymous preview must never be served
-// to a logged-in owner (and vice versa) after login/logout.
+// Resolved-audio-URL cache: a replay, a queue resume or a Next-skip must not
+// pay the sign round trip again. Keys are scoped to the listener — an
+// anonymous preview must never be served to a logged-in owner (and vice
+// versa) after login/logout. The map is mirrored to localStorage so a cold
+// start (the APK WebView reloading the site every launch) resumes the last
+// queue with zero URL round trips while the server-side signature is valid.
 interface CachedUrl {
   url: string;
   previewMode: boolean;
@@ -69,11 +72,82 @@ const audioUrlCache = new Map<string, CachedUrl>();
 
 const cacheKey = (userId: string | null, songId: string) => `${userId ?? "anon"}:${songId}`;
 
+/**
+ * How long a resolved URL may be REUSED, per kind. Deliberately a little
+ * SHORTER than the server-side signature (300s preview / 3600s full) so a
+ * cached URL is never expired by the time it plays. The old 15-minute full
+ * TTL re-paid the round trip for URLs that were still perfectly valid —
+ * every song replayed after 15 minutes stalled on the network for nothing.
+ */
+export function audioUrlTtlMs(previewMode: boolean): number {
+  return previewMode ? 280_000 : 3_300_000;
+}
+
+// --- localStorage mirror (kept on the phone so the next load is fast) ------
+const AUDIO_URL_STORE_KEY = "wesu:audio-url-cache";
+const AUDIO_URL_PERSIST_MAX = 40;
+
+function persistAudioUrlCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const now = Date.now();
+    // Map iteration order is insertion order and set() refreshes it, so the
+    // tail is the most recently used — keep that end.
+    const entries = [...audioUrlCache.entries()]
+      .filter(([, v]) => v.expiresAt > now)
+      .slice(-AUDIO_URL_PERSIST_MAX)
+      .map(([k, v]) => ({ k, ...v }));
+    window.localStorage.setItem(AUDIO_URL_STORE_KEY, JSON.stringify({ v: 1, entries }));
+  } catch {
+    /* quota / private mode — the in-memory map still works */
+  }
+}
+
+/** Re-read the localStorage mirror into memory (init + tests). */
+export function hydrateAudioUrlCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(AUDIO_URL_STORE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      entries?: { k: string; url: string; previewMode: boolean; expiresAt: number }[];
+    };
+    if (!Array.isArray(parsed?.entries)) return;
+    const now = Date.now();
+    for (const e of parsed.entries) {
+      if (!e || typeof e.k !== "string" || typeof e.url !== "string" || e.url.length === 0) continue;
+      if (typeof e.expiresAt !== "number" || e.expiresAt <= now) continue;
+      audioUrlCache.set(e.k, {
+        url: e.url,
+        previewMode: e.previewMode === true,
+        expiresAt: e.expiresAt,
+      });
+    }
+  } catch {
+    /* corrupt mirror — ignore; the next set rewrites it */
+  }
+}
+
+/** Test seam: drop everything (memory + persisted mirror). */
+export function __resetAudioUrlCacheForTests(): void {
+  audioUrlCache.clear();
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(AUDIO_URL_STORE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+if (typeof window !== "undefined") hydrateAudioUrlCache();
+
 export function getCachedAudioUrl(songId: string, userId: string | null): CachedUrl | null {
-  const cached = audioUrlCache.get(cacheKey(userId, songId));
+  const key = cacheKey(userId, songId);
+  const cached = audioUrlCache.get(key);
   if (!cached) return null;
   if (Date.now() > cached.expiresAt) {
-    audioUrlCache.delete(cacheKey(userId, songId));
+    audioUrlCache.delete(key);
+    persistAudioUrlCache();
     return null;
   }
   return cached;
@@ -85,14 +159,12 @@ export function setCachedAudioUrl(
   url: string,
   previewMode: boolean,
 ): void {
-  // Previews are signed for ~5 minutes server-side — cache them shorter so
-  // a replay re-resolves instead of playing an expired URL. Full URLs live 1h.
-  const ttl = previewMode ? 270_000 : 15 * 60 * 1000;
   audioUrlCache.set(cacheKey(userId, songId), {
     url,
     previewMode,
-    expiresAt: Date.now() + ttl,
+    expiresAt: Date.now() + audioUrlTtlMs(previewMode),
   });
+  persistAudioUrlCache();
 }
 
 /**
@@ -105,6 +177,7 @@ export function setCachedAudioUrl(
 export function evictCachedAudioUrlForUser(songId: string, userId: string | null): void {
   audioUrlCache.delete(cacheKey(userId, songId));
   audioUrlCache.delete(cacheKey(null, songId));
+  persistAudioUrlCache();
 }
 
 /** Drop cached URLs for a song (e.g. right after purchase unlocks the full track). */
@@ -112,6 +185,7 @@ export function evictCachedAudioUrl(songId: string): void {
   for (const key of audioUrlCache.keys()) {
     if (key.endsWith(`:${songId}`)) audioUrlCache.delete(key);
   }
+  persistAudioUrlCache();
 }
 
 export type PreviewCapAction = "advance" | "replay" | "wait" | "idle";
