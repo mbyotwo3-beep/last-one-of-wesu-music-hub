@@ -12,7 +12,8 @@ export const getFeaturedAlbums = createServerFn({ method: "GET" }).handler(async
     .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
     .eq("featured", true)
     .eq("status", "approved")
-    .order("release_date", { ascending: false })
+    .order("release_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(12);
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -91,7 +92,8 @@ export const globalSearch = createServerFn({ method: "GET" })
         .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
         .eq("status", "approved")
         .ilike("title", like)
-        .order("release_date", { ascending: false })
+        .order("release_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(limit * 3),
       supabase
         .from("artists")
@@ -188,7 +190,8 @@ export const listAlbums = createServerFn({ method: "GET" }).handler(async () => 
     )
     .eq("status", "approved")
     .eq("songs.status", "approved")
-    .order("release_date", { ascending: false })
+    .order("release_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
 
@@ -239,7 +242,8 @@ export const getArtistById = createServerFn({ method: "GET" })
         .select("id,title,cover_url,release_date,price")
         .eq("artist_id", data.id)
         .eq("status", "approved")
-        .order("release_date", { ascending: false }),
+        .order("release_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false }),
       supabase
         .from("songs")
         .select("id,title,duration,price,cover_url,play_count,album_id")
@@ -453,7 +457,8 @@ export const getRecentAlbums = createServerFn({ method: "GET" }).handler(async (
     .from("albums")
     .select("id,title,cover_url,price,release_date,genre,artist:artists(id,name)")
     .eq("status", "approved")
-    .order("release_date", { ascending: false })
+    .order("release_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -606,7 +611,8 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .select("id,title,cover_url,price,release_date,artist:artists(id,name)")
       .eq("featured", true)
       .eq("status", "approved")
-      .order("release_date", { ascending: false })
+      .order("release_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(6),
     supabase
       .from("songs")
@@ -635,7 +641,8 @@ export const getHomeDiscover = createServerFn({ method: "GET" }).handler(async (
       .from("albums")
       .select("id,title,cover_url,release_date,artist:artists(id,name)")
       .eq("status", "approved")
-      .order("release_date", { ascending: false })
+      .order("release_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(12),
     supabase
       .from("playlists")
