@@ -51,25 +51,27 @@ export function resolveHeroCta(args: {
   return { mode: args.target === "_blank" ? "new-tab" : "same-tab", url };
 }
 
-export type HeroLayout = "full-bleed" | "stacked";
+export type HeroLayout = "full-bleed" | "art-anchored";
 
 /**
  * Pure layout decision for a hero slide (unit-tested).
  *
- * Admin slides often ship as wide promotional banners (e.g. 820×320 ≈ 2.56:1)
- * with the title and artwork baked into the image. On desktop the hero box is
- * 2.4:1 so those banners fit almost exactly. On mobile the hero box is 16:9
- * (1.78:1) and "cover" would center-crop ~30% of the banner's width — cutting
- * the baked artwork mid-subject and colliding with the overlay text.
+ * Admin slides usually ship as wide promotional banners (e.g. 820×320 ≈
+ * 2.56:1) with the title and artwork baked into the RIGHT side of the image
+ * and an empty dark gradient on the left. On desktop the hero box is 2.4:1,
+ * so a center crop barely grazes the design. On mobile the hero box is 16:9
+ * (1.78:1): a CENTER crop would cut ~30% of the width — slicing the baked
+ * artwork mid-subject and the baked title in half.
  *
- * So on mobile a slide whose image is at least 1.9:1 — or a video slide,
- * whose iframe has no natural shape to preserve — renders STACKED: the full
- * uncropped media on top and the title/description/CTA in a block below it.
- * Square artwork (the system-generated hero's album art) and desktop keep
- * the full-bleed overlay look.
+ * So on mobile a slide whose image is at least 1.9:1 is painted ANCHORED to
+ * its art side ("right center"): the box is still filled edge to edge exactly
+ * like desktop, the artwork and baked title survive intact, and only the
+ * banner's empty left strip is cropped — the overlay text takes that space,
+ * just as it does on desktop. Square artwork (the system hero's album art)
+ * and desktop keep the plain centered cover.
  *
  * An unknown ratio (the image has not been measured yet, or the probe
- * failed) always returns "full-bleed": that is today's box, and it keeps
+ * failed) always returns "full-bleed": that is the plain cover, and it keeps
  * server-rendered and first-client-render markup identical (the ratio only
  * becomes known after hydration, when the image probe completes).
  */
@@ -77,11 +79,10 @@ export function resolveHeroLayout(args: {
   /** Natural image ratio (width / height). null when not yet measured. */
   ratio: number | null;
   isMobile: boolean;
-  hasVideo: boolean;
 }): HeroLayout {
   if (!args.isMobile) return "full-bleed";
   if (args.ratio === null || args.ratio <= 0) return "full-bleed";
-  return args.hasVideo || args.ratio >= 1.9 ? "stacked" : "full-bleed";
+  return args.ratio >= 1.9 ? "art-anchored" : "full-bleed";
 }
 
 interface HeroCarouselProps {
@@ -112,7 +113,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   // Mobile viewports stack wide admin banners instead of cropping them.
   const isMobile = useIsMobile();
   // Natural aspect ratio (width / height) per slide id, measured once the
-  // signed URL is known. Decides stacked vs full-bleed on mobile.
+  // signed URL is known. Decides the mobile background anchor.
   const [imageRatios, setImageRatios] = useState<Map<string, number>>(new Map());
   const ratioProbedRef = useRef<Map<string, string>>(new Map());
 
@@ -219,7 +220,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
 
   // Measure each slide image's natural aspect ratio once its URL is known.
   // Admin banners are often very wide (e.g. 820×320 ≈ 2.56:1); that ratio is
-  // what decides stacked vs full-bleed on mobile (resolveHeroLayout). Probes
+  // what decides the mobile background anchor (resolveHeroLayout). Probes
   // are deduped per slide+URL so re-renders and signed-URL refreshes never
   // re-measure an unchanged image.
   useEffect(() => {
@@ -274,25 +275,15 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   }
 
   const currentRatio = imageRatios.get(currentSlide.id) ?? null;
-  const hasVideo = !!currentSlide.videoUrl;
 
-  // Stacked (media on top, text below) vs full-bleed (text overlay) — see
-  // resolveHeroLayout. Desktop and square-art slides keep the original look.
-  const layout = resolveHeroLayout({ ratio: currentRatio, isMobile, hasVideo });
+  // Where the background anchors. Wide admin banners keep their artwork side
+  // (see resolveHeroLayout); everything else centers as it always has.
+  const layout = resolveHeroLayout({ ratio: currentRatio, isMobile });
+  const bgPosition = layout === "art-anchored" ? "right center" : "center";
 
-  // Cross-fading slide layers, shared by both layouts.
-  //
-  //   "dim"  — the full-bleed overlay look: art is cropped to fill the box
-  //            and darkened so the overlay text stays readable.
-  //
-  //   "fill" — the stacked card's media block: the box must never show a
-  //            blank band, and the banner must never be cropped. A blurred,
-  //            scaled copy of the image fills the whole box; the sharp image
-  //            sits complete (contain) on top of it. A wide banner therefore
-  //            spans the full width with its own blurred artwork filling the
-  //            bands above and below — the way YouTube and Apple Music treat
-  //            artwork that does not match the box.
-  const renderLayers = (mode: "dim" | "fill") => (
+  // Cross-fading slide layers. Both layouts carry the left gradient: the
+  // overlay text sits over it, on mobile and desktop alike.
+  const renderLayers = () => (
     <>
       {slides.map((slide, idx) => {
         const isCurrent = idx === currentIndex;
@@ -319,37 +310,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                   allowFullScreen
                   style={{ pointerEvents: "none" }}
                 />
-                {mode === "dim" && <div className="absolute inset-0 bg-black/60" />}
+                <div className="absolute inset-0 bg-black/60" />
               </div>
-            ) : mode === "fill" ? (
-              paintable ? (
-                <div className="absolute inset-0 overflow-hidden">
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backgroundImage: `url(${signedUrl})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      filter: "blur(28px)",
-                      // The blur bleeds past the element's edge; scaling the
-                      // layer hides the soft border entirely.
-                      transform: "scale(1.35)",
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/20" />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backgroundImage: `url(${signedUrl})`,
-                      backgroundSize: "contain",
-                      backgroundPosition: "center",
-                      backgroundRepeat: "no-repeat",
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="absolute inset-0 bg-secondary" />
-              )
             ) : (
               <div
                 className="absolute inset-0"
@@ -358,14 +320,12 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                     ? {
                         backgroundImage: `url(${signedUrl})`,
                         backgroundSize: "cover",
-                        backgroundPosition: "center",
+                        backgroundPosition: bgPosition,
                       }
                     : undefined
                 }
               >
-                {mode === "dim" && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
               </div>
             )}
           </div>
@@ -467,42 +427,9 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     </div>
   );
 
-  // MOBILE STACKED LAYOUT — wide admin banners (and video) show the media
-  // full and the text in a block below, inside the same rounded card. The
-  // media box is a 16:9 stage that is ALWAYS completely filled: the artwork
-  // appears in full (never cropped) over a blurred copy of itself, so no
-  // admin image geometry can leave a blank band.
-  if (layout === "stacked") {
-    return (
-      <div
-        className="relative w-full overflow-hidden rounded-2xl mb-8 bg-card ring-1 ring-white/5"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-      >
-        <div className="relative w-full overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
-          {renderLayers("fill")}
-          {renderArrows()}
-          {renderPauseButton()}
-          {renderProgress()}
-          {renderDots()}
-        </div>
-
-        <div className="px-6 py-5">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">
-            {currentSlide.title}
-          </h2>
-          {currentSlide.description ? (
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-              {currentSlide.description}
-            </p>
-          ) : null}
-          {renderCta()}
-        </div>
-      </div>
-    );
-  }
-
-  // FULL-BLEED LAYOUT — desktop, and mobile slides with square-ish artwork.
+  // FULL-BLEED LAYOUT — the one hero, desktop and mobile alike. Wide admin
+  // banners on mobile anchor to their art side (bgPosition above) so the box
+  // is filled edge to edge without slicing the baked artwork.
   return (
     <div
       className="relative w-full aspect-[16/9] md:aspect-[2.4/1] overflow-hidden rounded-2xl mb-8"
@@ -510,7 +437,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Background with video or image cross-fade */}
-      <div className="absolute inset-0">{renderLayers("dim")}</div>
+      <div className="absolute inset-0">{renderLayers()}</div>
 
       {/* Content */}
       <div className="absolute inset-0 flex items-center px-8 md:px-12 lg:px-16">
