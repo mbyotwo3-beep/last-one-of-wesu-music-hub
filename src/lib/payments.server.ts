@@ -282,6 +282,10 @@ export async function settleTransaction(
     current.item_type !== "album" &&
     current.item_type !== "playlist"
   ) {
+    // Ticket orders ride this shared ledger but belong to the tickets app —
+    // its checkout poller settles them directly against Lenco. Never mark a
+    // foreign transaction failed here: the money may already have arrived.
+    if (current.item_type === "ticket_order") return "processing";
     await supabaseAdmin
       .from("payment_transactions")
       .update({ status: "failed", provider_ref: providerRef ?? null } as any)

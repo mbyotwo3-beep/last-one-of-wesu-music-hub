@@ -88,6 +88,34 @@ export const Route = createFileRoute("/api/public/lenco-webhook")({
           return new Response("OK", { status: 200 });
         }
 
+        // Shared Lenco account: ticket-order events belong to the tickets app
+        // (wesuplusly.com). Forward them untouched — same API token means the
+        // signature verifies on the other side as well — instead of letting
+        // the song/album settle logic touch them. The tickets checkout poller
+        // settles directly against Lenco as the backstop either way.
+        if ((row as any).item_type === "ticket_order") {
+          const target = process.env.TICKETS_WEBHOOK_URL?.trim();
+          if (target) {
+            try {
+              await fetch(target, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(signature ? { "x-lenco-signature": signature } : {}),
+                },
+                body: rawBody,
+              });
+            } catch (err) {
+              console.error("[Lenco webhook] ticket_order forward failed:", err);
+            }
+          } else {
+            console.warn(
+              "[Lenco webhook] ticket_order event but TICKETS_WEBHOOK_URL is not set — leaving it for the tickets checkout poller",
+            );
+          }
+          return new Response("OK", { status: 200 });
+        }
+
         const isSuccess =
           event.endsWith(".successful") || tx.status === "successful" || tx.status === "success";
         // "cancelled" must count as failure — previously it fell through and
