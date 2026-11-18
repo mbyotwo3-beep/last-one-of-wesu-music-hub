@@ -42,6 +42,10 @@ export const getPlatformStats = createServerFn({ method: "GET" })
         .from("payment_transactions")
         .select("amount")
         .eq("status", "completed")
+        // Music revenue only — the shared ledger also carries ticket orders
+        // from the events platform (item_type 'ticket_order'); summing those
+        // here would inflate this dashboard with another product's money.
+        .in("item_type", ["song", "album", "playlist"])
         .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
       supabaseAdmin
         .from("artists")
@@ -77,6 +81,9 @@ export const getRecentActivity = createServerFn({ method: "GET" })
       supabaseAdmin
         .from("payment_transactions")
         .select("id,amount,method_code,status,created_at")
+        // This feed is the music store's activity — keep events-platform
+        // ticket orders out of it (shared payment_transactions ledger).
+        .in("item_type", ["song", "album", "playlist"])
         .order("created_at", { ascending: false })
         .limit(5),
     ]);

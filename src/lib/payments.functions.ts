@@ -193,6 +193,11 @@ export const verifyPayment = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (!tx) return { status: "not_found" as const };
+    // The shared ledger also carries events-platform ticket orders. A music
+    // checkout page must never reconcile (or display) one of those.
+    if (tx.item_type !== "song" && tx.item_type !== "album" && tx.item_type !== "playlist") {
+      return { status: "not_found" as const };
+    }
     if (tx.status === "completed" || tx.status === "failed") {
       return { status: tx.status as string, transaction: tx };
     }

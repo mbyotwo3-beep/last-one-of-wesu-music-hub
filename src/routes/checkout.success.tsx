@@ -66,6 +66,8 @@ function CheckoutSuccessPage() {
         .from("payment_transactions")
         .select("*")
         .eq("id", ref)
+        // Music receipts only — ticket orders share this ledger.
+        .in("item_type", ["song", "album", "playlist"])
         .maybeSingle();
       return data;
     },

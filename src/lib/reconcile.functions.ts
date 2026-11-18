@@ -13,6 +13,15 @@ import { isStaffUser } from "./roles";
 
 const STUCK_STATUSES = ["pending", "processing", "fulfillment_failed"] as const;
 
+/**
+ * The shared payment_transactions ledger also carries the events platform's
+ * ticket orders (item_type 'ticket_order'). Every staff view and mutation in
+ * this file must stay inside the music store's own rows: mixing them would
+ * show ticket money in this dashboard and — worse — let a blind cancel mark
+ * a ticket payment failed while the buyer's money may already have arrived.
+ */
+const MUSIC_ITEM_TYPES = ["song", "album", "playlist"] as const;
+
 export type StuckTransaction = {
   id: string;
   amount: number;
@@ -43,6 +52,7 @@ export const listStuckTransactions = createServerFn({ method: "GET" })
       .from("payment_transactions")
       .select("*")
       .in("status", STUCK_STATUSES as unknown as string[])
+      .in("item_type", MUSIC_ITEM_TYPES as unknown as string[])
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
@@ -100,6 +110,7 @@ export const reconcileTransaction = createServerFn({ method: "POST" })
       .from("payment_transactions")
       .select("*")
       .eq("id", data.transactionId)
+      .in("item_type", MUSIC_ITEM_TYPES as unknown as string[])
       .maybeSingle();
     if (!tx) throw new Error("Transaction not found");
 
@@ -118,6 +129,7 @@ export const reconcileAllTransactions = createServerFn({ method: "POST" })
       .from("payment_transactions")
       .select("*")
       .in("status", STUCK_STATUSES as unknown as string[])
+      .in("item_type", MUSIC_ITEM_TYPES as unknown as string[])
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -161,6 +173,7 @@ export const cancelStuckTransaction = createServerFn({ method: "POST" })
       .from("payment_transactions")
       .update({ status: "failed", updated_at: new Date().toISOString() })
       .eq("id", data.transactionId)
+      .in("item_type", MUSIC_ITEM_TYPES as unknown as string[])
       .in("status", ["pending", "processing"]);
     if (error) throw new Error(error.message);
 
@@ -195,6 +208,7 @@ export const listAllTransactions = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("payment_transactions")
       .select("*")
+      .in("item_type", MUSIC_ITEM_TYPES as unknown as string[])
       .order("created_at", { ascending: false })
       .limit(Math.min(data.limit ?? 200, 500));
     if (data.status && data.status !== "all") q = q.eq("status", data.status);
